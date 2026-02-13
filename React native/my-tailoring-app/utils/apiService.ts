@@ -1,10 +1,9 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Debug: Log environment variable
 console.log('ENV API URL:', process.env.EXPO_PUBLIC_API_BASE_URL);
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.202:5000/api';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.254.120:5000/api';
 console.log('Using API_BASE_URL:', API_BASE_URL);
 const REQUEST_TIMEOUT = parseInt(process.env.EXPO_PUBLIC_REQUEST_TIMEOUT || '10000', 10);
 
@@ -157,6 +156,35 @@ export const authService = {
         'Authorization': token ? `Bearer ${token}` : '',
       },
       body: formData,
+    });
+  },
+
+  // Password Reset Functions
+  forgotPassword: async (usernameOrEmail: string) => {
+    return apiCall('/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ usernameOrEmail }),
+    });
+  },
+
+  verifyResetCode: async (code: string, usernameOrEmail: string) => {
+    return apiCall('/verify-reset-code', {
+      method: 'POST',
+      body: JSON.stringify({ code, usernameOrEmail }),
+    });
+  },
+
+  resetPassword: async (resetToken: string, newPassword: string, confirmPassword: string) => {
+    return apiCall('/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ resetToken, newPassword, confirmPassword }),
+    });
+  },
+
+  resendResetCode: async (usernameOrEmail: string) => {
+    return apiCall('/resend-reset-code', {
+      method: 'POST',
+      body: JSON.stringify({ usernameOrEmail }),
     });
   }
 };

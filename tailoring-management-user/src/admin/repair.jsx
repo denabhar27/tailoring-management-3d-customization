@@ -739,7 +739,11 @@ const Repair = () => {
                         `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'N/A'
                       )}
                     </td>
-                    <td>{item.specific_data?.garmentType || 'N/A'}</td>
+                    <td>
+                      {item.specific_data?.garments && item.specific_data.garments.length > 0 
+                        ? `${item.specific_data.garments.length} garment${item.specific_data.garments.length > 1 ? 's' : ''}`
+                        : (item.specific_data?.garmentType || 'N/A')}
+                    </td>
                     <td><span style={{ fontSize: '0.9em', color: '#d32f2f' }}>{item.specific_data?.serviceName || 'N/A'}</span></td>
                     <td>{new Date(item.order_date).toLocaleDateString()}</td>
                     <td>₱{parseFloat(item.final_price || 0).toLocaleString()}</td>
@@ -1024,9 +1028,26 @@ const Repair = () => {
                   )}
                 </>
               )}
-              <div className="detail-row"><strong>Garment:</strong> {selectedOrder.specific_data?.garmentType || 'N/A'}</div>
-              <div className="detail-row"><strong>Service:</strong> {selectedOrder.specific_data?.serviceName || 'N/A'}</div>
-              <div className="detail-row"><strong>Damage Level:</strong> {selectedOrder.specific_data?.damageLevel || 'N/A'}</div>
+              {/* Multiple garments support */}
+              {selectedOrder.specific_data?.garments && selectedOrder.specific_data.garments.length > 0 ? (
+                <>
+                  <div className="detail-row"><strong>Garments:</strong> {selectedOrder.specific_data.garments.length} item{selectedOrder.specific_data.garments.length > 1 ? 's' : ''}</div>
+                  {selectedOrder.specific_data.garments.map((garment, idx) => (
+                    <div key={idx} style={{ marginLeft: '20px', paddingLeft: '10px', borderLeft: '2px solid #e0e0e0', marginBottom: '10px' }}>
+                      <div className="detail-row"><strong>Garment #{idx + 1}:</strong> {garment.garmentType || 'N/A'}</div>
+                      <div className="detail-row"><strong>Damage Level:</strong> {garment.damageLevel ? garment.damageLevel.charAt(0).toUpperCase() + garment.damageLevel.slice(1) : 'N/A'}</div>
+                      <div className="detail-row"><strong>Description:</strong> {garment.notes || 'N/A'}</div>
+                      <div className="detail-row"><strong>Price:</strong> ₱{garment.basePrice || 'N/A'}</div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <div className="detail-row"><strong>Garment:</strong> {selectedOrder.specific_data?.garmentType || 'N/A'}</div>
+                  <div className="detail-row"><strong>Service:</strong> {selectedOrder.specific_data?.serviceName || 'N/A'}</div>
+                  <div className="detail-row"><strong>Damage Level:</strong> {selectedOrder.specific_data?.damageLevel || 'N/A'}</div>
+                </>
+              )}
               
               {selectedOrder.specific_data?.imageUrl && (
                 <div className="detail-row">

@@ -497,3 +497,30 @@
 .clickable-image:hover .click-hint {
   color: #007bff;
 }
+
+/* Multiple garments in cart styles */
+.garments-header-cart {
+  margin: 8px 0 4px 0;
+  color: #8D6E63;
+  font-size: 0.9rem;
+}
+
+.garment-item-cart {
+  background: #f8f5f2;
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin: 4px 0;
+  border-left: 3px solid #8D6E63;
+}
+
+.garment-item-cart p {
+  margin: 2px 0;
+  font-size: 0.85rem;
+  color: #5D4037;
+}
+
+.garment-notes {
+  color: #888 !important;
+  font-style: italic;
+  font-size: 0.8rem !important;
+}

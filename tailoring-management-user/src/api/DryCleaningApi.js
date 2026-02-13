@@ -76,15 +76,19 @@ export async function addDryCleaningToCart(dryCleaningData) {
       },
       specificData: {
         serviceName: dryCleaningData.serviceName,
-        brand: dryCleaningData.brand,
         notes: dryCleaningData.notes,
         imageUrl: dryCleaningData.imageUrl,
         pickupDate: dryCleaningData.pickupDate,
         quantity: dryCleaningData.quantity,
-        garmentType: dryCleaningData.garmentType,
         isEstimatedPrice: dryCleaningData.isEstimatedPrice || false,
-        pricePerItem: dryCleaningData.pricePerItem,
-        uploadedAt: new Date().toISOString()
+        uploadedAt: new Date().toISOString(),
+        // Multiple garments support
+        garments: dryCleaningData.garments || [],
+        isMultipleGarments: dryCleaningData.isMultipleGarments || false,
+        // Legacy single-garment fields (for backwards compatibility)
+        garmentType: dryCleaningData.garments?.[0]?.garmentType || dryCleaningData.garmentType,
+        brand: dryCleaningData.garments?.[0]?.brand || dryCleaningData.brand,
+        pricePerItem: dryCleaningData.garments?.[0]?.pricePerItem || dryCleaningData.pricePerItem
       }
     };
 

@@ -108,6 +108,114 @@ const User = {
       WHERE user_id = ?
     `;
     db.query(sql, [first_name, last_name, email, phone_number, status, userId], callback);
+  },
+
+  // Password Reset Methods
+  
+  /**
+   * Store reset code for a user
+   * @param {number} userId - User ID
+   * @param {string} resetCode - 6-character security code
+   * @param {Date} expiresAt - Expiration timestamp
+   * @param {function} callback - Callback function
+   */
+  setResetCode: (userId, resetCode, expiresAt, callback) => {
+    const sql = `
+      UPDATE user 
+      SET reset_code = ?, 
+          reset_code_expires = ?, 
+          reset_attempts = 0,
+          reset_last_attempt = NOW()
+      WHERE user_id = ?
+    `;
+    db.query(sql, [resetCode, expiresAt, userId], callback);
+  },
+
+  /**
+   * Find user by reset code
+   * @param {string} resetCode - Security code
+   * @param {function} callback - Callback function
+   */
+  findByResetCode: (resetCode, callback) => {
+    const sql = `
+      SELECT user_id, username, email, first_name, last_name, 
+             reset_code, reset_code_expires, reset_attempts 
+      FROM user 
+      WHERE reset_code = ? AND reset_code_expires > NOW()
+    `;
+    db.query(sql, [resetCode], callback);
+  },
+
+  /**
+   * Increment reset attempts counter
+   * @param {number} userId - User ID
+   * @param {function} callback - Callback function
+   */
+  incrementResetAttempts: (userId, callback) => {
+    const sql = `
+      UPDATE user 
+      SET reset_attempts = reset_attempts + 1,
+          reset_last_attempt = NOW()
+      WHERE user_id = ?
+    `;
+    db.query(sql, [userId], callback);
+  },
+
+  /**
+   * Clear reset code after successful password reset
+   * @param {number} userId - User ID
+   * @param {function} callback - Callback function
+   */
+  clearResetCode: (userId, callback) => {
+    const sql = `
+      UPDATE user 
+      SET reset_code = NULL, 
+          reset_code_expires = NULL, 
+          reset_attempts = 0,
+          reset_last_attempt = NULL
+      WHERE user_id = ?
+    `;
+    db.query(sql, [userId], callback);
+  },
+
+  /**
+   * Update user password
+   * @param {number} userId - User ID
+   * @param {string} hashedPassword - Bcrypt hashed password
+   * @param {function} callback - Callback function
+   */
+  updatePassword: (userId, hashedPassword, callback) => {
+    const sql = `UPDATE user SET password = ? WHERE user_id = ?`;
+    db.query(sql, [hashedPassword, userId], callback);
+  },
+
+  /**
+   * Check if user has exceeded rate limit for password resets
+   * @param {number} userId - User ID
+   * @param {function} callback - Callback function
+   */
+  checkResetRateLimit: (userId, callback) => {
+    const sql = `
+      SELECT reset_attempts, reset_last_attempt 
+      FROM user 
+      WHERE user_id = ?
+    `;
+    db.query(sql, [userId], callback);
+  },
+
+  /**
+   * Find user by username or email for password reset
+   * @param {string} usernameOrEmail - Username or email
+   * @param {function} callback - Callback function
+   */
+  findByUsernameOrEmail: (usernameOrEmail, callback) => {
+    const sql = `
+      SELECT user_id, username, email, first_name, last_name, 
+             reset_attempts, reset_last_attempt
+      FROM user 
+      WHERE username = ? OR email = ?
+    `;
+    db.query(sql, [usernameOrEmail, usernameOrEmail], callback);
   }
 
 };

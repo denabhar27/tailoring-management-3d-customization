@@ -6,10 +6,12 @@ import '../../styles/RepairFormModal.css';
 import '../../styles/SharedModal.css';
 
 const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
+  // Multiple garments support - array of garment items
+  const [garments, setGarments] = useState([
+    { id: 1, damageLevel: '', garmentType: '', notes: '' }
+  ]);
+
   const [formData, setFormData] = useState({
-    damageLevel: '',
-    garmentType: '',
-    notes: '',
     date: '',
     time: ''
   });
@@ -76,10 +78,12 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   useEffect(() => {
-    if (formData.damageLevel) {
+    if (garments.some(g => g.damageLevel)) {
       calculateEstimatedPrice();
+    } else {
+      setEstimatedPrice(0);
     }
-  }, [formData.damageLevel, formData.garmentType, repairGarmentTypes]);
+  }, [garments, repairGarmentTypes]);
 
   useEffect(() => {
     if (formData.date) {
@@ -132,12 +136,12 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   useEffect(() => {
     if (!isOpen) {
       setFormData({
-        damageLevel: '',
-        garmentType: '',
-        notes: '',
         date: '',
         time: ''
       });
+      setGarments([
+        { id: 1, damageLevel: '', garmentType: '', notes: '' }
+      ]);
       setAllTimeSlots([]);
       setAvailableTimeSlots([]);
       setIsShopOpen(true);
@@ -150,7 +154,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   }, [isOpen]);
 
   const calculateEstimatedPrice = async () => {
-    if (!formData.damageLevel) {
+    if (!garments.some(g => g.damageLevel)) {
       setEstimatedPrice(0);
       return;
     }
@@ -158,25 +162,43 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     setPriceLoading(true);
     
     try {
+      let totalPrice = 0;
       
-      const damageLevel = damageLevels.find(level => level.value === formData.damageLevel);
-      let basePrice = damageLevel ? damageLevel.basePrice : 500;
-
-      const finalPrice = basePrice;
-      setEstimatedPrice(finalPrice);
-
-      try {
-        const apiResult = await getPriceEstimate(formData.damageLevel);
-        if (apiResult.success && apiResult.data.length > 0) {
-          console.log('API price estimate available:', apiResult.data);
+      garments.forEach(garment => {
+        if (garment.damageLevel) {
+          const damageLevel = damageLevels.find(level => level.value === garment.damageLevel);
+          const basePrice = damageLevel ? damageLevel.basePrice : 500;
+          totalPrice += basePrice;
         }
-      } catch (apiError) {
-        console.log('API price estimate not available, using local calculation');
-      }
+      });
+
+      setEstimatedPrice(totalPrice);
     } catch (error) {
       console.error('Price calculation error:', error);
     } finally {
       setPriceLoading(false);
+    }
+  };
+
+  // Garment management functions
+  const addGarment = () => {
+    const newId = Math.max(...garments.map(g => g.id)) + 1;
+    setGarments([...garments, { id: newId, damageLevel: '', garmentType: '', notes: '' }]);
+  };
+
+  const removeGarment = (id) => {
+    if (garments.length > 1) {
+      setGarments(garments.filter(g => g.id !== id));
+    }
+  };
+
+  const updateGarment = (id, field, value) => {
+    setGarments(garments.map(g => 
+      g.id === id ? { ...g, [field]: value } : g
+    ));
+    // Clear error for this field
+    if (errors[`garment_${id}_${field}`]) {
+      setErrors(prev => ({ ...prev, [`garment_${id}_${field}`]: '' }));
     }
   };
 
@@ -297,15 +319,19 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.damageLevel) {
-      newErrors.damageLevel = 'Please select a damage level';
-    }
-    if (!formData.garmentType) {
-      newErrors.garmentType = 'Please select a garment type';
-    }
-    if (!formData.notes || formData.notes.trim() === '') {
-      newErrors.notes = 'Please provide a detailed description';
-    }
+    // Validate each garment
+    garments.forEach((garment, index) => {
+      if (!garment.damageLevel) {
+        newErrors[`garment_${garment.id}_damageLevel`] = 'Please select a damage level';
+      }
+      if (!garment.garmentType) {
+        newErrors[`garment_${garment.id}_garmentType`] = 'Please select a garment type';
+      }
+      if (!garment.notes || garment.notes.trim() === '') {
+        newErrors[`garment_${garment.id}_notes`] = 'Please provide a detailed description';
+      }
+    });
+
     if (!formData.date) {
       newErrors.date = 'Please select a drop off date';
     }
@@ -374,20 +400,32 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
       const pickupDateTime = `${formData.date}T${formData.time}`;
 
+      // Build garments array for submission
+      const garmentsData = garments.map(garment => {
+        const damageLevel = damageLevels.find(level => level.value === garment.damageLevel);
+        const basePrice = damageLevel ? damageLevel.basePrice : 500;
+
+        return {
+          damageLevel: garment.damageLevel,
+          garmentType: garment.garmentType,
+          notes: garment.notes,
+          basePrice: basePrice
+        };
+      });
+
       const repairData = {
         serviceId: 1,
-        serviceName: `${formData.damageLevel} Repair`,
+        serviceName: `Repair Service`,
         basePrice: estimatedPrice.toString(),
         estimatedPrice: estimatedPrice.toString(),
-        damageLevel: formData.damageLevel,
-        damageDescription: formData.notes,
-        damageLocation: formData.garmentType,
-        garmentType: formData.garmentType,
         pickupDate: pickupDateTime,
-        imageUrl: imageUrl || 'no-image'
+        imageUrl: imageUrl || 'no-image',
+        garments: garmentsData,
+        isMultipleGarments: garments.length > 1
       };
 
       console.log('Repair data to send:', repairData);
+      console.log('Garments:', garmentsData);
 
       const result = await addRepairToCart(repairData);
       console.log('Add to cart result:', result);
@@ -432,14 +470,17 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const handleClose = () => {
     setFormData({
-      damageLevel: '',
-      garmentType: '',
-      notes: '',
-      datetime: ''
+      date: '',
+      time: ''
     });
+    setGarments([
+      { id: 1, damageLevel: '', garmentType: '', notes: '' }
+    ]);
     setImageFile(null);
+    setImagePreview('');
     setMessage('');
     setEstimatedPrice(0);
+    setErrors({});
     onClose();
   };
 
@@ -454,78 +495,99 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="modal-content-shared">
-          <div className="form-group-shared">
-            <label htmlFor="damageLevel" className="form-label-shared">
-              👔 Damage Level <span className="required-indicator">*</span>
-            </label>
-            <select
-              id="damageLevel"
-              name="damageLevel"
-              value={formData.damageLevel}
-              onChange={handleInputChange}
-              className={`form-select-shared ${errors.damageLevel ? 'error' : ''}`}
-              required
-            >
-              <option value="">Select damage level</option>
-              {damageLevels.map(level => (
-                <option key={level.value} value={level.value}>
-                  {level.label}
-                </option>
-              ))}
-            </select>
-            <div className="help-text-shared" style={{ marginTop: '12px' }}>
-              {damageLevels.map(level => (
-                <div key={level.value} style={{ marginBottom: '8px' }}>
-                  <strong>{level.label}:</strong> {level.description}
-                </div>
-              ))}
+          {/* Garments - Simple repeated inputs like original design */}
+          {garments.map((garment, index) => (
+            <div key={garment.id} className="garment-inputs-group">
+              {index > 0 && <hr className="garment-divider" />}
+              
+              <div className="garment-row-header">
+                {garments.length > 1 && (
+                  <span className="garment-label">Garment #{index + 1}</span>
+                )}
+                {garments.length > 1 && (
+                  <button 
+                    type="button" 
+                    className="remove-garment-link"
+                    onClick={() => removeGarment(garment.id)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+
+              <div className="form-group-shared">
+                <label className="form-label-shared">
+                  ⚠️ Damage Level <span className="required-indicator">*</span>
+                </label>
+                <select
+                  value={garment.damageLevel}
+                  onChange={(e) => updateGarment(garment.id, 'damageLevel', e.target.value)}
+                  className={`form-select-shared ${errors[`garment_${garment.id}_damageLevel`] ? 'error' : ''}`}
+                >
+                  <option value="">Select damage level</option>
+                  {damageLevels.map(level => (
+                    <option key={level.value} value={level.value}>
+                      {level.label} - ₱{level.basePrice}
+                    </option>
+                  ))}
+                </select>
+                {garment.damageLevel && (
+                  <div className="help-text-shared" style={{ marginTop: '8px' }}>
+                    {damageLevels.find(l => l.value === garment.damageLevel)?.description}
+                  </div>
+                )}
+                {errors[`garment_${garment.id}_damageLevel`] && (
+                  <span className="error-message-shared">{errors[`garment_${garment.id}_damageLevel`]}</span>
+                )}
+              </div>
+
+              <div className="form-group-shared">
+                <label className="form-label-shared">
+                  👔 Garment Type <span className="required-indicator">*</span>
+                </label>
+                <select
+                  value={garment.garmentType}
+                  onChange={(e) => updateGarment(garment.id, 'garmentType', e.target.value)}
+                  className={`form-select-shared ${errors[`garment_${garment.id}_garmentType`] ? 'error' : ''}`}
+                >
+                  <option value="">Select garment type</option>
+                  {repairGarmentTypes.map(g => (
+                    <option key={g.repair_garment_id} value={g.garment_name}>
+                      {g.garment_name}
+                    </option>
+                  ))}
+                </select>
+                {errors[`garment_${garment.id}_garmentType`] && (
+                  <span className="error-message-shared">{errors[`garment_${garment.id}_garmentType`]}</span>
+                )}
+              </div>
+
+              <div className="form-group-shared">
+                <label className="form-label-shared">
+                  📝 Description <span className="required-indicator">*</span>
+                </label>
+                <textarea
+                  value={garment.notes}
+                  onChange={(e) => updateGarment(garment.id, 'notes', e.target.value)}
+                  placeholder="Describe the damage in detail..."
+                  rows={3}
+                  className={`form-textarea-shared ${errors[`garment_${garment.id}_notes`] ? 'error' : ''}`}
+                />
+                {errors[`garment_${garment.id}_notes`] && (
+                  <span className="error-message-shared">{errors[`garment_${garment.id}_notes`]}</span>
+                )}
+              </div>
             </div>
-            {errors.damageLevel && (
-              <span className="error-message-shared">{errors.damageLevel}</span>
-            )}
-          </div>
-          <div className="form-group-shared">
-            <label htmlFor="garmentType" className="form-label-shared">
-              👔 Garment Type <span className="required-indicator">*</span>
-            </label>
-            <select
-              id="garmentType"
-              name="garmentType"
-              value={formData.garmentType}
-              onChange={handleInputChange}
-              className={`form-select-shared ${errors.garmentType ? 'error' : ''}`}
-              required
-            >
-              <option value="">Select garment type</option>
-              {repairGarmentTypes.map(garment => (
-                <option key={garment.repair_garment_id} value={garment.garment_name}>
-                  {garment.garment_name}
-                </option>
-              ))}
-            </select>
-            {errors.garmentType && (
-              <span className="error-message-shared">{errors.garmentType}</span>
-            )}
-          </div>
-          <div className="form-group-shared">
-            <label htmlFor="notes" className="form-label-shared">
-              📝 Detailed Description <span className="required-indicator">*</span>
-            </label>
-            <textarea
-              id="notes"
-              name="notes"
-              value={formData.notes}
-              onChange={handleInputChange}
-              placeholder="Please describe the damage in detail (size, location, extent of damage)..."
-              rows={4}
-              className={`form-textarea-shared ${errors.notes ? 'error' : ''}`}
-              required
-            />
-            <span className="help-text-shared">Examples: 2-inch hole in left sleeve, broken zipper on jacket back, torn seam on pants</span>
-            {errors.notes && (
-              <span className="error-message-shared">{errors.notes}</span>
-            )}
-          </div>
+          ))}
+          
+          <button 
+            type="button" 
+            className="add-garment-link"
+            onClick={addGarment}
+          >
+            + Add Another Garment
+          </button>
+
           <div className="form-group-shared">
             <label htmlFor="image" className="form-label-shared">📷 Upload Damage Photo (Recommended)</label>
             <div className="image-upload-wrapper-shared">
@@ -676,10 +738,19 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               )}
             </div>
           )}
-          {estimatedPrice > 0 && (
+          {estimatedPrice > 0 && garments.some(g => g.damageLevel) && (
             <div className="price-estimate-shared">
               <h4>Estimated Price: ₱{estimatedPrice}</h4>
-              <p>Based on damage level: {formData.damageLevel} • Garment type: {formData.garmentType}</p>
+              <div className="price-breakdown">
+                {garments.filter(g => g.damageLevel).map((garment, index) => {
+                  const damageLevel = damageLevels.find(l => l.value === garment.damageLevel);
+                  return (
+                    <p key={garment.id}>
+                      {garment.garmentType || 'Garment'} ({damageLevel?.label || garment.damageLevel}): ₱{damageLevel?.basePrice || 500}
+                    </p>
+                  );
+                })}
+              </div>
               <p className="estimated-pickup">Drop off item date: {formData.date && formData.time ? formatDropOffDate(`${formData.date}T${formData.time}`) : 'Not set'}</p>
               <p>Final price will be confirmed after admin review</p>
             </div>

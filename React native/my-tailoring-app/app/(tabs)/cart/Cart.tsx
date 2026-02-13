@@ -22,6 +22,23 @@ import { cartService, API_BASE_URL } from "../../../utils/apiService";
 
 const { width, height } = Dimensions.get("window");
 
+// Helper function to format service type for display
+const formatServiceType = (serviceType: string): string => {
+  switch (serviceType?.toLowerCase()) {
+    case 'dry_cleaning':
+      return 'Dry Cleaning';
+    case 'customize':
+    case 'customization':
+      return 'Customization';
+    case 'repair':
+      return 'Repair';
+    case 'rental':
+      return 'Rental';
+    default:
+      return serviceType || 'Service';
+  }
+};
+
 export default function CartScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -133,19 +150,21 @@ export default function CartScreen() {
             id: item.cart_id,
             service: item.service_type,
             serviceId: item.service_id,
-            item: item.specific_data?.serviceName || item.service_type || 'Service',
+            item: item.specific_data?.serviceName || formatServiceType(item.service_type),
             description: item.specific_data?.damageDescription || item.specific_data?.specialInstructions || '',
             price: parseFloat(item.final_price) || 0,
             basePrice: parseFloat(item.base_price) || 0,
             icon: getServiceIcon(item.service_type),
-            garmentType: item.specific_data?.garmentType || '',
-            damageType: item.specific_data?.damageLevel || item.specific_data?.damageType || '',
-            damageDescription: item.specific_data?.damageDescription || '',
+            // Multiple garments support - get from array or legacy fields
+            garments: item.specific_data?.garments || [],
+            garmentType: item.specific_data?.garments?.[0]?.garmentType || item.specific_data?.garmentType || '',
+            damageType: item.specific_data?.garments?.[0]?.damageLevel || item.specific_data?.damageLevel || item.specific_data?.damageType || '',
+            damageDescription: item.specific_data?.garments?.[0]?.notes || item.specific_data?.damageDescription || '',
             specialInstructions: item.specific_data?.specialInstructions || '',
             image: processedImage,
             appointmentDate: formattedDate,
             
-            clothingBrand: item.specific_data?.clothingBrand || item.specific_data?.brand || '',
+            clothingBrand: item.specific_data?.garments?.[0]?.brand || item.specific_data?.clothingBrand || item.specific_data?.brand || '',
             quantity: item.specific_data?.quantity || 1,
             fabricType: item.specific_data?.fabricType || '',
             style: item.specific_data?.style || '',
@@ -156,7 +175,7 @@ export default function CartScreen() {
             rentalStartDate: item.rental_start_date || '',
             rentalEndDate: item.rental_end_date || '',
             
-            pricePerItem: item.specific_data?.pricePerItem || '',
+            pricePerItem: item.specific_data?.garments?.[0]?.pricePerItem || item.specific_data?.pricePerItem || '',
             isEstimatedPrice: item.specific_data?.isEstimatedPrice || false,
             
             preferredDate: item.specific_data?.preferredDate || '',
@@ -415,53 +434,77 @@ export default function CartScreen() {
                     </View>
                   )}
                   <View style={styles.itemDetails}>
-                    <Text style={styles.serviceType}>{getServiceTypeDisplay(item.service)}</Text>
                     {item.isBundle && (
                       <Text style={styles.bundleBadge}>
                         Bundle ({item.bundleItems?.length || 0} items) - Tap to view
                       </Text>
                     )}
                     <Text style={styles.itemName}>{item.item}</Text>
-                    <Text style={styles.serviceIdText}>Service ID: {item.serviceId}</Text>
                     {item.service?.toLowerCase() === 'repair' && (
                       <>
-                        {item.damageType && (
-                          <Text style={styles.itemDetailText}>Damage Level: {item.damageType}</Text>
-                        )}
-                        {item.garmentType && (
-                          <Text style={styles.itemDetailText}>Garment: {item.garmentType}</Text>
-                        )}
-                        {item.damageDescription && (
-                          <Text style={styles.itemDetailText} numberOfLines={2}>
-                            Description: {item.damageDescription}
-                          </Text>
-                        )}
-                        {item.appointmentDate && (
-                          <Text style={styles.itemDetailText}>Drop off preferred date: {item.appointmentDate}</Text>
+                        {/* Multiple garments support */}
+                        {item.garments && item.garments.length > 0 ? (
+                          <>
+                            <Text style={styles.itemDetailText}>
+                              <Text style={{ fontWeight: 'bold' }}>{item.garments.length} Garment{item.garments.length > 1 ? 's' : ''}</Text>
+                            </Text>
+                            {item.garments.map((garment: any, idx: number) => (
+                              <Text key={idx} style={styles.itemDetailText}>
+                                • {garment.garmentType} ({garment.damageLevel}): ₱{garment.basePrice}
+                              </Text>
+                            ))}
+                          </>
+                        ) : (
+                          <>
+                            {item.damageType && (
+                              <Text style={styles.itemDetailText}>Damage Level: {item.damageType}</Text>
+                            )}
+                            {item.garmentType && (
+                              <Text style={styles.itemDetailText}>Garment: {item.garmentType}</Text>
+                            )}
+                            {item.damageDescription && (
+                              <Text style={styles.itemDetailText} numberOfLines={2}>
+                                Description: {item.damageDescription}
+                              </Text>
+                            )}
+                          </>
                         )}
                       </>
                     )}
 
                     {item.service?.toLowerCase() === 'dry_cleaning' && (
                       <>
-                        {item.garmentType && (
-                          <Text style={styles.itemDetailText}>
-                            Garment Type: {item.garmentType.charAt(0).toUpperCase() + item.garmentType.slice(1)}
-                          </Text>
-                        )}
-                        {item.clothingBrand && (
-                          <Text style={styles.itemDetailText}>Brand: {item.clothingBrand}</Text>
-                        )}
-                        {item.quantity > 0 && (
-                          <Text style={styles.itemDetailText}>Quantity: {item.quantity} items</Text>
-                        )}
-                        {item.appointmentDate && (
-                          <Text style={styles.itemDetailText}>Drop off date: {item.appointmentDate}</Text>
-                        )}
-                        {item.pricePerItem && (
-                          <Text style={styles.itemDetailText}>
-                            Price per item: ₱{parseFloat(item.pricePerItem).toFixed(2)}
-                          </Text>
+                        {/* Multiple garments support */}
+                        {item.garments && item.garments.length > 0 ? (
+                          <>
+                            <Text style={styles.itemDetailText}>
+                              <Text style={{ fontWeight: 'bold' }}>{item.garments.length} Garment{item.garments.length > 1 ? 's' : ''}</Text>
+                            </Text>
+                            {item.garments.map((garment: any, idx: number) => (
+                              <Text key={idx} style={styles.itemDetailText}>
+                                • {garment.garmentType} ({garment.brand}) × {garment.quantity}: ₱{garment.pricePerItem * garment.quantity}
+                              </Text>
+                            ))}
+                          </>
+                        ) : (
+                          <>
+                            {item.garmentType && (
+                              <Text style={styles.itemDetailText}>
+                                Garment Type: {item.garmentType.charAt(0).toUpperCase() + item.garmentType.slice(1)}
+                              </Text>
+                            )}
+                            {item.clothingBrand && (
+                              <Text style={styles.itemDetailText}>Brand: {item.clothingBrand}</Text>
+                            )}
+                            {item.quantity > 0 && (
+                              <Text style={styles.itemDetailText}>Quantity: {item.quantity} items</Text>
+                            )}
+                            {item.pricePerItem && (
+                              <Text style={styles.itemDetailText}>
+                                Price per item: ₱{parseFloat(item.pricePerItem).toFixed(2)}
+                              </Text>
+                            )}
+                          </>
                         )}
                       </>
                     )}
@@ -515,6 +558,30 @@ export default function CartScreen() {
                         )}
                       </>
                     )}
+                    {item.service?.toLowerCase() === 'rental' ? (
+                      <>
+                        <Text style={styles.itemPrice}>
+                          Rental Price: ₱{item.price.toLocaleString()}
+                        </Text>
+                        {item.downpayment > 0 && (
+                          <Text style={styles.itemPriceSmall}>
+                            Downpayment: ₱{item.downpayment.toLocaleString()}
+                          </Text>
+                        )}
+                      </>
+                    ) : item.service?.toLowerCase() === 'dry_cleaning' && item.isEstimatedPrice ? (
+                      <Text style={styles.itemPricePending}>
+                        Estimated Price: ₱{item.price.toLocaleString()}
+                      </Text>
+                    ) : item.service?.toLowerCase() === 'dry_cleaning' ? (
+                      <Text style={styles.itemPrice}>
+                        Final Price: ₱{item.price.toLocaleString()}
+                      </Text>
+                    ) : (
+                      <Text style={styles.itemPricePending}>
+                        Estimated Price: ₱{item.price.toLocaleString()}
+                      </Text>
+                    )}
                     {item.isBundle ? (
                       <TouchableOpacity
                         onPress={(e) => {
@@ -550,30 +617,6 @@ export default function CartScreen() {
                           color="#94665B"
                         />
                       </TouchableOpacity>
-                    )}
-                    {item.service?.toLowerCase() === 'rental' ? (
-                      <>
-                        <Text style={styles.itemPrice}>
-                          Rental Price: ₱{item.price.toLocaleString()}
-                        </Text>
-                        {item.downpayment > 0 && (
-                          <Text style={styles.itemPriceSmall}>
-                            Downpayment: ₱{item.downpayment.toLocaleString()}
-                          </Text>
-                        )}
-                      </>
-                    ) : item.service?.toLowerCase() === 'dry_cleaning' && item.isEstimatedPrice ? (
-                      <Text style={styles.itemPricePending}>
-                        Estimated Price: ₱{item.price.toLocaleString()}
-                      </Text>
-                    ) : item.service?.toLowerCase() === 'dry_cleaning' ? (
-                      <Text style={styles.itemPrice}>
-                        Final Price: ₱{item.price.toLocaleString()}
-                      </Text>
-                    ) : (
-                      <Text style={styles.itemPricePending}>
-                        Estimated Price: ₱{item.price.toLocaleString()}
-                      </Text>
                     )}
                   </View>
                   <TouchableOpacity
@@ -672,29 +715,53 @@ export default function CartScreen() {
                   )}
                   {selectedItemDetails.service?.toLowerCase() === 'repair' && (
                     <>
-                      {selectedItemDetails.damageType && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Damage Level</Text>
-                          <Text style={styles.detailsValue}>
-                            {selectedItemDetails.damageType}
-                          </Text>
-                        </View>
-                      )}
-                      {selectedItemDetails.garmentType && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Garment</Text>
-                          <Text style={styles.detailsValue}>
-                            {selectedItemDetails.garmentType}
-                          </Text>
-                        </View>
-                      )}
-                      {selectedItemDetails.damageDescription && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Description</Text>
-                          <Text style={styles.detailsValue}>
-                            {selectedItemDetails.damageDescription}
-                          </Text>
-                        </View>
+                      {/* Multiple garments support */}
+                      {selectedItemDetails.garments && selectedItemDetails.garments.length > 0 ? (
+                        <>
+                          <View style={styles.detailsSection}>
+                            <Text style={styles.detailsLabel}>Garments ({selectedItemDetails.garments.length})</Text>
+                          </View>
+                          {selectedItemDetails.garments.map((garment: any, idx: number) => (
+                            <View key={idx} style={[styles.detailsSection, { backgroundColor: '#f9f9f9', padding: 12, borderRadius: 8, marginBottom: 8 }]}>
+                              <Text style={[styles.detailsValue, { fontWeight: 'bold', marginBottom: 4 }]}>
+                                Garment #{idx + 1}
+                              </Text>
+                              <Text style={styles.detailsValue}>Type: {garment.garmentType}</Text>
+                              <Text style={styles.detailsValue}>Damage Level: {garment.damageLevel}</Text>
+                              {garment.notes && (
+                                <Text style={styles.detailsValue}>Description: {garment.notes}</Text>
+                              )}
+                              <Text style={styles.detailsValue}>Price: ₱{garment.basePrice}</Text>
+                            </View>
+                          ))}
+                        </>
+                      ) : (
+                        <>
+                          {selectedItemDetails.damageType && (
+                            <View style={styles.detailsSection}>
+                              <Text style={styles.detailsLabel}>Damage Level</Text>
+                              <Text style={styles.detailsValue}>
+                                {selectedItemDetails.damageType}
+                              </Text>
+                            </View>
+                          )}
+                          {selectedItemDetails.garmentType && (
+                            <View style={styles.detailsSection}>
+                              <Text style={styles.detailsLabel}>Garment</Text>
+                              <Text style={styles.detailsValue}>
+                                {selectedItemDetails.garmentType}
+                              </Text>
+                            </View>
+                          )}
+                          {selectedItemDetails.damageDescription && (
+                            <View style={styles.detailsSection}>
+                              <Text style={styles.detailsLabel}>Description</Text>
+                              <Text style={styles.detailsValue}>
+                                {selectedItemDetails.damageDescription}
+                              </Text>
+                            </View>
+                          )}
+                        </>
                       )}
                       {selectedItemDetails.appointmentDate && (
                         <View style={styles.detailsSection}>
@@ -708,43 +775,67 @@ export default function CartScreen() {
                   )}
                   {selectedItemDetails.service?.toLowerCase() === 'dry_cleaning' && (
                     <>
-                      {selectedItemDetails.garmentType && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Garment Type</Text>
-                          <Text style={styles.detailsValue}>
-                            {selectedItemDetails.garmentType.charAt(0).toUpperCase() + selectedItemDetails.garmentType.slice(1)}
-                          </Text>
-                        </View>
-                      )}
-                      {selectedItemDetails.clothingBrand && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Brand</Text>
-                          <Text style={styles.detailsValue}>
-                            {selectedItemDetails.clothingBrand}
-                          </Text>
-                        </View>
-                      )}
-                      {selectedItemDetails.quantity > 0 && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Quantity</Text>
-                          <Text style={styles.detailsValue}>
-                            {selectedItemDetails.quantity} items
-                          </Text>
-                        </View>
+                      {/* Multiple garments support */}
+                      {selectedItemDetails.garments && selectedItemDetails.garments.length > 0 ? (
+                        <>
+                          <View style={styles.detailsSection}>
+                            <Text style={styles.detailsLabel}>Garments ({selectedItemDetails.garments.length})</Text>
+                          </View>
+                          {selectedItemDetails.garments.map((garment: any, idx: number) => (
+                            <View key={idx} style={[styles.detailsSection, { backgroundColor: '#f9f9f9', padding: 12, borderRadius: 8, marginBottom: 8 }]}>
+                              <Text style={[styles.detailsValue, { fontWeight: 'bold', marginBottom: 4 }]}>
+                                Garment #{idx + 1}
+                              </Text>
+                              <Text style={styles.detailsValue}>Type: {garment.garmentType}</Text>
+                              {garment.brand && (
+                                <Text style={styles.detailsValue}>Brand: {garment.brand}</Text>
+                              )}
+                              <Text style={styles.detailsValue}>Quantity: {garment.quantity}</Text>
+                              <Text style={styles.detailsValue}>Price: ₱{garment.pricePerItem * garment.quantity}</Text>
+                            </View>
+                          ))}
+                        </>
+                      ) : (
+                        <>
+                          {selectedItemDetails.garmentType && (
+                            <View style={styles.detailsSection}>
+                              <Text style={styles.detailsLabel}>Garment Type</Text>
+                              <Text style={styles.detailsValue}>
+                                {selectedItemDetails.garmentType.charAt(0).toUpperCase() + selectedItemDetails.garmentType.slice(1)}
+                              </Text>
+                            </View>
+                          )}
+                          {selectedItemDetails.clothingBrand && (
+                            <View style={styles.detailsSection}>
+                              <Text style={styles.detailsLabel}>Brand</Text>
+                              <Text style={styles.detailsValue}>
+                                {selectedItemDetails.clothingBrand}
+                              </Text>
+                            </View>
+                          )}
+                          {selectedItemDetails.quantity > 0 && (
+                            <View style={styles.detailsSection}>
+                              <Text style={styles.detailsLabel}>Quantity</Text>
+                              <Text style={styles.detailsValue}>
+                                {selectedItemDetails.quantity} items
+                              </Text>
+                            </View>
+                          )}
+                          {selectedItemDetails.pricePerItem && (
+                            <View style={styles.detailsSection}>
+                              <Text style={styles.detailsLabel}>Price per item</Text>
+                              <Text style={styles.detailsValue}>
+                                ₱{parseFloat(selectedItemDetails.pricePerItem).toFixed(2)}
+                              </Text>
+                            </View>
+                          )}
+                        </>
                       )}
                       {selectedItemDetails.appointmentDate && (
                         <View style={styles.detailsSection}>
                           <Text style={styles.detailsLabel}>Drop off date</Text>
                           <Text style={styles.detailsValue}>
                             {selectedItemDetails.appointmentDate}
-                          </Text>
-                        </View>
-                      )}
-                      {selectedItemDetails.pricePerItem && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Price per item</Text>
-                          <Text style={styles.detailsValue}>
-                            ₱{parseFloat(selectedItemDetails.pricePerItem).toFixed(2)}
                           </Text>
                         </View>
                       )}

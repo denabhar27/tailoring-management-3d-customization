@@ -136,7 +136,7 @@ export default function LoginScreen() {
                 <View style={styles.checkbox} />
                 <Text style={styles.rememberMeText}>Remember me</Text>
               </TouchableOpacity>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push("/forgot-password")}>
                 <Text style={styles.forgotLink}>Forgot Password?</Text>
               </TouchableOpacity>
             </View>

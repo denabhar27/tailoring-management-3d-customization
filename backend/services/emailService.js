@@ -821,6 +821,128 @@ Thank you for choosing D'jackman Tailor Deluxe!
   return sendEmail({ to: userEmail, subject, text, html });
 };
 
+/**
+ * Send password reset email with security code
+ */
+const sendPasswordResetEmail = async ({
+  userEmail,
+  userName,
+  securityCode,
+  expiryMinutes = 15
+}) => {
+  const subject = "🔐 Password Reset Code - D'jackman Tailor Deluxe";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+                  <h1 style="color: #ffffff; margin: 0; font-size: 28px;">D'jackman Tailor Deluxe</h1>
+                  <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">Password Reset Request</p>
+                </td>
+              </tr>
+              
+              <!-- Content -->
+              <tr>
+                <td style="padding: 40px 30px;">
+                  <h2 style="color: #333; margin: 0 0 20px 0; font-size: 24px;">
+                    🔐 Password Reset Request
+                  </h2>
+                  
+                  <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                    Hello <strong>${userName}</strong>,
+                  </p>
+                  
+                  <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                    You requested to reset your password. Use the security code below to proceed:
+                  </p>
+                  
+                  <!-- Security Code Box -->
+                  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; margin: 30px 0; border-radius: 10px; text-align: center;">
+                    <p style="color: rgba(255,255,255,0.9); margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px;">
+                      Your Security Code
+                    </p>
+                    <p style="color: #ffffff; margin: 0; font-size: 42px; font-weight: bold; letter-spacing: 8px; font-family: 'Courier New', monospace;">
+                      ${securityCode}
+                    </p>
+                  </div>
+                  
+                  <!-- Expiry Warning -->
+                  <div style="background-color: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 0; color: #856404; font-size: 14px;">
+                      ⏰ <strong>Important:</strong> This code will expire in <strong>${expiryMinutes} minutes</strong>. 
+                      If it expires, you'll need to request a new code.
+                    </p>
+                  </div>
+                  
+                  <!-- Security Notice -->
+                  <div style="background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+                    <p style="margin: 0; color: #555; font-size: 14px;">
+                      🔒 <strong>Security Tip:</strong> If you didn't request this password reset, 
+                      please ignore this email. Your password will remain unchanged.
+                    </p>
+                  </div>
+                  
+                  <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 20px 0 0 0;">
+                    Enter this code in the app or website to continue resetting your password.
+                  </p>
+                </td>
+              </tr>
+              
+              <!-- Footer -->
+              <tr>
+                <td style="background-color: #f8f9fa; padding: 25px; border-radius: 0 0 10px 10px; text-align: center;">
+                  <p style="color: #888; font-size: 14px; margin: 0 0 10px 0;">
+                    D'jackman Tailor Deluxe
+                  </p>
+                  <p style="color: #aaa; font-size: 12px; margin: 0;">
+                    This is an automated security email. Please do not reply to this email.
+                  </p>
+                  <p style="color: #aaa; font-size: 11px; margin: 10px 0 0 0;">
+                    If you're having trouble, please contact our support team.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  const text = `
+PASSWORD RESET CODE - D'jackman Tailor Deluxe
+
+Hello ${userName},
+
+You requested to reset your password. Use the security code below to proceed:
+
+SECURITY CODE: ${securityCode}
+
+This code will expire in ${expiryMinutes} minutes.
+
+IMPORTANT: If you didn't request this password reset, please ignore this email. Your password will remain unchanged.
+
+Enter this code in the app or website to continue resetting your password.
+
+Thank you,
+D'jackman Tailor Deluxe
+  `;
+
+  return sendEmail({ to: userEmail, subject, text, html });
+};
+
 module.exports = {
   initializeSendGrid,
   isEmailServiceConfigured,
@@ -829,5 +951,6 @@ module.exports = {
   sendOverdueNotificationEmail,
   sendPenaltyChargeEmail,
   sendRentalStatusEmail,
-  sendServiceStatusEmail
+  sendServiceStatusEmail,
+  sendPasswordResetEmail
 };

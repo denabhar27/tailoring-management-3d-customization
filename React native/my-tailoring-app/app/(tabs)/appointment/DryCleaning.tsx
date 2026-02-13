@@ -57,16 +57,26 @@ interface TimeSlot {
   isClickable: boolean;
 }
 
+interface GarmentItem {
+  id: number;
+  garmentType: string;
+  brand: string;
+  quantity: string;
+}
+
 export default function DryCleaningClothes() {
   
   console.log('🧹🧹🧹 DRYCLEANING COMPONENT RENDERING 🧹🧹🧹');
   
   const router = useRouter();
   const [image, setImage] = useState<string | null>(null);
-  const [selectedItem, setSelectedItem] = useState("");
-  const [quantity, setQuantity] = useState("");
+  
+  // Multiple garments support
+  const [garments, setGarments] = useState<GarmentItem[]>([
+    { id: 1, garmentType: '', brand: '', quantity: '1' }
+  ]);
+  
   const [specialInstructions, setSpecialInstructions] = useState("");
-  const [clothingBrand, setClothingBrand] = useState("");
   const [pickupDate, setPickupDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [garmentPrices, setGarmentPrices] = useState<{ [key: string]: number }>(DEFAULT_GARMENT_TYPES);
@@ -75,6 +85,34 @@ export default function DryCleaningClothes() {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [isShopOpen, setIsShopOpen] = useState(true);
+
+  // Garment management functions
+  const addGarment = () => {
+    const newId = Math.max(...garments.map(g => g.id)) + 1;
+    setGarments([...garments, { id: newId, garmentType: '', brand: '', quantity: '1' }]);
+  };
+
+  const removeGarment = (id: number) => {
+    if (garments.length > 1) {
+      setGarments(garments.filter(g => g.id !== id));
+    }
+  };
+
+  const updateGarment = (id: number, field: keyof GarmentItem, value: string) => {
+    setGarments(garments.map(g => 
+      g.id === id ? { ...g, [field]: value } : g
+    ));
+  };
+
+  // Calculate total price
+  const calculateTotalPrice = (): number => {
+    return garments.reduce((total, garment) => {
+      if (!garment.garmentType) return total;
+      const price = garmentPrices[garment.garmentType] || 200;
+      const qty = parseInt(garment.quantity) || 1;
+      return total + (price * qty);
+    }, 0);
+  };
 
   
   useEffect(() => {
@@ -283,9 +321,24 @@ export default function DryCleaningClothes() {
   };
 
   const handleAddService = async () => {
-    if (!selectedItem || !quantity) {
-      Alert.alert("Missing Information", "Please fill in all required fields");
+    // Validate garments
+    const validGarments = garments.filter(g => g.garmentType && g.quantity);
+    if (validGarments.length === 0) {
+      Alert.alert("Missing Information", "Please add at least one garment with type and quantity");
       return;
+    }
+
+    // Check all garments have required fields
+    for (const garment of garments) {
+      if (!garment.garmentType) {
+        Alert.alert("Missing Information", "Please select a garment type for all items");
+        return;
+      }
+      const qty = parseInt(garment.quantity);
+      if (isNaN(qty) || qty <= 0) {
+        Alert.alert("Invalid Quantity", "Please enter a valid quantity for all items");
+        return;
+      }
     }
 
     if (!pickupDate) {
@@ -295,12 +348,6 @@ export default function DryCleaningClothes() {
 
     if (!selectedTimeSlot) {
       Alert.alert("Missing Information", "Please select a time slot");
-      return;
-    }
-
-    const qty = parseInt(quantity);
-    if (isNaN(qty) || qty <= 0) {
-      Alert.alert("Invalid Quantity", "Please enter a valid quantity");
       return;
     }
 
@@ -314,16 +361,8 @@ export default function DryCleaningClothes() {
       return;
     }
 
-    const unitPrice = getPriceForGarment(selectedItem);
-    const totalPrice = unitPrice * qty;
-
-    let description = `${qty} ${selectedItem}(s) - Professional dry cleaning`;
-    if (clothingBrand) {
-      description += ` (${clothingBrand})`;
-    }
-    if (specialInstructions) {
-      description += ` - ${specialInstructions}`;
-    }
+    const totalPrice = calculateTotalPrice();
+    const totalQuantity = garments.reduce((sum, g) => sum + (parseInt(g.quantity) || 0), 0);
 
     try {
       
@@ -378,19 +417,27 @@ export default function DryCleaningClothes() {
       
       const pickupDateTime = `${dateStr}T${selectedTimeSlot}`;
 
+      // Build garments array for submission
+      const garmentsData = garments.map(garment => ({
+        garmentType: garment.garmentType,
+        brand: garment.brand,
+        quantity: parseInt(garment.quantity) || 1,
+        pricePerItem: getPriceForGarment(garment.garmentType),
+        isEstimated: false
+      }));
+
       
       const dryCleaningData = {
         serviceType: 'dry_cleaning',
         serviceId: 3,
-        serviceName: `${selectedItem} Dry Cleaning`,
-        basePrice: unitPrice.toString(),
+        serviceName: 'Dry Cleaning Service',
+        basePrice: '0',
         finalPrice: totalPrice.toString(),
-        quantity: qty,
+        quantity: totalQuantity,
         specificData: {
-          garmentType: selectedItem,
-          clothingBrand: clothingBrand,
-          specialInstructions: specialInstructions,
-          quantity: qty,
+          garments: garmentsData,
+          isMultipleGarments: garments.length > 1,
+          notes: specialInstructions,
           imageUrl: imageUrl || 'no-image',
           pickupDate: pickupDateTime,
           appointmentTime: selectedTimeSlot
@@ -413,10 +460,8 @@ export default function DryCleaningClothes() {
           {
             text: "Add More",
             onPress: () => {
-              setSelectedItem("");
-              setQuantity("");
+              setGarments([{ id: 1, garmentType: '', brand: '', quantity: '1' }]);
               setSpecialInstructions("");
-              setClothingBrand("");
               setImage(null);
               setPickupDate(null);
               setSelectedTimeSlot("");
@@ -476,66 +521,88 @@ export default function DryCleaningClothes() {
             )}
           </TouchableOpacity>
 
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Type of Garment *</Text>
-            {loadingGarments ? (
-              <View style={[styles.pickerWrapper, { justifyContent: 'center', alignItems: 'center', paddingVertical: 15 }]}>
-                <ActivityIndicator size="small" color="#8D6E63" />
-                <Text style={{ color: '#8D6E63', marginTop: 8, fontSize: 12 }}>Loading garment types...</Text>
+          {/* Garments - Simple repeated inputs */}
+          {garments.map((garment, index) => (
+            <View key={garment.id}>
+              {index > 0 && <View style={styles.garmentDivider} />}
+              
+              {garments.length > 1 && (
+                <View style={styles.garmentRowHeader}>
+                  <Text style={styles.garmentLabel}>Garment #{index + 1}</Text>
+                  <TouchableOpacity 
+                    style={styles.removeGarmentButton}
+                    onPress={() => removeGarment(garment.id)}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#ef5350" />
+                    <Text style={styles.removeGarmentText}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              
+              <View style={styles.fieldContainer}>
+                <Text style={styles.label}>Garment Type *</Text>
+                {loadingGarments ? (
+                  <View style={[styles.pickerWrapper, { justifyContent: 'center', alignItems: 'center', paddingVertical: 15 }]}>
+                    <ActivityIndicator size="small" color="#8D6E63" />
+                  </View>
+                ) : (
+                  <View style={styles.pickerWrapper}>
+                    <Picker
+                      selectedValue={garment.garmentType}
+                      onValueChange={(value) => updateGarment(garment.id, 'garmentType', value)}
+                      style={styles.picker}
+                      dropdownIconColor="#8D6E63"
+                    >
+                      <Picker.Item label="Select garment type..." value="" color="#999" />
+                      {garmentTypes.map((item, idx) => (
+                        <Picker.Item 
+                          label={`${item} - ₱${getPriceForGarment(item)}`} 
+                          value={item} 
+                          key={`${garment.id}-${item}-${idx}`} 
+                        />
+                      ))}
+                    </Picker>
+                  </View>
+                )}
               </View>
-            ) : (
-              <View style={styles.pickerWrapper}>
-                <Picker
-                  selectedValue={selectedItem}
-                  onValueChange={(value) => setSelectedItem(value)}
-                  style={styles.picker}
-                  dropdownIconColor="#8D6E63"
-                >
-                  <Picker.Item
-                    label="Select garment type..."
-                    value=""
-                    color="#999"
-                  />
-                  {garmentTypes.map((item, index) => (
-                    <Picker.Item label={`${item} - ₱${getPriceForGarment(item)}`} value={item} key={`${item}-${index}`} />
-                  ))}
-                </Picker>
+              
+              <View style={styles.fieldContainer}>
+                <Text style={styles.label}>Brand</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter brand name"
+                  placeholderTextColor="#94a3b8"
+                  value={garment.brand}
+                  onChangeText={(value) => updateGarment(garment.id, 'brand', value)}
+                />
               </View>
-            )}
-            {selectedItem && (
-              <Text style={styles.priceIndicator}>
-                Price per item: ₱{getPriceForGarment(selectedItem)}
-              </Text>
-            )}
-          </View>
+              
+              <View style={styles.fieldContainer}>
+                <Text style={styles.label}>Quantity *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="1"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={garment.quantity}
+                  onChangeText={(value) => updateGarment(garment.id, 'quantity', value)}
+                />
+              </View>
+            </View>
+          ))}
+          
+          <TouchableOpacity style={styles.addGarmentButton} onPress={addGarment}>
+            <Ionicons name="add-circle-outline" size={20} color="#8D6E63" />
+            <Text style={styles.addGarmentButtonText}>Add Another Garment</Text>
+          </TouchableOpacity>
 
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Clothing Brand (Optional)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter brand name (e.g., Nike, Adidas)"
-              placeholderTextColor="#94a3b8"
-              value={clothingBrand}
-              onChangeText={setClothingBrand}
-            />
-          </View>
-
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Quantity *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Number of items (e.g., 3)"
-              placeholderTextColor="#94a3b8"
-              keyboardType="numeric"
-              value={quantity}
-              onChangeText={setQuantity}
-            />
-            {selectedItem && quantity && parseInt(quantity) > 0 && (
-              <Text style={styles.totalIndicator}>
-                Total: ₱{getPriceForGarment(selectedItem) * parseInt(quantity)}
-              </Text>
-            )}
-          </View>
+          {/* Total Price Display */}
+          {garments.some(g => g.garmentType && g.quantity) && (
+            <View style={styles.totalPriceRow}>
+              <Text style={styles.totalPriceLabel}>Total Price:</Text>
+              <Text style={styles.totalPriceValue}>₱{calculateTotalPrice()}</Text>
+            </View>
+          )}
 
           <View style={styles.fieldContainer}>
             <Text style={styles.label}>Special Instructions (Optional)</Text>
@@ -1053,5 +1120,91 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8D6E63',
     textAlign: 'center',
+  },
+  // Simple multi-garment styles
+  garmentDivider: {
+    height: 1,
+    backgroundColor: '#D7CCC8',
+    marginVertical: 20,
+  },
+  garmentRowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  garmentLabel: {
+    fontWeight: '600',
+    color: '#8D6E63',
+    fontSize: 15,
+  },
+  removeGarmentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  removeGarmentText: {
+    color: '#ef5350',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  removeGarmentLink: {
+    color: '#ef5350',
+    fontSize: 14,
+  },
+  addGarmentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginVertical: 16,
+    borderWidth: 1,
+    borderColor: '#D7CCC8',
+    borderRadius: 12,
+    borderStyle: 'dashed',
+    backgroundColor: '#FAFAFA',
+  },
+  addGarmentButtonText: {
+    color: '#8D6E63',
+    fontSize: 15,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  addGarmentLink: {
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  addGarmentLinkText: {
+    color: '#8D6E63',
+    fontSize: 15,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
+  },
+  totalPriceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#D7CCC8',
+    marginBottom: 16,
+  },
+  totalPriceLabel: {
+    color: '#5D4037',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  totalPriceValue: {
+    color: '#8D6E63',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
 });

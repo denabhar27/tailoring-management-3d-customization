@@ -615,9 +615,26 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                       )}
                       {item.service_type === 'repair' && item.specific_data && (
                         <div className="repair-details">
-                          <p>Damage Level: {item.specific_data.damageLevel || 'N/A'}</p>
-                          <p>Garment: {item.specific_data.garmentType || 'N/A'}</p>
-                          <p>Description: {item.specific_data.damageDescription || 'N/A'}</p>
+                          {/* Check for multiple garments */}
+                          {item.specific_data.garments && item.specific_data.garments.length > 0 ? (
+                            <>
+                              <p className="garments-header-cart">
+                                <strong>{item.specific_data.garments.length} Garment{item.specific_data.garments.length > 1 ? 's' : ''}</strong>
+                              </p>
+                              {item.specific_data.garments.map((garment, idx) => (
+                                <div key={idx} className="garment-item-cart">
+                                  <p>• {garment.garmentType} ({garment.damageLevel}): ₱{garment.basePrice}</p>
+                                  {garment.notes && <p className="garment-notes">  Notes: {garment.notes}</p>}
+                                </div>
+                              ))}
+                            </>
+                          ) : (
+                            <>
+                              <p>Damage Level: {item.specific_data.damageLevel || 'N/A'}</p>
+                              <p>Garment: {item.specific_data.garmentType || 'N/A'}</p>
+                              <p>Description: {item.specific_data.damageDescription || 'N/A'}</p>
+                            </>
+                          )}
                           <p>Drop off preferred date: {formatDateTo12Hour(item.specific_data.pickupDate) || 'N/A'}</p>
                           {item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
                             <div className="cart-item-image">
@@ -638,15 +655,31 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                       )}
                       {item.service_type === 'dry_cleaning' && item.specific_data && (
                         <div className="drycleaning-details">
-                          {item.specific_data.garmentType && (
-                            <p>Garment Type: {item.specific_data.garmentType.charAt(0).toUpperCase() + item.specific_data.garmentType.slice(1)}</p>
+                          {/* Check for multiple garments */}
+                          {item.specific_data.garments && item.specific_data.garments.length > 0 ? (
+                            <>
+                              <p className="garments-header-cart">
+                                <strong>{item.specific_data.garments.length} Garment{item.specific_data.garments.length > 1 ? 's' : ''}</strong>
+                              </p>
+                              {item.specific_data.garments.map((garment, idx) => (
+                                <div key={idx} className="garment-item-cart">
+                                  <p>• {garment.garmentType} ({garment.brand}) × {garment.quantity}: ₱{garment.pricePerItem * garment.quantity}</p>
+                                </div>
+                              ))}
+                            </>
+                          ) : (
+                            <>
+                              {item.specific_data.garmentType && (
+                                <p>Garment Type: {item.specific_data.garmentType.charAt(0).toUpperCase() + item.specific_data.garmentType.slice(1)}</p>
+                              )}
+                              <p>Brand: {item.specific_data.brand || 'N/A'}</p>
+                              <p>Quantity: {item.specific_data.quantity || 'N/A'} items</p>
+                              {item.specific_data.pricePerItem && (
+                                <p>Price per item: ₱{parseFloat(item.specific_data.pricePerItem).toFixed(2)}</p>
+                              )}
+                            </>
                           )}
-                          <p>Brand: {item.specific_data.brand || 'N/A'}</p>
-                          <p>Quantity: {item.specific_data.quantity || 'N/A'} items</p>
                           <p>Drop off date: {formatDateTo12Hour(item.specific_data.pickupDate) || 'N/A'}</p>
-                          {item.specific_data.pricePerItem && (
-                            <p>Price per item: ₱{parseFloat(item.specific_data.pricePerItem).toFixed(2)}</p>
-                          )}
                           {item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
                             <div className="cart-item-image">
                               <img 

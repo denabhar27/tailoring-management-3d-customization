@@ -769,7 +769,11 @@ const DryCleaning = () => {
                         `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'N/A'
                       )}
                     </td>
-                    <td>{item.specific_data?.garmentType || 'N/A'}</td>
+                    <td>
+                      {item.specific_data?.garments && item.specific_data.garments.length > 0 
+                        ? `${item.specific_data.garments.length} garment${item.specific_data.garments.length > 1 ? 's' : ''}`
+                        : (item.specific_data?.garmentType || 'N/A')}
+                    </td>
                     <td><span style={{ fontSize: '0.9em', color: '#d32f2f' }}>{item.specific_data?.serviceName || 'N/A'}</span></td>
                     <td>{new Date(item.order_date).toLocaleDateString()}</td>
                     <td>₱{parseFloat(item.final_price || 0).toLocaleString()}</td>
@@ -883,7 +887,21 @@ const DryCleaning = () => {
             </div>
             <div className="modal-body">
               <div className="detail-row"><strong>Order ID:</strong> #{selectedOrder.order_id}</div>
-              <div className="detail-row"><strong>Garment:</strong> {selectedOrder.specific_data?.garmentType || 'N/A'}</div>
+              {/* Multiple garments support */}
+              {selectedOrder.specific_data?.garments && selectedOrder.specific_data.garments.length > 0 ? (
+                <>
+                  <div className="detail-row"><strong>Garments:</strong> {selectedOrder.specific_data.garments.length} item{selectedOrder.specific_data.garments.length > 1 ? 's' : ''}</div>
+                  {selectedOrder.specific_data.garments.map((garment, idx) => (
+                    <div key={idx} style={{ marginLeft: '20px', paddingLeft: '10px', borderLeft: '2px solid #e0e0e0', marginBottom: '8px' }}>
+                      <div className="detail-row"><strong>#{idx + 1}:</strong> {garment.garmentType || 'N/A'} ({garment.brand || 'N/A'}) × {garment.quantity || 1} - ₱{(garment.pricePerItem * (garment.quantity || 1)).toFixed(2)}</div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <div className="detail-row"><strong>Garment:</strong> {selectedOrder.specific_data?.garmentType || 'N/A'}</div>
+                </>
+              )}
               <div className="detail-row"><strong>Service:</strong> {selectedOrder.specific_data?.serviceName || 'N/A'}</div>
 
               <div className="form-group" style={{ marginTop: '20px' }}>
@@ -1035,7 +1053,24 @@ const DryCleaning = () => {
                   )}
                 </>
               )}
-              <div className="detail-row"><strong>Garment:</strong> {selectedOrder.specific_data?.garmentType || 'N/A'}</div>
+              {/* Multiple garments support */}
+              {selectedOrder.specific_data?.garments && selectedOrder.specific_data.garments.length > 0 ? (
+                <>
+                  <div className="detail-row"><strong>Garments:</strong> {selectedOrder.specific_data.garments.length} item{selectedOrder.specific_data.garments.length > 1 ? 's' : ''}</div>
+                  {selectedOrder.specific_data.garments.map((garment, idx) => (
+                    <div key={idx} style={{ marginLeft: '20px', paddingLeft: '10px', borderLeft: '2px solid #e0e0e0', marginBottom: '8px' }}>
+                      <div className="detail-row"><strong>Garment #{idx + 1}:</strong> {garment.garmentType ? (garment.garmentType.charAt(0).toUpperCase() + garment.garmentType.slice(1)) : 'N/A'}</div>
+                      <div className="detail-row"><strong>Brand:</strong> {garment.brand || 'N/A'}</div>
+                      <div className="detail-row"><strong>Quantity:</strong> {garment.quantity || 1}</div>
+                      <div className="detail-row"><strong>Price:</strong> ₱{(garment.pricePerItem * (garment.quantity || 1)).toFixed(2)}</div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <div className="detail-row"><strong>Garment:</strong> {selectedOrder.specific_data?.garmentType || 'N/A'}</div>
+                </>
+              )}
               <div className="detail-row"><strong>Service:</strong> {selectedOrder.specific_data?.serviceName || 'N/A'}</div>
               <div className="detail-row"><strong>Date Received:</strong> {new Date(selectedOrder.order_date).toLocaleDateString()}</div>
               <div className="detail-row"><strong>Price:</strong> ₱{parseFloat(selectedOrder.final_price || 0).toLocaleString()}</div>
@@ -1084,8 +1119,22 @@ const DryCleaning = () => {
             <div className="modal-body">
               <div className="detail-row"><strong>Order ID:</strong> #{priceConfirmationItem.order_id}</div>
               <div className="detail-row"><strong>Service:</strong> {priceConfirmationItem.specific_data?.serviceName || 'N/A'}</div>
-              <div className="detail-row"><strong>Garment Type:</strong> {priceConfirmationItem.specific_data?.garmentType || 'N/A'}</div>
-              <div className="detail-row"><strong>Quantity:</strong> {priceConfirmationItem.specific_data?.quantity || 1}</div>
+              {/* Multiple garments support */}
+              {priceConfirmationItem.specific_data?.garments && priceConfirmationItem.specific_data.garments.length > 0 ? (
+                <>
+                  <div className="detail-row"><strong>Garments:</strong> {priceConfirmationItem.specific_data.garments.length} item{priceConfirmationItem.specific_data.garments.length > 1 ? 's' : ''}</div>
+                  {priceConfirmationItem.specific_data.garments.map((garment, idx) => (
+                    <div key={idx} style={{ marginLeft: '20px', paddingLeft: '10px', borderLeft: '2px solid #e0e0e0', marginBottom: '4px' }}>
+                      <span>{garment.garmentType ? (garment.garmentType.charAt(0).toUpperCase() + garment.garmentType.slice(1)) : 'N/A'} ({garment.brand || 'N/A'}) × {garment.quantity || 1}</span>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <div className="detail-row"><strong>Garment Type:</strong> {priceConfirmationItem.specific_data?.garmentType || 'N/A'}</div>
+                  <div className="detail-row"><strong>Quantity:</strong> {priceConfirmationItem.specific_data?.quantity || 1}</div>
+                </>
+              )}
               
               <div className="payment-form-group">
                 <label>Final Price (₱)</label>

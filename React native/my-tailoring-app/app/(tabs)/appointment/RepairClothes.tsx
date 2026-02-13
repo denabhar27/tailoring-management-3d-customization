@@ -41,14 +41,24 @@ interface TimeSlot {
   isClickable: boolean;
 }
 
+interface RepairGarmentItem {
+  id: number;
+  garmentType: string;
+  damageLevel: string;
+  notes: string;
+}
+
 export default function RepairClothes() {
   const router = useRouter();
 
   const [image, setImage] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [selectedItem, setSelectedItem] = useState("");
-  const [damageLevel, setDamageLevel] = useState("");
-  const [description, setDescription] = useState("");
+  
+  // Multiple garments support
+  const [garments, setGarments] = useState<RepairGarmentItem[]>([
+    { id: 1, garmentType: '', damageLevel: '', notes: '' }
+  ]);
+  
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>("");
@@ -66,6 +76,43 @@ export default function RepairClothes() {
     { value: 'major', label: 'Major', basePrice: 800, description: 'Large tears, structural damage, extensive repairs' },
     { value: 'severe', label: 'Severe', basePrice: 1500, description: 'Complete reconstruction, multiple major issues' }
   ];
+
+  // Garment management functions
+  const addGarment = () => {
+    const newId = Math.max(...garments.map(g => g.id)) + 1;
+    setGarments([...garments, { id: newId, garmentType: '', damageLevel: '', notes: '' }]);
+  };
+
+  const removeGarment = (id: number) => {
+    if (garments.length > 1) {
+      setGarments(garments.filter(g => g.id !== id));
+    }
+  };
+
+  const updateGarment = (id: number, field: keyof RepairGarmentItem, value: string) => {
+    setGarments(garments.map(g => 
+      g.id === id ? { ...g, [field]: value } : g
+    ));
+  };
+
+  // Calculate total price based on all garments
+  const calculateTotalPrice = (): number => {
+    return garments.reduce((total, garment) => {
+      if (!garment.damageLevel) return total;
+      const damageLevelObj = damageLevels.find(level => level.value === garment.damageLevel);
+      let basePrice = damageLevelObj ? damageLevelObj.basePrice : 500;
+      
+      // Apply garment multiplier
+      let garmentMultiplier = 1.0;
+      if (garment.garmentType === 'Suit' || garment.garmentType === 'Coat') {
+        garmentMultiplier = 1.3;
+      } else if (garment.garmentType === 'Dress') {
+        garmentMultiplier = 1.2;
+      }
+      
+      return total + Math.round(basePrice * garmentMultiplier);
+    }, 0);
+  };
 
   
   useEffect(() => {
@@ -135,32 +182,12 @@ export default function RepairClothes() {
   };
 
   useEffect(() => {
-    if (damageLevel) {
-      calculateEstimatedPrice();
+    if (garments.some(g => g.damageLevel)) {
+      setEstimatedPrice(calculateTotalPrice());
     } else {
       setEstimatedPrice(0);
     }
-  }, [damageLevel, selectedItem]);
-
-  const calculateEstimatedPrice = async () => {
-    if (!damageLevel) {
-      setEstimatedPrice(0);
-      return;
-    }
-
-    const damageLevelObj = damageLevels.find(level => level.value === damageLevel);
-    let basePrice = damageLevelObj ? damageLevelObj.basePrice : 500;
-
-    let garmentMultiplier = 1.0;
-    if (selectedItem === 'Suit' || selectedItem === 'Coat') {
-      garmentMultiplier = 1.3;
-    } else if (selectedItem === 'Dress') {
-      garmentMultiplier = 1.2;
-    }
-
-    const finalPrice = Math.round(basePrice * garmentMultiplier);
-    setEstimatedPrice(finalPrice);
-  };
+  }, [garments]);
 
   const getEstimatedTime = (damageLevel: string) => {
     const times: {[key: string]: string} = {
@@ -347,10 +374,31 @@ export default function RepairClothes() {
   };
 
   const handleAddService = async () => {
-    if (!selectedItem || !damageLevel || !description || !appointmentDate) {
+    // Validate garments
+    const validGarments = garments.filter(g => g.garmentType && g.damageLevel && g.notes);
+    if (validGarments.length === 0) {
       Alert.alert(
         "Missing Information",
-        "Please fill in all required fields"
+        "Please add at least one garment with type, damage level, and description"
+      );
+      return;
+    }
+
+    // Check all required fields for each garment
+    for (const garment of garments) {
+      if (!garment.garmentType || !garment.damageLevel || !garment.notes) {
+        Alert.alert(
+          "Missing Information",
+          "Please fill in all required fields for each garment"
+        );
+        return;
+      }
+    }
+
+    if (!appointmentDate) {
+      Alert.alert(
+        "Missing Information",
+        "Please select a drop-off date"
       );
       return;
     }
@@ -417,21 +465,30 @@ export default function RepairClothes() {
       const dateStr = `${year}-${month}-${day}`;
       const pickupDateTime = `${dateStr}T${selectedTimeSlot}`;
 
+      // Build garments array for submission
+      const garmentsData = garments.map(garment => {
+        const damageLevelObj = damageLevels.find(level => level.value === garment.damageLevel);
+        const basePrice = damageLevelObj ? damageLevelObj.basePrice : 500;
+        return {
+          damageLevel: garment.damageLevel,
+          garmentType: garment.garmentType,
+          notes: garment.notes,
+          basePrice: basePrice
+        };
+      });
+
       const repairData = {
         serviceType: 'repair', 
         serviceId: 1, 
-        quantity: 1, 
-        serviceName: `${damageLevel} Repair`,
+        quantity: garments.length, 
+        serviceName: 'Repair Service',
         basePrice: estimatedPrice.toString(),
         finalPrice: estimatedPrice.toString(), 
-        damageLevel: damageLevel,
-        damageDescription: description,
-        damageLocation: selectedItem,
-        garmentType: selectedItem,
         pickupDate: pickupDateTime, 
         appointmentTime: selectedTimeSlot, 
         imageUrl: imageUrl || 'no-image',
-        estimatedTime: getEstimatedTime(damageLevel)
+        garments: garmentsData,
+        isMultipleGarments: garments.length > 1
       };
 
       console.log('Sending repair data to cart:', JSON.stringify(repairData, null, 2));
@@ -450,12 +507,12 @@ export default function RepairClothes() {
             {
               text: "Add More",
               onPress: () => {
-                setSelectedItem("");
-                setDamageLevel("");
-                setDescription("");
+                setGarments([{ id: 1, garmentType: '', damageLevel: '', notes: '' }]);
                 setImage(null);
                 setImagePreview(null);
                 setAppointmentDate(null);
+                setSelectedTimeSlot("");
+                setTimeSlots([]);
                 setEstimatedPrice(0);
               },
             },
@@ -523,75 +580,98 @@ export default function RepairClothes() {
               </View>
             )}
           </TouchableOpacity>
-          <Text style={styles.sectionTitle}>Garment Type *</Text>
-          {loadingGarments ? (
-            <View style={[styles.pickerWrapper, { justifyContent: 'center', alignItems: 'center', paddingVertical: 15 }]}>
-              <ActivityIndicator size="small" color="#8D6E63" />
-              <Text style={{ color: '#64748b', marginTop: 8, fontSize: 12 }}>Loading garment types...</Text>
-            </View>
-          ) : (
-            <View style={styles.pickerWrapper}>
-              <Picker
-                selectedValue={selectedItem}
-                onValueChange={(value) => setSelectedItem(value)}
-                style={styles.picker}
-              >
-                <Picker.Item label="Select garment type..." value="" />
-                {repairGarmentTypes.map((item, index) => (
-                  <Picker.Item label={item} value={item} key={`${item}-${index}`} />
-                ))}
-              </Picker>
-            </View>
-          )}
-          <Text style={styles.sectionTitle}>Damage Level *</Text>
-          <View style={styles.damageLevelContainer}>
-            {damageLevels.map((level) => (
-              <TouchableOpacity
-                key={level.value}
-                style={[
-                  styles.damageLevelCard,
-                  damageLevel === level.value && styles.damageLevelCardSelected,
-                ]}
-                onPress={() => setDamageLevel(level.value)}
-              >
-                <View style={styles.damageLevelHeader}>
-                  <Text style={[
-                    styles.damageLevelLabel,
-                    damageLevel === level.value && styles.damageLevelLabelSelected,
-                  ]}>
-                    {level.label}
-                  </Text>
-                  {damageLevel === level.value && (
-                    <Ionicons name="checkmark-circle" size={20} color="#B8860B" />
-                  )}
+
+          {/* Garments - Simple repeated inputs */}
+          {garments.map((garment, index) => (
+            <View key={garment.id}>
+              {index > 0 && <View style={styles.garmentDivider} />}
+              
+              {garments.length > 1 && (
+                <View style={styles.garmentRowHeader}>
+                  <Text style={styles.garmentLabel}>Garment #{index + 1}</Text>
+                  <TouchableOpacity onPress={() => removeGarment(garment.id)}>
+                    <Text style={styles.removeGarmentLink}>Remove</Text>
+                  </TouchableOpacity>
                 </View>
-                <Text style={[
-                  styles.damageLevelDescription,
-                  damageLevel === level.value && styles.damageLevelDescriptionSelected,
-                ]}>
-                  {level.description}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          {damageLevel && (
-            <Text style={styles.priceIndicator}>
-              Estimated price: ₱{estimatedPrice}
-            </Text>
+              )}
+
+              <Text style={styles.sectionTitle}>Damage Level *</Text>
+              <View style={styles.damageLevelContainer}>
+                {damageLevels.map((level) => (
+                  <TouchableOpacity
+                    key={level.value}
+                    style={[
+                      styles.damageLevelCard,
+                      garment.damageLevel === level.value && styles.damageLevelCardSelected,
+                    ]}
+                    onPress={() => updateGarment(garment.id, 'damageLevel', level.value)}
+                  >
+                    <View style={styles.damageLevelHeader}>
+                      <Text style={[
+                        styles.damageLevelLabel,
+                        garment.damageLevel === level.value && styles.damageLevelLabelSelected,
+                      ]}>
+                        {level.label} - ₱{level.basePrice}
+                      </Text>
+                      {garment.damageLevel === level.value && (
+                        <Ionicons name="checkmark-circle" size={20} color="#B8860B" />
+                      )}
+                    </View>
+                    <Text style={[
+                      styles.damageLevelDescription,
+                      garment.damageLevel === level.value && styles.damageLevelDescriptionSelected,
+                    ]}>
+                      {level.description}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              <Text style={styles.sectionTitle}>Garment Type *</Text>
+              {loadingGarments ? (
+                <View style={[styles.pickerWrapper, { justifyContent: 'center', alignItems: 'center', paddingVertical: 15 }]}>
+                  <ActivityIndicator size="small" color="#8D6E63" />
+                </View>
+              ) : (
+                <View style={styles.pickerWrapper}>
+                  <Picker
+                    selectedValue={garment.garmentType}
+                    onValueChange={(value) => updateGarment(garment.id, 'garmentType', value)}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Select garment type..." value="" />
+                    {repairGarmentTypes.map((item, idx) => (
+                      <Picker.Item label={item} value={item} key={`${garment.id}-${item}-${idx}`} />
+                    ))}
+                  </Picker>
+                </View>
+              )}
+              
+              <Text style={styles.sectionTitle}>Damage Description *</Text>
+              <TextInput
+                placeholder="Describe the damage in detail..."
+                style={styles.textArea}
+                placeholderTextColor="#999"
+                multiline
+                value={garment.notes}
+                onChangeText={(value) => updateGarment(garment.id, 'notes', value)}
+                textAlignVertical="top"
+              />
+            </View>
+          ))}
+          
+          <TouchableOpacity style={styles.addGarmentLink} onPress={addGarment}>
+            <Text style={styles.addGarmentLinkText}>+ Add Another Garment</Text>
+          </TouchableOpacity>
+
+          {/* Total Price Display */}
+          {garments.some(g => g.damageLevel) && (
+            <View style={styles.totalPriceRow}>
+              <Text style={styles.totalPriceLabel}>Estimated Total:</Text>
+              <Text style={styles.totalPriceValue}>₱{estimatedPrice}</Text>
+            </View>
           )}
-          <Text style={styles.sectionTitle}>Detailed Description *</Text>
-          <TextInput
-            placeholder="Please describe the damage in detail (size, location, extent of damage)..."
-            style={styles.textArea}
-            placeholderTextColor="#999"
-            multiline
-            value={description}
-            onChangeText={setDescription}
-            textAlignVertical="top"
-          />
-          <Text style={styles.smallText}>
-            Examples: 2-inch hole in left sleeve, broken zipper on jacket back, torn seam on pants
-          </Text>
+
           <Text style={styles.sectionTitle}>Preferred Appointment Date *</Text>
           <Text style={styles.sectionSubtitle}>Select a date when the shop is open</Text>
           <TouchableOpacity
@@ -693,17 +773,15 @@ export default function RepairClothes() {
             <View style={styles.summaryCard}>
               <Text style={styles.summaryTitle}>Estimated Price: ₱{estimatedPrice}</Text>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Damage Level:</Text>
-                <Text style={styles.summaryValue}>{damageLevel}</Text>
+                <Text style={styles.summaryLabel}>Items:</Text>
+                <Text style={styles.summaryValue}>{garments.length} garment(s)</Text>
               </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Garment Type:</Text>
-                <Text style={styles.summaryValue}>{selectedItem}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Estimated Time:</Text>
-                <Text style={styles.summaryValue}>{getEstimatedTime(damageLevel)}</Text>
-              </View>
+              {garments.filter(g => g.damageLevel).map((g, idx) => (
+                <View key={g.id} style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>{g.garmentType || `Garment ${idx + 1}`}:</Text>
+                  <Text style={styles.summaryValue}>{damageLevels.find(l => l.value === g.damageLevel)?.label || g.damageLevel}</Text>
+                </View>
+              ))}
               <Text style={styles.summaryNote}>
                 Final price will be confirmed after admin review
               </Text>
@@ -1156,5 +1234,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8D6E63',
     textAlign: 'center',
+  },
+  // Simple multi-garment styles
+  garmentDivider: {
+    height: 1,
+    backgroundColor: '#D7CCC8',
+    marginVertical: 20,
+  },
+  garmentRowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  garmentLabel: {
+    fontWeight: '600',
+    color: '#8D6E63',
+    fontSize: 15,
+  },
+  removeGarmentLink: {
+    color: '#ef5350',
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  addGarmentLink: {
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  addGarmentLinkText: {
+    color: '#8D6E63',
+    fontSize: 15,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
+  },
+  totalPriceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#D7CCC8',
+    marginBottom: 16,
+  },
+  totalPriceLabel: {
+    color: '#5D4037',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  totalPriceValue: {
+    color: '#8D6E63',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
 });

@@ -171,13 +171,17 @@ export async function addRepairToCart(repairData) {
       },
       specificData: {
         serviceName: repairData.serviceName,
-        damageLevel: repairData.damageLevel,
-        garmentType: repairData.garmentType,
-        damageDescription: repairData.damageDescription,
-        damageLocation: repairData.damageLocation,
         imageUrl: repairData.imageUrl,
         pickupDate: repairData.pickupDate,
-        uploadedAt: new Date().toISOString()
+        uploadedAt: new Date().toISOString(),
+        // Multiple garments support
+        garments: repairData.garments || [],
+        isMultipleGarments: repairData.isMultipleGarments || false,
+        // Legacy single-garment fields (for backwards compatibility)
+        damageLevel: repairData.garments?.[0]?.damageLevel || repairData.damageLevel,
+        garmentType: repairData.garments?.[0]?.garmentType || repairData.garmentType,
+        damageDescription: repairData.garments?.[0]?.notes || repairData.damageDescription,
+        damageLocation: repairData.damageLocation
       }
     };
 

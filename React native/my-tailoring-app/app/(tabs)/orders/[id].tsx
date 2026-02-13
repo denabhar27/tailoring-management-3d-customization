@@ -210,7 +210,7 @@ export default function OrderDetails() {
 
           <Text style={styles.date}>Placed on {formatDate(order.order_date)}</Text>
           <Text style={styles.serviceType}>
-            {order.service_type.charAt(0).toUpperCase() + order.service_type.slice(1)} Service
+            {order.service_type === 'dry_cleaning' ? 'Dry Cleaning' : order.service_type.charAt(0).toUpperCase() + order.service_type.slice(1)} Service
           </Text>
 
           <View style={styles.divider} />

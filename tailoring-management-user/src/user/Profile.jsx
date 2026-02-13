@@ -682,7 +682,7 @@ const Profile = () => {
           return times[damageLevel] || 'N/A';
         };
 
-        const damageLevel = specific_data.damageLevel || 'N/A';
+        const damageLevel = specific_data.garments?.[0]?.damageLevel || specific_data.damageLevel || 'N/A';
         const estimatedPrice = specific_data.estimatedPrice || getEstimatedPrice(damageLevel);
         const estimatedTime = specific_data.estimatedTime || getEstimatedTimeFromLevel(damageLevel);
 
@@ -711,18 +711,52 @@ const Profile = () => {
               <span className="detail-label">Service Name:</span>
               <span className="detail-value">{formatServiceName(specific_data.serviceName) || 'N/A'}</span>
             </div>
-            <div className="detail-row">
-              <span className="detail-label">Damage Level:</span>
-              <span className="detail-value">{damageLevel ? damageLevel.charAt(0).toUpperCase() + damageLevel.slice(1) : 'N/A'}</span>
-            </div>
-            <div className="detail-row">
-              <span className="detail-label">Garment Type:</span>
-              <span className="detail-value">{specific_data.damageLocation || specific_data.garmentType || 'N/A'}</span>
-            </div>
-            <div className="detail-row">
-              <span className="detail-label">Description:</span>
-              <span className="detail-value">{specific_data.damageDescription || 'N/A'}</span>
-            </div>
+            
+            {/* Multiple garments support */}
+            {specific_data.garments && specific_data.garments.length > 0 ? (
+              <>
+                <div className="detail-row">
+                  <span className="detail-label">Garments:</span>
+                  <span className="detail-value"><strong>{specific_data.garments.length} item{specific_data.garments.length > 1 ? 's' : ''}</strong></span>
+                </div>
+                {specific_data.garments.map((garment, idx) => (
+                  <div key={idx} className="garment-details-block" style={{ marginLeft: '20px', paddingLeft: '10px', borderLeft: '2px solid #e0e0e0', marginBottom: '10px' }}>
+                    <div className="detail-row">
+                      <span className="detail-label">Garment #{idx + 1}:</span>
+                      <span className="detail-value">{garment.garmentType || 'N/A'}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-label">Damage Level:</span>
+                      <span className="detail-value">{garment.damageLevel ? garment.damageLevel.charAt(0).toUpperCase() + garment.damageLevel.slice(1) : 'N/A'}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-label">Description:</span>
+                      <span className="detail-value">{garment.notes || 'N/A'}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-label">Price:</span>
+                      <span className="detail-value">₱{garment.basePrice || 'N/A'}</span>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <>
+                <div className="detail-row">
+                  <span className="detail-label">Damage Level:</span>
+                  <span className="detail-value">{damageLevel ? damageLevel.charAt(0).toUpperCase() + damageLevel.slice(1) : 'N/A'}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Garment Type:</span>
+                  <span className="detail-value">{specific_data.damageLocation || specific_data.garmentType || 'N/A'}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Description:</span>
+                  <span className="detail-value">{specific_data.damageDescription || 'N/A'}</span>
+                </div>
+              </>
+            )}
+            
             <div className="detail-row">
               <span className="detail-label">Drop Off Item Date:</span>
               <span className="detail-value">{formatDateTo12Hour(specific_data.pickupDate)}</span>
@@ -982,18 +1016,52 @@ const Profile = () => {
               <span className="detail-label">Service Name:</span>
               <span className="detail-value">{formatServiceName(cleaningServiceName)}</span>
             </div>
-            <div className="detail-row">
-              <span className="detail-label">Garment Type:</span>
-              <span className="detail-value">{specific_data.garmentType ? (specific_data.garmentType.charAt(0).toUpperCase() + specific_data.garmentType.slice(1)) : 'N/A'}</span>
-            </div>
-            <div className="detail-row">
-              <span className="detail-label">Brand:</span>
-              <span className="detail-value">{specific_data.brand || 'N/A'}</span>
-            </div>
-            <div className="detail-row">
-              <span className="detail-label">Quantity:</span>
-              <span className="detail-value">{cleaningQuantity} items</span>
-            </div>
+            
+            {/* Multiple garments support */}
+            {specific_data.garments && specific_data.garments.length > 0 ? (
+              <>
+                <div className="detail-row">
+                  <span className="detail-label">Garments:</span>
+                  <span className="detail-value"><strong>{specific_data.garments.length} item{specific_data.garments.length > 1 ? 's' : ''}</strong></span>
+                </div>
+                {specific_data.garments.map((garment, idx) => (
+                  <div key={idx} className="garment-details-block" style={{ marginLeft: '20px', paddingLeft: '10px', borderLeft: '2px solid #e0e0e0', marginBottom: '10px' }}>
+                    <div className="detail-row">
+                      <span className="detail-label">Garment #{idx + 1}:</span>
+                      <span className="detail-value">{garment.garmentType ? (garment.garmentType.charAt(0).toUpperCase() + garment.garmentType.slice(1)) : 'N/A'}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-label">Brand:</span>
+                      <span className="detail-value">{garment.brand || 'N/A'}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-label">Quantity:</span>
+                      <span className="detail-value">{garment.quantity || 1}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-label">Price:</span>
+                      <span className="detail-value">₱{(garment.pricePerItem * (garment.quantity || 1)).toFixed(2)}</span>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <>
+                <div className="detail-row">
+                  <span className="detail-label">Garment Type:</span>
+                  <span className="detail-value">{specific_data.garmentType ? (specific_data.garmentType.charAt(0).toUpperCase() + specific_data.garmentType.slice(1)) : 'N/A'}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Brand:</span>
+                  <span className="detail-value">{specific_data.brand || 'N/A'}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Quantity:</span>
+                  <span className="detail-value">{cleaningQuantity} items</span>
+                </div>
+              </>
+            )}
+            
             <div className="detail-row">
               <span className="detail-label">Special Instructions:</span>
               <span className="detail-value">{specific_data.notes || 'None'}</span>

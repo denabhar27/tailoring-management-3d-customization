@@ -117,3 +117,91 @@ export async function updateProfile(profileData) {
     };
   }
 }
+
+// Password Reset Functions
+
+/**
+ * Request a password reset code
+ * @param {string} usernameOrEmail - Username or email address
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function forgotPassword(usernameOrEmail) {
+  try {
+    const response = await axios.post(`${BASE_URL}/forgot-password`, {
+      usernameOrEmail
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "An error occurred. Please try again."
+    };
+  }
+}
+
+/**
+ * Verify the security code
+ * @param {string} code - 6-character security code
+ * @param {string} usernameOrEmail - Username or email address
+ * @returns {Promise<{success: boolean, message: string, resetToken?: string}>}
+ */
+export async function verifyResetCode(code, usernameOrEmail) {
+  try {
+    const response = await axios.post(`${BASE_URL}/verify-reset-code`, {
+      code,
+      usernameOrEmail
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Verify reset code error:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Invalid code. Please try again."
+    };
+  }
+}
+
+/**
+ * Reset password with verified token
+ * @param {string} resetToken - Token from code verification
+ * @param {string} newPassword - New password
+ * @param {string} confirmPassword - Password confirmation
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function resetPassword(resetToken, newPassword, confirmPassword) {
+  try {
+    const response = await axios.post(`${BASE_URL}/reset-password`, {
+      resetToken,
+      newPassword,
+      confirmPassword
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Reset password error:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Failed to reset password. Please try again."
+    };
+  }
+}
+
+/**
+ * Resend security code
+ * @param {string} usernameOrEmail - Username or email address
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function resendResetCode(usernameOrEmail) {
+  try {
+    const response = await axios.post(`${BASE_URL}/resend-reset-code`, {
+      usernameOrEmail
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Resend reset code error:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Failed to resend code. Please try again."
+    };
+  }
+}

@@ -16,9 +16,11 @@ import full from "../assets/full.png";
 import tuxedo from "../assets/tuxedo.png";
 import { loginUser, registerUser } from '../api/AuthApi';
 import RentalClothes from './components/RentalClothes';
+import ForgotPassword from '../components/auth/ForgotPassword';
 
 const App = ({ setIsLoggedIn }) => {
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
@@ -454,7 +456,7 @@ const App = ({ setIsLoggedIn }) => {
                 <input type="checkbox" />
                 <span>Remember me</span>
               </label>
-              <a href="#" className="forgot-link">Forgot Password?</a>
+              <a href="#" className="forgot-link" onClick={(e) => { e.preventDefault(); setIsAuthModalOpen(false); setIsForgotPasswordOpen(true); }}>Forgot Password?</a>
             </div>
           )}
           {authError && (
@@ -477,6 +479,17 @@ const App = ({ setIsLoggedIn }) => {
       </div>
     </div>
   </div>
+)}
+
+{isForgotPasswordOpen && (
+  <ForgotPassword 
+    onClose={() => setIsForgotPasswordOpen(false)}
+    onSuccess={() => {
+      setIsForgotPasswordOpen(false);
+      setIsAuthModalOpen(true);
+      setIsLogin(true);
+    }}
+  />
 )}
       
     </>

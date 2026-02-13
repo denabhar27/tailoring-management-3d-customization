@@ -149,6 +149,8 @@ const faqRoutes = require('./routes/FAQRoutes');
 app.use('/api/faqs', faqRoutes);
 const analyticsRoutes = require('./routes/AnalyticsRoutes');
 app.use('/api/analytics', analyticsRoutes);
+const passwordResetRoutes = require('./routes/PasswordResetRoutes');
+app.use('/api', passwordResetRoutes);
 
 try {
   const appointmentSlotController = require('./controller/AppointmentSlotController');

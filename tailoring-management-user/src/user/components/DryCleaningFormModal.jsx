@@ -9,16 +9,18 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   
   const [garmentTypes, setGarmentTypes] = useState({});
   const [garmentTypesList, setGarmentTypesList] = useState([]);
+  const [loadingGarments, setLoadingGarments] = useState(false);
+
+  // Multiple garments support - array of garment items
+  const [garments, setGarments] = useState([
+    { id: 1, garmentType: '', customGarmentType: '', brand: '', quantity: 1 }
+  ]);
 
   const [formData, setFormData] = useState({
     serviceName: '',
-    brand: '',
     notes: '',
     date: '',
-    time: '',
-    quantity: 1,
-    garmentType: '',
-    customGarmentType: ''
+    time: ''
   });
   const [allTimeSlots, setAllTimeSlots] = useState([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState([]);
@@ -34,11 +36,21 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const [priceLoading, setPriceLoading] = useState(false);
   const [services, setServices] = useState([]);
 
+  // Load garment types on mount
   useEffect(() => {
     loadGarmentTypes();
   }, []);
 
+  // Also load garment types when modal opens (in case first load failed)
+  useEffect(() => {
+    if (isOpen && garmentTypesList.length === 0) {
+      console.log('[DryCleaningFormModal] Modal opened with empty garment list, reloading...');
+      loadGarmentTypes();
+    }
+  }, [isOpen]);
+
   const loadGarmentTypes = async () => {
+    setLoadingGarments(true);
     try {
       console.log('[DryCleaningFormModal] Loading garment types...');
       const result = await getAllDCGarmentTypes();
@@ -46,26 +58,20 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       if (result.success && result.data) {
         console.log('[DryCleaningFormModal] Found', result.data.length, 'garment types');
         const typesObj = {};
-        result.data.forEach(garment => {
-          if (garment.is_active === 1) {
-            typesObj[garment.garment_name.toLowerCase()] = parseFloat(garment.garment_price);
-          }
+        const activeGarments = result.data.filter(g => g.is_active === 1 || g.is_active === true);
+        activeGarments.forEach(garment => {
+          typesObj[garment.garment_name.toLowerCase()] = parseFloat(garment.garment_price);
         });
         setGarmentTypes(typesObj);
-        setGarmentTypesList(result.data.filter(g => g.is_active === 1));
-        console.log('[DryCleaningFormModal] Garment types loaded successfully');
+        setGarmentTypesList(activeGarments);
+        console.log('[DryCleaningFormModal] Garment types loaded successfully:', activeGarments.length, 'active items');
       } else {
         console.log('[DryCleaningFormModal] API returned no data or failed:', result);
       }
     } catch (err) {
       console.error("[DryCleaningFormModal] Load garment types error:", err);
-      
-      setGarmentTypes({
-        'barong': 200,
-        'suits': 200,
-        'coat': 300,
-        'trousers': 200
-      });
+    } finally {
+      setLoadingGarments(false);
     }
   };
 
@@ -75,14 +81,13 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       
       setFormData({
         serviceName: '',
-        brand: '',
         notes: '',
         date: '',
-        time: '',
-        quantity: 1,
-        garmentType: '',
-        customGarmentType: ''
+        time: ''
       });
+      setGarments([
+        { id: 1, garmentType: '', customGarmentType: '', brand: '', quantity: 1 }
+      ]);
       setAvailableTimeSlots([]);
       setErrors({});
     }
@@ -242,36 +247,63 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   useEffect(() => {
-    if (formData.quantity && formData.garmentType) {
+    if (garments.length > 0) {
       calculatePrice();
     } else {
       setEstimatedPrice(0);
       setIsEstimatedPrice(false);
     }
-  }, [formData.quantity, formData.garmentType, formData.customGarmentType, garmentTypesList]);
+  }, [garments, garmentTypesList]);
 
   const calculatePrice = () => {
-    if (!formData.quantity || !formData.garmentType) {
+    if (garments.length === 0) {
       setEstimatedPrice(0);
       setIsEstimatedPrice(false);
       return;
     }
 
-    const quantity = parseInt(formData.quantity);
-    
-    if (formData.garmentType === 'others') {
-      
-      const estimatedPricePerItem = 350;
-      const totalPrice = estimatedPricePerItem * quantity;
-      setEstimatedPrice(totalPrice);
-      setIsEstimatedPrice(true);
-    } else {
+    let totalPrice = 0;
+    let hasEstimatedItem = false;
 
-      const selectedGarment = garmentTypesList.find(g => g.garment_name.toLowerCase() === formData.garmentType);
-      const pricePerItem = selectedGarment ? parseFloat(selectedGarment.garment_price) : (garmentTypes[formData.garmentType] || 200);
-      const totalPrice = pricePerItem * quantity;
-      setEstimatedPrice(totalPrice);
-      setIsEstimatedPrice(false);
+    garments.forEach(garment => {
+      if (!garment.garmentType) return;
+      
+      const quantity = parseInt(garment.quantity) || 1;
+      
+      if (garment.garmentType === 'others') {
+        const estimatedPricePerItem = 350;
+        totalPrice += estimatedPricePerItem * quantity;
+        hasEstimatedItem = true;
+      } else {
+        const selectedGarment = garmentTypesList.find(g => g.garment_name.toLowerCase() === garment.garmentType);
+        const pricePerItem = selectedGarment ? parseFloat(selectedGarment.garment_price) : (garmentTypes[garment.garmentType] || 200);
+        totalPrice += pricePerItem * quantity;
+      }
+    });
+
+    setEstimatedPrice(totalPrice);
+    setIsEstimatedPrice(hasEstimatedItem);
+  };
+
+  // Garment management functions
+  const addGarment = () => {
+    const newId = Math.max(...garments.map(g => g.id)) + 1;
+    setGarments([...garments, { id: newId, garmentType: '', customGarmentType: '', brand: '', quantity: 1 }]);
+  };
+
+  const removeGarment = (id) => {
+    if (garments.length > 1) {
+      setGarments(garments.filter(g => g.id !== id));
+    }
+  };
+
+  const updateGarment = (id, field, value) => {
+    setGarments(garments.map(g => 
+      g.id === id ? { ...g, [field]: value } : g
+    ));
+    // Clear error for this field
+    if (errors[`garment_${id}_${field}`]) {
+      setErrors(prev => ({ ...prev, [`garment_${id}_${field}`]: '' }));
     }
   };
 
@@ -305,15 +337,19 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.garmentType) {
-      newErrors.garmentType = 'Please select a garment type';
-    }
-    if (formData.garmentType === 'others' && !formData.customGarmentType.trim()) {
-      newErrors.customGarmentType = 'Please specify the garment type';
-    }
-    if (!formData.brand || formData.brand.trim() === '') {
-      newErrors.brand = 'Please enter the clothing brand';
-    }
+    // Validate each garment
+    garments.forEach((garment, index) => {
+      if (!garment.garmentType) {
+        newErrors[`garment_${garment.id}_garmentType`] = 'Please select a garment type';
+      }
+      if (garment.garmentType === 'others' && !garment.customGarmentType.trim()) {
+        newErrors[`garment_${garment.id}_customGarmentType`] = 'Please specify the garment type';
+      }
+      if (!garment.brand || garment.brand.trim() === '') {
+        newErrors[`garment_${garment.id}_brand`] = 'Please enter the clothing brand';
+      }
+    });
+
     if (!formData.date) {
       newErrors.date = 'Please select a drop off date';
     }
@@ -384,36 +420,46 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         ? (services.find(service => service.service_name === 'Basic Dry Cleaning') || services[0])
         : null;
 
-      const actualGarmentType = formData.garmentType === 'others' 
-        ? formData.customGarmentType.trim() 
-        : formData.garmentType;
-
-      let pricePerItem = 350; 
-      if (formData.garmentType !== 'others') {
-        const selectedGarment = garmentTypesList.find(g => g.garment_name.toLowerCase() === formData.garmentType);
-        pricePerItem = selectedGarment ? parseFloat(selectedGarment.garment_price) : (garmentTypes[formData.garmentType] || 200);
-      }
-
       const pickupDateTime = `${formData.date}T${formData.time}`;
+
+      // Build garments array for submission
+      const garmentsData = garments.map(garment => {
+        const actualGarmentType = garment.garmentType === 'others' 
+          ? garment.customGarmentType.trim() 
+          : garment.garmentType;
+
+        let pricePerItem = 350; 
+        if (garment.garmentType !== 'others') {
+          const selectedGarment = garmentTypesList.find(g => g.garment_name.toLowerCase() === garment.garmentType);
+          pricePerItem = selectedGarment ? parseFloat(selectedGarment.garment_price) : (garmentTypes[garment.garmentType] || 200);
+        }
+
+        return {
+          garmentType: actualGarmentType,
+          brand: garment.brand,
+          quantity: garment.quantity,
+          pricePerItem: pricePerItem,
+          isEstimated: garment.garmentType === 'others'
+        };
+      });
 
       const dryCleaningData = {
         serviceId: defaultService?.service_id || 1,
         serviceName: 'Basic Dry Cleaning',
         basePrice: '0', 
         finalPrice: estimatedPrice.toString(),
-        quantity: formData.quantity,
-        brand: formData.brand,
+        quantity: garments.reduce((sum, g) => sum + parseInt(g.quantity), 0),
         notes: formData.notes,
         pickupDate: pickupDateTime,
         imageUrl: imageUrl || 'no-image',
-        pricePerItem: pricePerItem.toString(),
-        garmentType: actualGarmentType,
-        isEstimatedPrice: isEstimatedPrice
+        isEstimatedPrice: isEstimatedPrice,
+        garments: garmentsData,
+        isMultipleGarments: garments.length > 1
       };
 
       console.log('Dry cleaning data to send:', dryCleaningData);
       console.log('Estimated price:', estimatedPrice);
-      console.log('Form data:', formData);
+      console.log('Garments:', garmentsData);
 
       const result = await addDryCleaningToCart(dryCleaningData);
       console.log('Add to cart result:', result);
@@ -447,14 +493,13 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     
     setFormData({
       serviceName: '',
-      brand: '',
       notes: '',
       date: '',
-      time: '',
-      quantity: 1,
-      garmentType: '',
-      customGarmentType: ''
+      time: ''
     });
+    setGarments([
+      { id: 1, garmentType: '', customGarmentType: '', brand: '', quantity: 1 }
+    ]);
     setImageFile(null);
     setImagePreview('');
     setEstimatedPrice(0);
@@ -479,83 +524,105 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
         <div className="modal-content-shared">
           <form onSubmit={handleSubmit}>
-            <div className="form-group-shared">
-              <label htmlFor="garmentType" className="form-label-shared">
-                👔 Garment Type <span className="required-indicator">*</span>
-              </label>
-              <select
-                id="garmentType"
-                name="garmentType"
-                value={formData.garmentType}
-                onChange={handleInputChange}
-                className={`form-select-shared ${errors.garmentType ? 'error' : ''}`}
-                required
-              >
-                <option value="">Select garment type...</option>
-                {garmentTypesList.map(garment => (
-                  <option key={garment.dc_garment_id} value={garment.garment_name.toLowerCase()}>
-                    {garment.garment_name} - ₱{parseFloat(garment.garment_price).toFixed(2)}
-                  </option>
-                ))}
-                <option value="others">Others</option>
-              </select>
-              {errors.garmentType && (
-                <span className="error-message-shared">{errors.garmentType}</span>
-              )}
-              {formData.garmentType === 'others' && (
-                <>
+            {/* Garments - Simple repeated inputs like original design */}
+            {garments.map((garment, index) => (
+              <div key={garment.id} className="garment-inputs-group">
+                {index > 0 && <hr className="garment-divider" />}
+                
+                <div className="garment-row-header">
+                  {garments.length > 1 && (
+                    <span className="garment-label">Garment #{index + 1}</span>
+                  )}
+                  {garments.length > 1 && (
+                    <button 
+                      type="button" 
+                      className="remove-garment-link"
+                      onClick={() => removeGarment(garment.id)}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+
+                <div className="form-group-shared">
+                  <label className="form-label-shared">
+                    Garment Type <span className="required-indicator">*</span>
+                  </label>
+                  <select
+                    value={garment.garmentType}
+                    onChange={(e) => updateGarment(garment.id, 'garmentType', e.target.value)}
+                    className={`form-select-shared ${errors[`garment_${garment.id}_garmentType`] ? 'error' : ''}`}
+                    disabled={loadingGarments}
+                  >
+                    <option value="">{loadingGarments ? 'Loading...' : 'Select garment type...'}</option>
+                    {garmentTypesList.map(g => (
+                      <option key={g.dc_garment_id} value={g.garment_name.toLowerCase()}>
+                        {g.garment_name} - ₱{parseFloat(g.garment_price).toFixed(2)}
+                      </option>
+                    ))}
+                    <option value="others">Others</option>
+                  </select>
+                  {errors[`garment_${garment.id}_garmentType`] && (
+                    <span className="error-message-shared">{errors[`garment_${garment.id}_garmentType`]}</span>
+                  )}
+                </div>
+
+                {garment.garmentType === 'others' && (
+                  <div className="form-group-shared">
+                    <label className="form-label-shared">
+                      Specify Garment Type <span className="required-indicator">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={garment.customGarmentType}
+                      onChange={(e) => updateGarment(garment.id, 'customGarmentType', e.target.value)}
+                      placeholder="Enter garment type..."
+                      className={`form-input-shared ${errors[`garment_${garment.id}_customGarmentType`] ? 'error' : ''}`}
+                    />
+                    {errors[`garment_${garment.id}_customGarmentType`] && (
+                      <span className="error-message-shared">{errors[`garment_${garment.id}_customGarmentType`]}</span>
+                    )}
+                  </div>
+                )}
+
+                <div className="form-group-shared">
+                  <label className="form-label-shared">Quantity</label>
+                  <input
+                    type="number"
+                    value={garment.quantity}
+                    onChange={(e) => updateGarment(garment.id, 'quantity', parseInt(e.target.value) || 1)}
+                    min="1"
+                    max="50"
+                    className="form-input-shared"
+                  />
+                </div>
+
+                <div className="form-group-shared">
+                  <label className="form-label-shared">
+                    🏷️ Brand <span className="required-indicator">*</span>
+                  </label>
                   <input
                     type="text"
-                    name="customGarmentType"
-                    value={formData.customGarmentType}
-                    onChange={handleInputChange}
-                    placeholder="Specify garment type..."
-                    className={`form-input-shared ${errors.customGarmentType ? 'error' : ''}`}
-                    style={{ marginTop: '12px' }}
-                    required
+                    value={garment.brand}
+                    onChange={(e) => updateGarment(garment.id, 'brand', e.target.value)}
+                    placeholder="e.g., Gucci, Armani, Zara"
+                    className={`form-input-shared ${errors[`garment_${garment.id}_brand`] ? 'error' : ''}`}
                   />
-                  {errors.customGarmentType && (
-                    <span className="error-message-shared">{errors.customGarmentType}</span>
+                  {errors[`garment_${garment.id}_brand`] && (
+                    <span className="error-message-shared">{errors[`garment_${garment.id}_brand`]}</span>
                   )}
-                </>
-              )}
-            </div>
+                </div>
+              </div>
+            ))}
+            
+            <button 
+              type="button" 
+              className="add-garment-link"
+              onClick={addGarment}
+            >
+              + Add Another Garment
+            </button>
 
-            <div className="form-group-shared">
-              <label htmlFor="brand" className="form-label-shared">
-                🏷️ Clothing Brand <span className="required-indicator">*</span>
-              </label>
-              <input
-                type="text"
-                id="brand"
-                name="brand"
-                value={formData.brand}
-                onChange={handleInputChange}
-                placeholder="e.g., Gucci, Armani, Zara"
-                className={`form-input-shared ${errors.brand ? 'error' : ''}`}
-                required
-              />
-              {errors.brand && (
-                <span className="error-message-shared">{errors.brand}</span>
-              )}
-            </div>
-            <div className="form-group-shared">
-              <label htmlFor="quantity" className="form-label-shared">
-                📦 Number of Items <span className="required-indicator">*</span>
-              </label>
-              <input
-                type="number"
-                id="quantity"
-                name="quantity"
-                value={formData.quantity}
-                onChange={handleInputChange}
-                min="1"
-                max="50"
-                className="form-input-shared"
-                required
-              />
-              <span className="help-text-shared">Enter the number of items to be cleaned</span>
-            </div>
             <div className="form-group-shared">
               <label htmlFor="notes" className="form-label-shared">📝 Special Instructions</label>
               <textarea
@@ -718,21 +785,27 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               )}
               <span className="help-text-shared">Photos help us provide better service and accurate pricing</span>
             </div>
-            {estimatedPrice > 0 && formData.garmentType && (
+            {estimatedPrice > 0 && garments.some(g => g.garmentType) && (
               <div className="price-estimate-shared">
                 <h4>{isEstimatedPrice ? 'Estimated Price' : 'Final Price'}</h4>
-                {formData.garmentType === 'others' ? (
-                  <>
-                    <p>Items: {formData.quantity} × ₱350 (estimated)</p>
-                    <p><strong>Total: ₱{estimatedPrice} (Estimated)</strong></p>
-                  </>
-                ) : (
-                  <>
-                    <p>Garment: {formData.garmentType.charAt(0).toUpperCase() + formData.garmentType.slice(1)}</p>
-                    <p>Items: {formData.quantity} × ₱{garmentTypes[formData.garmentType]}</p>
-                    <p><strong>Total: ₱{estimatedPrice}</strong></p>
-                  </>
-                )}
+                <div className="price-breakdown">
+                  {garments.filter(g => g.garmentType).map((garment, index) => {
+                    const selectedGarment = garmentTypesList.find(g => g.garment_name.toLowerCase() === garment.garmentType);
+                    const pricePerItem = garment.garmentType === 'others' 
+                      ? 350 
+                      : (selectedGarment ? parseFloat(selectedGarment.garment_price) : (garmentTypes[garment.garmentType] || 200));
+                    const garmentName = garment.garmentType === 'others' 
+                      ? (garment.customGarmentType || 'Custom') 
+                      : garment.garmentType.charAt(0).toUpperCase() + garment.garmentType.slice(1);
+                    return (
+                      <p key={garment.id}>
+                        {garmentName}: {garment.quantity} × ₱{pricePerItem} = ₱{pricePerItem * garment.quantity}
+                        {garment.garmentType === 'others' && ' (estimated)'}
+                      </p>
+                    );
+                  })}
+                </div>
+                <p><strong>Total: ₱{estimatedPrice}{isEstimatedPrice ? ' (Estimated)' : ''}</strong></p>
                 <p className="estimated-pickup">Drop off item date: {formData.date && formData.time ? `${formData.date} ${formData.time.substring(0, 5)}` : 'Not set'}</p>
               </div>
             )}

@@ -455,25 +455,29 @@ const styles = StyleSheet.create({
 
   categoryContainer: {
     marginBottom: 16,
+    maxHeight: 44,
   },
   categoryContent: {
     paddingRight: 16,
+    alignItems: 'center',
   },
   categoryChip: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: "#fff",
     marginRight: 8,
     borderWidth: 1,
     borderColor: "#ddd",
+    height: 36,
+    justifyContent: 'center',
   },
   categoryChipActive: {
     backgroundColor: "#991b1b",
     borderColor: "#991b1b",
   },
   categoryChipText: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#666",
     fontWeight: "500",
   },

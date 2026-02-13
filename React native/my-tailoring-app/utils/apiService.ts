@@ -59,15 +59,18 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
       clearTimeout(timeoutId);
       
       console.log('API Response Status:', response.status);
-      console.log('API Response Headers:', [...response.headers.entries()]);
+      
+      // Clone response before reading to avoid "Already read" error
+      const responseClone = response.clone();
       
       if (!response.ok) {
         let errorData;
         try {
-          errorData = await response.json();
+          errorData = await responseClone.json();
           console.log('API Error Data:', errorData);
         } catch (jsonError) {
-          console.log('API Response Text:', await response.text());
+          const textResponse = await response.text();
+          console.log('API Response Text:', textResponse);
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);

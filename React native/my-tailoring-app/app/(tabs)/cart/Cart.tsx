@@ -672,7 +672,30 @@ export default function CartScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               {selectedItemDetails && (
                 <>
-                  {selectedItemDetails.image && selectedItemDetails.image !== 'no-image' && selectedItemDetails.image.trim() !== '' && !selectedItemDetails.image.includes('no-image') ? (
+                  {/* For customization with angle images, show 4 views at top */}
+                  {(selectedItemDetails.service?.toLowerCase() === 'customization' || selectedItemDetails.service?.toLowerCase() === 'customize') && 
+                   selectedItemDetails.designData?.angleImages ? (
+                    <View style={styles.topAngleImagesContainer}>
+                      <View style={styles.angleImagesGrid}>
+                        {['front', 'back', 'right', 'left'].map((angle) => (
+                          selectedItemDetails.designData.angleImages[angle] && (
+                            <View key={angle} style={styles.angleImageContainer}>
+                              <Image
+                                source={{ uri: selectedItemDetails.designData.angleImages[angle] }}
+                                style={styles.angleImage}
+                                resizeMode="cover"
+                              />
+                              <View style={styles.angleLabel}>
+                                <Text style={styles.angleLabelText}>
+                                  {angle.charAt(0).toUpperCase() + angle.slice(1)}
+                                </Text>
+                              </View>
+                            </View>
+                          )
+                        ))}
+                      </View>
+                    </View>
+                  ) : selectedItemDetails.image && selectedItemDetails.image !== 'no-image' && selectedItemDetails.image.trim() !== '' && !selectedItemDetails.image.includes('no-image') ? (
                     <>
                       <Image
                         source={{ uri: selectedItemDetails.image }}
@@ -687,7 +710,6 @@ export default function CartScreen() {
                         <Text style={styles.detailsImageLabel}>
                           {selectedItemDetails.service?.toLowerCase() === 'repair' ? 'Damage photo uploaded' :
                            selectedItemDetails.service?.toLowerCase() === 'dry_cleaning' ? 'Clothing photo uploaded' :
-                           selectedItemDetails.service?.toLowerCase() === 'customization' || selectedItemDetails.service?.toLowerCase() === 'customize' ? 'Design preview uploaded' :
                            'Photo uploaded'}
                         </Text>
                       </View>
@@ -718,20 +740,29 @@ export default function CartScreen() {
                       {/* Multiple garments support */}
                       {selectedItemDetails.garments && selectedItemDetails.garments.length > 0 ? (
                         <>
-                          <View style={styles.detailsSection}>
-                            <Text style={styles.detailsLabel}>Garments ({selectedItemDetails.garments.length})</Text>
-                          </View>
                           {selectedItemDetails.garments.map((garment: any, idx: number) => (
-                            <View key={idx} style={[styles.detailsSection, { backgroundColor: '#f9f9f9', padding: 12, borderRadius: 8, marginBottom: 8 }]}>
-                              <Text style={[styles.detailsValue, { fontWeight: 'bold', marginBottom: 4 }]}>
-                                Garment #{idx + 1}
-                              </Text>
-                              <Text style={styles.detailsValue}>Type: {garment.garmentType}</Text>
-                              <Text style={styles.detailsValue}>Damage Level: {garment.damageLevel}</Text>
+                            <View key={idx} style={styles.garmentCard}>
+                              <View style={styles.garmentCardHeader}>
+                                <Text style={styles.garmentCardTitle}>Garment {idx + 1}</Text>
+                              </View>
+                              <View style={styles.garmentCardRow}>
+                                <Text style={styles.garmentCardLabel}>Type:</Text>
+                                <Text style={styles.garmentCardValue}>{garment.garmentType}</Text>
+                              </View>
+                              <View style={styles.garmentCardRow}>
+                                <Text style={styles.garmentCardLabel}>Damage Level:</Text>
+                                <Text style={styles.garmentCardValue}>{garment.damageLevel}</Text>
+                              </View>
                               {garment.notes && (
-                                <Text style={styles.detailsValue}>Description: {garment.notes}</Text>
+                                <View style={styles.garmentCardRow}>
+                                  <Text style={styles.garmentCardLabel}>Description:</Text>
+                                  <Text style={styles.garmentCardValue}>{garment.notes}</Text>
+                                </View>
                               )}
-                              <Text style={styles.detailsValue}>Price: ₱{garment.basePrice}</Text>
+                              <View style={styles.garmentCardRow}>
+                                <Text style={styles.garmentCardLabel}>Price:</Text>
+                                <Text style={styles.garmentCardValue}>₱{garment.basePrice}</Text>
+                              </View>
                             </View>
                           ))}
                         </>
@@ -778,20 +809,29 @@ export default function CartScreen() {
                       {/* Multiple garments support */}
                       {selectedItemDetails.garments && selectedItemDetails.garments.length > 0 ? (
                         <>
-                          <View style={styles.detailsSection}>
-                            <Text style={styles.detailsLabel}>Garments ({selectedItemDetails.garments.length})</Text>
-                          </View>
                           {selectedItemDetails.garments.map((garment: any, idx: number) => (
-                            <View key={idx} style={[styles.detailsSection, { backgroundColor: '#f9f9f9', padding: 12, borderRadius: 8, marginBottom: 8 }]}>
-                              <Text style={[styles.detailsValue, { fontWeight: 'bold', marginBottom: 4 }]}>
-                                Garment #{idx + 1}
-                              </Text>
-                              <Text style={styles.detailsValue}>Type: {garment.garmentType}</Text>
+                            <View key={idx} style={styles.garmentCard}>
+                              <View style={styles.garmentCardHeader}>
+                                <Text style={styles.garmentCardTitle}>Garment {idx + 1}</Text>
+                              </View>
+                              <View style={styles.garmentCardRow}>
+                                <Text style={styles.garmentCardLabel}>Type:</Text>
+                                <Text style={styles.garmentCardValue}>{garment.garmentType}</Text>
+                              </View>
                               {garment.brand && (
-                                <Text style={styles.detailsValue}>Brand: {garment.brand}</Text>
+                                <View style={styles.garmentCardRow}>
+                                  <Text style={styles.garmentCardLabel}>Brand:</Text>
+                                  <Text style={styles.garmentCardValue}>{garment.brand}</Text>
+                                </View>
                               )}
-                              <Text style={styles.detailsValue}>Quantity: {garment.quantity}</Text>
-                              <Text style={styles.detailsValue}>Price: ₱{garment.pricePerItem * garment.quantity}</Text>
+                              <View style={styles.garmentCardRow}>
+                                <Text style={styles.garmentCardLabel}>Quantity:</Text>
+                                <Text style={styles.garmentCardValue}>{garment.quantity}</Text>
+                              </View>
+                              <View style={styles.garmentCardRow}>
+                                <Text style={styles.garmentCardLabel}>Price:</Text>
+                                <Text style={styles.garmentCardValue}>₱{garment.pricePerItem * garment.quantity}</Text>
+                              </View>
                             </View>
                           ))}
                         </>
@@ -893,39 +933,6 @@ export default function CartScreen() {
                             {selectedItemDetails.designData.pattern && selectedItemDetails.designData.pattern !== 'none' && `Pattern: ${selectedItemDetails.designData.pattern.charAt(0).toUpperCase() + selectedItemDetails.designData.pattern.slice(1)}\n`}
                             {selectedItemDetails.designData.personalization?.initials && `Personalization: ${selectedItemDetails.designData.personalization.initials}\n`}
                           </Text>
-                        </View>
-                      )}
-                      {selectedItemDetails.designData?.angleImages && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Design Views</Text>
-                          <View style={styles.angleImagesGrid}>
-                            {['front', 'back', 'right', 'left'].map((angle) => (
-                              selectedItemDetails.designData.angleImages[angle] && (
-                                <View key={angle} style={styles.angleImageContainer}>
-                                  <Image
-                                    source={{ uri: selectedItemDetails.designData.angleImages[angle] }}
-                                    style={styles.angleImage}
-                                    resizeMode="cover"
-                                  />
-                                  <View style={styles.angleLabel}>
-                                    <Text style={styles.angleLabelText}>
-                                      {angle.charAt(0).toUpperCase() + angle.slice(1)}
-                                    </Text>
-                                  </View>
-                                </View>
-                              )
-                            ))}
-                          </View>
-                        </View>
-                      )}
-                      {!selectedItemDetails.designData?.angleImages && selectedItemDetails.image && selectedItemDetails.image !== 'no-image' && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Design Preview</Text>
-                          <Image
-                            source={{ uri: selectedItemDetails.image }}
-                            style={styles.modalImage}
-                            resizeMode="contain"
-                          />
                         </View>
                       )}
                     </>
@@ -1506,6 +1513,42 @@ const styles = StyleSheet.create({
   },
   detailsValue: { fontSize: 17, color: "#1F2937", fontWeight: "500" },
   detailsPriceValue: { fontSize: 24, fontWeight: "800", color: "#94665B" },
+  
+  // Garment card styles
+  garmentCard: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  garmentCardHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  garmentCardTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  garmentCardRow: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  garmentCardLabel: {
+    fontSize: 14,
+    color: "#6B7280",
+    width: 100,
+  },
+  garmentCardValue: {
+    fontSize: 14,
+    color: "#1F2937",
+    flex: 1,
+  },
 
   bottomNav: {
     flexDirection: "row",
@@ -1628,17 +1671,18 @@ const styles = StyleSheet.create({
   angleImagesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
   },
   angleImageContainer: {
-    width: (width - 100) / 2,
+    width: '48%',
     aspectRatio: 1,
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: '#E5E7EB',
     position: 'relative',
+    marginBottom: 8,
   },
   angleImage: {
     width: '100%',
@@ -1658,5 +1702,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'capitalize',
+  },
+  topAngleImagesContainer: {
+    marginBottom: 16,
   },
 });

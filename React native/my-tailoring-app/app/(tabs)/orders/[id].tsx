@@ -214,7 +214,34 @@ export default function OrderDetails() {
           </Text>
 
           <View style={styles.divider} />
-          {(() => {
+          
+          {/* For customization, show 4 angle images at the top instead of single image */}
+          {(order.service_type === 'customization' || order.service_type === 'customize') && 
+           order.specific_data?.designData?.angleImages && (
+            <View style={styles.topAngleImagesContainer}>
+              <View style={styles.angleImagesGrid}>
+                {['front', 'back', 'right', 'left'].map((angle) => (
+                  order.specific_data.designData.angleImages[angle] && (
+                    <View key={angle} style={styles.angleImageContainer}>
+                      <Image
+                        source={{ uri: order.specific_data.designData.angleImages[angle] }}
+                        style={styles.angleImage}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.angleLabel}>
+                        <Text style={styles.angleLabelText}>
+                          {angle.charAt(0).toUpperCase() + angle.slice(1)}
+                        </Text>
+                      </View>
+                    </View>
+                  )
+                ))}
+              </View>
+            </View>
+          )}
+          
+          {/* For non-customization services, show single image */}
+          {order.service_type !== 'customization' && order.service_type !== 'customize' && (() => {
             
             let imageUrl = order.specific_data?.imageUrl || 
                           order.specific_data?.image_url || 
@@ -292,23 +319,43 @@ export default function OrderDetails() {
                       <Text style={styles.value}>{order.specific_data.serviceName}</Text>
                     </View>
                   )}
-                  {order.specific_data.garmentType && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.label}>Garment Type</Text>
-                      <Text style={styles.value}>{order.specific_data.garmentType}</Text>
-                    </View>
-                  )}
-                  {order.specific_data.clothingBrand && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.label}>Brand</Text>
-                      <Text style={styles.value}>{order.specific_data.clothingBrand}</Text>
-                    </View>
-                  )}
-                  {order.specific_data.quantity && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.label}>Quantity</Text>
-                      <Text style={styles.value}>{order.specific_data.quantity} items</Text>
-                    </View>
+                  {/* Multiple garments support */}
+                  {order.specific_data.garments && order.specific_data.garments.length > 0 ? (
+                    <>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Garments ({order.specific_data.garments.length})</Text>
+                      </View>
+                      {order.specific_data.garments.map((garment: any, idx: number) => (
+                        <View key={idx} style={styles.garmentCard}>
+                          <Text style={styles.garmentTitle}>Garment {idx + 1}</Text>
+                          <Text style={styles.garmentDetail}>Type: {garment.garmentType}</Text>
+                          {garment.brand && <Text style={styles.garmentDetail}>Brand: {garment.brand}</Text>}
+                          <Text style={styles.garmentDetail}>Quantity: {garment.quantity}</Text>
+                          <Text style={styles.garmentDetail}>Price: ₱{(garment.pricePerItem || 0) * (garment.quantity || 1)}</Text>
+                        </View>
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      {order.specific_data.garmentType && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.label}>Garment Type</Text>
+                          <Text style={styles.value}>{order.specific_data.garmentType}</Text>
+                        </View>
+                      )}
+                      {order.specific_data.clothingBrand && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.label}>Brand</Text>
+                          <Text style={styles.value}>{order.specific_data.clothingBrand}</Text>
+                        </View>
+                      )}
+                      {order.specific_data.quantity && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.label}>Quantity</Text>
+                          <Text style={styles.value}>{order.specific_data.quantity} items</Text>
+                        </View>
+                      )}
+                    </>
                   )}
                   {order.specific_data.specialInstructions && (
                     <View style={styles.detailRow}>
@@ -326,35 +373,71 @@ export default function OrderDetails() {
                       </Text>
                     </View>
                   )}
+                  {/* Display uploaded image */}
+                  {(order.specific_data.imageUrl || order.specific_data.image_url) && 
+                   (order.specific_data.imageUrl !== 'no-image' && order.specific_data.image_url !== 'no-image') && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.label}>Uploaded Image</Text>
+                      <Image
+                        source={{ 
+                          uri: (order.specific_data.imageUrl || order.specific_data.image_url).startsWith('http') 
+                            ? (order.specific_data.imageUrl || order.specific_data.image_url)
+                            : `${API_BASE_URL.replace('/api', '')}${order.specific_data.imageUrl || order.specific_data.image_url}`
+                        }}
+                        style={styles.uploadedImage}
+                        resizeMode="cover"
+                      />
+                    </View>
+                  )}
                 </>
               )}
               {order.service_type === 'repair' && (
                 <>
-                  {order.specific_data.garmentType && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.label}>Garment Type</Text>
-                      <Text style={styles.value}>{order.specific_data.garmentType}</Text>
-                    </View>
-                  )}
-                  {order.specific_data.damageLevel && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.label}>Damage Level</Text>
-                      <Text style={styles.value}>{order.specific_data.damageLevel}</Text>
-                    </View>
-                  )}
-                  {order.specific_data.damageDescription && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.label}>Damage Description</Text>
-                      <Text style={[styles.value, styles.multiline]}>
-                        {order.specific_data.damageDescription}
-                      </Text>
-                    </View>
-                  )}
-                  {order.specific_data.damageLocation && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.label}>Damage Location</Text>
-                      <Text style={styles.value}>{order.specific_data.damageLocation}</Text>
-                    </View>
+                  {/* Multiple garments support */}
+                  {order.specific_data.garments && order.specific_data.garments.length > 0 ? (
+                    <>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Garments ({order.specific_data.garments.length})</Text>
+                      </View>
+                      {order.specific_data.garments.map((garment: any, idx: number) => (
+                        <View key={idx} style={styles.garmentCard}>
+                          <Text style={styles.garmentTitle}>Garment {idx + 1}</Text>
+                          <Text style={styles.garmentDetail}>Type: {garment.garmentType}</Text>
+                          <Text style={styles.garmentDetail}>Damage Level: {garment.damageLevel}</Text>
+                          {garment.notes && <Text style={styles.garmentDetail}>Description: {garment.notes}</Text>}
+                          <Text style={styles.garmentDetail}>Price: ₱{garment.basePrice || 0}</Text>
+                        </View>
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      {order.specific_data.garmentType && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.label}>Garment Type</Text>
+                          <Text style={styles.value}>{order.specific_data.garmentType}</Text>
+                        </View>
+                      )}
+                      {order.specific_data.damageLevel && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.label}>Damage Level</Text>
+                          <Text style={styles.value}>{order.specific_data.damageLevel}</Text>
+                        </View>
+                      )}
+                      {order.specific_data.damageDescription && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.label}>Damage Description</Text>
+                          <Text style={[styles.value, styles.multiline]}>
+                            {order.specific_data.damageDescription}
+                          </Text>
+                        </View>
+                      )}
+                      {order.specific_data.damageLocation && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.label}>Damage Location</Text>
+                          <Text style={styles.value}>{order.specific_data.damageLocation}</Text>
+                        </View>
+                      )}
+                    </>
                   )}
                   {order.specific_data.pickupDate && (
                     <View style={styles.detailRow}>
@@ -362,6 +445,22 @@ export default function OrderDetails() {
                       <Text style={styles.value}>
                         {formatDate(order.specific_data.pickupDate)}
                       </Text>
+                    </View>
+                  )}
+                  {/* Display uploaded image */}
+                  {(order.specific_data.imageUrl || order.specific_data.image_url) && 
+                   (order.specific_data.imageUrl !== 'no-image' && order.specific_data.image_url !== 'no-image') && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.label}>Damage Image</Text>
+                      <Image
+                        source={{ 
+                          uri: (order.specific_data.imageUrl || order.specific_data.image_url).startsWith('http') 
+                            ? (order.specific_data.imageUrl || order.specific_data.image_url)
+                            : `${API_BASE_URL.replace('/api', '')}${order.specific_data.imageUrl || order.specific_data.image_url}`
+                        }}
+                        style={styles.uploadedImage}
+                        resizeMode="cover"
+                      />
                     </View>
                   )}
                 </>
@@ -494,29 +593,6 @@ export default function OrderDetails() {
                         {order.specific_data.designData.pattern && order.specific_data.designData.pattern !== 'none' && `Pattern: ${order.specific_data.designData.pattern.charAt(0).toUpperCase() + order.specific_data.designData.pattern.slice(1)}\n`}
                         {order.specific_data.designData.personalization?.initials && `Personalization: ${order.specific_data.designData.personalization.initials}`}
                       </Text>
-                    </View>
-                  )}
-                  {order.specific_data?.designData?.angleImages && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.label}>Design Views</Text>
-                      <View style={styles.angleImagesGrid}>
-                        {['front', 'back', 'right', 'left'].map((angle) => (
-                          order.specific_data.designData.angleImages[angle] && (
-                            <View key={angle} style={styles.angleImageContainer}>
-                              <Image
-                                source={{ uri: order.specific_data.designData.angleImages[angle] }}
-                                style={styles.angleImage}
-                                resizeMode="cover"
-                              />
-                              <View style={styles.angleLabel}>
-                                <Text style={styles.angleLabelText}>
-                                  {angle.charAt(0).toUpperCase() + angle.slice(1)}
-                                </Text>
-                              </View>
-                            </View>
-                          )
-                        ))}
-                      </View>
                     </View>
                   )}
                 </>
@@ -805,20 +881,47 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   
+  garmentCard: {
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+  },
+  garmentTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#5D4037',
+    marginBottom: 6,
+  },
+  garmentDetail: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 2,
+  },
+  uploadedImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  
   angleImagesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    justifyContent: 'space-between',
     marginTop: 8,
   },
   angleImageContainer: {
-    width: (width - 100) / 2,
+    width: '48%',
     aspectRatio: 1,
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: '#E5E7EB',
     position: 'relative',
+    marginBottom: 8,
   },
   angleImage: {
     width: '100%',
@@ -838,5 +941,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'capitalize',
+  },
+  topAngleImagesContainer: {
+    marginBottom: 16,
   },
 });

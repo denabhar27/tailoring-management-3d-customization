@@ -267,7 +267,16 @@ export default function OrderHistoryScreen() {
           <Ionicons name="receipt-outline" size={16} color="#8B4513" />
           <Text style={styles.transactionLogButtonText}>Transaction Log</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={(e) => {
+            e.stopPropagation();
+            router.push({
+              pathname: "/(tabs)/orders/[id]",
+              params: { id: item.order_item_id?.toString() || item.id?.toString() },
+            });
+          }}
+        >
           <Text style={styles.actionText}>View Details</Text>
           <Ionicons name="chevron-forward" size={16} color="#94665B" />
         </TouchableOpacity>
@@ -304,32 +313,6 @@ export default function OrderHistoryScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>Order History</Text>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.statsRow}
-      >
-        <View style={[styles.statCard, { backgroundColor: "#EEF2FF" }]}>
-          <Ionicons name="document-text" size={28} color="#6366F1" />
-          <Text style={styles.statBig}>{stats.total}</Text>
-          <Text style={styles.statLabel}>Total</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: "#FEF3C7" }]}>
-          <Ionicons name="hourglass-outline" size={28} color="#F59E0B" />
-          <Text style={styles.statBig}>{stats.active}</Text>
-          <Text style={styles.statLabel}>Active</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: "#DCFCE7" }]}>
-          <Ionicons name="checkmark-circle" size={28} color="#10B981" />
-          <Text style={styles.statBig}>{stats.completed}</Text>
-          <Text style={styles.statLabel}>Done</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: "#FCE7E7" }]}>
-          <Ionicons name="basket-outline" size={28} color="#EF4444" />
-          <Text style={styles.statBig}>{stats.toPickup}</Text>
-          <Text style={styles.statLabel}>Pickup</Text>
-        </View>
-      </ScrollView>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -442,19 +425,20 @@ const styles = StyleSheet.create({
   filterRow: {
     paddingLeft: width * 0.05,
     paddingBottom: 16,
+    maxHeight: 60,
   },
 
   filterTab: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     backgroundColor: "#FFFFFF",
-    borderRadius: 30,
-    marginRight: 12,
+    borderRadius: 20,
+    marginRight: 10,
     borderWidth: 1.5,
     borderColor: "#E5E7EB",
-    minHeight: 44,
+    height: 40,
   },
 
   activeTab: {

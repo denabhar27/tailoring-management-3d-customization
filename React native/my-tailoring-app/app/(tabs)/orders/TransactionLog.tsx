@@ -76,11 +76,13 @@ export default function TransactionLogScreen() {
     const typeMap: { [key: string]: string } = {
       payment: "Payment",
       down_payment: "Down Payment",
+      downpayment: "Down Payment",
       final_payment: "Final Payment",
+      partial_payment: "Partial Payment",
       refund: "Refund",
       adjustment: "Adjustment",
     };
-    return typeMap[type] || type;
+    return typeMap[type] || type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   };
 
   const formatPaymentStatus = (status: string | null) => {
@@ -88,11 +90,25 @@ export default function TransactionLogScreen() {
     const statusMap: { [key: string]: string } = {
       unpaid: "Unpaid",
       paid: "Paid",
-      "down-payment": "Down-payment",
+      "down-payment": "Down Payment",
+      down_payment: "Down Payment",
+      partial_payment: "Partial Payment",
       fully_paid: "Fully Paid",
       cancelled: "Cancelled",
     };
-    return statusMap[status] || status;
+    return statusMap[status] || status.replace(/_/g, ' ').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  const formatPaymentMethod = (method: string | null) => {
+    if (!method) return "N/A";
+    const methodMap: { [key: string]: string } = {
+      system_auto: "System Auto",
+      cash: "Cash",
+      gcash: "GCash",
+      card: "Card",
+      bank_transfer: "Bank Transfer",
+    };
+    return methodMap[method] || method.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   };
 
   const getTransactionTypeColor = (type: string) => {
@@ -111,14 +127,24 @@ export default function TransactionLogScreen() {
     }
   };
 
+  const handleClose = () => {
+    // Navigate back to order details
+    if (orderItemId) {
+      router.replace(`/(tabs)/orders/${orderItemId}`);
+    } else {
+      router.replace('/(tabs)/orders/OrderHistory');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Header matching web design */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={28} color="#1F2937" />
+        <TouchableOpacity onPress={handleClose}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Transaction Log</Text>
-        <View style={{ width: 28 }} />
+        <View style={{ width: 24 }} />
       </View>
 
       {loading ? (
@@ -146,80 +172,40 @@ export default function TransactionLogScreen() {
           </Text>
         </View>
       ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-        >
-          {logs.map((log) => (
-            <View key={log.log_id} style={styles.logCard}>
-              <View style={styles.logHeader}>
-                <View
-                  style={[
-                    styles.typeBadge,
-                    { backgroundColor: getTransactionTypeColor(log.transaction_type) },
-                  ]}
-                >
-                  <Text style={styles.typeBadgeText}>
-                    {formatTransactionType(log.transaction_type)}
-                  </Text>
-                </View>
-                <View style={styles.amountContainer}>
-                  <Text style={styles.amountLabel}>Amount:</Text>
+        <>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {logs.map((log) => (
+              <View key={log.log_id} style={styles.logCard}>
+                <View style={styles.logHeader}>
+                  <View style={styles.typeBadge}>
+                    <Text style={styles.typeBadgeText}>
+                      {formatTransactionType(log.transaction_type).toUpperCase()}
+                    </Text>
+                  </View>
                   <Text style={styles.amountValue}>
-                    ₱{parseFloat(log.amount.toString()).toFixed(2)}
+                    ₱{parseFloat(log.amount.toString()).toLocaleString()}
                   </Text>
                 </View>
-              </View>
-              <View style={styles.logDetails}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Payment Status:</Text>
-                  <Text style={styles.detailValue}>
-                    {log.previous_payment_status ? (
-                      <Text>
-                        {formatPaymentStatus(log.previous_payment_status)} →{" "}
-                        {formatPaymentStatus(log.new_payment_status)}
-                      </Text>
-                    ) : (
-                      formatPaymentStatus(log.new_payment_status)
-                    )}
-                  </Text>
+                <View style={styles.logDetails}>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Date:</Text>
+                    <Text style={styles.detailValue}>{formatDate(log.created_at)}</Text>
+                  </View>
                 </View>
-
-                {log.payment_method && (
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Payment Method:</Text>
-                    <Text style={styles.detailValue}>
-                      {log.payment_method === "system_auto"
-                        ? "System Auto"
-                        : log.payment_method}
-                    </Text>
-                  </View>
-                )}
-
-                {log.notes && (
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Notes:</Text>
-                    <Text style={[styles.detailValue, styles.notesText]}>
-                      {log.notes}
-                    </Text>
-                  </View>
-                )}
-
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Date:</Text>
-                  <Text style={styles.detailValue}>{formatDate(log.created_at)}</Text>
-                </View>
-
-                {log.created_by && (
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Created By:</Text>
-                    <Text style={styles.detailValue}>{log.created_by}</Text>
-                  </View>
-                )}
               </View>
-            </View>
-          ))}
-        </ScrollView>
+            ))}
+          </ScrollView>
+          
+          {/* Close button at bottom */}
+          <View style={styles.footerContainer}>
+            <TouchableOpacity style={styles.closeButtonBottom} onPress={handleClose}>
+              <Text style={styles.closeButtonText}>CLOSE</Text>
+            </TouchableOpacity>
+          </View>
+        </>
       )}
     </SafeAreaView>
   );
@@ -236,14 +222,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    backgroundColor: "#94665B",
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: "700",
-    color: "#1F2937",
+    color: "#fff",
   },
   centerContainer: {
     flex: 1,
@@ -288,76 +272,74 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 20,
   },
   logCard: {
     backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
     borderWidth: 1,
-    borderColor: "#F3F4F6",
+    borderColor: "#E5E7EB",
   },
   logHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    marginBottom: 12,
   },
   typeBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    backgroundColor: "#6B7280",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 6,
   },
   typeBadgeText: {
     color: "#fff",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  amountContainer: {
-    alignItems: "flex-end",
-  },
-  amountLabel: {
     fontSize: 12,
-    color: "#6B7280",
-    marginBottom: 4,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
   amountValue: {
-    fontSize: 20,
-    fontWeight: "800",
+    fontSize: 22,
+    fontWeight: "700",
     color: "#94665B",
   },
   logDetails: {
-    gap: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
   },
   detailRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
   },
   detailLabel: {
     fontSize: 14,
     fontWeight: "600",
     color: "#6B7280",
-    flex: 1,
   },
   detailValue: {
     fontSize: 14,
     color: "#1F2937",
-    flex: 2,
-    textAlign: "right",
   },
-  notesText: {
-    fontStyle: "italic",
-    color: "#6B7280",
+  footerContainer: {
+    padding: 20,
+    paddingTop: 0,
+    alignItems: "flex-end",
+  },
+  closeButtonBottom: {
+    backgroundColor: "#94665B",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  closeButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
 });
 

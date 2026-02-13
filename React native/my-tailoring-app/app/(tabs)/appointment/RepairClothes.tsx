@@ -589,8 +589,12 @@ export default function RepairClothes() {
               {garments.length > 1 && (
                 <View style={styles.garmentRowHeader}>
                   <Text style={styles.garmentLabel}>Garment #{index + 1}</Text>
-                  <TouchableOpacity onPress={() => removeGarment(garment.id)}>
-                    <Text style={styles.removeGarmentLink}>Remove</Text>
+                  <TouchableOpacity 
+                    style={styles.removeGarmentButton}
+                    onPress={() => removeGarment(garment.id)}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#ef5350" />
+                    <Text style={styles.removeGarmentText}>Remove</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -660,8 +664,9 @@ export default function RepairClothes() {
             </View>
           ))}
           
-          <TouchableOpacity style={styles.addGarmentLink} onPress={addGarment}>
-            <Text style={styles.addGarmentLinkText}>+ Add Another Garment</Text>
+          <TouchableOpacity style={styles.addGarmentButton} onPress={addGarment}>
+            <Ionicons name="add-circle-outline" size={20} color="#8D6E63" />
+            <Text style={styles.addGarmentButtonText}>Add Another Garment</Text>
           </TouchableOpacity>
 
           {/* Total Price Display */}
@@ -1252,10 +1257,45 @@ const styles = StyleSheet.create({
     color: '#8D6E63',
     fontSize: 15,
   },
+  removeGarmentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  removeGarmentText: {
+    color: '#ef5350',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
   removeGarmentLink: {
     color: '#ef5350',
     fontSize: 14,
     textDecorationLine: 'underline',
+  },
+  addGarmentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginVertical: 16,
+    borderWidth: 1,
+    borderColor: '#D7CCC8',
+    borderRadius: 12,
+    borderStyle: 'dashed',
+    backgroundColor: '#FAFAFA',
+  },
+  addGarmentButtonText: {
+    color: '#8D6E63',
+    fontSize: 15,
+    fontWeight: '500',
+    marginLeft: 8,
   },
   addGarmentLink: {
     paddingVertical: 12,

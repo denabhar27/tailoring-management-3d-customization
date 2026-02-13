@@ -1409,31 +1409,39 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: "row",
-    gap: 12,
+    justifyContent: "space-between",
   },
   btnAcceptPrice: {
     flex: 1,
     backgroundColor: "#10B981",
     paddingVertical: 12,
+    paddingHorizontal: 8,
     borderRadius: 8,
     alignItems: "center",
+    justifyContent: "center",
+    marginRight: 6,
   },
   btnAcceptPriceText: {
     color: "#fff",
     fontWeight: "600",
-    fontSize: 14,
+    fontSize: 13,
+    textAlign: "center",
   },
   btnDeclinePrice: {
     flex: 1,
     backgroundColor: "#EF4444",
     paddingVertical: 12,
+    paddingHorizontal: 8,
     borderRadius: 8,
     alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 6,
   },
   btnDeclinePriceText: {
     color: "#fff",
     fontWeight: "600",
-    fontSize: 14,
+    fontSize: 13,
+    textAlign: "center",
   },
 
   orderCard: {

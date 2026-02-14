@@ -225,8 +225,8 @@ export default function RentalLanding() {
           image_url: bundleItems[0]?.image_url || ''
         },
         rentalDates: {
-          startDate: bundleStartDate.toISOString().split('T')[0],
-          endDate: bundleEndDate!.toISOString().split('T')[0],
+          startDate: `${bundleStartDate.getFullYear()}-${String(bundleStartDate.getMonth() + 1).padStart(2, '0')}-${String(bundleStartDate.getDate()).padStart(2, '0')}`,
+          endDate: `${bundleEndDate!.getFullYear()}-${String(bundleEndDate!.getMonth() + 1).padStart(2, '0')}-${String(bundleEndDate!.getDate()).padStart(2, '0')}`,
           duration: bundleDuration
         }
       };

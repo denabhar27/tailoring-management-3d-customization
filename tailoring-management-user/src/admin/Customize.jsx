@@ -418,7 +418,7 @@ const Customize = () => {
 
     if (currentIndex === -1 || currentIndex === flow.length - 1) {
 
-      return null; 
+      return null;
 
     }
 
@@ -426,9 +426,9 @@ const Customize = () => {
 
     if (nextStatus === 'completed' && item) {
 
-      const pricingFactors = typeof item.pricing_factors === 'string' 
+      const pricingFactors = typeof item.pricing_factors === 'string'
 
-        ? JSON.parse(item.pricing_factors || '{}') 
+        ? JSON.parse(item.pricing_factors || '{}')
 
         : (item.pricing_factors || {});
 
@@ -438,7 +438,7 @@ const Customize = () => {
 
       const remainingBalance = finalPrice - amountPaid;
 
-      if (remainingBalance > 0.01) { 
+      if (remainingBalance > 0.01) {
 
         return null;
 
@@ -882,7 +882,7 @@ const Customize = () => {
 
     });
 
-    setGarmentGlbFile(null); 
+    setGarmentGlbFile(null);
 
     setShowGarmentTypeModal(true);
 
@@ -894,7 +894,7 @@ const Customize = () => {
 
     setGarmentTypeForm({ garment_name: '', garment_price: '', garment_code: '', description: '', is_active: 1 });
 
-    setGarmentGlbFile(null); 
+    setGarmentGlbFile(null);
 
     setShowGarmentTypeModal(true);
 
@@ -1004,7 +1004,7 @@ const Customize = () => {
 
       .substring(0, 30);
 
-    const timestamp = Date.now().toString(36); 
+    const timestamp = Date.now().toString(36);
 
     return `${baseName}-${timestamp}`;
 
@@ -1688,13 +1688,13 @@ const Customize = () => {
 
         let normalizedStatus = item.approval_status;
 
-        if (item.approval_status === 'pending_review' || 
+        if (item.approval_status === 'pending_review' ||
 
-            item.approval_status === null || 
+          item.approval_status === null ||
 
-            item.approval_status === undefined || 
+          item.approval_status === undefined ||
 
-            item.approval_status === '') {
+          item.approval_status === '') {
 
           normalizedStatus = 'pending';
 
@@ -1888,9 +1888,9 @@ const Customize = () => {
 
     if (status === 'completed' && item) {
 
-      const pricingFactors = typeof item.pricing_factors === 'string' 
+      const pricingFactors = typeof item.pricing_factors === 'string'
 
-        ? JSON.parse(item.pricing_factors || '{}') 
+        ? JSON.parse(item.pricing_factors || '{}')
 
         : (item.pricing_factors || {});
 
@@ -1900,7 +1900,7 @@ const Customize = () => {
 
       const remainingBalance = finalPrice - amountPaid;
 
-      if (remainingBalance > 0.01) { 
+      if (remainingBalance > 0.01) {
 
         showToast(`Cannot mark as completed. Payment is not complete. Remaining balance: ₱${remainingBalance.toFixed(2)}`, "error");
 
@@ -2310,21 +2310,21 @@ const Customize = () => {
 
             <div style={{ position: 'relative' }} data-add-menu>
 
-              <button 
+              <button
 
                 onClick={() => setShowAddMenu(!showAddMenu)}
 
-                style={{ 
+                style={{
 
-                  padding: '10px 20px', 
+                  padding: '10px 20px',
 
-                  backgroundColor: '#667eea', 
+                  backgroundColor: '#667eea',
 
-                  color: 'white', 
+                  color: 'white',
 
-                  border: 'none', 
+                  border: 'none',
 
-                  borderRadius: '5px', 
+                  borderRadius: '5px',
 
                   cursor: 'pointer',
 
@@ -2350,7 +2350,7 @@ const Customize = () => {
 
               {showAddMenu && (
 
-                <div 
+                <div
 
                   style={{
 
@@ -2748,9 +2748,9 @@ const Customize = () => {
 
                 getFilteredItems().map(item => {
 
-                  const pricingFactors = typeof item.pricing_factors === 'string' 
+                  const pricingFactors = typeof item.pricing_factors === 'string'
 
-                    ? JSON.parse(item.pricing_factors || '{}') 
+                    ? JSON.parse(item.pricing_factors || '{}')
 
                     : (item.pricing_factors || {});
 
@@ -2760,279 +2760,279 @@ const Customize = () => {
 
                   const remainingBalance = finalPrice - amountPaid;
 
-                  const isUniform = item.specific_data?.garmentType?.toLowerCase() === 'uniform' || 
+                  const isUniform = item.specific_data?.garmentType?.toLowerCase() === 'uniform' ||
 
-                    item.specific_data?.isUniform === true || 
+                    item.specific_data?.isUniform === true ||
 
                     item.pricing_factors?.isUniform === true;
 
                   return (
 
-                  <tr key={item.item_id} className="clickable-row" onClick={() => handleViewDetails(item)}>
+                    <tr key={item.item_id} className="clickable-row" onClick={() => handleViewDetails(item)}>
 
-                    <td><strong>#{item.order_id}</strong></td>
+                      <td><strong>#{item.order_id}</strong></td>
 
-                    <td>
+                      <td>
 
-                      {item.order_type === 'walk_in' ? (
+                        {item.order_type === 'walk_in' ? (
 
-                        <span>
+                          <span>
 
-                          <span style={{ 
+                            <span style={{
 
-                            display: 'inline-block',
+                              display: 'inline-block',
 
-                            backgroundColor: '#ff9800',
+                              backgroundColor: '#ff9800',
 
-                            color: 'white',
+                              color: 'white',
 
-                            padding: '2px 8px',
+                              padding: '2px 8px',
 
-                            borderRadius: '3px',
+                              borderRadius: '3px',
 
-                            fontSize: '0.75em',
+                              fontSize: '0.75em',
 
-                            marginRight: '5px',
+                              marginRight: '5px',
 
-                            fontWeight: 'bold'
+                              fontWeight: 'bold'
 
-                          }}>WALK-IN</span>
+                            }}>WALK-IN</span>
 
-                          {item.walk_in_customer_name || 'Walk-in Customer'}
+                            {item.walk_in_customer_name || 'Walk-in Customer'}
 
-                        </span>
-
-                      ) : (
-
-                        `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'N/A'
-
-                      )}
-
-                    </td>
-
-                    <td>{item.specific_data?.garmentType || 'N/A'}</td>
-
-                    <td><span style={{ fontSize: '0.9em', color: '#5D4037' }}>{item.specific_data?.fabricType || 'N/A'}</span></td>
-
-                    <td>{new Date(item.order_date).toLocaleDateString()}</td>
-
-                    <td>
-
-                      {isUniform && finalPrice === 0 ? (
-
-                        <span style={{ color: '#e65100', fontWeight: '600', fontSize: '0.9em' }}>Price varies</span>
-
-                      ) : isUniform && finalPrice > 0 ? (
-
-                        <span style={{ color: '#4caf50', fontWeight: '600' }}>₱{parseFloat(item.final_price || 0).toLocaleString()}</span>
-
-                      ) : (
-
-                        `₱${parseFloat(item.final_price || 0).toLocaleString()}`
-
-                      )}
-
-                    </td>
-
-                    <td>
-
-                      <div style={{ fontSize: '12px' }}>
-
-                        {isUniform && finalPrice === 0 ? (
-
-                          <span style={{ color: '#e65100', fontStyle: 'italic' }}>Pending quote</span>
+                          </span>
 
                         ) : (
 
-                          <>
-
-                            <div>Paid: ₱{amountPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-
-                            <div style={{ color: remainingBalance > 0 ? '#ff9800' : '#4caf50', fontWeight: 'bold' }}>
-
-                              Remaining: ₱{Math.max(0, remainingBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-
-                            </div>
-
-                          </>
+                          `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'N/A'
 
                         )}
 
-                      </div>
+                      </td>
 
-                    </td>
+                      <td>{item.specific_data?.garmentType || 'N/A'}</td>
 
-                    <td onClick={(e) => e.stopPropagation()}>
+                      <td><span style={{ fontSize: '0.9em', color: '#5D4037' }}>{item.specific_data?.fabricType || 'N/A'}</span></td>
 
-                      <span className={`status-badge ${getStatusClass(item.approval_status || 'pending')}`}>
+                      <td>{new Date(item.order_date).toLocaleDateString()}</td>
 
-                        {getStatusText(item.approval_status || 'pending')}
+                      <td>
 
-                      </span>
+                        {isUniform && finalPrice === 0 ? (
 
-                    </td>
+                          <span style={{ color: '#e65100', fontWeight: '600', fontSize: '0.9em' }}>Price varies</span>
 
-                    <td onClick={(e) => e.stopPropagation()}>
+                        ) : isUniform && finalPrice > 0 ? (
 
-                      {item.approval_status === 'pending_review' || item.approval_status === 'pending' || item.approval_status === null || item.approval_status === undefined || item.approval_status === '' ? (
+                          <span style={{ color: '#4caf50', fontWeight: '600' }}>₱{parseFloat(item.final_price || 0).toLocaleString()}</span>
 
-                        <div className="action-buttons">
+                        ) : (
 
-                          <button className="icon-btn accept" onClick={() => handleAccept(item.item_id)} title="Accept">
+                          `₱${parseFloat(item.final_price || 0).toLocaleString()}`
 
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        )}
 
-                              <polyline points="20 6 9 17 4 12"></polyline>
+                      </td>
 
-                            </svg>
+                      <td>
 
-                          </button>
+                        <div style={{ fontSize: '12px' }}>
 
-                          <button className="icon-btn decline" onClick={() => handleDecline(item.item_id)} title="Decline">
+                          {isUniform && finalPrice === 0 ? (
 
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <span style={{ color: '#e65100', fontStyle: 'italic' }}>Pending quote</span>
 
-                              <line x1="18" y1="6" x2="6" y2="18"></line>
+                          ) : (
 
-                              <line x1="6" y1="6" x2="18" y2="18"></line>
+                            <>
 
-                            </svg>
+                              <div>Paid: ₱{amountPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
 
-                          </button>
+                              <div style={{ color: remainingBalance > 0 ? '#ff9800' : '#4caf50', fontWeight: 'bold' }}>
 
-                          {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
+                                Remaining: ₱{Math.max(0, remainingBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 
-                            <button 
+                              </div>
 
-                              className="icon-btn" 
-
-                              onClick={(e) => {
-
-                                e.stopPropagation();
-
-                                setSelectedOrder(item);
-
-                                setPaymentAmount('');
-
-                                setShowPaymentModal(true);
-
-                              }} 
-
-                              title="Record Payment"
-
-                              style={{ backgroundColor: '#2196F3', color: 'white' }}
-
-                            >
-
-                              💰
-
-                            </button>
+                            </>
 
                           )}
 
                         </div>
 
-                      ) : (
+                      </td>
 
-                        <div className="action-buttons">
+                      <td onClick={(e) => e.stopPropagation()}>
 
-                          {getNextStatus(item.approval_status, 'customization', item) && (
+                        <span className={`status-badge ${getStatusClass(item.approval_status || 'pending')}`}>
 
-                            <button 
+                          {getStatusText(item.approval_status || 'pending')}
 
-                              className="icon-btn next-status" 
+                        </span>
 
-                              onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'customization', item))} 
+                      </td>
 
-                              title={`Move to ${getNextStatusLabel(item.approval_status, 'customization', item)}`}
+                      <td onClick={(e) => e.stopPropagation()}>
 
-                              style={{ backgroundColor: '#4CAF50', color: 'white' }}
+                        {item.approval_status === 'pending_review' || item.approval_status === 'pending' || item.approval_status === null || item.approval_status === undefined || item.approval_status === '' ? (
 
-                            >
+                          <div className="action-buttons">
+
+                            <button className="icon-btn accept" onClick={() => handleAccept(item.item_id)} title="Accept">
 
                               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
 
-                                <polyline points="9 18 15 12 9 6"></polyline>
+                                <polyline points="20 6 9 17 4 12"></polyline>
 
                               </svg>
 
                             </button>
 
-                          )}
-
-                          {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
-
-                            <button 
-
-                              className="icon-btn" 
-
-                              onClick={(e) => {
-
-                                e.stopPropagation();
-
-                                setSelectedOrder(item);
-
-                                setPaymentAmount('');
-
-                                setShowPaymentModal(true);
-
-                              }} 
-
-                              title="Record Payment"
-
-                              style={{ backgroundColor: '#2196F3', color: 'white' }}
-
-                            >
-
-                              💰
-
-                            </button>
-
-                          )}
-
-                          {(item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
-
-                            <button 
-
-                              className="icon-btn delete" 
-
-                              onClick={(e) => {
-
-                                e.stopPropagation();
-
-                                handleDeleteOrder(item);
-
-                              }} 
-
-                              title="Delete Order"
-
-                              style={{ backgroundColor: '#f44336', color: 'white' }}
-
-                            >
+                            <button className="icon-btn decline" onClick={() => handleDecline(item.item_id)} title="Decline">
 
                               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
 
-                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
 
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-
-                                <line x1="10" y1="11" x2="10" y2="17"></line>
-
-                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
 
                               </svg>
 
                             </button>
 
-                          )}
+                            {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
 
-                        </div>
+                              <button
 
-                      )}
+                                className="icon-btn"
 
-                    </td>
+                                onClick={(e) => {
 
-                  </tr>
+                                  e.stopPropagation();
+
+                                  setSelectedOrder(item);
+
+                                  setPaymentAmount('');
+
+                                  setShowPaymentModal(true);
+
+                                }}
+
+                                title="Record Payment"
+
+                                style={{ backgroundColor: '#2196F3', color: 'white' }}
+
+                              >
+
+                                💰
+
+                              </button>
+
+                            )}
+
+                          </div>
+
+                        ) : (
+
+                          <div className="action-buttons">
+
+                            {getNextStatus(item.approval_status, 'customization', item) && (
+
+                              <button
+
+                                className="icon-btn next-status"
+
+                                onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'customization', item))}
+
+                                title={`Move to ${getNextStatusLabel(item.approval_status, 'customization', item)}`}
+
+                                style={{ backgroundColor: '#4CAF50', color: 'white' }}
+
+                              >
+
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+
+                                  <polyline points="9 18 15 12 9 6"></polyline>
+
+                                </svg>
+
+                              </button>
+
+                            )}
+
+                            {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
+
+                              <button
+
+                                className="icon-btn"
+
+                                onClick={(e) => {
+
+                                  e.stopPropagation();
+
+                                  setSelectedOrder(item);
+
+                                  setPaymentAmount('');
+
+                                  setShowPaymentModal(true);
+
+                                }}
+
+                                title="Record Payment"
+
+                                style={{ backgroundColor: '#2196F3', color: 'white' }}
+
+                              >
+
+                                💰
+
+                              </button>
+
+                            )}
+
+                            {(item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
+
+                              <button
+
+                                className="icon-btn delete"
+
+                                onClick={(e) => {
+
+                                  e.stopPropagation();
+
+                                  handleDeleteOrder(item);
+
+                                }}
+
+                                title="Delete Order"
+
+                                style={{ backgroundColor: '#f44336', color: 'white' }}
+
+                              >
+
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+
+                                  <polyline points="3 6 5 6 21 6"></polyline>
+
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+
+                                  <line x1="10" y1="11" x2="10" y2="17"></line>
+
+                                  <line x1="14" y1="11" x2="14" y2="17"></line>
+
+                                </svg>
+
+                              </button>
+
+                            )}
+
+                          </div>
+
+                        )}
+
+                      </td>
+
+                    </tr>
 
                   );
 
@@ -3071,7 +3071,7 @@ const Customize = () => {
               {selectedOrder.order_type === 'walk_in' && selectedOrder.specific_data?.referenceImage && (
                 <div className="detail-row">
                   <strong>Reference Image:</strong>
-                  <div 
+                  <div
                     className="clickable-image"
                     style={{ marginTop: '10px', cursor: 'pointer' }}
                     onClick={() => openImagePreview(`http://localhost:5000/${selectedOrder.specific_data.referenceImage}`, 'Reference image')}
@@ -3113,9 +3113,9 @@ const Customize = () => {
 
                     if (newPrice && (editForm.approvalStatus === 'pending' || editForm.approvalStatus === 'accepted')) {
 
-                      const priceChanged = estimatedPrice ? Math.abs(parseFloat(newPrice) - estimatedPrice) > 0.01 : 
+                      const priceChanged = estimatedPrice ? Math.abs(parseFloat(newPrice) - estimatedPrice) > 0.01 :
 
-                                          Math.abs(parseFloat(newPrice) - originalPrice) > 0.01;
+                        Math.abs(parseFloat(newPrice) - originalPrice) > 0.01;
 
                       if (priceChanged) {
 
@@ -3125,7 +3125,7 @@ const Customize = () => {
 
                     }
 
-                    setEditForm({...editForm, finalPrice: newPrice, approvalStatus: newStatus});
+                    setEditForm({ ...editForm, finalPrice: newPrice, approvalStatus: newStatus });
 
                   }}
 
@@ -3155,7 +3155,7 @@ const Customize = () => {
 
                           <span style={{ color: '#666', fontSize: '0.85em' }}>
 
-                            {selectedOrder.order_type === 'walk_in' 
+                            {selectedOrder.order_type === 'walk_in'
 
                               ? 'Status will be set to "Accepted" (walk-in orders skip price confirmation).'
 
@@ -3276,17 +3276,17 @@ const Customize = () => {
 
                   <h3 style={{ margin: 0, fontSize: '18px', color: '#333' }}>Customer Measurements</h3>
 
-                  <button 
+                  <button
 
-                    className="btn-secondary" 
+                    className="btn-secondary"
 
                     onClick={async () => {
 
                       setMeasurementsLoading(true);
 
-                      const customerId = selectedOrder.order_type === 'walk_in' 
+                      const customerId = selectedOrder.order_type === 'walk_in'
 
-                        ? selectedOrder.walk_in_customer_id 
+                        ? selectedOrder.walk_in_customer_id
 
                         : selectedOrder.user_id;
 
@@ -3322,9 +3322,9 @@ const Customize = () => {
 
                           setMeasurements({
 
-                            top: typeof result.measurements.top_measurements === 'string' 
+                            top: typeof result.measurements.top_measurements === 'string'
 
-                              ? JSON.parse(result.measurements.top_measurements) 
+                              ? JSON.parse(result.measurements.top_measurements)
 
                               : result.measurements.top_measurements || {},
 
@@ -3403,7 +3403,7 @@ const Customize = () => {
 
                   <strong>Order Type:</strong>
 
-                  <span style={{ 
+                  <span style={{
 
                     display: 'inline-block',
 
@@ -3433,7 +3433,7 @@ const Customize = () => {
 
                 <span>
 
-                  {selectedOrder.order_type === 'walk_in' 
+                  {selectedOrder.order_type === 'walk_in'
 
                     ? (selectedOrder.walk_in_customer_name || 'Walk-in Customer')
 
@@ -3506,93 +3506,93 @@ const Customize = () => {
               )}
               <div className="measurements-btn-wrapper">
 
-                  <button 
+                <button
 
-                    className="btn-measurements" 
+                  className="btn-measurements"
 
-                    onClick={async () => {
+                  onClick={async () => {
 
-                      setMeasurementsLoading(true);
+                    setMeasurementsLoading(true);
 
-                      const customerId = selectedOrder.order_type === 'walk_in' 
+                    const customerId = selectedOrder.order_type === 'walk_in'
 
-                        ? selectedOrder.walk_in_customer_id 
+                      ? selectedOrder.walk_in_customer_id
 
-                        : selectedOrder.user_id;
+                      : selectedOrder.user_id;
 
-                      const customerType = selectedOrder.order_type === 'walk_in' ? 'walk_in' : 'online';
+                    const customerType = selectedOrder.order_type === 'walk_in' ? 'walk_in' : 'online';
 
-                      if (selectedOrder.order_type === 'walk_in' && selectedOrder.specific_data?.measurements) {
+                    if (selectedOrder.order_type === 'walk_in' && selectedOrder.specific_data?.measurements) {
 
-                        const orderMeasurements = typeof selectedOrder.specific_data.measurements === 'string'
+                      const orderMeasurements = typeof selectedOrder.specific_data.measurements === 'string'
 
-                          ? JSON.parse(selectedOrder.specific_data.measurements)
+                        ? JSON.parse(selectedOrder.specific_data.measurements)
 
-                          : selectedOrder.specific_data.measurements;
+                        : selectedOrder.specific_data.measurements;
+
+                      setMeasurements({
+
+                        top: orderMeasurements.top || {},
+
+                        bottom: orderMeasurements.bottom || {},
+
+                        notes: orderMeasurements.notes || ''
+
+                      });
+
+                      setMeasurementsLoading(false);
+
+                      setShowMeasurementsModal(true);
+
+                    } else {
+
+                      const result = await getMeasurements(customerId, customerType);
+
+                      if (result.success && result.measurements) {
 
                         setMeasurements({
 
-                          top: orderMeasurements.top || {},
+                          top: typeof result.measurements.top_measurements === 'string'
 
-                          bottom: orderMeasurements.bottom || {},
+                            ? JSON.parse(result.measurements.top_measurements)
 
-                          notes: orderMeasurements.notes || ''
+                            : result.measurements.top_measurements || {},
+
+                          bottom: typeof result.measurements.bottom_measurements === 'string'
+
+                            ? JSON.parse(result.measurements.bottom_measurements)
+
+                            : result.measurements.bottom_measurements || {},
+
+                          notes: result.measurements.notes || ''
 
                         });
 
-                        setMeasurementsLoading(false);
-
-                        setShowMeasurementsModal(true);
-
                       } else {
 
-                        const result = await getMeasurements(customerId, customerType);
-
-                        if (result.success && result.measurements) {
-
-                          setMeasurements({
-
-                            top: typeof result.measurements.top_measurements === 'string' 
-
-                              ? JSON.parse(result.measurements.top_measurements) 
-
-                              : result.measurements.top_measurements || {},
-
-                            bottom: typeof result.measurements.bottom_measurements === 'string'
-
-                              ? JSON.parse(result.measurements.bottom_measurements)
-
-                              : result.measurements.bottom_measurements || {},
-
-                            notes: result.measurements.notes || ''
-
-                          });
-
-                        } else {
-
-                          setMeasurements({ top: {}, bottom: {}, notes: '' });
-
-                        }
-
-                        setMeasurementsLoading(false);
-
-                        setShowMeasurementsModal(true);
+                        setMeasurements({ top: {}, bottom: {}, notes: '' });
 
                       }
 
-                    }}
+                      setMeasurementsLoading(false);
 
-                  >
+                      setShowMeasurementsModal(true);
 
-                    {measurementsLoading ? 'Loading...' : 'View/Edit Measurements'}
+                    }
 
-                  </button>
+                  }}
+
+                >
+
+                  {measurementsLoading ? 'Loading...' : 'View/Edit Measurements'}
+
+                </button>
 
               </div>
               {selectedOrder.order_type === 'walk_in' && selectedOrder.specific_data?.referenceImage && (
                 <div className="detail-row">
                   <strong>Reference Image:</strong>
-                  <div 
+                  <div
                     className="clickable-image"
                     style={{ marginTop: '10px', cursor: 'pointer' }}
                     onClick={() => openImagePreview(`http://localhost:5000/${selectedOrder.specific_data.referenceImage}`, 'Reference image')}
@@ -3655,7 +3655,7 @@ const Customize = () => {
 
                               <div key={angle} style={{ position: 'relative' }}>
 
-                                <div 
+                                <div
 
                                   className="clickable-image"
 
@@ -3671,15 +3671,15 @@ const Customize = () => {
 
                                     alt={`${angle} view`}
 
-                                    style={{ 
+                                    style={{
 
-                                      width: '100%', 
+                                      width: '100%',
 
-                                      height: 'auto', 
+                                      height: 'auto',
 
                                       maxHeight: '200px',
 
-                                      borderRadius: '8px', 
+                                      borderRadius: '8px',
 
                                       border: '2px solid #ddd',
 
@@ -3695,19 +3695,19 @@ const Customize = () => {
 
                                   />
 
-                                  <div style={{ 
+                                  <div style={{
 
-                                    position: 'absolute', 
+                                    position: 'absolute',
 
-                                    bottom: '5px', 
+                                    bottom: '5px',
 
-                                    left: '5px', 
+                                    left: '5px',
 
-                                    background: 'rgba(0,0,0,0.7)', 
+                                    background: 'rgba(0,0,0,0.7)',
 
-                                    color: 'white', 
+                                    color: 'white',
 
-                                    padding: '4px 8px', 
+                                    padding: '4px 8px',
 
                                     borderRadius: '4px',
 
@@ -3751,7 +3751,7 @@ const Customize = () => {
 
                       <strong>Design Preview:</strong>
 
-                      <div 
+                      <div
 
                         className="clickable-image"
 
@@ -4012,7 +4012,7 @@ const Customize = () => {
 
               <div className="detail-row"><strong>Fabric:</strong> {priceConfirmationItem.specific_data?.fabricType || 'N/A'}</div>
 
-              <div className="form-group" style={{ marginTop: '20px' }}>
+              <div className="payment-form-group">
 
                 <label>Final Price (₱)</label>
 
@@ -4029,8 +4029,6 @@ const Customize = () => {
                   onChange={(e) => setPriceConfirmationPrice(e.target.value)}
 
                   placeholder="Enter final price"
-
-                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '16px' }}
 
                 />
 
@@ -4072,7 +4070,7 @@ const Customize = () => {
 
             </div>
 
-            <div className="modal-footer">
+            <div className="modal-footer-centered">
 
               <button className="btn-cancel" onClick={() => setShowPriceConfirmationModal(false)}>Cancel</button>
 
@@ -4103,9 +4101,9 @@ const Customize = () => {
 
               <div className="detail-row">
 
-                <strong>Customer:</strong> 
+                <strong>Customer:</strong>
 
-                {selectedOrder.order_type === 'walk_in' 
+                {selectedOrder.order_type === 'walk_in'
 
                   ? (selectedOrder.walk_in_customer_name || 'Walk-in Customer')
 
@@ -4129,137 +4127,137 @@ const Customize = () => {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
 
-                  <div className="form-group">
+                    <div className="form-group">
 
-                    <label>Chest (inches)</label>
+                      <label>Chest (inches)</label>
 
-                    <input
+                      <input
 
-                      type="number"
+                        type="number"
 
-                      step="0.1"
+                        step="0.1"
 
-                      value={measurements.top.chest || ''}
+                        value={measurements.top.chest || ''}
 
-                      onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, chest: e.target.value } })}
+                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, chest: e.target.value } })}
 
-                      placeholder="Enter chest measurement"
+                        placeholder="Enter chest measurement"
 
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
 
-                    />
+                      />
 
-                  </div>
+                    </div>
 
-                  <div className="form-group">
+                    <div className="form-group">
 
-                    <label>Shoulders (inches)</label>
+                      <label>Shoulders (inches)</label>
 
-                    <input
+                      <input
 
-                      type="number"
+                        type="number"
 
-                      step="0.1"
+                        step="0.1"
 
-                      value={measurements.top.shoulders || ''}
+                        value={measurements.top.shoulders || ''}
 
-                      onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, shoulders: e.target.value } })}
+                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, shoulders: e.target.value } })}
 
-                      placeholder="Enter shoulder measurement"
+                        placeholder="Enter shoulder measurement"
 
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
 
-                    />
+                      />
 
-                  </div>
+                    </div>
 
-                  <div className="form-group">
+                    <div className="form-group">
 
-                    <label>Sleeve Length (inches)</label>
+                      <label>Sleeve Length (inches)</label>
 
-                    <input
+                      <input
 
-                      type="number"
+                        type="number"
 
-                      step="0.1"
+                        step="0.1"
 
-                      value={measurements.top.sleeve_length || ''}
+                        value={measurements.top.sleeve_length || ''}
 
-                      onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, sleeve_length: e.target.value } })}
+                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, sleeve_length: e.target.value } })}
 
-                      placeholder="Enter sleeve length"
+                        placeholder="Enter sleeve length"
 
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
 
-                    />
+                      />
 
-                  </div>
+                    </div>
 
-                  <div className="form-group">
+                    <div className="form-group">
 
-                    <label>Neck (inches)</label>
+                      <label>Neck (inches)</label>
 
-                    <input
+                      <input
 
-                      type="number"
+                        type="number"
 
-                      step="0.1"
+                        step="0.1"
 
-                      value={measurements.top.neck || ''}
+                        value={measurements.top.neck || ''}
 
-                      onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, neck: e.target.value } })}
+                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, neck: e.target.value } })}
 
-                      placeholder="Enter neck measurement"
+                        placeholder="Enter neck measurement"
 
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
 
-                    />
+                      />
 
-                  </div>
+                    </div>
 
-                  <div className="form-group">
+                    <div className="form-group">
 
-                    <label>Waist (inches)</label>
+                      <label>Waist (inches)</label>
 
-                    <input
+                      <input
 
-                      type="number"
+                        type="number"
 
-                      step="0.1"
+                        step="0.1"
 
-                      value={measurements.top.waist || ''}
+                        value={measurements.top.waist || ''}
 
-                      onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, waist: e.target.value } })}
+                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, waist: e.target.value } })}
 
-                      placeholder="Enter waist measurement"
+                        placeholder="Enter waist measurement"
 
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
 
-                    />
+                      />
 
-                  </div>
+                    </div>
 
-                  <div className="form-group">
+                    <div className="form-group">
 
-                    <label>Length (inches)</label>
+                      <label>Length (inches)</label>
 
-                    <input
+                      <input
 
-                      type="number"
+                        type="number"
 
-                      step="0.1"
+                        step="0.1"
 
-                      value={measurements.top.length || ''}
+                        value={measurements.top.length || ''}
 
-                      onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, length: e.target.value } })}
+                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, length: e.target.value } })}
 
-                      placeholder="Enter length measurement"
+                        placeholder="Enter length measurement"
 
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
 
-                    />
+                      />
 
-                  </div>
+                    </div>
 
                   </div>
 
@@ -4270,137 +4268,137 @@ const Customize = () => {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
 
-                  <div className="form-group">
+                    <div className="form-group">
 
-                    <label>Waist (inches)</label>
+                      <label>Waist (inches)</label>
 
-                    <input
+                      <input
 
-                      type="number"
+                        type="number"
 
-                      step="0.1"
+                        step="0.1"
 
-                      value={measurements.bottom.waist || ''}
+                        value={measurements.bottom.waist || ''}
 
-                      onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, waist: e.target.value } })}
+                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, waist: e.target.value } })}
 
-                      placeholder="Enter waist measurement"
+                        placeholder="Enter waist measurement"
 
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
 
-                    />
+                      />
 
-                  </div>
+                    </div>
 
-                  <div className="form-group">
+                    <div className="form-group">
 
-                    <label>Hips (inches)</label>
+                      <label>Hips (inches)</label>
 
-                    <input
+                      <input
 
-                      type="number"
+                        type="number"
 
-                      step="0.1"
+                        step="0.1"
 
-                      value={measurements.bottom.hips || ''}
+                        value={measurements.bottom.hips || ''}
 
-                      onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, hips: e.target.value } })}
+                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, hips: e.target.value } })}
 
-                      placeholder="Enter hip measurement"
+                        placeholder="Enter hip measurement"
 
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
 
-                    />
+                      />
 
-                  </div>
+                    </div>
 
-                  <div className="form-group">
+                    <div className="form-group">
 
-                    <label>Inseam (inches)</label>
+                      <label>Inseam (inches)</label>
 
-                    <input
+                      <input
 
-                      type="number"
+                        type="number"
 
-                      step="0.1"
+                        step="0.1"
 
-                      value={measurements.bottom.inseam || ''}
+                        value={measurements.bottom.inseam || ''}
 
-                      onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, inseam: e.target.value } })}
+                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, inseam: e.target.value } })}
 
-                      placeholder="Enter inseam measurement"
+                        placeholder="Enter inseam measurement"
 
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
 
-                    />
+                      />
 
-                  </div>
+                    </div>
 
-                  <div className="form-group">
+                    <div className="form-group">
 
-                    <label>Length (inches)</label>
+                      <label>Length (inches)</label>
 
-                    <input
+                      <input
 
-                      type="number"
+                        type="number"
 
-                      step="0.1"
+                        step="0.1"
 
-                      value={measurements.bottom.length || ''}
+                        value={measurements.bottom.length || ''}
 
-                      onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, length: e.target.value } })}
+                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, length: e.target.value } })}
 
-                      placeholder="Enter length measurement"
+                        placeholder="Enter length measurement"
 
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
 
-                    />
+                      />
 
-                  </div>
+                    </div>
 
-                  <div className="form-group">
+                    <div className="form-group">
 
-                    <label>Thigh (inches)</label>
+                      <label>Thigh (inches)</label>
 
-                    <input
+                      <input
 
-                      type="number"
+                        type="number"
 
-                      step="0.1"
+                        step="0.1"
 
-                      value={measurements.bottom.thigh || ''}
+                        value={measurements.bottom.thigh || ''}
 
-                      onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, thigh: e.target.value } })}
+                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, thigh: e.target.value } })}
 
-                      placeholder="Enter thigh measurement"
+                        placeholder="Enter thigh measurement"
 
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
 
-                    />
+                      />
 
-                  </div>
+                    </div>
 
-                  <div className="form-group">
+                    <div className="form-group">
 
-                    <label>Outseam (inches)</label>
+                      <label>Outseam (inches)</label>
 
-                    <input
+                      <input
 
-                      type="number"
+                        type="number"
 
-                      step="0.1"
+                        step="0.1"
 
-                      value={measurements.bottom.outseam || ''}
+                        value={measurements.bottom.outseam || ''}
 
-                      onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, outseam: e.target.value } })}
+                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, outseam: e.target.value } })}
 
-                      placeholder="Enter outseam measurement"
+                        placeholder="Enter outseam measurement"
 
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
 
-                    />
+                      />
 
-                  </div>
+                    </div>
 
                   </div>
 
@@ -4432,14 +4430,14 @@ const Customize = () => {
             <div className="modal-footer-centered">
               <button className="btn-cancel-list" onClick={() => setShowMeasurementsModal(false)}>Cancel</button>
               <button className="btn-save-list" onClick={async () => {
-                
+
                 const isWalkIn = selectedOrder.order_type === 'walk_in';
-                const customerId = isWalkIn 
-                  ? selectedOrder.walk_in_customer_id 
+                const customerId = isWalkIn
+                  ? selectedOrder.walk_in_customer_id
                   : selectedOrder.user_id;
 
-                const customerName = isWalkIn 
-                  ? selectedOrder.walk_in_customer_name 
+                const customerName = isWalkIn
+                  ? selectedOrder.walk_in_customer_name
                   : `${selectedOrder.first_name || ''} ${selectedOrder.last_name || ''}`.trim();
 
                 const measurementsData = {
@@ -4457,7 +4455,7 @@ const Customize = () => {
                   if (result.success) {
                     await alert('Measurements saved successfully!', 'Success', 'success');
                     setShowMeasurementsModal(false);
-                    
+
                     loadCustomizationOrders();
                   } else {
                     await alert(result.message || 'Failed to save measurements', 'Error', 'error');
@@ -4517,784 +4515,784 @@ const Customize = () => {
         onClose={closeImagePreview}
 
       />
-{showGLBUploadModal && (
+      {showGLBUploadModal && (
 
-  <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowGLBUploadModal(false)}>
+        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowGLBUploadModal(false)}>
 
-    <div className="modal-content" style={{ maxWidth: '600px' }}>
+          <div className="modal-content" style={{ maxWidth: '600px' }}>
 
-      <div className="modal-header">
+            <div className="modal-header">
 
-        <h2>Upload 3D Model (GLB File)</h2>
+              <h2>Upload 3D Model (GLB File)</h2>
 
-        <span className="close-modal" onClick={() => setShowGLBUploadModal(false)}>×</span>
-
-      </div>
-
-      <div className="glb-modal-body">
-        <div className="model-type-selection">
-
-          <label>
-
-            Select Model Type * <span className="required-note">(Important: Choose where this model will be used)</span>
-
-          </label>
-
-          <select
-
-            value={glbFormData.model_type}
-
-            onChange={(e) => setGlbFormData({ ...glbFormData, model_type: e.target.value, garment_category: '' })}
-
-          >
-
-            <option value="garment">👔 Garment (Main clothing items - Coats, Suits, Barong, Pants)</option>
-
-            <option value="button">🔘 Button (Decorative buttons for garments)</option>
-
-            <option value="accessory">🎩 Accessory (Hats, ties, belts, etc.)</option>
-
-          </select>
-
-          <div className="model-type-info">
-
-            {glbFormData.model_type === 'garment' && (
-
-              <div>
-
-                <strong>Garment:</strong> This will appear in the "Select Type" dropdown alongside built-in models (Blazer, Barong, Suit, Pants). 
-
-                Use this for complete clothing items.
-
-              </div>
-
-            )}
-
-            {glbFormData.model_type === 'button' && (
-
-              <div>
-
-                <strong>Button:</strong> This will appear in the "3D Buttons" section. Use this for decorative button models that can be added to garments.
-
-              </div>
-
-            )}
-
-            {glbFormData.model_type === 'accessory' && (
-
-              <div>
-
-                <strong>Accessory:</strong> This will appear in the "3D Accessories" section. Use this for items like hats, ties, belts, etc.
-
-              </div>
-
-            )}
-
-          </div>
-
-        </div>
-
-        <div className="glb-form-group">
-
-          <label>Model Name *</label>
-
-          <input
-
-            type="text"
-
-            value={glbFormData.model_name}
-
-            onChange={(e) => setGlbFormData({ ...glbFormData, model_name: e.target.value })}
-
-            placeholder={glbFormData.model_type === 'garment' ? 'e.g., Chinese Collar 3D Model' : glbFormData.model_type === 'button' ? 'e.g., Gold Button Set' : 'e.g., Leather Belt'}
-
-          />
-
-        </div>
-        {glbFormData.model_type === 'garment' && (
-
-          <div className="glb-form-group">
-
-            <label>Select Garment Type *</label>
-
-            <select
-
-              value={glbFormData.garment_category}
-
-              onChange={(e) => setGlbFormData({ ...glbFormData, garment_category: e.target.value })}
-
-              required
-
-            >
-
-              <option value="">-- Select Garment Type --</option>
-
-              {getAllGarmentCategories().map(category => (
-
-                <option key={category.value} value={category.value}>
-
-                  {category.label}
-
-                </option>
-
-              ))}
-
-            </select>
-
-            <small>This model will appear in the "Select Type" dropdown for the selected garment type</small>
-
-          </div>
-
-        )}
-
-        <div className="glb-form-group">
-
-          <label>GLB File *</label>
-
-          <input
-
-            type="file"
-
-            accept=".glb"
-
-            onChange={handleGLBFileChange}
-
-          />
-
-          {glbFile && (
-
-            <div className="file-selected-info">
-
-              Selected: {glbFile.name} ({(glbFile.size / 1024 / 1024).toFixed(2)} MB)
+              <span className="close-modal" onClick={() => setShowGLBUploadModal(false)}>×</span>
 
             </div>
 
-          )}
+            <div className="glb-modal-body">
+              <div className="model-type-selection">
 
-          <small>Maximum file size: 50MB</small>
+                <label>
 
-        </div>
+                  Select Model Type * <span className="required-note">(Important: Choose where this model will be used)</span>
 
-        <div className="glb-form-group">
+                </label>
 
-          <label>Description</label>
+                <select
 
-          <textarea
+                  value={glbFormData.model_type}
 
-            value={glbFormData.description}
+                  onChange={(e) => setGlbFormData({ ...glbFormData, model_type: e.target.value, garment_category: '' })}
 
-            onChange={(e) => setGlbFormData({ ...glbFormData, description: e.target.value })}
+                >
 
-            placeholder="Optional description..."
+                  <option value="garment">👔 Garment (Main clothing items - Coats, Suits, Barong, Pants)</option>
 
-            rows={3}
+                  <option value="button">🔘 Button (Decorative buttons for garments)</option>
 
-          />
+                  <option value="accessory">🎩 Accessory (Hats, ties, belts, etc.)</option>
 
-        </div>
-        {customModels.length > 0 && (
+                </select>
 
-          <div className="models-list-header">
+                <div className="model-type-info">
 
-            <div className="models-list-title-row">
+                  {glbFormData.model_type === 'garment' && (
 
-              <h3>Existing Custom Models ({customModels.length})</h3>
+                    <div>
+
+                      <strong>Garment:</strong> This will appear in the "Select Type" dropdown alongside built-in models (Blazer, Barong, Suit, Pants).
+
+                      Use this for complete clothing items.
+
+                    </div>
+
+                  )}
+
+                  {glbFormData.model_type === 'button' && (
+
+                    <div>
+
+                      <strong>Button:</strong> This will appear in the "3D Buttons" section. Use this for decorative button models that can be added to garments.
+
+                    </div>
+
+                  )}
+
+                  {glbFormData.model_type === 'accessory' && (
+
+                    <div>
+
+                      <strong>Accessory:</strong> This will appear in the "3D Accessories" section. Use this for items like hats, ties, belts, etc.
+
+                    </div>
+
+                  )}
+
+                </div>
+
+              </div>
+
+              <div className="glb-form-group">
+
+                <label>Model Name *</label>
+
+                <input
+
+                  type="text"
+
+                  value={glbFormData.model_name}
+
+                  onChange={(e) => setGlbFormData({ ...glbFormData, model_name: e.target.value })}
+
+                  placeholder={glbFormData.model_type === 'garment' ? 'e.g., Chinese Collar 3D Model' : glbFormData.model_type === 'button' ? 'e.g., Gold Button Set' : 'e.g., Leather Belt'}
+
+                />
+
+              </div>
+              {glbFormData.model_type === 'garment' && (
+
+                <div className="glb-form-group">
+
+                  <label>Select Garment Type *</label>
+
+                  <select
+
+                    value={glbFormData.garment_category}
+
+                    onChange={(e) => setGlbFormData({ ...glbFormData, garment_category: e.target.value })}
+
+                    required
+
+                  >
+
+                    <option value="">-- Select Garment Type --</option>
+
+                    {getAllGarmentCategories().map(category => (
+
+                      <option key={category.value} value={category.value}>
+
+                        {category.label}
+
+                      </option>
+
+                    ))}
+
+                  </select>
+
+                  <small>This model will appear in the "Select Type" dropdown for the selected garment type</small>
+
+                </div>
+
+              )}
+
+              <div className="glb-form-group">
+
+                <label>GLB File *</label>
+
+                <input
+
+                  type="file"
+
+                  accept=".glb"
+
+                  onChange={handleGLBFileChange}
+
+                />
+
+                {glbFile && (
+
+                  <div className="file-selected-info">
+
+                    Selected: {glbFile.name} ({(glbFile.size / 1024 / 1024).toFixed(2)} MB)
+
+                  </div>
+
+                )}
+
+                <small>Maximum file size: 50MB</small>
+
+              </div>
+
+              <div className="glb-form-group">
+
+                <label>Description</label>
+
+                <textarea
+
+                  value={glbFormData.description}
+
+                  onChange={(e) => setGlbFormData({ ...glbFormData, description: e.target.value })}
+
+                  placeholder="Optional description..."
+
+                  rows={3}
+
+                />
+
+              </div>
+              {customModels.length > 0 && (
+
+                <div className="models-list-header">
+
+                  <div className="models-list-title-row">
+
+                    <h3>Existing Custom Models ({customModels.length})</h3>
+
+                    <button
+
+                      onClick={handleDeleteAllModels}
+
+                      className="model-delete-all-btn"
+
+                      title="Delete all custom models"
+
+                    >
+
+                      DELETE ALL
+
+                    </button>
+
+                  </div>
+
+                  <div className="models-scrollable">
+
+                    {customModels.map(model => (
+
+                      <div key={model.model_id} className="model-item-card">
+
+                        <div className="model-item-info">
+
+                          <div className="model-item-name">{model.model_name}</div>
+
+                          <div className="model-item-details">
+
+                            Type: {model.model_type} | Category: {model.garment_category || 'N/A'}
+
+                          </div>
+
+                        </div>
+
+                        <button
+
+                          onClick={() => handleDeleteModel(model.model_id)}
+
+                          className="model-delete-btn"
+
+                        >
+
+                          DELETE
+
+                        </button>
+
+                      </div>
+
+                    ))}
+
+                  </div>
+
+                </div>
+
+              )}
+
+            </div>
+
+            <div className="modal-footer-centered">
+
+              <button className="glb-btn-cancel" onClick={() => setShowGLBUploadModal(false)}>Cancel</button>
 
               <button
 
-                onClick={handleDeleteAllModels}
+                className="glb-btn-submit"
 
-                className="model-delete-all-btn"
+                onClick={handleGLBUpload}
 
-                title="Delete all custom models"
+                disabled={uploadingGLB || !glbFile || !glbFormData.model_name.trim()}
 
               >
 
-                DELETE ALL
+                {uploadingGLB ? 'Uploading...' : 'Upload'}
 
               </button>
 
             </div>
 
-            <div className="models-scrollable">
+          </div>
 
-              {customModels.map(model => (
+        </div>
 
-                <div key={model.model_id} className="model-item-card">
+      )}
+      {showFabricTypeModal && (
 
-                  <div className="model-item-info">
+        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowFabricTypeModal(false)}>
 
-                    <div className="model-item-name">{model.model_name}</div>
+          <div className="modal-content" style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
 
-                    <div className="model-item-details">
+            <div className="modal-header">
 
-                      Type: {model.model_type} | Category: {model.garment_category || 'N/A'}
+              <h2>{editingFabricType ? 'Edit Fabric Type' : 'Add Fabric Type'}</h2>
 
-                    </div>
+              <span className="close-modal" onClick={() => {
 
-                  </div>
+                setShowFabricTypeModal(false);
 
-                  <button
+                setEditingFabricType(null);
 
-                    onClick={() => handleDeleteModel(model.model_id)}
+                setFabricTypeForm({ fabric_name: '', fabric_price: '', description: '', is_active: 1 });
 
-                    className="model-delete-btn"
-
-                  >
-
-                    DELETE
-
-                  </button>
-
-                </div>
-
-              ))}
+              }}>×</span>
 
             </div>
 
-          </div>
+            <div className="customize-modal-body">
 
-        )}
+              <div className="customize-form-group">
 
-      </div>
+                <label>Fabric Name *</label>
 
-      <div className="modal-footer-centered">
+                <input
 
-        <button className="glb-btn-cancel" onClick={() => setShowGLBUploadModal(false)}>Cancel</button>
+                  type="text"
 
-        <button 
+                  value={fabricTypeForm.fabric_name}
 
-          className="glb-btn-submit" 
+                  onChange={(e) => setFabricTypeForm({ ...fabricTypeForm, fabric_name: e.target.value })}
 
-          onClick={handleGLBUpload}
+                  placeholder="e.g., Silk, Cotton, Linen"
 
-          disabled={uploadingGLB || !glbFile || !glbFormData.model_name.trim()}
+                />
 
-        >
+              </div>
 
-          {uploadingGLB ? 'Uploading...' : 'Upload'}
+              <div className="customize-form-group">
 
-        </button>
+                <label>Price (₱) *</label>
 
-      </div>
+                <input
 
-    </div>
+                  type="number"
 
-  </div>
+                  step="0.01"
 
-)}
-{showFabricTypeModal && (
+                  min="0"
 
-  <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowFabricTypeModal(false)}>
+                  value={fabricTypeForm.fabric_price}
 
-    <div className="modal-content" style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
+                  onChange={(e) => setFabricTypeForm({ ...fabricTypeForm, fabric_price: e.target.value })}
 
-      <div className="modal-header">
+                  placeholder="0.00"
 
-        <h2>{editingFabricType ? 'Edit Fabric Type' : 'Add Fabric Type'}</h2>
+                />
 
-        <span className="close-modal" onClick={() => {
+              </div>
 
-          setShowFabricTypeModal(false);
+              <div className="customize-form-group">
 
-          setEditingFabricType(null);
+                <label>Description</label>
 
-          setFabricTypeForm({ fabric_name: '', fabric_price: '', description: '', is_active: 1 });
+                <textarea
 
-        }}>×</span>
+                  value={fabricTypeForm.description}
 
-      </div>
+                  onChange={(e) => setFabricTypeForm({ ...fabricTypeForm, description: e.target.value })}
 
-      <div className="customize-modal-body">
+                  placeholder="Optional description..."
 
-        <div className="customize-form-group">
+                  rows={3}
 
-          <label>Fabric Name *</label>
+                />
 
-          <input
+              </div>
 
-            type="text"
+              <div className="customize-form-group">
 
-            value={fabricTypeForm.fabric_name}
+                <label>
 
-            onChange={(e) => setFabricTypeForm({ ...fabricTypeForm, fabric_name: e.target.value })}
+                  <input
 
-            placeholder="e.g., Silk, Cotton, Linen"
+                    type="checkbox"
 
-          />
+                    checked={fabricTypeForm.is_active === 1}
 
-        </div>
+                    onChange={(e) => setFabricTypeForm({ ...fabricTypeForm, is_active: e.target.checked ? 1 : 0 })}
 
-        <div className="customize-form-group">
+                  />
 
-          <label>Price (₱) *</label>
+                  Active (Show in dropdowns)
 
-          <input
+                </label>
 
-            type="number"
+              </div>
+              {fabricTypes.length > 0 && (
 
-            step="0.01"
+                <div className="fabric-types-list-header">
 
-            min="0"
+                  <h3>Existing Fabric Types ({fabricTypes.length})</h3>
 
-            value={fabricTypeForm.fabric_price}
+                  <div className="fabric-types-scrollable">
 
-            onChange={(e) => setFabricTypeForm({ ...fabricTypeForm, fabric_price: e.target.value })}
+                    {fabricTypes.map(fabric => (
 
-            placeholder="0.00"
+                      <div
 
-          />
+                        key={fabric.fabric_id}
 
-        </div>
+                        className={`fabric-item-card ${fabric.is_active ? 'active' : 'inactive'}`}
 
-        <div className="customize-form-group">
+                      >
 
-          <label>Description</label>
+                        <div className="fabric-item-info">
 
-          <textarea
+                          <div className="fabric-item-name">{fabric.fabric_name}</div>
 
-            value={fabricTypeForm.description}
+                          <div className="fabric-item-details">
 
-            onChange={(e) => setFabricTypeForm({ ...fabricTypeForm, description: e.target.value })}
+                            <span className="price">Price: ₱{parseFloat(fabric.fabric_price).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
 
-            placeholder="Optional description..."
+                            {fabric.description && ` | ${fabric.description}`}
 
-            rows={3}
+                            {!fabric.is_active && <span className="inactive-badge">(Inactive)</span>}
 
-          />
+                          </div>
 
-        </div>
+                        </div>
 
-        <div className="customize-form-group">
+                        <div className="fabric-item-actions">
 
-          <label>
+                          <button
 
-            <input
+                            onClick={() => openEditFabricType(fabric)}
 
-              type="checkbox"
+                            className="fabric-edit-btn"
 
-              checked={fabricTypeForm.is_active === 1}
+                          >
 
-              onChange={(e) => setFabricTypeForm({ ...fabricTypeForm, is_active: e.target.checked ? 1 : 0 })}
+                            Edit
 
-            />
+                          </button>
 
-            Active (Show in dropdowns)
+                          <button
 
-          </label>
+                            onClick={() => handleDeleteFabricType(fabric.fabric_id)}
 
-        </div>
-        {fabricTypes.length > 0 && (
+                            className="fabric-delete-btn"
 
-          <div className="fabric-types-list-header">
+                          >
 
-            <h3>Existing Fabric Types ({fabricTypes.length})</h3>
+                            Delete
 
-            <div className="fabric-types-scrollable">
+                          </button>
 
-              {fabricTypes.map(fabric => (
+                        </div>
 
-                <div 
+                      </div>
 
-                  key={fabric.fabric_id} 
-
-                  className={`fabric-item-card ${fabric.is_active ? 'active' : 'inactive'}`}
-
-                >
-
-                  <div className="fabric-item-info">
-
-                    <div className="fabric-item-name">{fabric.fabric_name}</div>
-
-                    <div className="fabric-item-details">
-
-                      <span className="price">Price: ₱{parseFloat(fabric.fabric_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-
-                      {fabric.description && ` | ${fabric.description}`}
-
-                      {!fabric.is_active && <span className="inactive-badge">(Inactive)</span>}
-
-                    </div>
-
-                  </div>
-
-                  <div className="fabric-item-actions">
-
-                    <button
-
-                      onClick={() => openEditFabricType(fabric)}
-
-                      className="fabric-edit-btn"
-
-                    >
-
-                      Edit
-
-                    </button>
-
-                    <button
-
-                      onClick={() => handleDeleteFabricType(fabric.fabric_id)}
-
-                      className="fabric-delete-btn"
-
-                    >
-
-                      Delete
-
-                    </button>
+                    ))}
 
                   </div>
 
                 </div>
 
-              ))}
+              )}
+
+            </div>
+
+            <div className="customize-modal-footer">
+
+              <button className="customize-btn-cancel" onClick={() => {
+
+                setShowFabricTypeModal(false);
+
+                setEditingFabricType(null);
+
+                setFabricTypeForm({ fabric_name: '', fabric_price: '', description: '', is_active: 1 });
+
+              }}>Cancel</button>
+
+              <button
+
+                className="customize-btn-submit"
+
+                onClick={handleFabricTypeSubmit}
+
+                disabled={!fabricTypeForm.fabric_name.trim() || !fabricTypeForm.fabric_price || isNaN(parseFloat(fabricTypeForm.fabric_price))}
+
+              >
+
+                {editingFabricType ? 'Update' : 'Create'}
+
+              </button>
 
             </div>
 
           </div>
 
-        )}
-
-      </div>
-
-      <div className="customize-modal-footer">
-
-        <button className="customize-btn-cancel" onClick={() => {
-
-          setShowFabricTypeModal(false);
-
-          setEditingFabricType(null);
-
-          setFabricTypeForm({ fabric_name: '', fabric_price: '', description: '', is_active: 1 });
-
-        }}>Cancel</button>
-
-        <button
-
-          className="customize-btn-submit"
-
-          onClick={handleFabricTypeSubmit}
-
-          disabled={!fabricTypeForm.fabric_name.trim() || !fabricTypeForm.fabric_price || isNaN(parseFloat(fabricTypeForm.fabric_price))}
-
-        >
-
-          {editingFabricType ? 'Update' : 'Create'}
-
-        </button>
-
-      </div>
-
-    </div>
-
-  </div>
-
-)}
-{showGarmentTypeModal && (
-
-  <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowGarmentTypeModal(false)}>
-
-    <div className="modal-content" style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
-
-      <div className="modal-header">
-
-        <h2>{editingGarmentType ? 'Edit Garment Type' : 'Add Garment Type'}</h2>
-
-        <span className="close-modal" onClick={() => {
-
-          setShowGarmentTypeModal(false);
-
-          setEditingGarmentType(null);
-
-          setGarmentTypeForm({ garment_name: '', garment_price: '', garment_code: '', description: '', is_active: 1 });
-
-          setGarmentGlbFile(null);
-
-        }}>×</span>
-
-      </div>
-
-      <div className="customize-modal-body">
-
-        <div className="customize-form-group">
-
-          <label>Garment Name *</label>
-
-          <input
-
-            type="text"
-
-            value={garmentTypeForm.garment_name}
-
-            onChange={(e) => setGarmentTypeForm({ ...garmentTypeForm, garment_name: e.target.value })}
-
-            placeholder="e.g., Polo, Vest, Tuxedo"
-
-          />
-
         </div>
 
-        <div className="customize-form-group">
+      )}
+      {showGarmentTypeModal && (
 
-          <label>Garment Code *</label>
+        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowGarmentTypeModal(false)}>
 
-          <input
+          <div className="modal-content" style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
 
-            type="text"
+            <div className="modal-header">
 
-            value={garmentTypeForm.garment_code}
+              <h2>{editingGarmentType ? 'Edit Garment Type' : 'Add Garment Type'}</h2>
 
-            onChange={(e) => setGarmentTypeForm({ ...garmentTypeForm, garment_code: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
+              <span className="close-modal" onClick={() => {
 
-            placeholder="e.g., polo, vest, tuxedo (lowercase, no spaces)"
+                setShowGarmentTypeModal(false);
 
-          />
+                setEditingGarmentType(null);
 
-          <small>This code is used internally to identify the garment type. Use lowercase letters and hyphens only.</small>
+                setGarmentTypeForm({ garment_name: '', garment_price: '', garment_code: '', description: '', is_active: 1 });
 
-        </div>
+                setGarmentGlbFile(null);
 
-        <div className="customize-form-group">
-
-          <label>Price (₱) *</label>
-
-          <input
-
-            type="number"
-
-            step="0.01"
-
-            min="0"
-
-            value={garmentTypeForm.garment_price}
-
-            onChange={(e) => setGarmentTypeForm({ ...garmentTypeForm, garment_price: e.target.value })}
-
-            placeholder="0.00"
-
-          />
-
-        </div>
-
-        <div className="customize-form-group">
-
-          <label>3D Model (GLB File) {!editingGarmentType && '*'}</label>
-
-          <input
-
-            type="file"
-
-            accept=".glb"
-
-            onChange={handleGarmentGlbFileChange}
-
-            style={{ marginBottom: '8px' }}
-
-          />
-
-          {garmentGlbFile && (
-
-            <div style={{ 
-
-              padding: '8px 12px', 
-
-              backgroundColor: '#e8f5e9', 
-
-              borderRadius: '4px',
-
-              fontSize: '13px',
-
-              color: '#2e7d32',
-
-              display: 'flex',
-
-              alignItems: 'center',
-
-              gap: '8px'
-
-            }}>
-
-              <span>✅</span>
-
-              <span>Selected: {garmentGlbFile.name} ({(garmentGlbFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+              }}>×</span>
 
             </div>
 
-          )}
+            <div className="customize-modal-body">
 
-          <small style={{ color: '#666', display: 'block', marginTop: '4px' }}>
+              <div className="customize-form-group">
 
-            {editingGarmentType 
+                <label>Garment Name *</label>
 
-              ? 'Upload a new GLB file to replace the existing 3D model (optional)' 
+                <input
 
-              : 'Upload a 3D model file (.glb) that will be displayed in the 3D customizer. Max 50MB.'}
+                  type="text"
 
-          </small>
+                  value={garmentTypeForm.garment_name}
 
-        </div>
+                  onChange={(e) => setGarmentTypeForm({ ...garmentTypeForm, garment_name: e.target.value })}
 
-        <div className="customize-form-group">
+                  placeholder="e.g., Polo, Vest, Tuxedo"
 
-          <label>Description</label>
+                />
 
-          <textarea
+              </div>
 
-            value={garmentTypeForm.description}
+              <div className="customize-form-group">
 
-            onChange={(e) => setGarmentTypeForm({ ...garmentTypeForm, description: e.target.value })}
+                <label>Garment Code *</label>
 
-            placeholder="Optional description..."
+                <input
 
-            rows={3}
+                  type="text"
 
-          />
+                  value={garmentTypeForm.garment_code}
 
-        </div>
+                  onChange={(e) => setGarmentTypeForm({ ...garmentTypeForm, garment_code: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
 
-        <div className="customize-form-group">
+                  placeholder="e.g., polo, vest, tuxedo (lowercase, no spaces)"
 
-          <label>
+                />
 
-            <input
+                <small>This code is used internally to identify the garment type. Use lowercase letters and hyphens only.</small>
 
-              type="checkbox"
+              </div>
 
-              checked={garmentTypeForm.is_active === 1}
+              <div className="customize-form-group">
 
-              onChange={(e) => setGarmentTypeForm({ ...garmentTypeForm, is_active: e.target.checked ? 1 : 0 })}
+                <label>Price (₱) *</label>
 
-            />
+                <input
 
-            Active (Show in dropdowns)
+                  type="number"
 
-          </label>
+                  step="0.01"
 
-        </div>
-        {garmentTypes.length > 0 && (
+                  min="0"
 
-          <div className="fabric-types-list-header">
+                  value={garmentTypeForm.garment_price}
 
-            <h3>Existing Garment Types ({garmentTypes.length})</h3>
+                  onChange={(e) => setGarmentTypeForm({ ...garmentTypeForm, garment_price: e.target.value })}
 
-            <div className="fabric-types-scrollable">
+                  placeholder="0.00"
 
-              {garmentTypes.map(garment => (
+                />
 
-                <div 
+              </div>
 
-                  key={garment.garment_id} 
+              <div className="customize-form-group">
 
-                  className={`fabric-item-card ${garment.is_active ? 'active' : 'inactive'}`}
+                <label>3D Model (GLB File) {!editingGarmentType && '*'}</label>
 
-                >
+                <input
 
-                  <div className="fabric-item-info">
+                  type="file"
 
-                    <div className="fabric-item-name">{garment.garment_name}</div>
+                  accept=".glb"
 
-                    <div className="fabric-item-details">
+                  onChange={handleGarmentGlbFileChange}
 
-                      <span className="price">Price: ₱{parseFloat(garment.garment_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                  style={{ marginBottom: '8px' }}
 
-                      {garment.garment_code && <span> | Code: {garment.garment_code}</span>}
+                />
 
-                      {garment.description && ` | ${garment.description}`}
+                {garmentGlbFile && (
 
-                      {!garment.is_active && <span className="inactive-badge">(Inactive)</span>}
+                  <div style={{
 
-                    </div>
+                    padding: '8px 12px',
+
+                    backgroundColor: '#e8f5e9',
+
+                    borderRadius: '4px',
+
+                    fontSize: '13px',
+
+                    color: '#2e7d32',
+
+                    display: 'flex',
+
+                    alignItems: 'center',
+
+                    gap: '8px'
+
+                  }}>
+
+                    <span>✅</span>
+
+                    <span>Selected: {garmentGlbFile.name} ({(garmentGlbFile.size / 1024 / 1024).toFixed(2)} MB)</span>
 
                   </div>
 
-                  <div className="fabric-item-actions">
+                )}
 
-                    <button
+                <small style={{ color: '#666', display: 'block', marginTop: '4px' }}>
 
-                      onClick={() => openEditGarmentType(garment)}
+                  {editingGarmentType
 
-                      className="fabric-edit-btn"
+                    ? 'Upload a new GLB file to replace the existing 3D model (optional)'
 
-                    >
+                    : 'Upload a 3D model file (.glb) that will be displayed in the 3D customizer. Max 50MB.'}
 
-                      Edit
+                </small>
 
-                    </button>
+              </div>
 
-                    <button
+              <div className="customize-form-group">
 
-                      onClick={() => handleDeleteGarmentType(garment.garment_id)}
+                <label>Description</label>
 
-                      className="fabric-delete-btn"
+                <textarea
 
-                    >
+                  value={garmentTypeForm.description}
 
-                      Delete
+                  onChange={(e) => setGarmentTypeForm({ ...garmentTypeForm, description: e.target.value })}
 
-                    </button>
+                  placeholder="Optional description..."
+
+                  rows={3}
+
+                />
+
+              </div>
+
+              <div className="customize-form-group">
+
+                <label>
+
+                  <input
+
+                    type="checkbox"
+
+                    checked={garmentTypeForm.is_active === 1}
+
+                    onChange={(e) => setGarmentTypeForm({ ...garmentTypeForm, is_active: e.target.checked ? 1 : 0 })}
+
+                  />
+
+                  Active (Show in dropdowns)
+
+                </label>
+
+              </div>
+              {garmentTypes.length > 0 && (
+
+                <div className="fabric-types-list-header">
+
+                  <h3>Existing Garment Types ({garmentTypes.length})</h3>
+
+                  <div className="fabric-types-scrollable">
+
+                    {garmentTypes.map(garment => (
+
+                      <div
+
+                        key={garment.garment_id}
+
+                        className={`fabric-item-card ${garment.is_active ? 'active' : 'inactive'}`}
+
+                      >
+
+                        <div className="fabric-item-info">
+
+                          <div className="fabric-item-name">{garment.garment_name}</div>
+
+                          <div className="fabric-item-details">
+
+                            <span className="price">Price: ₱{parseFloat(garment.garment_price).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+
+                            {garment.garment_code && <span> | Code: {garment.garment_code}</span>}
+
+                            {garment.description && ` | ${garment.description}`}
+
+                            {!garment.is_active && <span className="inactive-badge">(Inactive)</span>}
+
+                          </div>
+
+                        </div>
+
+                        <div className="fabric-item-actions">
+
+                          <button
+
+                            onClick={() => openEditGarmentType(garment)}
+
+                            className="fabric-edit-btn"
+
+                          >
+
+                            Edit
+
+                          </button>
+
+                          <button
+
+                            onClick={() => handleDeleteGarmentType(garment.garment_id)}
+
+                            className="fabric-delete-btn"
+
+                          >
+
+                            Delete
+
+                          </button>
+
+                        </div>
+
+                      </div>
+
+                    ))}
 
                   </div>
 
                 </div>
 
-              ))}
+              )}
+
+            </div>
+
+            <div className="customize-modal-footer">
+
+              <button className="customize-btn-cancel" onClick={() => {
+
+                setShowGarmentTypeModal(false);
+
+                setEditingGarmentType(null);
+
+                setGarmentTypeForm({ garment_name: '', garment_price: '', garment_code: '', description: '', is_active: 1 });
+
+                setGarmentGlbFile(null);
+
+              }} disabled={uploadingGarmentGlb}>Cancel</button>
+
+              <button
+
+                className="customize-btn-submit"
+
+                onClick={handleGarmentTypeSubmit}
+
+                disabled={
+
+                  uploadingGarmentGlb ||
+
+                  !garmentTypeForm.garment_name.trim() ||
+
+                  !garmentTypeForm.garment_price ||
+
+                  isNaN(parseFloat(garmentTypeForm.garment_price)) ||
+
+                  (!editingGarmentType && !garmentGlbFile)
+
+                }
+
+              >
+
+                {uploadingGarmentGlb ? 'Uploading...' : (editingGarmentType ? 'Update' : 'Create')}
+
+              </button>
 
             </div>
 
           </div>
 
-        )}
+        </div>
 
-      </div>
-
-      <div className="customize-modal-footer">
-
-        <button className="customize-btn-cancel" onClick={() => {
-
-          setShowGarmentTypeModal(false);
-
-          setEditingGarmentType(null);
-
-          setGarmentTypeForm({ garment_name: '', garment_price: '', garment_code: '', description: '', is_active: 1 });
-
-          setGarmentGlbFile(null);
-
-        }} disabled={uploadingGarmentGlb}>Cancel</button>
-
-        <button
-
-          className="customize-btn-submit"
-
-          onClick={handleGarmentTypeSubmit}
-
-          disabled={
-
-            uploadingGarmentGlb ||
-
-            !garmentTypeForm.garment_name.trim() || 
-
-            !garmentTypeForm.garment_price || 
-
-            isNaN(parseFloat(garmentTypeForm.garment_price)) ||
-
-            (!editingGarmentType && !garmentGlbFile) 
-
-          }
-
-        >
-
-          {uploadingGarmentGlb ? 'Uploading...' : (editingGarmentType ? 'Update' : 'Create')}
-
-        </button>
-
-      </div>
-
-    </div>
-
-  </div>
-
-)}
+      )}
       {showPatternModal && (
 
         <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowPatternModal(false)}>
@@ -5329,9 +5327,9 @@ const Customize = () => {
 
                   onChange={(e) => {
 
-                    setPatternForm({ 
+                    setPatternForm({
 
-                      ...patternForm, 
+                      ...patternForm,
 
                       pattern_name: e.target.value,
 
@@ -5393,11 +5391,11 @@ const Customize = () => {
 
                     <p style={{ marginBottom: '8px', color: '#666', fontSize: '14px' }}>Preview:</p>
 
-                    <div style={{ 
+                    <div style={{
 
-                      width: '200px', 
+                      width: '200px',
 
-                      height: '200px', 
+                      height: '200px',
 
                       margin: '0 auto',
 
@@ -5486,13 +5484,13 @@ const Customize = () => {
               </div>
               {!editingPattern && (
 
-                <div style={{ 
+                <div style={{
 
-                  border: '1px solid #e0e0e0', 
+                  border: '1px solid #e0e0e0',
 
-                  borderRadius: '8px', 
+                  borderRadius: '8px',
 
-                  padding: '15px', 
+                  padding: '15px',
 
                   marginTop: '15px',
 
@@ -5504,17 +5502,17 @@ const Customize = () => {
 
                     🔄 Seamless Texture Processing
 
-                    <span style={{ 
+                    <span style={{
 
-                      fontSize: '11px', 
+                      fontSize: '11px',
 
-                      backgroundColor: '#4CAF50', 
+                      backgroundColor: '#4CAF50',
 
-                      color: 'white', 
+                      color: 'white',
 
-                      padding: '2px 8px', 
+                      padding: '2px 8px',
 
-                      borderRadius: '10px' 
+                      borderRadius: '10px'
 
                     }}>
 
@@ -5526,7 +5524,7 @@ const Customize = () => {
 
                   <p style={{ fontSize: '12px', color: '#666', marginBottom: '12px' }}>
 
-                    Your uploaded image will be automatically converted into a seamless, tileable fabric pattern 
+                    Your uploaded image will be automatically converted into a seamless, tileable fabric pattern
 
                     optimized for 3D garment texturing.
 
@@ -5612,13 +5610,13 @@ const Customize = () => {
 
                   </div>
 
-                  <div style={{ 
+                  <div style={{
 
-                    marginTop: '10px', 
+                    marginTop: '10px',
 
-                    padding: '10px', 
+                    padding: '10px',
 
-                    backgroundColor: '#e3f2fd', 
+                    backgroundColor: '#e3f2fd',
 
                     borderRadius: '6px',
 
@@ -5689,9 +5687,9 @@ const Customize = () => {
 
                       return (
 
-                        <div 
+                        <div
 
-                          key={pattern.pattern_id} 
+                          key={pattern.pattern_id}
 
                           className={`fabric-item-card ${pattern.is_active ? 'active' : 'inactive'}`}
 
@@ -5710,13 +5708,13 @@ const Customize = () => {
 
                             flexShrink: 0,
 
-                            background: imageUrl 
+                            background: imageUrl
 
                               ? `url(${imageUrl}) center/cover`
 
-                              : pattern.pattern_type === 'procedural' 
+                              : pattern.pattern_type === 'procedural'
 
-                                ? '#f0f0f0' 
+                                ? '#f0f0f0'
 
                                 : '#ccc',
 
@@ -5907,9 +5905,9 @@ const Customize = () => {
 
               {(() => {
 
-                const pricingFactors = typeof selectedOrder.pricing_factors === 'string' 
+                const pricingFactors = typeof selectedOrder.pricing_factors === 'string'
 
-                  ? JSON.parse(selectedOrder.pricing_factors || '{}') 
+                  ? JSON.parse(selectedOrder.pricing_factors || '{}')
 
                   : (selectedOrder.pricing_factors || {});
 

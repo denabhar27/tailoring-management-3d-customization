@@ -8,12 +8,14 @@ import {
   Image,
   ScrollView,
   Dimensions,
+  SafeAreaView,
   Alert,
+  Platform,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import DateTimePickerModal from "../../../components/DateTimePickerModal";
 import { cartService } from "../../../utils/apiService";
 
 const { width, height } = Dimensions.get("window");
@@ -22,13 +24,15 @@ export default function CustomizeClothes() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [image, setImage] = useState<string | null>(null);
-  const insets = useSafeAreaInsets();
   const [garmentCategory, setGarmentCategory] = useState("");
   const [style, setStyle] = useState("");
   const [fabricType, setFabricType] = useState("");
   const [buttonStyle, setButtonStyle] = useState("");
   const [sizeMeasurement, setSizeMeasurement] = useState("");
   const [loading, setLoading] = useState(false);
+  const [preferredDate, setPreferredDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -38,6 +42,36 @@ export default function CustomizeClothes() {
     if (!result.canceled) {
       setImage(result.assets[0].uri);
     }
+  };
+
+  const handleDateConfirm = (selectedDate: Date) => {
+    setPreferredDate(selectedDate);
+    setShowDatePicker(false);
+    // Show time picker after date is selected
+    setTimeout(() => setShowTimePicker(true), 300);
+  };
+
+  const handleTimeConfirm = (selectedTime: Date) => {
+    const newDate = new Date(preferredDate);
+    newDate.setHours(selectedTime.getHours());
+    newDate.setMinutes(selectedTime.getMinutes());
+    setPreferredDate(newDate);
+    setShowTimePicker(false);
+  };
+
+  const handlePickerCancel = () => {
+    setShowDatePicker(false);
+    setShowTimePicker(false);
+  };
+
+  const formatDateTime = (date: Date) => {
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   const getPriceForGarment = (garment: string): number => {
@@ -63,10 +97,10 @@ export default function CustomizeClothes() {
     setLoading(true);
     
     try {
-      
+      // Prepare customize data for backend
       const customizeData = {
         serviceType: 'customize',
-        serviceId: 2, 
+        serviceId: 2, // Assuming customize service ID is 2
         serviceName: `Custom ${garmentCategory}`,
         basePrice: getPriceForGarment(garmentCategory).toString(),
         finalPrice: getPriceForGarment(garmentCategory).toString(),
@@ -76,7 +110,8 @@ export default function CustomizeClothes() {
           fabricType: fabricType,
           buttonStyle: buttonStyle,
           sizeMeasurement: sizeMeasurement,
-          imageUrl: image || 'no-image'
+          imageUrl: image || 'no-image',
+          preferredDate: `${preferredDate.getFullYear()}-${String(preferredDate.getMonth() + 1).padStart(2, '0')}-${String(preferredDate.getDate()).padStart(2, '0')}`
         }
       };
 
@@ -111,7 +146,7 @@ export default function CustomizeClothes() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={{ paddingBottom: height * 0.12 }}
+        contentContainerStyle={{ paddingBottom: height * 0.2 }}
       >
        
         <View style={styles.header}>
@@ -125,6 +160,31 @@ export default function CustomizeClothes() {
           </TouchableOpacity>
         </View>
 
+        {/* 3D Customizer Button */}
+        <TouchableOpacity 
+          style={styles.customizer3DButton}
+          onPress={() => router.push("/(tabs)/appointment/Customizer3D")}
+        >
+          <View style={styles.customizer3DContent}>
+            <MaterialCommunityIcons name="rotate-3d-variant" size={40} color="#B8860B" />
+            <View style={styles.customizer3DTextContainer}>
+              <Text style={styles.customizer3DTitle}>✨ Try Our 3D Customizer</Text>
+              <Text style={styles.customizer3DSubtitle}>
+                Design your garment in interactive 3D view
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#B8860B" />
+          </View>
+        </TouchableOpacity>
+
+        {/* Divider */}
+        <View style={styles.dividerContainer}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>
@@ -132,6 +192,31 @@ export default function CustomizeClothes() {
             </Text>
           </View>
 
+          {/* 3D Customizer Button */}
+          <TouchableOpacity
+            style={styles.customizer3DButton}
+            onPress={() => router.push("/(tabs)/appointment/Customizer3D")}
+          >
+            <View style={styles.customizer3DContent}>
+              <MaterialCommunityIcons name="cube-scan" size={32} color="#B8860B" />
+              <View style={styles.customizer3DTextContainer}>
+                <Text style={styles.customizer3DTitle}>3D Customizer</Text>
+                <Text style={styles.customizer3DSubtitle}>
+                  Design your garment in 3D view
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="#B8860B" />
+            </View>
+          </TouchableOpacity>
+
+          {/* Divider with OR text */}
+          <View style={styles.dividerContainer}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR use form below</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          
           {step === 1 && (
             <View style={styles.section}>
               <Text style={styles.label}>Garment Category</Text>
@@ -179,6 +264,7 @@ export default function CustomizeClothes() {
             </View>
           )}
 
+          
           {step === 2 && (
             <View style={styles.section}>
               <Text style={styles.label}>Design Pattern</Text>
@@ -219,6 +305,33 @@ export default function CustomizeClothes() {
               <Text style={styles.label}>Size Measurement</Text>
               <TextInput placeholder="Enter your size details" style={styles.input} value={sizeMeasurement} onChangeText={setSizeMeasurement} />
 
+              <Text style={styles.label}>Preferred Date & Time *</Text>
+              <TouchableOpacity 
+                style={styles.dateTimeButton}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Ionicons name="calendar-outline" size={20} color="#B8860B" />
+                <Text style={styles.dateTimeText}>{formatDateTime(preferredDate)}</Text>
+                <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <DateTimePickerModal
+                visible={showDatePicker}
+                mode="date"
+                value={preferredDate}
+                minimumDate={new Date()}
+                onConfirm={handleDateConfirm}
+                onCancel={handlePickerCancel}
+              />
+
+              <DateTimePickerModal
+                visible={showTimePicker}
+                mode="time"
+                value={preferredDate}
+                onConfirm={handleTimeConfirm}
+                onCancel={handlePickerCancel}
+              />
+
               <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[styles.button, styles.cancelBtn]}
@@ -241,24 +354,19 @@ export default function CustomizeClothes() {
         </View>
       </ScrollView>
 
-      <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+     
+      <View style={styles.bottomNav}>
         <TouchableOpacity onPress={() => router.push("../home")}>
-          <View style={styles.navItemWrap}>
-            <Ionicons name="home-outline" size={20} color="#9CA3AF" />
-          </View>
+          <Ionicons name="home-outline" size={22} color="#777" />
         </TouchableOpacity>
         <View style={styles.navItemWrapActive}>
-          <Ionicons name="receipt-outline" size={20} color="#7A5A00" />
+          <Ionicons name="cut" size={22} color="#7A5A00" />
         </View>
         <TouchableOpacity onPress={() => router.push("/(tabs)/cart/Cart")}>
-          <View style={styles.navItemWrap}>
-            <Ionicons name="cart-outline" size={20} color="#9CA3AF" />
-          </View>
+          <Ionicons name="cart-outline" size={22} color="#777" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push("../UserProfile/profile")}>
-          <View style={styles.navItemWrap}>
-            <Ionicons name="person-outline" size={20} color="#9CA3AF" />
-          </View>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/UserProfile/profile")}>
+          <Ionicons name="person-outline" size={22} color="#777" />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -284,6 +392,54 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   profileIcon: { marginLeft: 8 },
+
+  // 3D Customizer Button Styles
+  customizer3DButton: {
+    marginHorizontal: width * 0.04,
+    marginTop: height * 0.02,
+    backgroundColor: "#FFF8E7",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#B8860B",
+    borderStyle: "dashed",
+    overflow: "hidden",
+  },
+  customizer3DContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+  },
+  customizer3DTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  customizer3DTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#5D4037",
+  },
+  customizer3DSubtitle: {
+    fontSize: 12,
+    color: "#8D6E63",
+    marginTop: 2,
+  },
+  dividerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: width * 0.05,
+    marginVertical: height * 0.015,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#ddd",
+  },
+  dividerText: {
+    marginHorizontal: 10,
+    color: "#999",
+    fontSize: 12,
+    fontWeight: "500",
+  },
 
   card: {
     backgroundColor: "#fff",
@@ -372,6 +528,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ccc",
   },
+  dateTimeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 15,
+    backgroundColor: "#ffffff",
+  },
+  dateTimeText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#333",
+    marginLeft: 10,
+  },
   buttonRow: {
     flexDirection: "row",
     justifyContent: "center",
@@ -392,35 +565,23 @@ const styles = StyleSheet.create({
   bottomNav: {
     flexDirection: "row",
     justifyContent: "space-around",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#EEE",
+    backgroundColor: "#f5f5f5",
+    paddingVertical: height * 0.015,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    elevation: 10,
+    bottom: height * 0.015,
+    width: "55%",
+    alignSelf: "center",
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 10,
-    shadowOffset: { width: 0, height: -3 },
-  },
-  navItemWrap: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
+    shadowOffset: { width: 0, height: -2 },
+    elevation: 5,
   },
   navItemWrapActive: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#FDE68A",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "#F5E6C8",
+    padding: 8,
+    borderRadius: 20,
   },
 });

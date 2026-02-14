@@ -19,7 +19,7 @@ import { orderTrackingService, API_BASE_URL } from "../../../utils/apiService";
 
 const { width } = Dimensions.get("window");
 
-const formatSize = (size: any): Array<{ label: string; value: string }> | null => {
+const formatSize = (size: any): { label: string; value: string }[] | null => {
   if (!size) return null;
 
   if (typeof size === 'string' && !size.trim().startsWith('{')) {

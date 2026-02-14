@@ -249,7 +249,32 @@ const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
                     <label>Upload Photo of Damage *</label>
                     <input
                       type="file"
-                      accept="image}
+                      accept="image/*"
+                      onChange={(e) => handleImageUpload(e.target.files[0])}
+                    />
+                    {uploadedImage && (
+                      <div className="uploaded-preview">
+                        <img src={`http://localhost:5000${uploadedImage.url}`} alt="Preview" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="repair-form-actions">
+                  <button className="repair-back-btn" onClick={() => setStep(2)}>
+                    ← Back
+                  </button>
+                  <button
+                    className="repair-next-btn"
+                    onClick={() => setStep(4)}
+                    disabled={!garmentType || !damageDescription}
+                  >
+                    Review Request →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {step === 4 && (
             <div className="repair-step">
               <h3>Review Your Repair Request</h3>

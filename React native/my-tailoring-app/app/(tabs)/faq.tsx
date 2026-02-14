@@ -12,8 +12,8 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useFocusEffect } from "expo-router";
+import { useRouter , useFocusEffect } from "expo-router";
+
 import { faqService } from "../../utils/apiService";
 
 interface FAQ {

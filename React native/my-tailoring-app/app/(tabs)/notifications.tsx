@@ -13,8 +13,8 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useFocusEffect } from "expo-router";
+import { useRouter , useFocusEffect } from "expo-router";
+
 import { notificationService } from "../../utils/apiService";
 
 interface Notification {
@@ -247,7 +247,7 @@ export default function NotificationsScreen() {
             <Ionicons name="notifications-off-outline" size={80} color="#D1D5DB" />
             <Text style={styles.emptyText}>No notifications</Text>
             <Text style={styles.emptySubtext}>
-              You'll see notifications about your orders here
+              You&apos;ll see notifications about your orders here
             </Text>
           </View>
         ) : (

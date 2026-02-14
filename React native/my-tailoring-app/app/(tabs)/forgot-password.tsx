@@ -51,7 +51,7 @@ export default function ForgotPasswordScreen() {
 
   // Resend cooldown timer
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     if (resendCooldown > 0) {
       timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
     }
@@ -293,7 +293,7 @@ export default function ForgotPasswordScreen() {
             </TouchableOpacity>
 
             <View style={styles.resendSection}>
-              <Text style={styles.resendText}>Didn't receive the code?</Text>
+              <Text style={styles.resendText}>Didn&apos;t receive the code?</Text>
               <TouchableOpacity
                 onPress={handleResendCode}
                 disabled={resendCooldown > 0 || loading}

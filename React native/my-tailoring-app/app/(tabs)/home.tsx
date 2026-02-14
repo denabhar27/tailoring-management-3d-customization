@@ -10,11 +10,11 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView , useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { LinearGradient } from "expo-linear-gradient";
 import { rentalService } from "../../utils/rentalService";
 import { notificationService } from "../../utils/apiService";

@@ -181,7 +181,7 @@ const BillingAnalytics = () => {
     <div className="analytics-dashboard">
       <div className="analytics-header">
         <div className="header-content">
-          <h2>💰 Revenue Analytics</h2>
+          <h2>Revenue Analytics</h2>
           <p>Revenue trends and performance comparisons</p>
         </div>
         <button 
@@ -196,14 +196,14 @@ const BillingAnalytics = () => {
             </>
           ) : (
             <>
-              📥 Export All to Excel
+              Export All to Excel
             </>
           )}
         </button>
       </div>
       {exportSuccess && (
         <div className="export-success-notification">
-          ✅ {exportSuccess}
+          {exportSuccess}
         </div>
       )}
       <div className="analytics-filters billing-filters">
@@ -275,7 +275,7 @@ const BillingAnalytics = () => {
       <div className="charts-grid">
         <div className="chart-container trend-chart">
           <div className="chart-header">
-            <h3>📈 Revenue Trend</h3>
+            <h3>Revenue Trend</h3>
             <div className="chart-controls">
               <div className="period-selector">
                 <label>View by:</label>
@@ -292,7 +292,7 @@ const BillingAnalytics = () => {
                 disabled={exportLoading.trend || trendData.length === 0}
                 title="Export to Excel"
               >
-                {exportLoading.trend ? '⏳' : '📥'}
+                {exportLoading.trend ? '...' : 'Export'}
               </button>
             </div>
           </div>
@@ -306,7 +306,7 @@ const BillingAnalytics = () => {
         </div>
         <div className="chart-container comparison-chart">
           <div className="chart-header">
-            <h3>📊 Revenue Comparison</h3>
+            <h3>Revenue Comparison</h3>
             <div className="chart-controls">
               <div className="period-selector">
                 <label>Compare:</label>
@@ -323,7 +323,7 @@ const BillingAnalytics = () => {
                 disabled={exportLoading.comparison || !comparisonData.data}
                 title="Export to Excel"
               >
-                {exportLoading.comparison ? '⏳' : '📥'}
+                {exportLoading.comparison ? '...' : 'Export'}
               </button>
             </div>
           </div>

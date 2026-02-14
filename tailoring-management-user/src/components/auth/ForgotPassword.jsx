@@ -263,7 +263,7 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
                 id="code"
                 value={code}
                 onChange={handleCodeChange}
-                placeholder="Enter 6-character code"
+                placeholder="ENTER 6-CHARACTERS"
                 className="code-input"
                 maxLength={6}
                 disabled={isLoading}
@@ -382,8 +382,6 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
   return (
     <div className="forgot-password-modal-overlay" onClick={onClose}>
       <div className="forgot-password-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="close-button" onClick={onClose}>×</button>
-        
         {error && <div className="error-message">{error}</div>}
         {successMessage && step !== 'success' && (
           <div className="success-message">{successMessage}</div>

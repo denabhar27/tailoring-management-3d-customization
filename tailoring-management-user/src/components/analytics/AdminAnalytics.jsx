@@ -96,7 +96,7 @@ const AdminAnalytics = () => {
   return (
     <div className="analytics-dashboard">
       <div className="analytics-header">
-        <h2>📊 Service Analytics</h2>
+        <h2>Service Analytics</h2>
         <p>Revenue breakdown by service type and top performing services</p>
       </div>
       <div className="analytics-filters">

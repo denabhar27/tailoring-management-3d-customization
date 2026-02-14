@@ -196,8 +196,9 @@ function Rental() {
   };
 
   const handleDeleteOrder = async (rental) => {
+    const statusText = rental.approval_status === 'cancelled' ? 'rejected' : 'completed';
     const confirmed = await confirm(
-      `Are you sure you want to delete this completed rental order (ORD-${rental.order_id})?\n\nThis action cannot be undone.`,
+      `Are you sure you want to delete this ${statusText} rental order (ORD-${rental.order_id})?\n\nThis action cannot be undone.`,
       'Delete Order',
       'danger',
       { confirmText: 'Delete', cancelText: 'Cancel' }
@@ -595,7 +596,6 @@ function Rental() {
           <div className="stat-card">
             <div className="stat-header">
               <span>Pending</span>
-              <div className="stat-icon" style={{ background: '#fff3e0', color: '#ff9800' }}>📋</div>
             </div>
             <div className="stat-number">{stats.pending}</div>
           </div>
@@ -603,7 +603,6 @@ function Rental() {
           <div className="stat-card">
             <div className="stat-header">
               <span>Ready to Pick Up</span>
-              <div className="stat-icon" style={{ background: '#e3f2fd', color: '#2196f3' }}>📦</div>
             </div>
             <div className="stat-number">{stats.ready_to_pickup}</div>
           </div>
@@ -611,7 +610,6 @@ function Rental() {
           <div className="stat-card">
             <div className="stat-header">
               <span>Rented</span>
-              <div className="stat-icon" style={{ background: '#f3e5f5', color: '#9c27b0' }}>🎭</div>
             </div>
             <div className="stat-number">{stats.rented}</div>
           </div>
@@ -619,7 +617,6 @@ function Rental() {
           <div className="stat-card">
             <div className="stat-header">
               <span>Returned</span>
-              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>✓</div>
             </div>
             <div className="stat-number">{stats.returned}</div>
           </div>
@@ -627,7 +624,6 @@ function Rental() {
           <div className="stat-card">
             <div className="stat-header">
               <span>Rejected</span>
-              <div className="stat-icon" style={{ background: '#ffebee', color: '#f44336' }}>✕</div>
             </div>
             <div className="stat-number">{stats.rejected}</div>
           </div>
@@ -830,7 +826,26 @@ function Rental() {
                             }
 
                             if (isRejected) {
-                              return null;
+                              return (
+                                <div className="action-buttons">
+                                  <button 
+                                    className="icon-btn delete" 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteOrder(rental);
+                                    }} 
+                                    title="Delete Order"
+                                    style={{ backgroundColor: '#f44336', color: 'white' }}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="3 6 5 6 21 6"></polyline>
+                                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                      <line x1="10" y1="11" x2="10" y2="17"></line>
+                                      <line x1="14" y1="11" x2="14" y2="17"></line>
+                                    </svg>
+                                  </button>
+                                </div>
+                              );
                             }
                             
                             return (

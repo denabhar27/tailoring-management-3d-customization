@@ -138,7 +138,7 @@ const AnalyticsDashboard = () => {
     <div className="analytics-dashboard">
       <div className="analytics-header">
         <div className="header-content">
-          <h2>📊 Revenue Analytics</h2>
+          <h2>Revenue Analytics</h2>
           <p>Comprehensive insights into your business performance</p>
         </div>
         <button 
@@ -153,14 +153,14 @@ const AnalyticsDashboard = () => {
             </>
           ) : (
             <>
-              📥 Download Excel Report
+              Download Excel Report
             </>
           )}
         </button>
       </div>
       {exportSuccess && (
         <div className="export-success-notification">
-          ✅ {exportSuccess}
+          {exportSuccess}
         </div>
       )}
       <div className="analytics-filters">
@@ -214,7 +214,7 @@ const AnalyticsDashboard = () => {
       <div className="charts-grid">
         <div className="chart-container pie-chart">
           <div className="chart-header">
-            <h3>🥧 Service Revenue Distribution</h3>
+            <h3>Service Revenue Distribution</h3>
           </div>
           <div className="chart-body">
             <ServiceRevenuePieChart data={serviceData} />
@@ -222,7 +222,7 @@ const AnalyticsDashboard = () => {
         </div>
         <div className="chart-container bar-chart">
           <div className="chart-header">
-            <h3>🏆 Top Services</h3>
+            <h3>Top Services</h3>
           </div>
           <div className="chart-body">
             <TopServicesBarChart data={topServices} />

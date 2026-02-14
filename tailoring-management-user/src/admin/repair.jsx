@@ -508,8 +508,9 @@ const Repair = () => {
   };
 
   const handleDeleteOrder = async (item) => {
+    const statusText = item.approval_status === 'cancelled' ? 'rejected' : 'completed';
     const confirmed = await confirm(
-      `Are you sure you want to delete this completed order (ORD-${item.order_id})?\n\nThis action cannot be undone.`,
+      `Are you sure you want to delete this ${statusText} order (ORD-${item.order_id})?\n\nThis action cannot be undone.`,
       'Delete Order',
       'danger',
       { confirmText: 'Delete', cancelText: 'Cancel' }
@@ -629,42 +630,36 @@ const Repair = () => {
           <div className="stat-card">
             <div className="stat-header">
               <span>Pending</span>
-              <div className="stat-icon" style={{ background: '#fff3e0', color: '#f57c00' }}>⏳</div>
             </div>
             <div className="stat-number">{stats.pending}</div>
           </div>
           <div className="stat-card">
             <div className="stat-header">
               <span>Accepted</span>
-              <div className="stat-icon" style={{ background: '#e1f5fe', color: '#039be5' }}>✓</div>
             </div>
             <div className="stat-number">{stats.accepted}</div>
           </div>
           <div className="stat-card">
             <div className="stat-header">
               <span>In Progress</span>
-              <div className="stat-icon" style={{ background: '#e3f2fd', color: '#2196f3' }}>🔄</div>
             </div>
             <div className="stat-number">{stats.inProgress}</div>
           </div>
           <div className="stat-card">
             <div className="stat-header">
               <span>To Pick up</span>
-              <div className="stat-icon" style={{ background: '#fff3e0', color: '#ff9800' }}>📦</div>
             </div>
             <div className="stat-number">{stats.toPickup}</div>
           </div>
           <div className="stat-card">
             <div className="stat-header">
               <span>Completed</span>
-              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>✓</div>
             </div>
             <div className="stat-number">{stats.completed}</div>
           </div>
           <div className="stat-card">
             <div className="stat-header">
               <span>Rejected</span>
-              <div className="stat-icon" style={{ background: '#ffebee', color: '#f44336' }}>✕</div>
             </div>
             <div className="stat-number">{stats.rejected}</div>
           </div>
@@ -819,7 +814,7 @@ const Repair = () => {
                               💰
                             </button>
                           )}
-                          {item.approval_status === 'completed' && (
+                          {(item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
                             <button 
                               className="icon-btn delete" 
                               onClick={(e) => {

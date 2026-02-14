@@ -294,8 +294,17 @@
   padding: 15px 20px;
   border-bottom: 1px solid #f0f0f0;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
+  background: #f8f9fa !important;
+}
+
+.chart-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d3436 !important;
+  font-family: 'Montserrat', 'Poppins', sans-serif;
 }
 
 .period-selector {
@@ -455,25 +464,6 @@
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
-}
-
-
-.chart-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  background: linear-gradient(135deg, #f8f9fa 0%, #f5f6fa 100%);
-  border-bottom: 1px solid #eee;
-  border-radius: 12px 12px 0 0;
-}
-
-.chart-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #2d3436;
-  font-family: 'Montserrat', 'Poppins', sans-serif;
 }
 
 .chart-controls {

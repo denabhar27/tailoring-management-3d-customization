@@ -157,7 +157,6 @@ const Inventory = () => {
           <div className="stat-card">
             <div className="stat-header">
               <span>Total Items</span>
-              <div className="stat-icon" style={{ background: '#e3f2fd', color: '#2196f3' }}>📦</div>
             </div>
             <div className="stat-number">{inventoryStats.total}</div>
           </div>
@@ -165,7 +164,6 @@ const Inventory = () => {
           <div className="stat-card">
             <div className="stat-header">
               <span>Customization</span>
-              <div className="stat-icon" style={{ background: '#f3e5f5', color: '#9c27b0' }}>✂️</div>
             </div>
             <div className="stat-number">{inventoryStats.customization}</div>
           </div>
@@ -173,7 +171,6 @@ const Inventory = () => {
           <div className="stat-card">
             <div className="stat-header">
               <span>Dry Cleaning</span>
-              <div className="stat-icon" style={{ background: '#e3f2fd', color: '#2196f3' }}>🧺</div>
             </div>
             <div className="stat-number">{inventoryStats.dryCleaning}</div>
           </div>
@@ -181,7 +178,6 @@ const Inventory = () => {
           <div className="stat-card">
             <div className="stat-header">
               <span>Repair</span>
-              <div className="stat-icon" style={{ background: '#fff3e0', color: '#ff9800' }}>🔧</div>
             </div>
             <div className="stat-number">{inventoryStats.repair}</div>
           </div>
@@ -189,7 +185,6 @@ const Inventory = () => {
           <div className="stat-card">
             <div className="stat-header">
               <span>Total Value</span>
-              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>💰</div>
             </div>
             <div className="stat-number" style={{ fontSize: '24px' }}>
               ₱{inventoryStats.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

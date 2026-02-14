@@ -1953,10 +1953,10 @@ exports.deleteOrderItem = (req, res) => {
 
     const orderItem = results[0];
 
-    if (orderItem.approval_status !== 'completed' && orderItem.approval_status !== 'returned') {
+    if (orderItem.approval_status !== 'completed' && orderItem.approval_status !== 'returned' && orderItem.approval_status !== 'cancelled') {
       return res.status(400).json({
         success: false,
-        message: "Only completed or returned orders can be deleted"
+        message: "Only completed, returned, or rejected orders can be deleted"
       });
     }
 

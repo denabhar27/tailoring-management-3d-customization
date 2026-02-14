@@ -4,6 +4,7 @@ import '../adminStyle/admin.css';
 import AdminHeader from './AdminHeader';
 import { getAdminDashboardOverview } from '../api/AdminDashboardApi';
 import { getAllTransactionLogs } from '../api/TransactionLogApi';
+import { format, subMonths } from 'date-fns';
 
 function AdminPage() {
   const [stats, setStats] = useState([]);
@@ -15,7 +16,8 @@ function AdminPage() {
 
   const [serviceFilter, setServiceFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('all'); 
+  const [startDate, setStartDate] = useState(format(subMonths(new Date(), 1), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all'); 
 
   useEffect(() => {
@@ -218,29 +220,27 @@ function AdminPage() {
       });
     }
 
-    if (dateFilter !== 'all') {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const weekAgo = new Date(today);
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      const monthAgo = new Date(today);
-      monthAgo.setDate(monthAgo.getDate() - 30);
-      
+    if (startDate || endDate) {
       filtered = filtered.filter(activity => {
-        
         const timeStr = activity.time || '';
-        if (!timeStr) return false;
+        if (!timeStr) return true;
         
         try {
           const activityDate = new Date(timeStr);
           const activityDateOnly = new Date(activityDate.getFullYear(), activityDate.getMonth(), activityDate.getDate());
           
-          if (dateFilter === 'today') {
-            return activityDateOnly.getTime() === today.getTime();
-          } else if (dateFilter === 'week') {
-            return activityDate >= weekAgo;
-          } else if (dateFilter === 'month') {
-            return activityDate >= monthAgo;
+          if (startDate && endDate) {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            return activityDateOnly >= start && activityDateOnly <= end;
+          } else if (startDate) {
+            const start = new Date(startDate);
+            return activityDateOnly >= start;
+          } else if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            return activityDateOnly <= end;
           }
         } catch (e) {
           console.error('Error parsing date:', timeStr, e);
@@ -250,7 +250,7 @@ function AdminPage() {
     }
 
     setRecentActivities(filtered);
-  }, [serviceFilter, statusFilter, dateFilter, allActivities]);
+  }, [serviceFilter, statusFilter, startDate, endDate, allActivities]);
 
   return (
     <div className="admin-page">
@@ -299,21 +299,30 @@ function AdminPage() {
             <label>Status:</label>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="filter-select">
               <option value="all">All Status</option>
-              <option value="payment">💳 Paid</option>
+              <option value="payment">Paid</option>
               <option value="pending">Pending</option>
               <option value="in-progress">In Progress</option>
               <option value="completed">Completed</option>
             </select>
           </div>
           
-          <div className="filter-dropdown">
+          <div className="filter-dropdown date-range-filter">
             <label>Date:</label>
-            <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="filter-select">
-              <option value="all">All Time</option>
-              <option value="today">Today</option>
-              <option value="week">7 Days</option>
-              <option value="month">30 Days</option>
-            </select>
+            <div className="date-range-inputs">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="date-input"
+              />
+              <span className="date-separator">to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="date-input"
+              />
+            </div>
           </div>
           {statusFilter === 'payment' && (
             <div className="filter-dropdown">
@@ -327,11 +336,12 @@ function AdminPage() {
             </div>
           )}
           
-          {(serviceFilter !== 'all' || statusFilter !== 'all' || dateFilter !== 'all' || paymentStatusFilter !== 'all') && (
+          {(serviceFilter !== 'all' || statusFilter !== 'all' || startDate || endDate || paymentStatusFilter !== 'all') && (
             <button className="clear-btn-dropdown" onClick={() => { 
               setServiceFilter('all'); 
               setStatusFilter('all'); 
-              setDateFilter('all');
+              setStartDate('');
+              setEndDate('');
               setPaymentStatusFilter('all');
             }}>Clear Filters</button>
           )}
@@ -379,7 +389,7 @@ function AdminPage() {
                             fontSize: '12px',
                             fontWeight: '600'
                           }}>
-                            💳 Payment: {activity.paymentInfo?.payment_status === 'paid' ? 'Paid' : 
+                            Payment: {activity.paymentInfo?.payment_status === 'paid' ? 'Paid' : 
                                          activity.paymentInfo?.payment_status === 'fully_paid' ? 'Fully Paid' :
                                          activity.paymentInfo?.payment_status === 'down-payment' ? 'Down Payment' :
                                          activity.paymentInfo?.payment_status === 'partial_payment' ? 'Partial Payment' :

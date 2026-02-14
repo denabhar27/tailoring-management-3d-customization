@@ -428,6 +428,57 @@ html {
   box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.2);
 }
 
+/* Date Range Filter Styles */
+.date-range-filter {
+  min-width: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.date-range-filter label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.date-range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+}
+
+.date-input {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 140px;
+}
+
+.date-input:hover {
+  border-color: #8b4513;
+  box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.1);
+}
+
+.date-input:focus {
+  outline: none;
+  border-color: #8b4513;
+  box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.2);
+}
+
+.date-separator {
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .clear-btn-dropdown {
   padding: 10px 16px;
   background: linear-gradient(135deg, #8b4513 0%, #a0522d 100%);

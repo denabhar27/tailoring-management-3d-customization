@@ -12,7 +12,7 @@ const getAuthHeader = () => {
 
 export const getAllDryCleaningOrders = async () => {
     try {
-        const response = await fetch(`${API_URL}/dry-cleaning/orders`, {
+        const response = await fetch(`${API_URL_ORDERS}/dry-cleaning/orders`, {
             headers: getAuthHeader()
         });
         if (!response.ok) {
@@ -27,7 +27,7 @@ export const getAllDryCleaningOrders = async () => {
 
 export const getDryCleaningOrdersByStatus = async (status) => {
     try {
-        const response = await fetch(`${API_URL}/dry-cleaning/orders/status/${status}`, {
+        const response = await fetch(`${API_URL_ORDERS}/dry-cleaning/orders/status/${status}`, {
             headers: getAuthHeader()
         });
         if (!response.ok) {
@@ -42,7 +42,7 @@ export const getDryCleaningOrdersByStatus = async (status) => {
 
 export const updateDryCleaningOrderItem = async (itemId, updateData) => {
     try {
-        const response = await fetch(`${API_URL}/dry-cleaning/items/${itemId}`, {
+        const response = await fetch(`${API_URL_ORDERS}/dry-cleaning/items/${itemId}`, {
             method: 'PUT',
             headers: getAuthHeader(),
             body: JSON.stringify(updateData)

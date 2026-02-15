@@ -48,7 +48,12 @@ const allowedOrigins = [
   'http://192.168.1.202:3000',
   'http://192.168.1.202:8081',
   'http://192.168.1.202:8082',
-];
+  // Production domains (Vercel)
+  'https://tailoring-management-3d-customizati-zeta.vercel.app',
+  'https://tailoring-management-3d-customi-git-bd8c13-denabhar27s-projects.vercel.app',
+  'https://tailoring-management-3d-customization-rped-g9iqc602q.vercel.app',
+  process.env.FRONTEND_URL,
+].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -61,9 +66,12 @@ app.use(cors({
           origin.includes('127.0.0.1') || 
           origin.includes('192.168.') ||
           origin.includes('10.0.') ||
-          origin.includes('172.16.')) {
+          origin.includes('172.16.') ||
+          origin.includes('.vercel.app') ||
+          origin.includes('.onrender.com')) {
         callback(null, true);
       } else {
+        console.log('CORS blocked origin:', origin);
         callback(new Error('Not allowed by CORS'));
       }
     }

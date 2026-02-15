@@ -11,6 +11,7 @@ import TransactionLogModal from './components/TransactionLogModal';
 import { useAlert } from '../context/AlertContext';
 import { getMyMeasurements } from '../api/CustomerApi';
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
+import { API_BASE_URL, API_URL } from '../api/config';
 
 const Profile = () => {
   const { alert } = useAlert();
@@ -362,7 +363,7 @@ const Profile = () => {
   const handleAcceptPrice = async (item) => {
     try {
       
-      const response = await fetch(`http://localhost:5000/api/orders/${item.order_item_id}/accept-price`, {
+      const response = await fetch(`${API_URL}/orders/${item.order_item_id}/accept-price`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -392,7 +393,7 @@ const Profile = () => {
   const handleDeclinePrice = async (item) => {
     try {
       
-      const response = await fetch(`http://localhost:5000/api/orders/${item.order_item_id}/decline-price`, {
+      const response = await fetch(`${API_URL}/orders/${item.order_item_id}/decline-price`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -694,10 +695,10 @@ const Profile = () => {
                 <span className="detail-label">Damage Photo:</span>
                 <div className="detail-value">
                   <img
-                    src={`http://localhost:5000${specific_data.imageUrl}`}
+                    src={`${API_BASE_URL}${specific_data.imageUrl}`}
                     alt="Damage"
                     className="damage-photo clickable-image"
-                    onClick={() => openImagePreview(`http://localhost:5000${specific_data.imageUrl}`, 'Damage Photo')}
+                    onClick={() => openImagePreview(`${API_BASE_URL}${specific_data.imageUrl}`, 'Damage Photo')}
                     title="Click to enlarge"
                     onError={(e) => {
                       e.target.style.display = 'none';
@@ -720,23 +721,18 @@ const Profile = () => {
                   <span className="detail-value"><strong>{specific_data.garments.length} item{specific_data.garments.length > 1 ? 's' : ''}</strong></span>
                 </div>
                 {specific_data.garments.map((garment, idx) => (
-                  <div key={idx} className="garment-details-block" style={{ marginLeft: '20px', paddingLeft: '10px', borderLeft: '2px solid #e0e0e0', marginBottom: '10px' }}>
-                    <div className="detail-row">
-                      <span className="detail-label">Garment #{idx + 1}:</span>
-                      <span className="detail-value">{garment.garmentType || 'N/A'}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="detail-label">Damage Level:</span>
-                      <span className="detail-value">{garment.damageLevel ? garment.damageLevel.charAt(0).toUpperCase() + garment.damageLevel.slice(1) : 'N/A'}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="detail-label">Description:</span>
-                      <span className="detail-value">{garment.notes || 'N/A'}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="detail-label">Price:</span>
-                      <span className="detail-value">₱{garment.basePrice || 'N/A'}</span>
-                    </div>
+                  <div key={idx} className="garment-card" style={{ 
+                    marginTop: '10px', 
+                    padding: '12px 16px', 
+                    backgroundColor: '#f9f9f9', 
+                    borderRadius: '8px', 
+                    border: '1px solid #e0e0e0',
+                    textAlign: 'left'
+                  }}>
+                    <div style={{ marginBottom: '6px' }}><strong>Garment #{idx + 1}:</strong> {garment.garmentType || 'N/A'}</div>
+                    <div style={{ marginBottom: '6px' }}><strong>Damage Level:</strong> {garment.damageLevel ? garment.damageLevel.charAt(0).toUpperCase() + garment.damageLevel.slice(1) : 'N/A'}</div>
+                    <div style={{ marginBottom: '6px' }}><strong>Description:</strong> {garment.notes || 'N/A'}</div>
+                    <div><strong>Price:</strong> ₱{garment.basePrice || 'N/A'}</div>
                   </div>
                 ))}
               </>
@@ -825,10 +821,10 @@ const Profile = () => {
                 <span className="detail-label">Design Preview:</span>
                 <div className="detail-value">
                   <img
-                    src={`http://localhost:5000${specific_data.imageUrl}`}
+                    src={`${API_BASE_URL}${specific_data.imageUrl}`}
                     alt="Design preview"
                     className="damage-photo clickable-image"
-                    onClick={() => openImagePreview(`http://localhost:5000${specific_data.imageUrl}`, 'Design Preview')}
+                    onClick={() => openImagePreview(`${API_BASE_URL}${specific_data.imageUrl}`, 'Design Preview')}
                     title="Click to enlarge"
                     onError={(e) => {
                       e.target.style.display = 'none';
@@ -999,10 +995,10 @@ const Profile = () => {
                 <span className="detail-label">Clothing Photo:</span>
                 <div className="detail-value">
                   <img
-                    src={`http://localhost:5000${specific_data.imageUrl}`}
+                    src={`${API_BASE_URL}${specific_data.imageUrl}`}
                     alt="Clothing"
                     className="damage-photo clickable-image"
-                    onClick={() => openImagePreview(`http://localhost:5000${specific_data.imageUrl}`, 'Clothing Photo')}
+                    onClick={() => openImagePreview(`${API_BASE_URL}${specific_data.imageUrl}`, 'Clothing Photo')}
                     title="Click to enlarge"
                     onError={(e) => {
                       e.target.style.display = 'none';
@@ -1025,23 +1021,18 @@ const Profile = () => {
                   <span className="detail-value"><strong>{specific_data.garments.length} item{specific_data.garments.length > 1 ? 's' : ''}</strong></span>
                 </div>
                 {specific_data.garments.map((garment, idx) => (
-                  <div key={idx} className="garment-details-block" style={{ marginLeft: '20px', paddingLeft: '10px', borderLeft: '2px solid #e0e0e0', marginBottom: '10px' }}>
-                    <div className="detail-row">
-                      <span className="detail-label">Garment #{idx + 1}:</span>
-                      <span className="detail-value">{garment.garmentType ? (garment.garmentType.charAt(0).toUpperCase() + garment.garmentType.slice(1)) : 'N/A'}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="detail-label">Brand:</span>
-                      <span className="detail-value">{garment.brand || 'N/A'}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="detail-label">Quantity:</span>
-                      <span className="detail-value">{garment.quantity || 1}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="detail-label">Price:</span>
-                      <span className="detail-value">₱{(garment.pricePerItem * (garment.quantity || 1)).toFixed(2)}</span>
-                    </div>
+                  <div key={idx} className="garment-card" style={{ 
+                    marginTop: '10px', 
+                    padding: '12px 16px', 
+                    backgroundColor: '#f9f9f9', 
+                    borderRadius: '8px', 
+                    border: '1px solid #e0e0e0',
+                    textAlign: 'left'
+                  }}>
+                    <div style={{ marginBottom: '6px' }}><strong>Garment #{idx + 1}:</strong> {garment.garmentType ? (garment.garmentType.charAt(0).toUpperCase() + garment.garmentType.slice(1)) : 'N/A'}</div>
+                    <div style={{ marginBottom: '6px' }}><strong>Brand:</strong> {garment.brand || 'N/A'}</div>
+                    <div style={{ marginBottom: '6px' }}><strong>Quantity:</strong> {garment.quantity || 1}</div>
+                    <div><strong>Price:</strong> ₱{(garment.pricePerItem * (garment.quantity || 1)).toFixed(2)}</div>
                   </div>
                 ))}
               </>

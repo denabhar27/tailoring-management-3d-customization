@@ -15,13 +15,13 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useFocusEffect } from "expo-router";
+import { useRouter , useFocusEffect } from "expo-router";
+
 import * as ImagePicker from "expo-image-picker";
 import { Picker } from "@react-native-picker/picker";
 import DateTimePickerModal from "../../../components/DateTimePickerModal";
-import { cartService, API_BASE_URL, appointmentSlotService } from "../../../utils/apiService";
-import apiCall from "../../../utils/apiService";
+import apiCall, { cartService, API_BASE_URL, appointmentSlotService } from "../../../utils/apiService";
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get("window");
@@ -499,7 +499,7 @@ export default function DryCleaningClothes() {
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Dry Cleaning Service</Text>
             <Text style={styles.cardSubtitle}>
-              We'll make it fresh and clean
+              We&apos;ll make it fresh and clean
             </Text>
           </View>
 

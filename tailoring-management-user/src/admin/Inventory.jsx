@@ -4,6 +4,7 @@ import AdminHeader from './AdminHeader';
 import Sidebar from './Sidebar';
 import { getCompletedItems, getItemsByServiceType, getInventoryStats } from '../api/InventoryApi';
 import ImagePreviewModal from '../components/ImagePreviewModal';
+import { API_BASE_URL } from '../api/config';
 
 const Inventory = () => {
   const [allItems, setAllItems] = useState([]);
@@ -88,7 +89,7 @@ const Inventory = () => {
       if (item.completedItemImage.startsWith('http')) {
         return item.completedItemImage;
       }
-      return `http://localhost:5000${item.completedItemImage}`;
+      return `${API_BASE_URL}${item.completedItemImage}`;
     }
 
     if (item.specificData) {
@@ -97,7 +98,7 @@ const Inventory = () => {
         if (imageUrl.startsWith('http')) {
           return imageUrl;
         }
-        return `http://localhost:5000${imageUrl}`;
+        return `${API_BASE_URL}${imageUrl}`;
       }
     }
     

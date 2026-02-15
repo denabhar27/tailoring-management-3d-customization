@@ -1,7 +1,8 @@
 import axios from "axios";
 import { getToken } from "./AuthApi";
+import { API_URL } from './config';
 
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = API_URL;
 
 const getAuthHeaders = () => {
   const token = getToken();

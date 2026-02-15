@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import '../adminStyle/dryclean.css'; 
+import '../adminStyle/dryclean.css';
 import AdminHeader from './AdminHeader';
 import Sidebar from './Sidebar';
 import { getAllRepairOrders, getRepairOrdersByStatus, updateRepairOrderItem } from '../api/RepairOrderApi';
@@ -8,6 +8,7 @@ import { useAlert } from '../context/AlertContext';
 import { getAllRepairGarmentTypesAdmin, createRepairGarmentType, updateRepairGarmentType, deleteRepairGarmentType } from '../api/RepairGarmentTypeApi';
 import { recordPayment } from '../api/PaymentApi';
 import { deleteOrderItem } from '../api/OrderApi';
+import { API_BASE_URL } from '../api/config';
 
 const Repair = () => {
   const { alert, confirm } = useAlert();
@@ -47,6 +48,13 @@ const Repair = () => {
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
+
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  };
 
   const openImagePreview = (url, alt) => {
     setPreviewImageUrl(url);
@@ -102,43 +110,43 @@ const Repair = () => {
     if (currentStatus === 'accepted') {
       return 'confirmed';
     }
-    
+
     const statusFlow = {
       'repair': ['pending', 'price_confirmation', 'accepted', 'confirmed', 'ready_for_pickup', 'completed'],
       'customization': ['pending', 'price_confirmation', 'accepted', 'confirmed', 'ready_for_pickup', 'completed'],
       'dry_cleaning': ['pending', 'price_confirmation', 'accepted', 'confirmed', 'ready_for_pickup', 'completed'],
       'rental': ['pending', 'ready_for_pickup', 'picked_up', 'rented', 'returned', 'completed']
     };
-    
+
     const flow = statusFlow[serviceType] || statusFlow['repair'];
     const currentIndex = flow.indexOf(currentStatus);
-    
+
     if (currentIndex === -1 || currentIndex === flow.length - 1) {
-      return null; 
+      return null;
     }
-    
+
     const nextStatus = flow[currentIndex + 1];
 
     if (nextStatus === 'completed' && item) {
-      const pricingFactors = typeof item.pricing_factors === 'string' 
-        ? JSON.parse(item.pricing_factors || '{}') 
+      const pricingFactors = typeof item.pricing_factors === 'string'
+        ? JSON.parse(item.pricing_factors || '{}')
         : (item.pricing_factors || {});
       const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
       const finalPrice = parseFloat(item.final_price || 0);
       const remainingBalance = finalPrice - amountPaid;
 
-      if (remainingBalance > 0.01) { 
+      if (remainingBalance > 0.01) {
         return null;
       }
     }
-    
+
     return nextStatus;
   };
 
   const getNextStatusLabel = (currentStatus, serviceType = 'repair', item = null) => {
     const nextStatus = getNextStatus(currentStatus, serviceType, item);
     if (!nextStatus) return null;
-    
+
     const labelMap = {
       'accepted': 'Accept',
       'price_confirmation': 'Price Confirm',
@@ -149,7 +157,7 @@ const Repair = () => {
       'rented': 'Mark Rented',
       'returned': 'Mark Returned'
     };
-    
+
     return labelMap[nextStatus] || getStatusText(nextStatus);
   };
 
@@ -188,7 +196,7 @@ const Repair = () => {
       } else {
         result = await createRepairGarmentType(repairGarmentTypeForm);
       }
-      
+
       if (result.success) {
         alert(editingRepairGarmentType ? 'Repair garment type updated successfully!' : 'Repair garment type created successfully!', 'Success');
         setShowRepairGarmentTypeModal(false);
@@ -249,7 +257,7 @@ const Repair = () => {
       console.log("Loaded orders:", result);
       if (result.success) {
         console.log("Setting orders:", result.orders);
-        
+
         result.orders.forEach(order => {
           if (order.item_id === 25) {
             console.log("Item 25 status after refresh:", order.approval_status);
@@ -267,10 +275,10 @@ const Repair = () => {
     }
   };
 
-  const pendingAppointments = allItems.filter(item => 
-    item.approval_status === 'pending_review' || 
+  const pendingAppointments = allItems.filter(item =>
+    item.approval_status === 'pending_review' ||
     item.approval_status === 'pending' ||
-    item.approval_status === null || 
+    item.approval_status === null ||
     item.approval_status === undefined ||
     item.approval_status === ''
   );
@@ -286,7 +294,7 @@ const Repair = () => {
 
   const getFilteredItems = () => {
     let items = [];
-    
+
     if (viewFilter === "pending") {
       items = pendingAppointments;
     } else if (viewFilter === "accepted") {
@@ -317,12 +325,12 @@ const Repair = () => {
 
     if (statusFilter && viewFilter === 'all') {
       items = items.filter(item => {
-        
+
         let normalizedStatus = item.approval_status;
-        if (item.approval_status === 'pending_review' || 
-            item.approval_status === null || 
-            item.approval_status === undefined || 
-            item.approval_status === '') {
+        if (item.approval_status === 'pending_review' ||
+          item.approval_status === null ||
+          item.approval_status === undefined ||
+          item.approval_status === '') {
           normalizedStatus = 'pending';
         }
         return normalizedStatus === statusFilter;
@@ -332,7 +340,7 @@ const Repair = () => {
     items.sort((a, b) => {
       const isPendingA = a.approval_status === 'pending' || a.approval_status === 'pending_review' || !a.approval_status;
       const isPendingB = b.approval_status === 'pending' || b.approval_status === 'pending_review' || !b.approval_status;
-      
+
       if (isPendingA && !isPendingB) return -1;
       if (!isPendingA && isPendingB) return 1;
       return 0;
@@ -357,13 +365,13 @@ const Repair = () => {
         });
         if (result.success) {
           await loadRepairOrders();
-          await alert("Walk-in order accepted (price confirmed in person)", "Success", "success");
+          showToast("Walk-in order accepted (price confirmed in person)", "success");
         } else {
-          await alert(result.message || "Failed to accept request", "Error", "error");
+          showToast(result.message || "Failed to accept request", "error");
         }
       } catch (err) {
         console.error("Accept error:", err);
-        await alert("Failed to accept request", "Error", "error");
+        showToast("Failed to accept request", "error");
       }
       return;
     }
@@ -376,10 +384,10 @@ const Repair = () => {
 
   const handlePriceConfirmationSubmit = async () => {
     if (!priceConfirmationItem) return;
-    
+
     const finalPrice = parseFloat(priceConfirmationPrice);
     if (isNaN(finalPrice) || finalPrice <= 0) {
-      await alert("Please enter a valid price", "Error", "error");
+      showToast("Please enter a valid price", "error");
       return;
     }
 
@@ -390,20 +398,20 @@ const Repair = () => {
       });
       if (result.success) {
         await loadRepairOrders();
-        
+
         if (viewFilter !== 'all') {
           setViewFilter('price-confirmation');
         }
-        await alert("Repair request moved to price confirmation!", "Success", "success");
+        showToast("Repair request moved to price confirmation!", "success");
         setShowPriceConfirmationModal(false);
         setPriceConfirmationItem(null);
         setPriceConfirmationPrice('');
       } else {
-        await alert(result.message || "Failed to accept repair request", "Error", "error");
+        showToast(result.message || "Failed to accept repair request", "error");
       }
     } catch (err) {
       console.error("Accept error:", err);
-      await alert("Failed to accept repair request", "Error", "error");
+      showToast("Failed to accept repair request", "error");
     }
   };
 
@@ -413,11 +421,11 @@ const Repair = () => {
     if (confirmed) {
       try {
         const result = await updateRepairOrderItem(itemId, {
-          approvalStatus: 'cancelled'  
+          approvalStatus: 'cancelled'
         });
         console.log("Decline result:", result);
         if (result.success) {
-          loadRepairOrders(); 
+          loadRepairOrders();
         } else {
           await alert(result.message || "Failed to decline repair request", "Error", "error");
         }
@@ -434,14 +442,14 @@ const Repair = () => {
     const currentStatusLabel = item ? getStatusText(item.approval_status) : 'current';
 
     if (status === 'completed' && item) {
-      const pricingFactors = typeof item.pricing_factors === 'string' 
-        ? JSON.parse(item.pricing_factors || '{}') 
+      const pricingFactors = typeof item.pricing_factors === 'string'
+        ? JSON.parse(item.pricing_factors || '{}')
         : (item.pricing_factors || {});
       const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
       const finalPrice = parseFloat(item.final_price || 0);
       const remainingBalance = finalPrice - amountPaid;
 
-      if (remainingBalance > 0.01) { 
+      if (remainingBalance > 0.01) {
         await alert(
           `Cannot mark as completed. Payment is not complete. Remaining balance: ₱${remainingBalance.toFixed(2)}`,
           "Payment Required",
@@ -450,24 +458,24 @@ const Repair = () => {
         return;
       }
     }
-    
+
     const confirmed = await confirm(
       `Are you sure you want to move this order from "${currentStatusLabel}" to "${statusLabel}"?`,
       'Update Status',
       'warning'
     );
-    
+
     if (!confirmed) return;
-    
+
     try {
       const result = await updateRepairOrderItem(itemId, {
         approvalStatus: status
       });
       if (result.success) {
-        await loadRepairOrders(); 
+        await loadRepairOrders();
 
         if (viewFilter !== 'all') {
-          
+
           if (status === 'accepted') {
             setViewFilter('accepted');
           } else if (status === 'price_confirmation') {
@@ -482,13 +490,13 @@ const Repair = () => {
             setViewFilter('rejected');
           }
         }
-        
-        await alert(`Status updated to "${statusLabel}"!`, "Success", "success");
+
+        showToast(`Status updated to "${statusLabel}"!`, "success");
       } else {
-        await alert(result.message || "Failed to update status", "Error", "error");
+        showToast(result.message || "Failed to update status", "error");
       }
     } catch (err) {
-      await alert("Failed to update status", "Error", "error");
+      showToast("Failed to update status", "error");
     }
   };
 
@@ -515,9 +523,9 @@ const Repair = () => {
       'danger',
       { confirmText: 'Delete', cancelText: 'Cancel' }
     );
-    
+
     if (!confirmed) return;
-    
+
     try {
       const result = await deleteOrderItem(item.item_id);
       if (result.success) {
@@ -546,17 +554,17 @@ const Repair = () => {
 
   const handleSaveEdit = async () => {
     if (!selectedOrder) return;
-    
+
     try {
       console.log("Frontend - Sending edit data:", editForm);
       console.log("Frontend - Selected order:", selectedOrder);
-      
+
       const result = await updateRepairOrderItem(selectedOrder.item_id, editForm);
       console.log("Frontend - Update result:", result);
-      
+
       if (result.success) {
         setShowEditModal(false);
-        loadRepairOrders(); 
+        loadRepairOrders();
         await alert('Repair order updated successfully!', "Success", "success");
       } else {
         await alert(result.message || 'Failed to update repair order', "Error", "error");
@@ -713,138 +721,138 @@ const Repair = () => {
                 <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px' }}>No repair orders found</td></tr>
               ) : (
                 getFilteredItems().map(item => {
-                  
-                  const pricingFactors = typeof item.pricing_factors === 'string' 
-                    ? JSON.parse(item.pricing_factors || '{}') 
+
+                  const pricingFactors = typeof item.pricing_factors === 'string'
+                    ? JSON.parse(item.pricing_factors || '{}')
                     : (item.pricing_factors || {});
                   const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
                   const finalPrice = parseFloat(item.final_price || 0);
                   const remainingBalance = finalPrice - amountPaid;
 
                   return (
-                  <tr key={item.item_id} className="clickable-row" onClick={() => handleViewDetails(item)}>
-                    <td><strong>#{item.order_id}</strong></td>
-                    <td>
-                      {item.order_type === 'walk_in' ? (
-                        <span>
-                          <span style={{ 
-                            display: 'inline-block',
-                            backgroundColor: '#ff9800',
-                            color: 'white',
-                            padding: '2px 8px',
-                            borderRadius: '3px',
-                            fontSize: '0.75em',
-                            marginRight: '5px',
-                            fontWeight: 'bold'
-                          }}>WALK-IN</span>
-                          {item.walk_in_customer_name || 'Walk-in Customer'}
+                    <tr key={item.item_id} className="clickable-row" onClick={() => handleViewDetails(item)}>
+                      <td><strong>#{item.order_id}</strong></td>
+                      <td>
+                        {item.order_type === 'walk_in' ? (
+                          <span>
+                            <span style={{
+                              display: 'inline-block',
+                              backgroundColor: '#ff9800',
+                              color: 'white',
+                              padding: '2px 8px',
+                              borderRadius: '3px',
+                              fontSize: '0.75em',
+                              marginRight: '5px',
+                              fontWeight: 'bold'
+                            }}>WALK-IN</span>
+                            {item.walk_in_customer_name || 'Walk-in Customer'}
+                          </span>
+                        ) : (
+                          `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'N/A'
+                        )}
+                      </td>
+                      <td>
+                        {item.specific_data?.garments && item.specific_data.garments.length > 0
+                          ? `${item.specific_data.garments.length} garment${item.specific_data.garments.length > 1 ? 's' : ''}`
+                          : (item.specific_data?.garmentType || 'N/A')}
+                      </td>
+                      <td><span style={{ fontSize: '0.9em', color: '#d32f2f' }}>{item.specific_data?.serviceName || 'N/A'}</span></td>
+                      <td>{new Date(item.order_date).toLocaleDateString()}</td>
+                      <td>₱{parseFloat(item.final_price || 0).toLocaleString()}</td>
+                      <td>
+                        <div style={{ fontSize: '12px' }}>
+                          <div>Paid: ₱{amountPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div style={{ color: remainingBalance > 0 ? '#ff9800' : '#4caf50', fontWeight: 'bold' }}>
+                            Remaining: ₱{Math.max(0, remainingBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                      </td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <span className={`status-badge ${getStatusClass(item.approval_status || 'pending')}`}>
+                          {getStatusText(item.approval_status || 'pending')}
                         </span>
-                      ) : (
-                        `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'N/A'
-                      )}
-                    </td>
-                    <td>
-                      {item.specific_data?.garments && item.specific_data.garments.length > 0 
-                        ? `${item.specific_data.garments.length} garment${item.specific_data.garments.length > 1 ? 's' : ''}`
-                        : (item.specific_data?.garmentType || 'N/A')}
-                    </td>
-                    <td><span style={{ fontSize: '0.9em', color: '#d32f2f' }}>{item.specific_data?.serviceName || 'N/A'}</span></td>
-                    <td>{new Date(item.order_date).toLocaleDateString()}</td>
-                    <td>₱{parseFloat(item.final_price || 0).toLocaleString()}</td>
-                    <td>
-                      <div style={{ fontSize: '12px' }}>
-                        <div>Paid: ₱{amountPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                        <div style={{ color: remainingBalance > 0 ? '#ff9800' : '#4caf50', fontWeight: 'bold' }}>
-                          Remaining: ₱{Math.max(0, remainingBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </div>
-                      </div>
-                    </td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <span className={`status-badge ${getStatusClass(item.approval_status || 'pending')}`}>
-                        {getStatusText(item.approval_status || 'pending')}
-                      </span>
-                    </td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      {item.approval_status === 'pending_review' || item.approval_status === 'pending' || item.approval_status === null || item.approval_status === undefined || item.approval_status === '' ? (
-                        <div className="action-buttons">
-                          <button className="icon-btn accept" onClick={() => handleAccept(item.item_id)} title="Accept">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                          </button>
-                          <button className="icon-btn decline" onClick={() => handleDecline(item.item_id)} title="Decline">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="18" y1="6" x2="6" y2="18"></line>
-                              <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                          </button>
-                          {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
-                            <button 
-                              className="icon-btn" 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedOrder(item);
-                                setPaymentAmount('');
-                                setShowPaymentModal(true);
-                              }} 
-                              title="Record Payment"
-                              style={{ backgroundColor: '#2196F3', color: 'white' }}
-                            >
-                              💰
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="action-buttons">
-                          {getNextStatus(item.approval_status, 'repair', item) && (
-                            <button 
-                              className="icon-btn next-status" 
-                              onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'repair', item))} 
-                              title={`Move to ${getNextStatusLabel(item.approval_status, 'repair', item)}`}
-                              style={{ backgroundColor: '#4CAF50', color: 'white' }}
-                            >
+                      </td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        {item.approval_status === 'pending_review' || item.approval_status === 'pending' || item.approval_status === null || item.approval_status === undefined || item.approval_status === '' ? (
+                          <div className="action-buttons">
+                            <button className="icon-btn accept" onClick={() => handleAccept(item.item_id)} title="Accept">
                               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="9 18 15 12 9 6"></polyline>
+                                <polyline points="20 6 9 17 4 12"></polyline>
                               </svg>
                             </button>
-                          )}
-                          {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
-                            <button 
-                              className="icon-btn" 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedOrder(item);
-                                setPaymentAmount('');
-                                setShowPaymentModal(true);
-                              }} 
-                              title="Record Payment"
-                              style={{ backgroundColor: '#2196F3', color: 'white' }}
-                            >
-                              💰
-                            </button>
-                          )}
-                          {(item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
-                            <button 
-                              className="icon-btn delete" 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteOrder(item);
-                              }} 
-                              title="Delete Order"
-                              style={{ backgroundColor: '#f44336', color: 'white' }}
-                            >
+                            <button className="icon-btn decline" onClick={() => handleDecline(item.item_id)} title="Decline">
                               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                <line x1="10" y1="11" x2="10" y2="17"></line>
-                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
                               </svg>
                             </button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
+                            {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
+                              <button
+                                className="icon-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedOrder(item);
+                                  setPaymentAmount('');
+                                  setShowPaymentModal(true);
+                                }}
+                                title="Record Payment"
+                                style={{ backgroundColor: '#2196F3', color: 'white' }}
+                              >
+                                💰
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="action-buttons">
+                            {getNextStatus(item.approval_status, 'repair', item) && (
+                              <button
+                                className="icon-btn next-status"
+                                onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'repair', item))}
+                                title={`Move to ${getNextStatusLabel(item.approval_status, 'repair', item)}`}
+                                style={{ backgroundColor: '#4CAF50', color: 'white' }}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                              </button>
+                            )}
+                            {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
+                              <button
+                                className="icon-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedOrder(item);
+                                  setPaymentAmount('');
+                                  setShowPaymentModal(true);
+                                }}
+                                title="Record Payment"
+                                style={{ backgroundColor: '#2196F3', color: 'white' }}
+                              >
+                                💰
+                              </button>
+                            )}
+                            {(item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
+                              <button
+                                className="icon-btn delete"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteOrder(item);
+                                }}
+                                title="Delete Order"
+                                style={{ backgroundColor: '#f44336', color: 'white' }}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="3 6 5 6 21 6"></polyline>
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
                   );
                 })
               )}
@@ -863,32 +871,32 @@ const Repair = () => {
               <div className="detail-row"><strong>Order ID:</strong> #{selectedOrder.order_id}</div>
               <div className="detail-row"><strong>Garment:</strong> {selectedOrder.specific_data?.garmentType || 'N/A'}</div>
               <div className="detail-row"><strong>Service:</strong> {selectedOrder.specific_data?.serviceName || 'N/A'}</div>
-              
+
               {selectedOrder.specific_data?.imageUrl && (
                 <div className="detail-row">
-                  <strong>Damage Image:</strong><br/>
-                  <div 
-                    className="clickable-image" 
+                  <strong>Damage Image:</strong><br />
+                  <div
+                    className="clickable-image"
                     style={{ cursor: 'pointer', display: 'inline-block', marginTop: '8px' }}
-                    onClick={() => openImagePreview(`http://localhost:5000${selectedOrder.specific_data.imageUrl}`, 'Damage Image')}
+                    onClick={() => openImagePreview(`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`, 'Damage Image')}
                   >
-                    <img 
-                      src={`http://localhost:5000${selectedOrder.specific_data.imageUrl}`} 
-                      alt="Damage" 
+                    <img
+                      src={`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`}
+                      alt="Damage"
                       style={{ maxWidth: '200px', maxHeight: '200px', border: '1px solid #ddd', borderRadius: '4px' }}
                     />
                     <small className="click-hint" style={{ display: 'block', fontSize: '11px', color: '#888', marginTop: '4px' }}>Click to expand</small>
                   </div>
                 </div>
               )}
-              
+
               <div className="detail-row"><strong>Damage Description:</strong> {selectedOrder.specific_data?.damageDescription || 'N/A'}</div>
-              
+
               <div className="form-group" style={{ marginTop: '20px' }}>
                 <label>Final Price (₱)</label>
-                <input 
-                  type="number" 
-                  value={editForm.finalPrice} 
+                <input
+                  type="number"
+                  value={editForm.finalPrice}
                   onChange={(e) => {
                     const newPrice = e.target.value;
                     const estimatedPrice = getEstimatedPrice(selectedOrder);
@@ -896,18 +904,18 @@ const Repair = () => {
 
                     let newStatus = editForm.approvalStatus;
                     const isWalkIn = selectedOrder.order_type === 'walk_in';
-                    
+
                     if (newPrice && estimatedPrice && (editForm.approvalStatus === 'pending' || editForm.approvalStatus === 'accepted')) {
                       const priceChanged = Math.abs(parseFloat(newPrice) - estimatedPrice) > 0.01;
                       if (priceChanged) {
-                        
+
                         newStatus = isWalkIn ? 'accepted' : 'price_confirmation';
                       }
                     }
-                    
-                    setEditForm({...editForm, finalPrice: newPrice, approvalStatus: newStatus});
-                  }} 
-                  placeholder="Enter final price" 
+
+                    setEditForm({ ...editForm, finalPrice: newPrice, approvalStatus: newStatus });
+                  }}
+                  placeholder="Enter final price"
                   style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
                 />
                 {(() => {
@@ -921,7 +929,7 @@ const Repair = () => {
                           <strong>⚠️ Price Changed:</strong> Estimated: ₱{estimatedPrice.toFixed(2)} → New: ₱{parseFloat(editForm.finalPrice).toFixed(2)}
                           <br />
                           <span style={{ color: '#666', fontSize: '0.85em' }}>
-                            {isWalkIn 
+                            {isWalkIn
                               ? 'Status will be set to "Accepted" (walk-in orders skip price confirmation).'
                               : 'Status will be set to "Price Confirmation" to notify customer.'}
                           </span>
@@ -932,20 +940,20 @@ const Repair = () => {
                   return null;
                 })()}
               </div>
-              
+
               <div className="form-group">
                 <label>Status</label>
-                <select 
-                  value={editForm.approvalStatus} 
+                <select
+                  value={editForm.approvalStatus}
                   onChange={(e) => {
-                    
+
                     const newStatus = e.target.value;
                     const isWalkIn = selectedOrder.order_type === 'walk_in';
                     if (isWalkIn && newStatus === 'price_confirmation') {
                       showToast('Walk-in orders do not require price confirmation. Status set to "Accepted".', 'info');
-                      setEditForm({...editForm, approvalStatus: 'accepted'});
+                      setEditForm({ ...editForm, approvalStatus: 'accepted' });
                     } else {
-                      setEditForm({...editForm, approvalStatus: newStatus});
+                      setEditForm({ ...editForm, approvalStatus: newStatus });
                     }
                   }}
                   style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
@@ -971,12 +979,12 @@ const Repair = () => {
                   </div>
                 )}
               </div>
-              
+
               <div className="form-group">
                 <label>Admin Notes</label>
-                <textarea 
-                  value={editForm.adminNotes} 
-                  onChange={(e) => setEditForm({...editForm, adminNotes: e.target.value})} 
+                <textarea
+                  value={editForm.adminNotes}
+                  onChange={(e) => setEditForm({ ...editForm, adminNotes: e.target.value })}
                   placeholder="Add admin notes..."
                   rows={3}
                   style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
@@ -1002,7 +1010,7 @@ const Repair = () => {
               {selectedOrder.order_type === 'walk_in' && (
                 <div className="detail-row">
                   <strong>Order Type:</strong>
-                  <span style={{ 
+                  <span style={{
                     display: 'inline-block',
                     backgroundColor: '#ff9800',
                     color: 'white',
@@ -1017,7 +1025,7 @@ const Repair = () => {
               <div className="detail-row">
                 <strong>Customer:</strong>
                 <span>
-                  {selectedOrder.order_type === 'walk_in' 
+                  {selectedOrder.order_type === 'walk_in'
                     ? (selectedOrder.walk_in_customer_name || 'Walk-in Customer')
                     : `${selectedOrder.first_name || ''} ${selectedOrder.last_name || ''}`.trim() || 'N/A'}
                 </span>
@@ -1052,35 +1060,35 @@ const Repair = () => {
                   <div className="detail-row"><strong>Damage Level:</strong> {selectedOrder.specific_data?.damageLevel || 'N/A'}</div>
                 </>
               )}
-              
+
               {selectedOrder.specific_data?.imageUrl && (
                 <div className="detail-row">
-                  <strong>Damage Image:</strong><br/>
-                  <div 
-                    className="clickable-image" 
+                  <strong>Damage Image:</strong><br />
+                  <div
+                    className="clickable-image"
                     style={{ cursor: 'pointer', display: 'inline-block', marginTop: '8px' }}
-                    onClick={() => openImagePreview(`http://localhost:5000${selectedOrder.specific_data.imageUrl}`, 'Damage Image')}
+                    onClick={() => openImagePreview(`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`, 'Damage Image')}
                   >
-                    <img 
-                      src={`http://localhost:5000${selectedOrder.specific_data.imageUrl}`} 
-                      alt="Damage" 
+                    <img
+                      src={`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`}
+                      alt="Damage"
                       style={{ maxWidth: '300px', maxHeight: '300px', border: '1px solid #ddd', borderRadius: '4px' }}
                     />
                     <small className="click-hint" style={{ display: 'block', fontSize: '11px', color: '#888', marginTop: '4px' }}>Click to expand</small>
                   </div>
                 </div>
               )}
-              
+
               <div className="detail-row"><strong>Damage Description:</strong> {selectedOrder.specific_data?.damageDescription || 'N/A'}</div>
               <div className="detail-row"><strong>Date Received:</strong> {new Date(selectedOrder.order_date).toLocaleDateString()}</div>
               <div className="detail-row"><strong>Estimated Time:</strong> {selectedOrder.pricing_factors?.estimatedTime || 'N/A'}</div>
               <div className="detail-row"><strong>Repair Cost:</strong> ₱{parseFloat(selectedOrder.final_price || 0).toLocaleString()}</div>
-              <div className="detail-row"><strong>Status:</strong> 
+              <div className="detail-row"><strong>Status:</strong>
                 <span className={`status-badge ${getStatusClass(selectedOrder.approval_status || 'pending')}`}>
                   {getStatusText(selectedOrder.approval_status || 'pending')}
                 </span>
               </div>
-              
+
               {selectedOrder.pricing_factors?.adminNotes && (
                 <div className="detail-row"><strong>Admin Notes:</strong> {selectedOrder.pricing_factors.adminNotes}</div>
               )}
@@ -1097,103 +1105,103 @@ const Repair = () => {
         altText={previewImageAlt}
         onClose={closeImagePreview}
       />
-{showRepairGarmentTypeModal && (
-  <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowRepairGarmentTypeModal(false)}>
-    <div className="modal-content" style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
-      <div className="modal-header">
-        <h2>{editingRepairGarmentType ? 'Edit Repair Garment Type' : 'Add Repair Garment Type'}</h2>
-        <span className="close-modal" onClick={() => {
-          setShowRepairGarmentTypeModal(false);
-          setEditingRepairGarmentType(null);
-          setRepairGarmentTypeForm({ garment_name: '', description: '', is_active: 1 });
-        }}>×</span>
-      </div>
-      
-      <div className="repair-modal-body">
-        <div className="repair-form-group">
-          <label>Garment Name *</label>
-          <input
-            type="text"
-            value={repairGarmentTypeForm.garment_name}
-            onChange={(e) => setRepairGarmentTypeForm({ ...repairGarmentTypeForm, garment_name: e.target.value })}
-            placeholder="e.g., Shirt, Pants, Jacket, Coat, Dress, Suit"
-          />
-        </div>
+      {showRepairGarmentTypeModal && (
+        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowRepairGarmentTypeModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <h2>{editingRepairGarmentType ? 'Edit Repair Garment Type' : 'Add Repair Garment Type'}</h2>
+              <span className="close-modal" onClick={() => {
+                setShowRepairGarmentTypeModal(false);
+                setEditingRepairGarmentType(null);
+                setRepairGarmentTypeForm({ garment_name: '', description: '', is_active: 1 });
+              }}>×</span>
+            </div>
 
-        <div className="repair-form-group">
-          <label>Description</label>
-          <textarea
-            value={repairGarmentTypeForm.description}
-            onChange={(e) => setRepairGarmentTypeForm({ ...repairGarmentTypeForm, description: e.target.value })}
-            placeholder="Optional description..."
-            rows={3}
-          />
-        </div>
+            <div className="repair-modal-body">
+              <div className="repair-form-group">
+                <label>Garment Name *</label>
+                <input
+                  type="text"
+                  value={repairGarmentTypeForm.garment_name}
+                  onChange={(e) => setRepairGarmentTypeForm({ ...repairGarmentTypeForm, garment_name: e.target.value })}
+                  placeholder="e.g., Shirt, Pants, Jacket, Coat, Dress, Suit"
+                />
+              </div>
 
-        <div className="repair-form-group">
-          <label>
-            <input
-              type="checkbox"
-              checked={repairGarmentTypeForm.is_active === 1}
-              onChange={(e) => setRepairGarmentTypeForm({ ...repairGarmentTypeForm, is_active: e.target.checked ? 1 : 0 })}
-            />
-            Active (Show in dropdowns)
-          </label>
-        </div>
-        {repairGarmentTypes.length > 0 && (
-          <div className="repair-types-list-header">
-            <h3>Existing Repair Garment Types ({repairGarmentTypes.length})</h3>
-            <div className="repair-types-scrollable">
-              {repairGarmentTypes.map(garment => (
-                <div 
-                  key={garment.repair_garment_id} 
-                  className={`repair-item-card ${garment.is_active ? 'active' : 'inactive'}`}
-                >
-                  <div className="repair-item-info">
-                    <div className="repair-item-name">{garment.garment_name}</div>
-                    <div className="repair-item-details">
-                      {garment.description && `${garment.description}`}
-                      {!garment.is_active && <span className="inactive-badge">(Inactive)</span>}
-                    </div>
-                  </div>
-                  <div className="repair-item-actions">
-                    <button
-                      onClick={() => openEditRepairGarmentType(garment)}
-                      className="repair-garment-edit-btn"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteRepairGarmentType(garment.repair_garment_id)}
-                      className="repair-garment-delete-btn"
-                    >
-                      Delete
-                    </button>
+              <div className="repair-form-group">
+                <label>Description</label>
+                <textarea
+                  value={repairGarmentTypeForm.description}
+                  onChange={(e) => setRepairGarmentTypeForm({ ...repairGarmentTypeForm, description: e.target.value })}
+                  placeholder="Optional description..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="repair-form-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={repairGarmentTypeForm.is_active === 1}
+                    onChange={(e) => setRepairGarmentTypeForm({ ...repairGarmentTypeForm, is_active: e.target.checked ? 1 : 0 })}
+                  />
+                  Active (Show in dropdowns)
+                </label>
+              </div>
+              {repairGarmentTypes.length > 0 && (
+                <div className="repair-types-list-header">
+                  <h3>Existing Repair Garment Types ({repairGarmentTypes.length})</h3>
+                  <div className="repair-types-scrollable">
+                    {repairGarmentTypes.map(garment => (
+                      <div
+                        key={garment.repair_garment_id}
+                        className={`repair-item-card ${garment.is_active ? 'active' : 'inactive'}`}
+                      >
+                        <div className="repair-item-info">
+                          <div className="repair-item-name">{garment.garment_name}</div>
+                          <div className="repair-item-details">
+                            {garment.description && `${garment.description}`}
+                            {!garment.is_active && <span className="inactive-badge">(Inactive)</span>}
+                          </div>
+                        </div>
+                        <div className="repair-item-actions">
+                          <button
+                            onClick={() => openEditRepairGarmentType(garment)}
+                            className="repair-garment-edit-btn"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRepairGarmentType(garment.repair_garment_id)}
+                            className="repair-garment-delete-btn"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
+              )}
+            </div>
+
+            <div className="repair-modal-footer">
+              <button className="repair-btn-cancel" onClick={() => {
+                setShowRepairGarmentTypeModal(false);
+                setEditingRepairGarmentType(null);
+                setRepairGarmentTypeForm({ garment_name: '', description: '', is_active: 1 });
+              }}>Cancel</button>
+              <button
+                className="repair-btn-submit"
+                onClick={handleRepairGarmentTypeSubmit}
+                disabled={!repairGarmentTypeForm.garment_name.trim()}
+              >
+                {editingRepairGarmentType ? 'Update' : 'Create'}
+              </button>
             </div>
           </div>
-        )}
-      </div>
-      
-      <div className="repair-modal-footer">
-        <button className="repair-btn-cancel" onClick={() => {
-          setShowRepairGarmentTypeModal(false);
-          setEditingRepairGarmentType(null);
-          setRepairGarmentTypeForm({ garment_name: '', description: '', is_active: 1 });
-        }}>Cancel</button>
-        <button
-          className="repair-btn-submit"
-          onClick={handleRepairGarmentTypeSubmit}
-          disabled={!repairGarmentTypeForm.garment_name.trim()}
-        >
-          {editingRepairGarmentType ? 'Update' : 'Create'}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+        </div>
+      )}
       {showPriceConfirmationModal && priceConfirmationItem && priceConfirmationItem.order_type !== 'walk_in' && (
         <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowPriceConfirmationModal(false)}>
           <div className="modal-content">
@@ -1205,8 +1213,8 @@ const Repair = () => {
               <div className="detail-row"><strong>Order ID:</strong> #{priceConfirmationItem.order_id}</div>
               <div className="detail-row"><strong>Garment Type:</strong> {priceConfirmationItem.specific_data?.garmentType || 'N/A'}</div>
               <div className="detail-row"><strong>Damage Level:</strong> {priceConfirmationItem.specific_data?.damageLevel || 'N/A'}</div>
-              
-              <div className="form-group" style={{ marginTop: '20px' }}>
+
+              <div className="payment-form-group">
                 <label>Final Price (₱)</label>
                 <input
                   type="number"
@@ -1215,7 +1223,6 @@ const Repair = () => {
                   value={priceConfirmationPrice}
                   onChange={(e) => setPriceConfirmationPrice(e.target.value)}
                   placeholder="Enter final price"
-                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '16px' }}
                 />
                 {(() => {
                   const estimatedPrice = getEstimatedPrice(priceConfirmationItem);
@@ -1232,12 +1239,12 @@ const Repair = () => {
                   return null;
                 })()}
               </div>
-              
+
               <div style={{ marginTop: '15px', padding: '12px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '0.9em', color: '#1976d2' }}>
                 ℹ️ Customer will be notified to confirm the price before proceeding.
               </div>
             </div>
-            <div className="modal-footer">
+            <div className="modal-footer-centered">
               <button className="btn-cancel" onClick={() => setShowPriceConfirmationModal(false)}>Cancel</button>
               <button className="btn-save" onClick={handlePriceConfirmationSubmit}>Confirm & Move to Price Confirmation</button>
             </div>
@@ -1271,13 +1278,13 @@ const Repair = () => {
                 <span>₱{parseFloat(selectedOrder.final_price || 0).toLocaleString()}</span>
               </div>
               {(() => {
-                const pricingFactors = typeof selectedOrder.pricing_factors === 'string' 
-                  ? JSON.parse(selectedOrder.pricing_factors || '{}') 
+                const pricingFactors = typeof selectedOrder.pricing_factors === 'string'
+                  ? JSON.parse(selectedOrder.pricing_factors || '{}')
                   : (selectedOrder.pricing_factors || {});
                 const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
                 const finalPrice = parseFloat(selectedOrder.final_price || 0);
                 const remaining = finalPrice - amountPaid;
-                
+
                 if (amountPaid > 0) {
                   return (
                     <>
@@ -1296,7 +1303,7 @@ const Repair = () => {
                 }
                 return null;
               })()}
-              
+
               <div className="payment-form-group">
                 <label>Payment Amount *</label>
                 <input
@@ -1326,6 +1333,23 @@ const Repair = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {toast.show && (
+        <div className={`toast ${toast.type}`}>
+          {toast.type === 'success' ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="15" y1="9" x2="9" y2="15"></line>
+              <line x1="9" y1="9" x2="15" y2="15"></line>
+            </svg>
+          )}
+          <span>{toast.message}</span>
         </div>
       )}
     </div>

@@ -561,7 +561,7 @@ export default function RepairClothes() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Repair Request</Text>
-            <Text style={styles.cardSubtitle}>We'll make it good as new</Text>
+            <Text style={styles.cardSubtitle}>We&apos;ll make it good as new</Text>
           </View>
           <Text style={styles.sectionTitle}>Upload Damage Photo (Recommended)</Text>
           <TouchableOpacity style={styles.imageUpload} onPress={pickImage}>

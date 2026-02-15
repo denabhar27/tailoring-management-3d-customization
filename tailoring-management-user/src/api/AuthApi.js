@@ -1,6 +1,7 @@
 import axios from "axios";
+import { API_URL } from './config';
 
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = API_URL;
 
 export async function registerUser(userData) {
   try {

@@ -321,7 +321,11 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
         }
       }
 
-      const dateStr = preferredDate.toISOString().split('T')[0];
+      // Format date in local timezone to avoid UTC conversion issues
+      const year = preferredDate.getFullYear();
+      const month = String(preferredDate.getMonth() + 1).padStart(2, '0');
+      const day = String(preferredDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       let slotResult = null;
       try {
         slotResult = await appointmentSlotService.bookSlot('customization', dateStr, selectedTimeSlot);

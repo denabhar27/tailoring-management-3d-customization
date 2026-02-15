@@ -5,17 +5,12 @@ import '../styles/Guesthome.css';
 import '../styles/Transitions.css';
 import { initScrollAnimations, initHeaderScroll } from '../utils/scrollAnimations';
 import logo from "../assets/logo.png";
-import dp from "../assets/dp.png";
 import appointmentBg from "../assets/background.jpg";
 import heroBg from "../assets/tailorbackground.jpg";
-import suitSample from "../assets/suits.png";
 import customizeBg from "../assets/background.jpg";
 import repairBg from "../assets/repair.png";
-import brown from "../assets/brown.png";
-import full from "../assets/full.png";
-import tuxedo from "../assets/tuxedo.png";
 import dryCleanBg from "../assets/dryclean.png";
-import { getUser, logoutUser } from '../api/AuthApi';
+import { logoutUser } from '../api/AuthApi';
 import { notificationApi } from '../api/NotificationApi';
 import { getCartSummary } from '../api/CartApi';
 import RentalClothes from './components/RentalClothes';
@@ -25,32 +20,55 @@ import DryCleaningFormModal from './components/DryCleaningFormModal';
 import CustomizationFormModal from './components/CustomizationFormModal';
 import OrderDetailsModal from './OrderDetailsModal';
 
-const UserHomePage = ({ userName, setIsLoggedIn }) => {
+const UserHomePage = ({ setIsLoggedIn }) => {
   const navigate = useNavigate();
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const [cartItems, setCartItems] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
-  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [repairFormModalOpen, setRepairFormModalOpen] = useState(false);
   const [dryCleaningFormModalOpen, setDryCleaningFormModalOpen] = useState(false);
   const [customizationFormModalOpen, setCustomizationFormModalOpen] = useState(false);
-  const [appointmentDate, setAppointmentDate] = useState('');
-  const [appointments, setAppointments] = useState(() => {
-    try {
-      const s = typeof window !== 'undefined' && localStorage.getItem('appointments');
-      return s ? JSON.parse(s) : [];
-    } catch {
-      return [];
-    }
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [cartItemCount, setCartItemCount] = useState(0);
   const [orderDetailsModalOpen, setOrderDetailsModalOpen] = useState(false);
   const [selectedOrderItemId, setSelectedOrderItemId] = useState(null);
+
+  const fetchCartCount = async () => {
+    try {
+      const result = await getCartSummary();
+      if (result.success) {
+        setCartItemCount(result.itemCount || 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch cart count:', err);
+      setCartItemCount(0);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const result = await notificationApi.getNotifications();
+      if (result.success) {
+        setNotifications(result.data || []);
+      } else {
+        setNotifications([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+      setNotifications([]);
+    }
+  };
+
+  const fetchUnreadCount = async () => {
+    try {
+      const count = await notificationApi.getUnreadCount();
+      setUnreadCount(count);
+    } catch (err) {
+      console.error('Failed to fetch unread count:', err);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -95,50 +113,11 @@ const UserHomePage = ({ userName, setIsLoggedIn }) => {
     }
   }, [cartOpen]);
 
-  const fetchCartCount = async () => {
-    try {
-      const result = await getCartSummary();
-      if (result.success) {
-        setCartItemCount(result.itemCount || 0);
-      }
-    } catch (err) {
-      console.error('Failed to fetch cart count:', err);
-      setCartItemCount(0);
-    }
-  };
-
   useEffect(() => {
     if (notificationsOpen) {
       fetchNotifications();
     }
   }, [notificationsOpen]);
-
-  const fetchNotifications = async () => {
-    try {
-      console.log('[NOTIFICATIONS] Attempting to fetch notifications...');
-      const result = await notificationApi.getNotifications();
-      console.log('[NOTIFICATIONS] Received result:', result);
-      if (result.success) {
-        setNotifications(result.data || []);
-      } else {
-        console.warn('[NOTIFICATIONS] API returned success:false');
-        setNotifications([]);
-      }
-    } catch (err) {
-      console.error('[NOTIFICATIONS] Failed to fetch notifications:', err.message || err);
-      
-      setNotifications([]);
-    }
-  };
-
-  const fetchUnreadCount = async () => {
-    try {
-      const count = await notificationApi.getUnreadCount();
-      setUnreadCount(count);
-    } catch (err) {
-      console.error('Failed to fetch unread count:', err);
-    }
-  };
 
   const handleMarkAsRead = async (notificationId) => {
     try {
@@ -165,11 +144,9 @@ const UserHomePage = ({ userName, setIsLoggedIn }) => {
   };
 
   const handleNotificationClick = (notif) => {
-    
     if (!notif.is_read) {
       handleMarkAsRead(notif.notification_id);
     }
-    
     if (notif.order_item_id) {
       setSelectedOrderItemId(notif.order_item_id);
       setOrderDetailsModalOpen(true);
@@ -181,12 +158,6 @@ const UserHomePage = ({ userName, setIsLoggedIn }) => {
     { type: 'Customize', description: 'Personalize and customize' },
     { type: 'Dry Cleaning', description: 'Impeccable clean on your suit' },
   ];
-
-  const user = getUser() || {
-    name: userName || 'User',
-    email: '',
-    avatar: dp,
-  };
 
   const handleLogout = () => {
     logoutUser();
@@ -224,56 +195,8 @@ const UserHomePage = ({ userName, setIsLoggedIn }) => {
       return;
     }
 
-    setCartItems((prev) => {
-      const id = 'ORD-' + String(prev.length + 1).padStart(4, '0');
-      const newItem = {
-        id,
-        type,
-        details: { brand: '', size: '', notes: '', repair: '', datetime: '' },
-        status: 'pending',
-        toPay: true,
-        expanded: false,
-      };
-      return [...prev, newItem];
-    });
     setServiceModalOpen(false);
     setCartOpen(true);
-  };
-
-  const updateItemDetails = (id, patch) => {
-    setCartItems((prev) => prev.map((it) => (it.id === id ? { ...it, details: { ...it.details, ...patch } } : it)));
-  };
-
-  const removeItem = (id) => {
-    setCartItems((prev) => prev.filter((it) => it.id !== id));
-  };
-
-  const submitAppointment = async () => {
-    if (cartItems.length === 0 || !appointmentDate) return;
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-    const payload = {
-      services: cartItems.map((it) => ({ orderId: it.id, serviceType: it.type, details: { ...it.details, date: appointmentDate } })),
-      customer: { name: user.name, email: user.email },
-      date: appointmentDate,
-    };
-    try {
-      setIsSubmitting(true);
-      const res = await fetch(`${API_BASE}/api/appointments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (!res.ok) throw new Error('Failed to submit');
-      setAppointments((prev) => {
-        const id = 'APT-' + String(prev.length + 1).padStart(4, '0');
-        const next = [...prev, { id, status: 'pending', services: cartItems, date: appointmentDate }];
-        try { localStorage.setItem('appointments', JSON.stringify(next)); } catch (e) { void e }
-        return next;
-      });
-      setSummaryModalOpen(false);
-      setCartItems([]);
-      setAppointmentDate('');
-    } catch {
-      setSummaryModalOpen(false);
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   const services = [
@@ -492,134 +415,6 @@ const UserHomePage = ({ userName, setIsLoggedIn }) => {
         </div>
       )}
 
-    {cartOpen && (
-  <div className="cart-drawer" onClick={() => setCartOpen(false)}>
-    <div className="cart-panel" onClick={(e) => e.stopPropagation()}>
-      <div className="cart-header">
-        <div className="cart-title">Cart ({cartItems.length})</div>
-        <button className="cart-close" onClick={() => setCartOpen(false)}>×</button>
-      </div>
-      <div className="cart-items">
-        {cartItems.length === 0 && <div className="cart-empty">No services selected</div>}
-        {cartItems.map((it) => (
-          <div key={it.id} className="cart-card">
-            <div className="cart-card-top">
-              <div className="cart-id">{it.id}</div>
-              <div className="cart-type">{it.type}</div>
-            </div>
-            <div className="cart-card-body">
-              <div className="cart-form">
-                {serviceForms[it.type]?.map((field) => (
-                  <div key={field.name} className="form-group">
-                    <label>{field.label}</label>
-                    {field.type === "textarea" ? (
-                      <textarea
-                        rows={3}
-                        value={it.details[field.name] || ""}
-                        onChange={(e) =>
-                          updateItemDetails(it.id, { [field.name]: e.target.value })
-                        }
-                      />
-                    ) : field.type === "file" ? (
-                      <input
-                        type="file"
-                        onChange={(e) =>
-                          updateItemDetails(it.id, { [field.name]: e.target.files[0] })
-                        }
-                      />
-                    ) : (
-                      <input
-                        type={field.type}
-                        value={it.details[field.name] || ""}
-                        onChange={(e) =>
-                          updateItemDetails(it.id, { [field.name]: e.target.value })
-                        }
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div className="cart-actions">
-                <button className="btn-danger" onClick={() => removeItem(it.id)}>Remove</button>
-              </div>
-            </div> {}
-          </div> 
-        ))}
-      </div> {}
-      <div className="cart-footer">
-        <button className="btn-primary" disabled={cartItems.length === 0} onClick={() => { setCartOpen(false); setSummaryModalOpen(true); }}>Proceed to booking</button>
-      </div>
-    </div>
-  </div>
-)}
-
-     {summaryModalOpen && (
-  <div className="auth-modal-overlay" onClick={() => setSummaryModalOpen(false)}>
-    <div className="auth-modal" onClick={(e) => e.stopPropagation()}>
-      <div className="auth-container">
-        <div className="auth-header">
-          <h2>Finalize Appointment</h2>
-          <p className="auth-subtitle">Review your services and select appointment date</p>
-        </div>
-        <div style={{ padding: '16px 18px', maxHeight: '400px', overflowY: 'auto' }}>
-          {cartItems.map((it) => (
-            <div key={it.id} style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid #eee' }}>
-              <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '8px', color: '#8B4513' }}>
-                {it.type} • {it.id}
-              </div>
-              {serviceForms[it.type]?.map((field) => {
-                const value = it.details[field.name];
-                let displayValue = value || '-';
-                
-                
-                if (field.type === 'file' && value) {
-                  displayValue = value.name || 'File uploaded';
-                }
-                
-                return (
-                  <div key={field.name} style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
-                    <strong>{field.label}:</strong> {displayValue}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-        <div style={{ padding: '16px 18px', borderTop: '1px solid #eee' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '14px' }}>
-            Select Appointment Date:
-          </label>
-          <input
-            type="date"
-            value={appointmentDate}
-            onChange={(e) => setAppointmentDate(e.target.value)}
-            style={{ 
-              width: '100%', 
-              padding: '12px 14px', 
-              marginBottom: '16px', 
-              border: '1px solid #ddd', 
-              borderRadius: '10px',
-              fontSize: '14px'
-            }}
-            min={new Date().toISOString().split('T')[0]}
-          />
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <button onClick={() => setSummaryModalOpen(false)} className="btn-secondary">
-              Back
-            </button>
-            <button 
-              onClick={submitAppointment} 
-              className="btn-primary" 
-              disabled={!appointmentDate || isSubmitting}
-            >
-              {isSubmitting ? 'Submitting...' : 'Confirm Booking'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
       <Cart 
         isOpen={cartOpen} 
         onClose={() => {

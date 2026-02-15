@@ -1,4 +1,6 @@
-const API_URL = 'http://localhost:5000/api/orders';
+import { API_URL } from './config';
+
+const API_URL_ORDERS = `${API_URL}/orders`;
 
 const getAuthHeader = () => {
     const token = localStorage.getItem('token');

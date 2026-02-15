@@ -13,6 +13,7 @@ import ImagePreviewModal from '../../components/ImagePreviewModal';
 import { useAlert } from '../../context/AlertContext';
 import { getRentalImageUrl } from '../../api/RentalApi';
 import SimpleImageCarousel from '../../components/SimpleImageCarousel';
+import { API_BASE_URL } from '../../api/config';
 
 const Cart = ({ isOpen, onClose, onCartUpdate }) => {
   const { confirm } = useAlert();
@@ -639,10 +640,10 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           {item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
                             <div className="cart-item-image">
                               <img 
-                                src={`http://localhost:5000${item.specific_data.imageUrl}`} 
+                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`} 
                                 alt="Damage preview" 
                                 className="cart-damage-photo clickable-image"
-                                onClick={() => openImagePreview(`http://localhost:5000${item.specific_data.imageUrl}`, 'Damage Photo')}
+                                onClick={() => openImagePreview(`${API_BASE_URL}${item.specific_data.imageUrl}`, 'Damage Photo')}
                                 title="Click to enlarge"
                                 onError={(e) => {
                                   e.target.style.display = 'none';
@@ -683,10 +684,10 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           {item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
                             <div className="cart-item-image">
                               <img 
-                                src={`http://localhost:5000${item.specific_data.imageUrl}`} 
+                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`} 
                                 alt="Clothing preview" 
                                 className="cart-damage-photo clickable-image"
-                                onClick={() => openImagePreview(`http://localhost:5000${item.specific_data.imageUrl}`, 'Clothing Photo')}
+                                onClick={() => openImagePreview(`${API_BASE_URL}${item.specific_data.imageUrl}`, 'Clothing Photo')}
                                 title="Click to enlarge"
                                 onError={(e) => {
                                   e.target.style.display = 'none';
@@ -756,10 +757,10 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           {!item.specific_data.designData?.angleImages && item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
                             <div className="cart-item-image" style={{ marginTop: '10px' }}>
                               <img 
-                                src={`http://localhost:5000${item.specific_data.imageUrl}`} 
+                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`} 
                                 alt="Design preview" 
                                 className="cart-damage-photo clickable-image"
-                                onClick={() => openImagePreview(`http://localhost:5000${item.specific_data.imageUrl}`, 'Design Preview')}
+                                onClick={() => openImagePreview(`${API_BASE_URL}${item.specific_data.imageUrl}`, 'Design Preview')}
                                 title="Click to enlarge"
                                 onError={(e) => {
                                   e.target.style.display = 'none';
@@ -842,10 +843,10 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           {item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && !item.specific_data.designData?.angleImages && (
                             <div className="cart-item-image">
                               <img 
-                                src={`http://localhost:5000${item.specific_data.imageUrl}`} 
+                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`} 
                                 alt="Design preview" 
                                 className="cart-damage-photo clickable-image"
-                                onClick={() => openImagePreview(`http://localhost:5000${item.specific_data.imageUrl}`, 'Design Preview')}
+                                onClick={() => openImagePreview(`${API_BASE_URL}${item.specific_data.imageUrl}`, 'Design Preview')}
                                 title="Click to enlarge"
                                 onError={(e) => {
                                   e.target.style.display = 'none';

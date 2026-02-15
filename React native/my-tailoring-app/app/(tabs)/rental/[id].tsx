@@ -314,8 +314,8 @@ export default function RentalDetail() {
           image_url: item.image_url
         },
         rentalDates: {
-          startDate: startDate!.toISOString().split('T')[0],
-          endDate: calculatedEndDate.toISOString().split('T')[0]
+          startDate: `${startDate!.getFullYear()}-${String(startDate!.getMonth() + 1).padStart(2, '0')}-${String(startDate!.getDate()).padStart(2, '0')}`,
+          endDate: `${calculatedEndDate.getFullYear()}-${String(calculatedEndDate.getMonth() + 1).padStart(2, '0')}-${String(calculatedEndDate.getDate()).padStart(2, '0')}`
         }
       };
 

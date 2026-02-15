@@ -211,10 +211,13 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
       const garmentName = garmentTypes.find(g => g.id === selectedGarment)?.name || selectedGarment;
       const fabricName = fabricTypes.find(f => f.id === selectedFabric)?.name || selectedFabric;
 
+      const now = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
       await addCustomizationToCart({
         garmentType: garmentName,
         fabricType: fabricName,
-        preferredDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        preferredDate: dateStr,
         notes: `${measurements ? `Measurements: ${measurements}\n` : ''}${notes}`,
         imageUrl: imageUrl,
         estimatedPrice: getSelectedGarmentPrice(),

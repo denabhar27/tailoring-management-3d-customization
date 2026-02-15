@@ -2,6 +2,7 @@ import { RoundedBox, Capsule, Text, Edges, useGLTF, useTexture } from '@react-th
 import React, { useMemo, useLayoutEffect, Suspense, useEffect, useState, useRef } from 'react';
 import * as THREE from 'three';
 import CustomModelLoader from './CustomModelLoader';
+import { API_BASE_URL } from '../../api/config';
 
 const isMobile = () => {
   return typeof window !== 'undefined' && (
@@ -127,10 +128,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
 
       let imageUrl = currentPattern.image_url;
       if (!imageUrl.startsWith('http')) {
-        const baseUrl = window.location.origin.includes('localhost')
-          ? 'http://localhost:5000'
-          : window.location.origin.replace(/:\d+$/, ':5000');
-        imageUrl = `${baseUrl}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+        imageUrl = `${API_BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
       }
       
       console.log('📥 Full image URL:', imageUrl);
@@ -646,11 +644,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
     
     let modelUrl = customModelToRender.file_url;
     if (!modelUrl.startsWith('http')) {
-      
-      const baseUrl = window.location.origin.includes('localhost') 
-        ? 'http://localhost:5000'
-        : window.location.origin.replace(/:\d+$/, ':5000'); 
-      modelUrl = `${baseUrl}${modelUrl.startsWith('/') ? '' : '/'}${modelUrl}`;
+      modelUrl = `${API_BASE_URL}${modelUrl.startsWith('/') ? '' : '/'}${modelUrl}`;
     }
     
     console.log('=== RENDERING CUSTOM MODEL ===');
@@ -723,7 +717,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
     if (matchingCustomModel && matchingCustomModel.file_url) {
       const modelUrl = matchingCustomModel.file_url.startsWith('http') 
         ? matchingCustomModel.file_url 
-        : `http://localhost:5000${matchingCustomModel.file_url}`;
+        : `${API_BASE_URL}${matchingCustomModel.file_url}`;
       
       return (
         <group position={[0, 0, 0]} scale={sizeScale}>
@@ -760,7 +754,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
   if (garment.startsWith('custom-') && matchingCustomModel && matchingCustomModel.file_url) {
     const modelUrl = matchingCustomModel.file_url.startsWith('http') 
       ? matchingCustomModel.file_url 
-      : `http://localhost:5000${matchingCustomModel.file_url}`;
+      : `${API_BASE_URL}${matchingCustomModel.file_url}`;
 
     const customModelScale = sizeScale * 3;
     

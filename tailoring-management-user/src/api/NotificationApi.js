@@ -1,31 +1,6 @@
+import { API_BASE_URL } from './config';
 
-
-const getApiBase = () => {
-  
-  if (import.meta.env.VITE_API_URL) {
-    console.log('[NOTIFICATION API] Using VITE_API_URL from env:', import.meta.env.VITE_API_URL);
-    return import.meta.env.VITE_API_URL;
-  }
-
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    console.log('[NOTIFICATION API] Using localhost');
-    return 'http://localhost:5000';
-  }
-
-  const possibleIPs = [
-    '192.168.1.202',  
-    '192.168.254.102', 
-    window.location.hostname.split(':')[0] 
-  ];
-
-  const backendIP = possibleIPs[0];
-  const apiBase = `http://${backendIP}:5000`;
-  console.log('[NOTIFICATION API] Auto-detected API base URL:', apiBase);
-  console.log('[NOTIFICATION API] If this is wrong, set VITE_API_URL in .env file');
-  return apiBase;
-};
-
-const API_BASE = getApiBase();
+const API_BASE = API_BASE_URL;
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');

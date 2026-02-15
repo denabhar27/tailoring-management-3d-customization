@@ -12,7 +12,7 @@ import {
   Platform,
   Linking,
   Share,
-} from 'react-native';
+ Image, Modal, ScrollView, TextInput } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { Image, Modal, ScrollView, TextInput } from 'react-native';
+
 import DateTimePickerModal from '../../../components/DateTimePickerModal';
 import { 
   uploadCustomizationImage, 
@@ -33,8 +33,9 @@ const WEB_3D_CUSTOMIZER_URL = process.env.EXPO_PUBLIC_WEB_3D_URL || 'http://192.
 console.log('3D Customizer URL:', WEB_3D_CUSTOMIZER_URL);
 
 interface CustomizationData {
-  type: 'CUSTOMIZATION_COMPLETE' | 'CUSTOMIZATION_CANCEL' | 'CUSTOMIZATION_ERROR' | 'DESIGN_IMAGE_READY' | 'CONSOLE_LOG';
+  type: 'CUSTOMIZATION_COMPLETE' | 'CUSTOMIZATION_CANCEL' | 'CUSTOMIZATION_ERROR' | 'DESIGN_IMAGE_READY' | 'CONSOLE_LOG' | string;
   garmentType?: string;
+  garmentCode?: string;
   fabricType?: string;
   designImage?: string; 
   angleImages?: { front?: string; back?: string; right?: string; left?: string }; 
@@ -412,7 +413,8 @@ export default function Customizer3DScreen() {
     try {
       const data: CustomizationData = JSON.parse(event.nativeEvent.data);
       
-      console.log('Received message from WebView:', data.type);
+      console.log('[Customizer3D] Received message from WebView:', data.type);
+      console.log('[Customizer3D] Full data keys:', Object.keys(data));
 
       switch (data.type) {
         case 'CUSTOMIZATION_COMPLETE':
@@ -507,6 +509,10 @@ export default function Customizer3DScreen() {
   };
 
   const handleCustomizationComplete = async (data: CustomizationData) => {
+    console.log('[Customizer3D] handleCustomizationComplete received data:', JSON.stringify(data, null, 2));
+    console.log('[Customizer3D] angleImages:', data.angleImages);
+    console.log('[Customizer3D] designImage:', data.designImage ? 'present' : 'missing');
+    console.log('[Customizer3D] designData:', data.designData);
     
     setPendingCustomization(data);
     setNotes(data.notes || '');
@@ -582,10 +588,16 @@ export default function Customizer3DScreen() {
         angleImages: pendingCustomization.angleImages,
       };
       
+      // Format date in local timezone to avoid UTC conversion issues
+      const year = preferredDate.getFullYear();
+      const month = String(preferredDate.getMonth() + 1).padStart(2, '0');
+      const day = String(preferredDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      
       const cartResponse = await addCustomizationToCart({
         garmentType: selectedGarment,
         fabricType: selectedFabric,
-        preferredDate: preferredDate.toISOString().split('T')[0],
+        preferredDate: dateStr,
         notes: notes || pendingCustomization.notes || '',
         imageUrl: imageUrl,
         designData: designDataWithAngleImages,
@@ -753,13 +765,6 @@ export default function Customizer3DScreen() {
         cacheEnabled={true}
         thirdPartyCookiesEnabled={true}
         sharedCookiesEnabled={true}
-        
-        androidHardwareAccelerationDisabled={false}
-        androidLayerType="hardware"
-        overScrollMode="never"
-        setBuiltInZoomControls={false}
-        setDisplayZoomControls={false}
-        
         onContentProcessDidTerminate={() => {
           webViewRef.current?.reload();
         }}
@@ -1148,7 +1153,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
-  errorText: {
+  errorTextWebview: {
     fontSize: 15,
     color: '#8D6E63',
     textAlign: 'center',

@@ -18,8 +18,8 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useFocusEffect } from "expo-router";
+import { useRouter , useFocusEffect } from "expo-router";
+
 import { orderStore, Order } from "../../../utils/orderStore";
 import { authService, orderTrackingService, notificationService, measurementsService } from "../../../utils/apiService";
 
@@ -562,7 +562,7 @@ export default function ProfileScreen() {
                           return (
                             <View key={idx} style={[styles.measurementRow, idx % 2 === 0 ? styles.measurementRowEven : styles.measurementRowOdd]}>
                               <Text style={styles.measurementLabel}>{label}</Text>
-                              <Text style={styles.measurementValue}>{value}"</Text>
+                              <Text style={styles.measurementValue}>{value}&quot;</Text>
                             </View>
                           );
                         })}
@@ -591,7 +591,7 @@ export default function ProfileScreen() {
                           return (
                             <View key={idx} style={[styles.measurementRow, idx % 2 === 0 ? styles.measurementRowEven : styles.measurementRowOdd]}>
                               <Text style={styles.measurementLabel}>{label}</Text>
-                              <Text style={styles.measurementValue}>{value}"</Text>
+                              <Text style={styles.measurementValue}>{value}&quot;</Text>
                             </View>
                           );
                         })}

@@ -45,7 +45,12 @@ body {
   overflow-x: hidden;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: 'Montserrat', 'Poppins', sans-serif;
   font-weight: 700;
   color: #2D3436;
@@ -172,7 +177,7 @@ html {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr); 
+  grid-template-columns: repeat(4, 1fr);
   gap: 25px;
   margin-bottom: 40px;
   width: 100%;
@@ -225,7 +230,8 @@ html {
   flex-wrap: wrap;
 }
 
-.search-container select, .search-container input {
+.search-container select,
+.search-container input {
   padding: 12px 20px;
   border: 1px solid #DFE6E9;
   border-radius: 10px;
@@ -502,6 +508,7 @@ tbody td {
     opacity: 0;
     transform: scale(0.9) translateY(-20px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -579,7 +586,10 @@ tbody td {
 .modal-overlay {
   display: none;
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -588,9 +598,9 @@ tbody td {
   z-index: 1000;
   padding: 20px;
   animation: fadeIn 0.3s ease;
-  }
+}
 
-  .modal-content {
+.modal-content {
   background: linear-gradient(135deg, #FFFFFF 0%, #FAFAFA 100%);
   width: 100%;
   max-width: 500px;
@@ -599,9 +609,9 @@ tbody td {
   overflow: hidden;
   animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid rgba(139, 69, 19, 0.1);
-  }
+}
 
-  .modal-header {
+.modal-header {
   background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
   color: white;
   padding: 20px 28px;
@@ -610,17 +620,17 @@ tbody td {
   align-items: center;
   font-size: 1.4rem;
   box-shadow: 0 4px 15px rgba(139, 69, 19, 0.2);
-  }
-  
-  .modal-header h2 {
+}
+
+.modal-header h2 {
   margin: 0;
   font-size: 1.4rem;
   font-family: 'Montserrat', 'Poppins', sans-serif;
   font-weight: 700;
   letter-spacing: -0.02em;
-  }
-  
-  .close-modal {
+}
+
+.close-modal {
   font-size: 28px;
   cursor: pointer;
   font-weight: bold;
@@ -632,19 +642,19 @@ tbody td {
   border-radius: 50%;
   transition: all 0.3s ease;
   color: white;
-  }
-  
-  .close-modal:hover {
+}
+
+.close-modal:hover {
   background: rgba(255, 255, 255, 0.25);
   transform: rotate(90deg) scale(1.1);
-  }
+}
 
-  .modal-body {
+.modal-body {
   padding: 28px;
   background: #FFFFFF;
-  }
-  
-  .detail-row {
+}
+
+.detail-row {
   display: flex;
   flex-direction: column;
   padding: 12px 0;
@@ -653,71 +663,71 @@ tbody td {
   gap: 4px;
   text-align: left;
   align-items: flex-start;
-  }
-  
-  .detail-row:last-child {
+}
+
+.detail-row:last-child {
   border-bottom: none;
-  }
-  
-  .detail-row strong {
+}
+
+.detail-row strong {
   color: #333;
   font-weight: 600;
   font-size: 14px;
-  }
-  
-  .detail-row span,
-  .detail-row:not(:has(span))::after {
+}
+
+.detail-row span,
+.detail-row:not(:has(span))::after {
   color: #555;
   font-size: 15px;
-  }
+}
 
-  .detail-row.centered-content {
+.detail-row.centered-content {
   flex-direction: row;
   justify-content: center;
   align-items: center;
-  }
+}
 
-  .status-badge {
+.status-badge {
   padding: 6px 14px;
   border-radius: 20px;
   font-weight: 600;
   font-size: 0.9rem;
-  }
-  
-  .status-badge.in-progress {
+}
+
+.status-badge.in-progress {
   background: #e3f2fd;
   color: #1976d2;
-  }
-  
-  .status-badge.price-confirmation {
+}
+
+.status-badge.price-confirmation {
   background: #fff3e0;
   color: #ff9800;
-  }
-  
-  .status-badge.to-pickup {
+}
+
+.status-badge.to-pickup {
   background: #fff3e0;
   color: #f57c00;
-  }
-  
-  .status-badge.completed {
+}
+
+.status-badge.completed {
   background: #e8f5e9;
   color: #2e7d32;
-  }
-  
-  .status-badge.overdue {
+}
+
+.status-badge.overdue {
   background: #ffebee;
   color: #d32f2f;
-  }
+}
 
-  .modal-footer {
+.modal-footer {
   padding: 10px 20px;
   gap: 30px;
   text-align: right;
   background: #f9f9f9;
   border-top: 1px solid #eee;
-  }
-  
-  .close-btn {
+}
+
+.close-btn {
   padding: 30px 50px;
   color: white;
   border: none;
@@ -725,10 +735,10 @@ tbody td {
   cursor: pointer;
   font-size: 1rem;
   transition: background 0.3s;
-  }
-  
-  .btn-save{
-    padding: 5px 20px;
+}
+
+.btn-save {
+  padding: 5px 20px;
   background: #1a4971;
   color: white;
   border: none;
@@ -736,40 +746,46 @@ tbody td {
   cursor: pointer;
   font-size: 1rem;
   transition: background 0.3s;
-  }
-  
-  .close-btn:hover {
+}
+
+.close-btn:hover {
   background: #143d59;
-  }
+}
 
-  @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-  }
-  
-  @keyframes slideUp {
+@keyframes fadeIn {
   from {
-  transform: translateY(50px);
-  opacity: 0;
-  }
-  to {
-  transform: translateY(0);
-  opacity: 1;
-  }
+    opacity: 0;
   }
 
-  @media (max-width: 600px) {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 600px) {
   .modal-content {
-  margin: 20px;
-  max-width: none;
+    margin: 20px;
+    max-width: none;
   }
+
   .detail-row {
-  flex-direction: column;
-  gap: 4px;
+    flex-direction: column;
+    gap: 4px;
   }
+
   .detail-row strong {
-  min-width: auto;
+    min-width: auto;
   }
-  }
-  
-  
+}

@@ -6,6 +6,7 @@ import {
   uploadRepairImage,
   addRepairToCart
 } from '../../api/RepairApi';
+import { API_BASE_URL } from '../../api/config';
 import '../../styles/RepairModal.css';
 
 const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
@@ -249,7 +250,32 @@ const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
                     <label>Upload Photo of Damage *</label>
                     <input
                       type="file"
-                      accept="image}
+                      accept="image/*"
+                      onChange={(e) => handleImageUpload(e.target.files[0])}
+                    />
+                    {uploadedImage && (
+                      <div className="uploaded-preview">
+                        <img src={`${API_BASE_URL}${uploadedImage.url}`} alt="Preview" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="repair-form-actions">
+                  <button className="repair-back-btn" onClick={() => setStep(2)}>
+                    ← Back
+                  </button>
+                  <button
+                    className="repair-next-btn"
+                    onClick={() => setStep(4)}
+                    disabled={!garmentType || !damageDescription}
+                  >
+                    Review Request →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {step === 4 && (
             <div className="repair-step">
               <h3>Review Your Repair Request</h3>
@@ -273,7 +299,7 @@ const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
                 {uploadedImage && (
                   <div className="summary-item">
                     <label>Damage Photo:</label>
-                    <img src={`http://localhost:5000${uploadedImage.url}`} alt="Damage" className="summary-image" />
+                    <img src={`${API_BASE_URL}${uploadedImage.url}`} alt="Damage" className="summary-image" />
                   </div>
                 )}
                 <div className="summary-item price">

@@ -546,7 +546,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
                 <div className="form-group-shared">
                   <label className="form-label-shared">
-                    Garment Type <span className="required-indicator">*</span>
+                    <i className="fas fa-tshirt"></i> Garment Type <span className="required-indicator">*</span>
                   </label>
                   <select
                     value={garment.garmentType}
@@ -586,7 +586,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 )}
 
                 <div className="form-group-shared">
-                  <label className="form-label-shared">Quantity</label>
+                  <label className="form-label-shared"><i className="fas fa-sort-numeric-up"></i> Quantity</label>
                   <input
                     type="number"
                     value={garment.quantity}
@@ -599,7 +599,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
                 <div className="form-group-shared">
                   <label className="form-label-shared">
-                    🏷️ Brand <span className="required-indicator">*</span>
+                    <i className="fas fa-tag"></i> Brand <span className="required-indicator">*</span>
                   </label>
                   <input
                     type="text"
@@ -624,7 +624,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
             </button>
 
             <div className="form-group-shared">
-              <label htmlFor="notes" className="form-label-shared">📝 Special Instructions</label>
+              <label htmlFor="notes" className="form-label-shared"><i className="fas fa-pen"></i> Special Instructions</label>
               <textarea
                 id="notes"
                 name="notes"
@@ -637,7 +637,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
             </div>
             <div className="form-group-shared">
               <label htmlFor="date" className="form-label-shared">
-                📅 Drop off item date <span className="required-indicator">*</span>
+                <i className="fas fa-calendar"></i> Drop off item date <span className="required-indicator">*</span>
               </label>
               <input
                 type="date"
@@ -657,7 +657,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
             {formData.date && (
               <div className="form-group-shared">
                 <label className="form-label-shared">
-                  🕐 Select Time Slot <span className="required-indicator">*</span>
+                  <i className="fas fa-clock"></i> Select Time Slot <span className="required-indicator">*</span>
                 </label>
                 <div className="time-slot-legend">
                   <div className="legend-item">
@@ -681,7 +681,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                   </div>
                 ) : !isShopOpen ? (
                   <div className="shop-closed-message">
-                    <span className="closed-icon">🚫</span>
+                    <span className="closed-icon"><i className="fas fa-ban"></i></span>
                     <p>The shop is closed on this date. Please select another date.</p>
                   </div>
                 ) : allTimeSlots.length > 0 ? (
@@ -725,7 +725,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                   </div>
                 ) : (
                   <div className="no-slots-message">
-                    <span className="no-slots-icon">📅</span>
+                    <span className="no-slots-icon"><i className="fas fa-calendar"></i></span>
                     <p>No time slots available for this date. Please select another date.</p>
                   </div>
                 )}
@@ -738,7 +738,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 
                 {formData.time && (
                   <div className="selected-slot-info">
-                    ✅ Selected: <strong>{allTimeSlots.find(s => s.time_slot === formData.time)?.display_time}</strong>
+                    <i className="fas fa-check"></i> Selected: <strong>{allTimeSlots.find(s => s.time_slot === formData.time)?.display_time}</strong>
                   </div>
                 )}
                 {errors.time && (
@@ -747,7 +747,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               </div>
             )}
             <div className="form-group-shared">
-              <label htmlFor="image" className="form-label-shared">📷 Upload Clothing Photo (Optional)</label>
+              <label htmlFor="image" className="form-label-shared"><i className="fas fa-camera"></i> Upload Clothing Photo (Optional)</label>
               <div className="image-upload-wrapper-shared">
                 <input
                   type="file"
@@ -758,7 +758,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                   className="file-input-shared"
                 />
                 <label htmlFor="image" className="upload-button-shared">
-                  📷 Choose Photo
+                  <i className="fas fa-camera"></i> Choose Photo
                 </label>
               </div>
               {imagePreview && (
@@ -780,7 +780,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
               {imageFile && !imagePreview && (
                 <div className="help-text-shared" style={{ marginTop: '8px' }}>
-                  📎 {imageFile.name}
+                  <i className="fas fa-paperclip"></i> {imageFile.name}
                 </div>
               )}
               <span className="help-text-shared">Photos help us provide better service and accurate pricing</span>

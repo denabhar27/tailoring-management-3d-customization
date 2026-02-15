@@ -656,7 +656,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           )}
           <div className="form-group-shared">
             <label className="form-label-shared">
-              📷 Upload Reference Image
+              <i className="fas fa-camera"></i> Upload Reference Image
               <span className="required-indicator">*</span>
             </label>
             {isUniformSelected && (
@@ -670,7 +670,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 alignItems: 'center',
                 gap: '10px'
               }}>
-                <span style={{ fontSize: '20px' }}>👔</span>
+                <span style={{ fontSize: '20px' }}><i className="fas fa-tshirt"></i></span>
                 <div>
                   <strong style={{ color: '#e65100' }}>Uniform Selected</strong>
                   <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#666' }}>
@@ -689,7 +689,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 disabled={loading}
               />
               <label htmlFor="imageUpload" className="upload-button-shared">
-                {imagePreview ? '📷 Change Image' : '📁 Choose Image'}
+                {imagePreview ? <><i className="fas fa-camera"></i> Change Image</> : <><i className="fas fa-folder-open"></i> Choose Image</>}
               </label>
             </div>
 
@@ -749,7 +749,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           </div>
           <div className="form-group-shared">
             <label htmlFor="fabricType" className="form-label-shared">
-              🧵 Fabric Type
+              <i className="fas fa-scroll"></i> Fabric Type
               <span className="required-indicator">*</span>
             </label>
             <select
@@ -777,7 +777,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           </div>
           <div className="form-group-shared">
             <label htmlFor="garmentType" className="form-label-shared">
-              👔 Garment Type
+              <i className="fas fa-tshirt"></i> Garment Type
               <span className="required-indicator">*</span>
             </label>
             <select
@@ -794,7 +794,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                   {garment} - ₱{garmentTypes[garment]}
                 </option>
               ))}
-              <option value="Uniform" style={{ fontWeight: 'bold' }}>👔 Uniform (Price varies)</option>
+              <option value="Uniform" style={{ fontWeight: 'bold' }}><i className="fas fa-tshirt"></i> Uniform (Price varies)</option>
             </select>
             {errors.garmentType && (
               <span className="error-message-shared">{errors.garmentType}</span>
@@ -802,7 +802,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           </div>
           <div className="form-group-shared">
             <label htmlFor="preferredDate" className="form-label-shared">
-              📅 Preferred Date for Sizing in Store
+              <i className="fas fa-calendar"></i> Preferred Date for Sizing in Store
               <span className="required-indicator">*</span>
             </label>
             <input
@@ -828,7 +828,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           {formData.preferredDate && (
             <div className="form-group-shared">
               <label className="form-label-shared">
-                🕐 Select Time Slot <span className="required-indicator">*</span>
+                <i className="fas fa-clock"></i> Select Time Slot <span className="required-indicator">*</span>
               </label>
               <div className="time-slot-legend">
                 <div className="legend-item">
@@ -852,7 +852,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 </div>
               ) : !isShopOpen ? (
                 <div className="shop-closed-message">
-                  <span className="closed-icon">🚫</span>
+                  <span className="closed-icon"><i className="fas fa-ban"></i></span>
                   <p>The shop is closed on this date. Please select another date.</p>
                 </div>
               ) : allTimeSlots.length > 0 ? (
@@ -889,14 +889,14 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 </div>
               ) : (
                 <div className="no-slots-message">
-                  <span className="no-slots-icon">📅</span>
+                  <span className="no-slots-icon"><i className="fas fa-calendar"></i></span>
                   <p>No time slots available for this date. Please select another date.</p>
                 </div>
               )}
               
               {formData.preferredTime && (
                 <div className="selected-slot-info">
-                  ✅ Selected: <strong>{allTimeSlots.find(s => s.time_slot === formData.preferredTime)?.display_time}</strong>
+                  <i className="fas fa-check"></i> Selected: <strong>{allTimeSlots.find(s => s.time_slot === formData.preferredTime)?.display_time}</strong>
                 </div>
               )}
             </div>
@@ -904,7 +904,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           {designDetails && (
             <div className="form-group" style={{ backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '8px', border: '1px solid #e0e0e0', marginTop: '10px' }}>
               <h4 style={{ margin: '0 0 15px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>
-                🎨 3D Customization Choices
+                <i className="fas fa-palette"></i> 3D Customization Choices
               </h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '14px' }}>
                 {designDetails.size && (
@@ -962,7 +962,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           )}
           <div className="form-group-shared">
             <label htmlFor="notes" className="form-label-shared">
-              📝 Additional Notes
+              <i className="fas fa-pen"></i> Additional Notes
             </label>
             <textarea
               id="notes"
@@ -1012,8 +1012,9 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
             className="btn-shared btn-secondary-shared"
             onClick={handleOpen3DCustomizer}
             disabled={loading}
+            style={{ fontSize: '14px' }}
           >
-            🎨 3D Customization
+            <i className="fas fa-tshirt" style={{ marginRight: '8px' }}></i> 3D Customize
           </button>
           <button
             type="button"

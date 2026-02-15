@@ -517,7 +517,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
               <div className="form-group-shared">
                 <label className="form-label-shared">
-                  ⚠️ Damage Level <span className="required-indicator">*</span>
+                  <i className="fas fa-exclamation-triangle"></i> Damage Level <span className="required-indicator">*</span>
                 </label>
                 <select
                   value={garment.damageLevel}
@@ -543,7 +543,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
               <div className="form-group-shared">
                 <label className="form-label-shared">
-                  👔 Garment Type <span className="required-indicator">*</span>
+                  <i className="fas fa-tshirt"></i> Garment Type <span className="required-indicator">*</span>
                 </label>
                 <select
                   value={garment.garmentType}
@@ -564,7 +564,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
               <div className="form-group-shared">
                 <label className="form-label-shared">
-                  📝 Description <span className="required-indicator">*</span>
+                  <i className="fas fa-pen"></i> Description <span className="required-indicator">*</span>
                 </label>
                 <textarea
                   value={garment.notes}
@@ -589,7 +589,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           </button>
 
           <div className="form-group-shared">
-            <label htmlFor="image" className="form-label-shared">📷 Upload Damage Photo (Recommended)</label>
+            <label htmlFor="image" className="form-label-shared"><i className="fas fa-camera"></i> Upload Damage Photo (Recommended)</label>
             <div className="image-upload-wrapper-shared">
               <input
                 type="file"
@@ -600,7 +600,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 className="file-input-shared"
               />
               <label htmlFor="image" className="upload-button-shared">
-                📷 Choose Photo
+                <i className="fas fa-camera"></i> Choose Photo
               </label>
             </div>
             {imagePreview && (
@@ -622,14 +622,14 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
             
             {imageFile && !imagePreview && (
               <div className="help-text-shared" style={{ marginTop: '8px' }}>
-                📎 {imageFile.name}
+                <i className="fas fa-paperclip"></i> {imageFile.name}
               </div>
             )}
             <span className="help-text-shared">Photos help us provide accurate pricing and better service</span>
           </div>
           <div className="form-group-shared">
             <label htmlFor="date" className="form-label-shared">
-              📅 Drop off date <span className="required-indicator">*</span>
+              <i className="fas fa-calendar"></i> Drop off date <span className="required-indicator">*</span>
             </label>
             <input
               type="date"
@@ -649,7 +649,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           {formData.date && (
             <div className="form-group-shared">
               <label className="form-label-shared">
-                🕐 Select Time Slot <span className="required-indicator">*</span>
+                <i className="fas fa-clock"></i> Select Time Slot <span className="required-indicator">*</span>
               </label>
               <div className="time-slot-legend">
                 <div className="legend-item">
@@ -673,7 +673,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 </div>
               ) : !isShopOpen ? (
                 <div className="shop-closed-message">
-                  <span className="closed-icon">🚫</span>
+                  <span className="closed-icon"><i className="fas fa-ban"></i></span>
                   <p>The shop is closed on this date. Please select another date.</p>
                 </div>
               ) : allTimeSlots.length > 0 ? (
@@ -717,7 +717,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 </div>
               ) : (
                 <div className="no-slots-message">
-                  <span className="no-slots-icon">📅</span>
+                  <span className="no-slots-icon"><i className="fas fa-calendar"></i></span>
                   <p>No time slots available for this date. Please select another date.</p>
                 </div>
               )}
@@ -730,7 +730,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               
               {formData.time && (
                 <div className="selected-slot-info">
-                  ✅ Selected: <strong>{allTimeSlots.find(s => s.time_slot === formData.time)?.display_time}</strong>
+                  <i className="fas fa-check"></i> Selected: <strong>{allTimeSlots.find(s => s.time_slot === formData.time)?.display_time}</strong>
                 </div>
               )}
               {errors.time && (

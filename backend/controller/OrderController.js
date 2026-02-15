@@ -1327,7 +1327,8 @@ exports.updateRentalOrderItem = (req, res) => {
 
   const updateData = {
     approvalStatus: approvalStatus || undefined,
-    adminNotes: adminNotes || undefined
+    adminNotes: adminNotes || undefined,
+    damageNotes: damageNotes !== undefined ? damageNotes : undefined
   };
 
   console.log("Controller - Processed updateData:", updateData);

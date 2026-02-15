@@ -727,7 +727,9 @@ const Profile = () => {
                     backgroundColor: '#f9f9f9', 
                     borderRadius: '8px', 
                     border: '1px solid #e0e0e0',
-                    textAlign: 'left'
+                    textAlign: 'left',
+                    marginLeft: '0',
+                    width: '100%'
                   }}>
                     <div style={{ marginBottom: '6px' }}><strong>Garment #{idx + 1}:</strong> {garment.garmentType || 'N/A'}</div>
                     <div style={{ marginBottom: '6px' }}><strong>Damage Level:</strong> {garment.damageLevel ? garment.damageLevel.charAt(0).toUpperCase() + garment.damageLevel.slice(1) : 'N/A'}</div>
@@ -758,8 +760,10 @@ const Profile = () => {
               <span className="detail-value">{formatDateTo12Hour(specific_data.pickupDate)}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">Estimated Price:</span>
-              <span className="detail-value">₱{parseFloat(estimatedPrice).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+              <span className="detail-label">{item.status === 'pending' ? 'Estimated Price:' : 'Final Price:'}</span>
+              <span className="detail-value">
+                ₱{parseFloat(item.status === 'pending' ? estimatedPrice : item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+              </span>
             </div>
           </div>
         );
@@ -2180,6 +2184,19 @@ const Profile = () => {
 
                         if (selectedItem.status === 'pending') {
                           const estimatedPrice = getEstimatedPrice(selectedItem.specific_data, selectedItem.service_type);
+                          
+                          // For dry cleaning: only show "(Estimated)" if user selected "others" in garment dropdown
+                          if (isDryCleaning) {
+                            const isEstimated = selectedItem.specific_data?.isEstimatedPrice === true;
+                            if (isEstimated) {
+                              return `₱${estimatedPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (Estimated)`;
+                            } else {
+                              // User selected a specific garment from dropdown - show final price
+                              return `₱${finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                            }
+                          }
+                          
+                          // For other services, show estimated if price > 0
                           if (estimatedPrice > 0) {
                             return `₱${estimatedPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (Estimated)`;
                           }

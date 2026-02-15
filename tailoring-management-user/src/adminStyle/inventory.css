@@ -67,8 +67,8 @@ html, body {
 
 .inventory-management .stats-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 25px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
   margin-bottom: 40px;
   width: 100%;
 }

@@ -731,309 +731,161 @@ const CustomerList = () => {
     </div>
 
   </div>
-              <div style={{ marginTop: '30px', paddingTop: '20px', borderTop: '2px solid #eee' }}>
-
-                <h3 className="measurement-title" style={{ marginTop: 0, marginBottom: '15px', fontSize: '18px', color: '#000', textAlign: 'center', fontWeight: '600' }}>Customer Measurements</h3>
-                <div style={{ display: 'flex', gap: '20px', marginTop: '15px' }}>
-                  <div style={{ flex: 1, padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-
-                    <p className="measurement-title" style={{ marginTop: 0, marginBottom: '15px', color: '#000', textAlign: 'center', fontWeight: '600', fontSize: '16px' }}>Top Measurements</p>
-
-                    <div className="measurements-grid">
-
-                    <div className="measurement-field">
-
-                      <label>Chest (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.chest || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, chest: e.target.value } })}
-
-                        placeholder="Enter chest measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="measurement-field">
-
-                      <label>Shoulders (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.shoulders || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, shoulders: e.target.value } })}
-
-                        placeholder="Enter shoulder measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="measurement-field">
-
-                      <label>Sleeve (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.sleeve_length || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, sleeve_length: e.target.value } })}
-
-                        placeholder="Enter sleeve length"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="measurement-field">
-
-                      <label>Neck (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.neck || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, neck: e.target.value } })}
-
-                        placeholder="Enter neck measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="measurement-field">
-
-                      <label>Waist (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.waist || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, waist: e.target.value } })}
-
-                        placeholder="Enter waist measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="measurement-field">
-
-                      <label>Length (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.length || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, length: e.target.value } })}
-
-                        placeholder="Enter length measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                  </div>
-
-                </div>
-                  <div style={{ flex: 1, padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-
-                    <p className="measurement-title" style={{ marginTop: 0, marginBottom: '15px', color: '#000', textAlign: 'center', fontWeight: '600', fontSize: '16px' }}>Bottom Measurements</p>
-
-                    <div className="measurements-grid">
-
-                    <div className="measurement-field">
-
-                      <label>Waist (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.waist || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, waist: e.target.value } })}
-
-                        placeholder="Enter waist measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="measurement-field">
-
-                      <label>Hips (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.hips || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, hips: e.target.value } })}
-
-                        placeholder="Enter hip measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="measurement-field">
-
-                      <label>Inseam (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.inseam || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, inseam: e.target.value } })}
-
-                        placeholder="Enter inseam measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="measurement-field">
-
-                      <label>Length (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.length || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, length: e.target.value } })}
-
-                        placeholder="Enter length measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="measurement-field">
-
-                      <label>Thigh (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.thigh || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, thigh: e.target.value } })}
-
-                        placeholder="Enter thigh measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="measurement-field">
-
-                      <label>Outseam (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.outseam || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, outseam: e.target.value } })}
-
-                        placeholder="Enter outseam measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                  </div>
-
-                </div>
-
-                </div>
-                <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#fff3e0', borderRadius: '8px', border: '1px solid #ffcc80' }}>
-
-                  <label style={{ display: 'block', marginBottom: '10px', color: '#000', fontWeight: '600', fontSize: '16px' }}>Notes</label>
-
-                  <textarea
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
-                    value={measurements.notes}
-                    onChange={(e) => setMeasurements({ ...measurements, notes: e.target.value })}
-                    placeholder="Add any additional notes about measurements..."
-                    rows={3}
-                  />
-
-                </div>
-
-              </div>
+   <div style={{ marginTop: '5px', paddingTop: '10px', borderTop: '2px solid #eee' }}>
+  <div style={{ display: 'flex', gap: '20px', marginTop: '15px' }}>
+    <div style={{ flex: 1, padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+<p style={{ marginTop: 0, marginBottom: '15px', color: '#000', textAlign: 'left', fontWeight: '600', fontSize: '16px' }}>Top Measurements</p>      <div className="measurements-grid">
+        <div className="measurement-field">
+          <label style={{ display: 'block', textAlign: 'left', width: '100%' }}>Chest (inches)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={measurements.top.chest || ''}
+            onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, chest: e.target.value } })}
+            placeholder="Enter chest measurement"
+            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left' }}
+          />
+        </div>
+        <div className="measurement-field">
+          <label style={{ display: 'block', textAlign: 'left', width: '100%' }}>Shoulders (inches)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={measurements.top.shoulders || ''}
+            onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, shoulders: e.target.value } })}
+            placeholder="Enter shoulder measurement"
+            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left' }}
+          />
+        </div>
+        <div className="measurement-field">
+          <label style={{ display: 'block', textAlign: 'left', width: '100%' }}>Sleeve (inches)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={measurements.top.sleeve_length || ''}
+            onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, sleeve_length: e.target.value } })}
+            placeholder="Enter sleeve length"
+            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left' }}
+          />
+        </div>
+        <div className="measurement-field">
+          <label style={{ display: 'block', textAlign: 'left', width: '100%' }}>Neck (inches)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={measurements.top.neck || ''}
+            onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, neck: e.target.value } })}
+            placeholder="Enter neck measurement"
+            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left' }}
+          />
+        </div>
+        <div className="measurement-field">
+          <label style={{ display: 'block', textAlign: 'left', width: '100%' }}>Waist (inches)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={measurements.top.waist || ''}
+            onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, waist: e.target.value } })}
+            placeholder="Enter waist measurement"
+            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left' }}
+          />
+        </div>
+        <div className="measurement-field">
+          <label style={{ display: 'block', textAlign: 'left', width: '100%' }}>Length (inches)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={measurements.top.length || ''}
+            onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, length: e.target.value } })}
+            placeholder="Enter length measurement"
+            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left' }}
+          />
+        </div>
+      </div>
+    </div>
+    <div style={{ flex: 1, padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+      <p style={{ marginTop: 0, marginBottom: '15px', color: '#000', textAlign: 'left', fontWeight: '600', fontSize: '16px', display: 'block', width: '100%' }}>Bottom Measurements</p>
+      <div className="measurements-grid">
+        <div className="measurement-field">
+          <label style={{ display: 'block', textAlign: 'left', width: '100%' }}>Waist (inches)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={measurements.bottom.waist || ''}
+            onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, waist: e.target.value } })}
+            placeholder="Enter waist measurement"
+            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left' }}
+          />
+        </div>
+        <div className="measurement-field">
+          <label style={{ display: 'block', textAlign: 'left', width: '100%' }}>Hips (inches)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={measurements.bottom.hips || ''}
+            onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, hips: e.target.value } })}
+            placeholder="Enter hip measurement"
+            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left' }}
+          />
+        </div>
+        <div className="measurement-field">
+          <label style={{ display: 'block', textAlign: 'left', width: '100%' }}>Inseam (inches)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={measurements.bottom.inseam || ''}
+            onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, inseam: e.target.value } })}
+            placeholder="Enter inseam measurement"
+            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left' }}
+          />
+        </div>
+        <div className="measurement-field">
+          <label style={{ display: 'block', textAlign: 'left', width: '100%' }}>Length (inches)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={measurements.bottom.length || ''}
+            onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, length: e.target.value } })}
+            placeholder="Enter length measurement"
+            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left' }}
+          />
+        </div>
+        <div className="measurement-field">
+          <label style={{ display: 'block', textAlign: 'left', width: '100%' }}>Thigh (inches)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={measurements.bottom.thigh || ''}
+            onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, thigh: e.target.value } })}
+            placeholder="Enter thigh measurement"
+            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left' }}
+          />
+        </div>
+        <div className="measurement-field">
+          <label style={{ display: 'block', textAlign: 'left', width: '100%' }}>Outseam (inches)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={measurements.bottom.outseam || ''}
+            onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, outseam: e.target.value } })}
+            placeholder="Enter outseam measurement"
+            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left' }}
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#fff3e0', borderRadius: '8px', border: '1px solid #ffcc80' }}>
+    <label style={{ display: 'block', marginBottom: '10px', color: '#000', fontWeight: '600', fontSize: '16px', textAlign: 'left', width: '100%' }}>Notes</label>
+    <textarea
+      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px', textAlign: 'left' }}
+      value={measurements.notes}
+      onChange={(e) => setMeasurements({ ...measurements, notes: e.target.value })}
+      placeholder="Add any additional notes about measurements..."
+      rows={3}
+    />
+  </div>
+</div>
 
             </div>
 

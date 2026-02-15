@@ -630,36 +630,45 @@ const Repair = () => {
           <div className="stat-card">
             <div className="stat-header">
               <span>Pending</span>
+              <div className="stat-icon" style={{ background: '#fff3e0', color: '#ff9800' }}>
+                <i className="fas fa-hourglass-half"></i>
+              </div>
             </div>
             <div className="stat-number">{stats.pending}</div>
           </div>
           <div className="stat-card">
             <div className="stat-header">
-              <span>Accepted</span>
-            </div>
-            <div className="stat-number">{stats.accepted}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-header">
               <span>In Progress</span>
+              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>
+                <i className="fas fa-sync-alt"></i>
+              </div>
             </div>
             <div className="stat-number">{stats.inProgress}</div>
           </div>
           <div className="stat-card">
             <div className="stat-header">
               <span>To Pick up</span>
+              <div className="stat-icon" style={{ background: '#e3f2fd', color: '#2196f3' }}>
+                <i className="fas fa-box"></i>
+              </div>
             </div>
             <div className="stat-number">{stats.toPickup}</div>
           </div>
           <div className="stat-card">
             <div className="stat-header">
               <span>Completed</span>
+              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>
+                <i className="fas fa-check"></i>
+              </div>
             </div>
             <div className="stat-number">{stats.completed}</div>
           </div>
           <div className="stat-card">
             <div className="stat-header">
               <span>Rejected</span>
+              <div className="stat-icon" style={{ background: '#ffebee', color: '#f44336' }}>
+                <i className="fas fa-times"></i>
+              </div>
             </div>
             <div className="stat-number">{stats.rejected}</div>
           </div>

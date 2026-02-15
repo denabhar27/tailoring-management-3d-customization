@@ -4,10 +4,12 @@ import '../adminStyle/admin.css';
 import AdminHeader from './AdminHeader';
 import { getAdminDashboardOverview } from '../api/AdminDashboardApi';
 import { getAllTransactionLogs } from '../api/TransactionLogApi';
+import { getBillingStats } from '../api/BillingApi';
 import { format, subMonths } from 'date-fns';
 
 function AdminPage() {
   const [stats, setStats] = useState([]);
+  const [billingStats, setBillingStats] = useState({});
   const [recentActivities, setRecentActivities] = useState([]);
   const [allActivities, setAllActivities] = useState([]);
   const [allPayments, setAllPayments] = useState([]); 
@@ -25,13 +27,21 @@ function AdminPage() {
       try {
         setLoading(true);
         setError(null);
-        const data = await getAdminDashboardOverview();
+        const [data, billingData] = await Promise.all([
+          getAdminDashboardOverview(),
+          getBillingStats()
+        ]);
+        
         if (data?.success) {
           setStats(data.stats || []);
           setAllActivities(data.recentActivities || []);
           setRecentActivities(data.recentActivities || []);
         } else {
           setError(data.message || 'Failed to load dashboard data');
+        }
+
+        if (billingData?.success) {
+          setBillingStats(billingData.stats || {});
         }
       } catch (err) {
         console.error('Error loading admin dashboard:', err);
@@ -274,13 +284,78 @@ function AdminPage() {
               <h3>Loading dashboard...</h3>
             </div>
           ) : (
-            stats.map((stat, index) => (
-              <div className="stat-card" key={index}>
-                <h3 className={stat.title === 'Monthly Revenue' ? 'small-revenue' : ''}>{stat.number}</h3>
-                <p>{stat.title}</p>
-                {stat.info && <small>{stat.info}</small>}
+            <>
+              {stats.map((stat, index) => {
+                // Determine icon and color based on stat title
+                const getIconAndColor = (title) => {
+                  switch(title?.toLowerCase()) {
+                    case 'total orders':
+                    case 'orders':
+                      return { icon: '📦', color: '#e3f2fd', textColor: '#2196f3' };
+                    case 'pending':
+                    case 'pending orders':
+                      return { icon: '⏱️', color: '#fff3e0', textColor: '#ff9800' };
+                    case 'in progress':
+                    case 'in-progress':
+                      return { icon: '🔄', color: '#e8f5e9', textColor: '#4caf50' };
+                    case 'completed':
+                    case 'completed orders':
+                      return { icon: '✅', color: '#e8f5e9', textColor: '#4caf50' };
+                    case 'customers':
+                      return { icon: '👥', color: '#f3e5f5', textColor: '#9c27b0' };
+                    case 'monthly revenue':
+                      return { icon: '💰', color: '#e8f5e9', textColor: '#4caf50' };
+                    case 'repair':
+                      return { icon: '🔧', color: '#ffebee', textColor: '#f44336' };
+                    case 'dry cleaning':
+                    case 'dry clean':
+                      return { icon: '🧺', color: '#e3f2fd', textColor: '#2196f3' };
+                    case 'customization':
+                    case 'custom':
+                      return { icon: '🎨', color: '#fff3e0', textColor: '#ff9800' };
+                    case 'rental':
+                      return { icon: '👔', color: '#f3e5f5', textColor: '#9c27b0' };
+                    default:
+                      return { icon: '📊', color: '#f5f5f5', textColor: '#666' };
+                  }
+                };
+                
+                const { icon, color, textColor } = getIconAndColor(stat.title);
+                
+                return (
+                  <div className="stat-card" key={index}>
+                    <div className="stat-header">
+                      <span>{stat.title}</span>
+                      <div className="stat-icon" style={{ background: color, color: textColor }}>{icon}</div>
+                    </div>
+                    <div className="stat-number">{stat.number}</div>
+                    {stat.info && <small>{stat.info}</small>}
+                  </div>
+                );
+              })}
+              
+              {/* Total Revenue Container */}
+              <div className="stat-card">
+                <div className="stat-header">
+                  <span>Total Revenue</span>
+                  <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>💰</div>
+                </div>
+                <div className="stat-number" style={{ fontSize: '28px' }}>
+                  ₱{(billingStats.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
               </div>
-            ))
+
+              {/* Pending Revenue Container */}
+              <div className="stat-card">
+                <div className="stat-header">
+                  <span>Pending</span>
+                  <div className="stat-icon" style={{ background: '#fff3e0', color: '#ff9800' }}>⏳</div>
+                </div>
+                <div className="stat-number" style={{ fontSize: '28px' }}>
+                  ₱{(billingStats.pendingRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+            </>
           )}
         </div>
         <div className="filter-dropdowns">

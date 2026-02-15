@@ -437,42 +437,6 @@ const Billing = () => {
 
           </div>
 
-          <div className="stat-card">
-
-            <div className="stat-header">
-
-              <span>Total Revenue</span>
-
-              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>💰</div>
-
-            </div>
-
-            <div className="stat-number" style={{ fontSize: '28px' }}>
-
-              ₱{(billingStats.totalRevenue || localStats.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-
-            </div>
-
-          </div>
-
-          <div className="stat-card">
-
-            <div className="stat-header">
-
-              <span>Pending</span>
-
-              <div className="stat-icon" style={{ background: '#fff3e0', color: '#ff9800' }}>⏳</div>
-
-            </div>
-
-            <div className="stat-number" style={{ fontSize: '28px' }}>
-
-              ₱{(billingStats.pendingRevenue || localStats.pendingRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-
-            </div>
-
-          </div>
-
         </div>
         <AnalyticsDashboard />
         <div className="search-container">
@@ -881,7 +845,10 @@ const Billing = () => {
             </div>
 
             <div className="modal-footer">
-              <button className="btn-cancel-list" onClick={() => setShowDetailModal(false)}>
+              <button 
+                className="close-btn" 
+                onClick={() => setShowDetailModal(false)}
+              >
                 Close
               </button>
               <button 
@@ -891,7 +858,7 @@ const Billing = () => {
                   await updatePaymentStatus(selectedBill.id, nextStatus);
                   setShowDetailModal(false);
                 }}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '14px' }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="9 18 15 12 9 6"></polyline>

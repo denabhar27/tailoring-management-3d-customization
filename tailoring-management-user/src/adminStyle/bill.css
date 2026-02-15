@@ -265,11 +265,12 @@ tbody td {
   display: flex;
 }
 
+
 .modal-content {
   background: linear-gradient(135deg, #FFFFFF 0%, #FAFAFA 100%);
-  width: 100%;
+  width: 60%;
   max-width: 500px;
-  border-radius: 24px;
+  border-radius: 16px;
   box-shadow: 0 20px 60px rgba(139, 69, 19, 0.3), 0 8px 25px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -279,7 +280,7 @@ tbody td {
 .modal-header {
   background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
   color: white;
-  padding: 20px 28px;
+  padding: 16px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -288,18 +289,18 @@ tbody td {
 
 .modal-header h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   font-family: 'Montserrat', 'Poppins', sans-serif;
   letter-spacing: -0.02em;
 }
 
 .close-modal {
-  font-size: 28px;
+  font-size: 24px;
   cursor: pointer;
   font-weight: bold;
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -315,7 +316,7 @@ tbody td {
 }
 
 .modal-body {
-  padding: 28px;
+  padding: 20px;
   max-height: 60vh;
   overflow-y: auto;
   background: #FFFFFF;
@@ -324,9 +325,9 @@ tbody td {
 .detail-row {
   display: flex;
   justify-content: space-between;
-  padding: 12px 0;
+  padding: 10px 0;
   border-bottom: 1px solid #eee;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .detail-row:last-child {
@@ -335,42 +336,24 @@ tbody td {
 
 .detail-row strong {
   color: #333;
-  min-width: 140px;
+  min-width: 120px;
 }
 
 .modal-footer {
-  padding: 20px;
+  padding: 16px;
   display: flex;
-  gap: 12px;
+  gap: 10px;
   justify-content: flex-end;
   background: #f9f9f9;
   border-top: 1px solid #eee;
 }
 
-.btn-save {
-  padding: 12px 24px;
-  background: linear-gradient(135deg, #27AE60 0%, #229954 100%);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
-}
-
-.btn-save:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(39, 174, 96, 0.4);
-}
-
 .close-btn {
-  padding: 12px 24px;
+  padding: 8px 16px;
   background: #6c757d;
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 20px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;

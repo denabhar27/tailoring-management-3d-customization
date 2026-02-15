@@ -596,34 +596,45 @@ function Rental() {
           <div className="stat-card">
             <div className="stat-header">
               <span>Pending</span>
+              <div className="stat-icon" style={{ background: '#fff3e0', color: '#ff9800' }}>
+                <i className="fas fa-hourglass-half"></i>
+              </div>
             </div>
             <div className="stat-number">{stats.pending}</div>
           </div>
-
           <div className="stat-card">
             <div className="stat-header">
               <span>Ready to Pick Up</span>
+              <div className="stat-icon" style={{ background: '#e3f2fd', color: '#2196f3' }}>
+                <i className="fas fa-box"></i>
+              </div>
             </div>
             <div className="stat-number">{stats.ready_to_pickup}</div>
           </div>
-
           <div className="stat-card">
             <div className="stat-header">
               <span>Rented</span>
+              <div className="stat-icon" style={{ background: '#f3e5f5', color: '#9c27b0' }}>
+                <i className="fas fa-tshirt"></i>
+              </div>
             </div>
             <div className="stat-number">{stats.rented}</div>
           </div>
-
           <div className="stat-card">
             <div className="stat-header">
               <span>Returned</span>
+              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>
+                <i className="fas fa-check"></i>
+              </div>
             </div>
             <div className="stat-number">{stats.returned}</div>
           </div>
-
           <div className="stat-card">
             <div className="stat-header">
               <span>Rejected</span>
+              <div className="stat-icon" style={{ background: '#ffebee', color: '#f44336' }}>
+                <i className="fas fa-times"></i>
+              </div>
             </div>
             <div className="stat-number">{stats.rejected}</div>
           </div>

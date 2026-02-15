@@ -278,7 +278,7 @@ html {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr); 
+  grid-template-columns: repeat(3, 1fr);
   gap: 25px;
   margin-bottom: 40px;
   width: 100%;
@@ -286,35 +286,16 @@ html {
 }
 
 .stat-card {
-  background: linear-gradient(135deg, #FFFFFF 0%, #FAFAFA 100%);
+  background: #FFFFFF;
   padding: 28px;
-  border-radius: 20px;
-  box-shadow: 0 8px 25px rgba(139, 69, 19, 0.08), 0 2px 10px rgba(0, 0, 0, 0.04);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(139, 69, 19, 0.08);
-  position: relative;
-  overflow: hidden;
-}
-
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #8B4513 0%, #A0522D 100%);
-  transform: scaleX(0);
-  transition: transform 0.4s ease;
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .stat-card:hover {
-  transform: translateY(-6px) scale(1.02);
-  box-shadow: 0 12px 35px rgba(139, 69, 19, 0.15), 0 4px 15px rgba(0, 0, 0, 0.08);
-}
-
-.stat-card:hover::before {
-  transform: scaleX(1);
+  transform: translateY(-5px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
 }
 
 .stat-header {

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../../styles/Cart.css';
 import { 
   getUserCart, 
@@ -287,7 +287,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   const formatPrice = (price) => {
-    return `â‚±${parseFloat(price || 0).toFixed(2)}`;
+    return `₱${parseFloat(price || 0).toFixed(2)}`;
   };
 
   const formatDateTo12Hour = (dateString) => {
@@ -518,7 +518,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
               />
               Select All
             </label>
-            <button className="cart-close-btn" onClick={onClose}>Ã—</button>
+            <button className="cart-close-btn" onClick={onClose}>×</button>
           </div>
         </div>
 
@@ -624,7 +624,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                               </p>
                               {item.specific_data.garments.map((garment, idx) => (
                                 <div key={idx} className="garment-item-cart">
-                                  <p>â€¢ {garment.garmentType} ({garment.damageLevel}): â‚±{garment.basePrice}</p>
+                                  <p>• {garment.garmentType} ({garment.damageLevel}): ₱{garment.basePrice}</p>
                                   {garment.notes && <p className="garment-notes">  Notes: {garment.notes}</p>}
                                 </div>
                               ))}
@@ -664,7 +664,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                               </p>
                               {item.specific_data.garments.map((garment, idx) => (
                                 <div key={idx} className="garment-item-cart">
-                                  <p>â€¢ {garment.garmentType} ({garment.brand}) Ã— {garment.quantity}: â‚±{garment.pricePerItem * garment.quantity}</p>
+                                  <p>• {garment.garmentType} ({garment.brand}) × {garment.quantity}: ₱{garment.pricePerItem * garment.quantity}</p>
                                 </div>
                               ))}
                             </>
@@ -676,7 +676,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                               <p>Brand: {item.specific_data.brand || 'N/A'}</p>
                               <p>Quantity: {item.specific_data.quantity || 'N/A'} items</p>
                               {item.specific_data.pricePerItem && (
-                                <p>Price per item: â‚±{parseFloat(item.specific_data.pricePerItem).toFixed(2)}</p>
+                                <p>Price per item: ₱{parseFloat(item.specific_data.pricePerItem).toFixed(2)}</p>
                               )}
                             </>
                           )}
@@ -786,7 +786,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                                     fontWeight: '400'
                                   }}
                                 >
-                                  {expandedDetails.has(item.cart_id) ? 'â–¼ Hide' : 'â–¶ Show'}
+                                  {expandedDetails.has(item.cart_id) ? '▼ Hide' : '▶ Show'}
                                 </button>
                               </div>
                               
@@ -984,7 +984,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                   justifyContent: 'center'
                 }}
               >
-                Ã—
+                ×
               </button>
             </div>
             {parentBundleData && (
@@ -1089,7 +1089,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                       </p>
                     )}
                     <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: '#007bff' }}>
-                      Click to view details â†’
+                      Click to view details →
                     </p>
                   </div>
                 </div>
@@ -1152,7 +1152,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                   justifyContent: 'center'
                 }}
               >
-                Ã—
+                ×
               </button>
             </div>
             {selectedBundleItem.image_url && (
@@ -1267,7 +1267,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                   justifyContent: 'center'
                 }}
               >
-                Ã—
+                ×
               </button>
             </div>
             {(() => {

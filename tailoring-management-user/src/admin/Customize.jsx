@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
+import { API_BASE_URL } from '../api/config';
+
 import '../adminStyle/customize.css';
 
 import AdminHeader from './AdminHeader';
@@ -17,8 +19,6 @@ import { getAllFabricTypesAdmin, createFabricType, updateFabricType, deleteFabri
 import { getAllGarmentTypesAdmin, createGarmentType, updateGarmentType, deleteGarmentType } from '../api/GarmentTypeApi';
 
 import { getAllPatterns, uploadPatternImage, createPattern, updatePattern, deletePattern } from '../api/PatternApi';
-
-import { API_BASE_URL } from '../api/config';
 
 import ImagePreviewModal from '../components/ImagePreviewModal';
 
@@ -1232,9 +1232,7 @@ const Customize = () => {
 
     if (pattern.image_url) {
 
-      const baseUrl = window.location.origin.includes('localhost') ? '${API_BASE_URL}' : '';
-
-      setPatternImagePreview(`${baseUrl}${pattern.image_url}`);
+      setPatternImagePreview(`${API_BASE_URL}${pattern.image_url}`);
 
     } else {
 
@@ -1260,9 +1258,7 @@ const Customize = () => {
 
     if (pattern.image_url.startsWith('http')) return pattern.image_url;
 
-    const baseUrl = window.location.origin.includes('localhost') ? '${API_BASE_URL}' : '';
-
-    return `${baseUrl}${pattern.image_url}`;
+    return `${API_BASE_URL}${pattern.image_url}`;
 
   };
 

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/UserHomePage.css';
 import '../styles/Profile.css';
@@ -266,7 +266,7 @@ const Profile = () => {
   const formatServiceName = (serviceName) => {
     if (!serviceName) return '';
     
-    let formatted = serviceName.replace(/^[\s\-â€“â€”]+/, '');
+    let formatted = serviceName.replace(/^[\s\-–—]+/, '');
     
     return formatted.charAt(0).toUpperCase() + formatted.slice(1);
   };
@@ -643,9 +643,9 @@ const Profile = () => {
                     border: '1px solid #ffc107',
                     marginTop: '10px'
                   }}>
-                    <span className="detail-label" style={{ color: '#856404', fontWeight: '600' }}>âš ï¸ Late Return Penalty:</span>
+                    <span className="detail-label" style={{ color: '#856404', fontWeight: '600' }}>⚠️ Late Return Penalty:</span>
                     <span className="detail-value" style={{ color: '#856404', fontWeight: '600' }}>
-                      â‚±{penalty.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ({penaltyDays} day{penaltyDays > 1 ? 's' : ''} exceeded)
+                      ₱{penalty.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ({penaltyDays} day{penaltyDays > 1 ? 's' : ''} exceeded)
                     </span>
                   </div>
                 );
@@ -732,7 +732,7 @@ const Profile = () => {
                     <div style={{ marginBottom: '6px' }}><strong>Garment #{idx + 1}:</strong> {garment.garmentType || 'N/A'}</div>
                     <div style={{ marginBottom: '6px' }}><strong>Damage Level:</strong> {garment.damageLevel ? garment.damageLevel.charAt(0).toUpperCase() + garment.damageLevel.slice(1) : 'N/A'}</div>
                     <div style={{ marginBottom: '6px' }}><strong>Description:</strong> {garment.notes || 'N/A'}</div>
-                    <div><strong>Price:</strong> â‚±{garment.basePrice || 'N/A'}</div>
+                    <div><strong>Price:</strong> ₱{garment.basePrice || 'N/A'}</div>
                   </div>
                 ))}
               </>
@@ -759,7 +759,7 @@ const Profile = () => {
             </div>
             <div className="detail-row">
               <span className="detail-label">Estimated Price:</span>
-              <span className="detail-value">â‚±{parseFloat(estimatedPrice).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+              <span className="detail-value">₱{parseFloat(estimatedPrice).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
             </div>
           </div>
         );
@@ -867,7 +867,7 @@ const Profile = () => {
               <div className="detail-row" style={{ marginTop: '15px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
                 <div style={{ width: '100%' }}>
                   <h5 style={{ margin: '0 0 15px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>
-                    ðŸŽ¨ 3D Customization Choices
+                    🎨 3D Customization Choices
                   </h5>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '14px' }}>
                     {specific_data.designData.size && (
@@ -1032,7 +1032,7 @@ const Profile = () => {
                     <div style={{ marginBottom: '6px' }}><strong>Garment #{idx + 1}:</strong> {garment.garmentType ? (garment.garmentType.charAt(0).toUpperCase() + garment.garmentType.slice(1)) : 'N/A'}</div>
                     <div style={{ marginBottom: '6px' }}><strong>Brand:</strong> {garment.brand || 'N/A'}</div>
                     <div style={{ marginBottom: '6px' }}><strong>Quantity:</strong> {garment.quantity || 1}</div>
-                    <div><strong>Price:</strong> â‚±{(garment.pricePerItem * (garment.quantity || 1)).toFixed(2)}</div>
+                    <div><strong>Price:</strong> ₱{(garment.pricePerItem * (garment.quantity || 1)).toFixed(2)}</div>
                   </div>
                 ))}
               </>
@@ -1065,7 +1065,7 @@ const Profile = () => {
               <span className="detail-label">
                 {specific_data?.isEstimatedPrice === true ? 'Estimated Price:' : 'Final Price:'}
               </span>
-              <span className="detail-value">â‚±{dryCleaningPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+              <span className="detail-value">₱{dryCleaningPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
             </div>
           </div>
         );
@@ -1414,7 +1414,7 @@ const Profile = () => {
       <header className="header">
         <div className="logo">
           <img src={logo} alt="Logo" className="logo-img" />
-          <span className="logo-text">Dâ€™jackman Tailor Deluxe</span>
+          <span className="logo-text">D’jackman Tailor Deluxe</span>
         </div>
 
         <div className="user-info">
@@ -1643,22 +1643,22 @@ const Profile = () => {
                           <span style={{ color: '#e65100', fontWeight: '600' }}>Price varies</span>
                         ) : isUniform && finalPrice > 0 ? (
                           <span style={{ color: '#4caf50', fontWeight: '600' }}>
-                            â‚±{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                            ₱{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                           </span>
                         ) : hasPayment && remainingAmount > 0 ? (
                           <>
                             <div style={{ fontSize: '14px', color: '#666', textDecoration: 'line-through' }}>
-                              â‚±{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                              ₱{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                             </div>
                             <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#ff9800' }}>
-                              â‚±{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                              ₱{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                             </div>
                             <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
                               Remaining
                             </div>
                           </>
                         ) : (
-                          `â‚±${finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+                          `₱${finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
                         )}
                       </div>
                     </div>
@@ -1669,7 +1669,7 @@ const Profile = () => {
                       </span>
                       {item.payment_status_display && (
                         <span className={`status-badge ${getPaymentStatusBadgeClass(item.payment_status)}`}>
-                          ðŸ’³ {item.payment_status_display}
+                          💳 {item.payment_status_display}
                         </span>
                       )}
                     </div>
@@ -1695,13 +1695,13 @@ const Profile = () => {
                             alignItems: 'center',
                             gap: '12px'
                           }}>
-                            <span style={{ fontSize: '24px' }}>ðŸš¨</span>
+                            <span style={{ fontSize: '24px' }}>🚨</span>
                             <div>
                               <div style={{ color: '#721c24', fontWeight: '600', fontSize: '14px' }}>
                                 OVERDUE: {daysOverdue} day{daysOverdue > 1 ? 's' : ''} past due date!
                               </div>
                               <div style={{ color: '#721c24', fontSize: '13px', marginTop: '4px' }}>
-                                Current penalty: <strong>â‚±{penaltyAmount.toLocaleString()}</strong> (â‚±100/day)
+                                Current penalty: <strong>₱{penaltyAmount.toLocaleString()}</strong> (₱100/day)
                               </div>
                               <div style={{ color: '#856404', fontSize: '12px', marginTop: '4px' }}>
                                 Please return immediately to avoid additional charges.
@@ -1723,13 +1723,13 @@ const Profile = () => {
                             alignItems: 'center',
                             gap: '12px'
                           }}>
-                            <span style={{ fontSize: '24px' }}>â°</span>
+                            <span style={{ fontSize: '24px' }}>⏰</span>
                             <div>
                               <div style={{ color: '#856404', fontWeight: '600', fontSize: '14px' }}>
                                 DUE TODAY! Please return the item today.
                               </div>
                               <div style={{ color: '#856404', fontSize: '12px', marginTop: '4px' }}>
-                                Late returns will incur a penalty of â‚±100 per day.
+                                Late returns will incur a penalty of ₱100 per day.
                               </div>
                             </div>
                           </div>
@@ -1748,13 +1748,13 @@ const Profile = () => {
                             alignItems: 'center',
                             gap: '12px'
                           }}>
-                            <span style={{ fontSize: '24px' }}>ðŸ“…</span>
+                            <span style={{ fontSize: '24px' }}>📅</span>
                             <div>
                               <div style={{ color: '#004085', fontWeight: '600', fontSize: '14px' }}>
                                 Return in {diffDays} day{diffDays > 1 ? 's' : ''} ({new Date(item.rental_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})
                               </div>
                               <div style={{ color: '#004085', fontSize: '12px', marginTop: '4px' }}>
-                                Late returns will incur a penalty of â‚±100 per day.
+                                Late returns will incur a penalty of ₱100 per day.
                               </div>
                             </div>
                           </div>
@@ -1768,20 +1768,20 @@ const Profile = () => {
                           <>
                             <div className="price-row">
                               <span className="price-label">Total Rental Price:</span>
-                              <span className="price-value final">â‚±{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                              <span className="price-value final">₱{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                             </div>
                             <div className="price-row">
                               <span className="price-label">Amount Paid:</span>
-                              <span className="price-value" style={{ color: '#4caf50' }}>â‚±{totalPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                              <span className="price-value" style={{ color: '#4caf50' }}>₱{totalPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                             </div>
                             <div className="price-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
                               <span className="price-label" style={{ fontWeight: 'bold', fontSize: '16px' }}>Remaining Amount:</span>
                               <span className="price-value" style={{ fontWeight: 'bold', fontSize: '18px', color: '#ff9800' }}>
-                                â‚±{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                ₱{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                               </span>
                             </div>
                             <div style={{ marginTop: '8px', padding: '10px', backgroundColor: '#fff3e0', borderRadius: '6px', fontSize: '13px', color: '#666' }}>
-                              ðŸ’¡ Pay the remaining amount when you return the rental item.
+                              💡 Pay the remaining amount when you return the rental item.
                             </div>
                           </>
                         ) : item.status === 'pending' ? (
@@ -1795,14 +1795,14 @@ const Profile = () => {
                                 return (
                                   <div className="price-row">
                                     <span className="price-label">Estimated Price:</span>
-                                    <span className="price-value estimated">â‚±{estimatedPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    <span className="price-value estimated">₱{estimatedPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                   </div>
                                 );
                               } else {
                                 return (
                                   <div className="price-row">
                                     <span className="price-label">Final Price:</span>
-                                    <span className="price-value final">â‚±{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    <span className="price-value final">₱{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                   </div>
                                 );
                               }
@@ -1811,7 +1811,7 @@ const Profile = () => {
                             return estimatedPrice > 0 ? (
                               <div className="price-row">
                                 <span className="price-label">Estimated Price:</span>
-                                <span className="price-value estimated">â‚±{estimatedPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                <span className="price-value estimated">₱{estimatedPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                               </div>
                             ) : null;
                           })()
@@ -1820,13 +1820,13 @@ const Profile = () => {
                           <>
                             <div className="price-row">
                               <span className="price-label">Estimated Price:</span>
-                              <span className="price-value estimated">â‚±{estimatedPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                              <span className="price-value estimated">₱{estimatedPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                             </div>
                             <div className="price-row">
                               <span className="price-label">Final Price:</span>
                               <span className={`price-value ${priceChanged ? 'changed' : 'same'}`}>
-                                â‚±{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                                {priceChanged && <span className="price-change-indicator">âš ï¸ Updated by Admin</span>}
+                                ₱{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                {priceChanged && <span className="price-change-indicator">⚠️ Updated by Admin</span>}
                               </span>
                             </div>
                             {priceChanged && item.specific_data?.adminNotes && (
@@ -1839,13 +1839,13 @@ const Profile = () => {
                               <>
                                 <div className="price-row">
                                   <span className="price-label">Amount Paid:</span>
-                                  <span className="price-value" style={{ color: '#4caf50' }}>â‚±{totalPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                  <span className="price-value" style={{ color: '#4caf50' }}>₱{totalPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                 </div>
                                 {remainingAmount > 0 && (
                                   <div className="price-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
                                     <span className="price-label" style={{ fontWeight: 'bold', fontSize: '16px' }}>Remaining Amount:</span>
                                     <span className="price-value" style={{ fontWeight: 'bold', fontSize: '18px', color: '#ff9800' }}>
-                                      â‚±{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                      ₱{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                     </span>
                                   </div>
                                 )}
@@ -1863,19 +1863,19 @@ const Profile = () => {
                                 <>
                                   <div className="price-row">
                                     <span className="price-label">Estimated Price:</span>
-                                    <span className="price-value estimated">â‚±{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    <span className="price-value estimated">₱{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                   </div>
                                   {hasPayment && (
                                     <>
                                       <div className="price-row">
                                         <span className="price-label">Amount Paid:</span>
-                                        <span className="price-value" style={{ color: '#4caf50' }}>â‚±{totalPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                        <span className="price-value" style={{ color: '#4caf50' }}>₱{totalPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                       </div>
                                       {remainingAmount > 0 && (
                                         <div className="price-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
                                           <span className="price-label" style={{ fontWeight: 'bold', fontSize: '16px' }}>Remaining Amount:</span>
                                           <span className="price-value" style={{ fontWeight: 'bold', fontSize: '18px', color: '#ff9800' }}>
-                                            â‚±{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                            ₱{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                           </span>
                                         </div>
                                       )}
@@ -1889,19 +1889,19 @@ const Profile = () => {
                               <>
                                 <div className="price-row">
                                   <span className="price-label">Final Price:</span>
-                                  <span className="price-value final">â‚±{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                  <span className="price-value final">₱{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                 </div>
                                 {hasPayment && (
                                   <>
                                     <div className="price-row">
                                       <span className="price-label">Amount Paid:</span>
-                                      <span className="price-value" style={{ color: '#4caf50' }}>â‚±{totalPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                      <span className="price-value" style={{ color: '#4caf50' }}>₱{totalPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                     </div>
                                     {remainingAmount > 0 && (
                                       <div className="price-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
                                         <span className="price-label" style={{ fontWeight: 'bold', fontSize: '16px' }}>Remaining Amount:</span>
                                         <span className="price-value" style={{ fontWeight: 'bold', fontSize: '18px', color: '#ff9800' }}>
-                                          â‚±{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                          ₱{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                         </span>
                                       </div>
                                     )}
@@ -1922,14 +1922,14 @@ const Profile = () => {
                         marginBottom: '20px'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '24px' }}>ðŸ’°</span>
+                          <span style={{ fontSize: '24px' }}>💰</span>
                           <strong style={{ color: '#e65100', fontSize: '16px' }}>Downpayment Payment Required</strong>
                         </div>
                         <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>
                           Please pay the downpayment amount when picking up your rental item from the store.
                         </div>
                         <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ff9800' }}>
-                          Downpayment Amount: â‚±{parseFloat(item.pricing_factors?.downpayment || item.specific_data?.downpayment || 0).toLocaleString()}
+                          Downpayment Amount: ₱{parseFloat(item.pricing_factors?.downpayment || item.specific_data?.downpayment || 0).toLocaleString()}
                         </div>
                       </div>
                     )}
@@ -2080,7 +2080,7 @@ const Profile = () => {
                           onMouseEnter={(e) => e.target.style.backgroundColor = '#6B3410'}
                           onMouseLeave={(e) => e.target.style.backgroundColor = '#8B4513'}
                         >
-                          ðŸ’³ Transaction Log
+                          💳 Transaction Log
                         </button>
                         {item.status !== 'cancelled' && item.status !== 'completed' && item.status !== 'returned' && item.status !== 'accepted' && (
                           <button
@@ -2125,7 +2125,7 @@ const Profile = () => {
             <div className="details-modal" onClick={(e) => e.stopPropagation()}>
               <div className="details-modal-header">
                 <h3 className="modal-title-black">Order Details - ORD-{selectedItem.order_id}</h3>
-                <button className="details-modal-close" onClick={closeDetailsModal}>Ã—</button>
+                <button className="details-modal-close" onClick={closeDetailsModal}>×</button>
               </div>
 
               <div className="details-modal-content">
@@ -2166,10 +2166,10 @@ const Profile = () => {
                           return (
                             <div>
                               <div style={{ fontSize: '14px', color: '#666', textDecoration: 'line-through', marginBottom: '4px' }}>
-                                â‚±{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                ₱{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                               </div>
                               <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#ff9800' }}>
-                                â‚±{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                ₱{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                               </div>
                               <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
                                 (Remaining after payment)
@@ -2181,11 +2181,11 @@ const Profile = () => {
                         if (selectedItem.status === 'pending') {
                           const estimatedPrice = getEstimatedPrice(selectedItem.specific_data, selectedItem.service_type);
                           if (estimatedPrice > 0) {
-                            return `â‚±${estimatedPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (Estimated)`;
+                            return `₱${estimatedPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (Estimated)`;
                           }
                         }
 
-                        return `â‚±${finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                        return `₱${finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
                       })()}
                     </span>
                   </div>
@@ -2287,7 +2287,7 @@ const Profile = () => {
           <div className="details-modal" onClick={(e) => e.stopPropagation()}>
             <div className="details-modal-header">
               <h3 className="modal-title-black">My Measurements</h3>
-              <button className="details-modal-close" onClick={() => setMeasurementsModalOpen(false)}>Ã—</button>
+              <button className="details-modal-close" onClick={() => setMeasurementsModalOpen(false)}>×</button>
             </div>
             <div className="details-modal-content">
               {loadingMeasurements ? (
@@ -2427,7 +2427,7 @@ const Profile = () => {
                     phone_number: currentUser.phone_number || ''
                   });
                 }
-              }}>Ã—</button>
+              }}>×</button>
             </div>
             <div className="details-modal-content">
               <div style={{ marginBottom: '15px' }}>
@@ -2613,7 +2613,7 @@ const Profile = () => {
                 setCancelModalOpen(false);
                 setItemToCancel(null);
                 setCancelReason('');
-              }}>Ã—</button>
+              }}>×</button>
             </div>
             <div className="details-modal-content">
               <p style={{ marginBottom: '20px', color: '#666' }}>

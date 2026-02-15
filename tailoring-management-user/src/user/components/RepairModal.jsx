@@ -6,8 +6,8 @@ import {
   uploadRepairImage,
   addRepairToCart
 } from '../../api/RepairApi';
-import '../../styles/RepairModal.css';
 import { API_BASE_URL } from '../../api/config';
+import '../../styles/RepairModal.css';
 
 const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
   const [step, setStep] = useState(1); 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAllRepairServices, getPriceEstimate, uploadRepairImage, addRepairToCart } from '../../api/RepairApi';
-import repairBg from "../../assets/repair.png";
 import { API_BASE_URL } from '../../api/config';
+import repairBg from "../../assets/repair.png";
 
 const RepairService = ({ openAuthModal, showAll = false }) => {
   const [repairServices, setRepairServices] = useState([]);

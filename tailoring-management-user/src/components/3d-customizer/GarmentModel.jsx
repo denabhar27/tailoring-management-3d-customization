@@ -128,10 +128,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
 
       let imageUrl = currentPattern.image_url;
       if (!imageUrl.startsWith('http')) {
-        const baseUrl = window.location.origin.includes('localhost')
-          ? '${API_BASE_URL}'
-          : window.location.origin.replace(/:\d+$/, ':5000');
-        imageUrl = `${baseUrl}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+        imageUrl = `${API_BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
       }
       
       console.log('📥 Full image URL:', imageUrl);
@@ -647,11 +644,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
     
     let modelUrl = customModelToRender.file_url;
     if (!modelUrl.startsWith('http')) {
-      
-      const baseUrl = window.location.origin.includes('localhost') 
-        ? '${API_BASE_URL}'
-        : window.location.origin.replace(/:\d+$/, ':5000'); 
-      modelUrl = `${baseUrl}${modelUrl.startsWith('/') ? '' : '/'}${modelUrl}`;
+      modelUrl = `${API_BASE_URL}${modelUrl.startsWith('/') ? '' : '/'}${modelUrl}`;
     }
     
     console.log('=== RENDERING CUSTOM MODEL ===');

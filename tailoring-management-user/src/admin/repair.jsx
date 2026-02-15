@@ -8,6 +8,7 @@ import { useAlert } from '../context/AlertContext';
 import { getAllRepairGarmentTypesAdmin, createRepairGarmentType, updateRepairGarmentType, deleteRepairGarmentType } from '../api/RepairGarmentTypeApi';
 import { recordPayment } from '../api/PaymentApi';
 import { deleteOrderItem } from '../api/OrderApi';
+import { API_BASE_URL } from '../api/config';
 
 const Repair = () => {
   const { alert, confirm } = useAlert();
@@ -868,10 +869,10 @@ const Repair = () => {
                   <div
                     className="clickable-image"
                     style={{ cursor: 'pointer', display: 'inline-block', marginTop: '8px' }}
-                    onClick={() => openImagePreview(`http://localhost:5000${selectedOrder.specific_data.imageUrl}`, 'Damage Image')}
+                    onClick={() => openImagePreview(`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`, 'Damage Image')}
                   >
                     <img
-                      src={`http://localhost:5000${selectedOrder.specific_data.imageUrl}`}
+                      src={`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`}
                       alt="Damage"
                       style={{ maxWidth: '200px', maxHeight: '200px', border: '1px solid #ddd', borderRadius: '4px' }}
                     />
@@ -1057,10 +1058,10 @@ const Repair = () => {
                   <div
                     className="clickable-image"
                     style={{ cursor: 'pointer', display: 'inline-block', marginTop: '8px' }}
-                    onClick={() => openImagePreview(`http://localhost:5000${selectedOrder.specific_data.imageUrl}`, 'Damage Image')}
+                    onClick={() => openImagePreview(`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`, 'Damage Image')}
                   >
                     <img
-                      src={`http://localhost:5000${selectedOrder.specific_data.imageUrl}`}
+                      src={`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`}
                       alt="Damage"
                       style={{ maxWidth: '300px', maxHeight: '300px', border: '1px solid #ddd', borderRadius: '4px' }}
                     />

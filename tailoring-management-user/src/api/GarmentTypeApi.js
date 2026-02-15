@@ -1,31 +1,7 @@
 import axios from "axios";
+import { API_URL } from './config';
 
-const getApiBase = () => {
-  
-  if (typeof window !== 'undefined' && window.REACT_NATIVE_AUTH?.apiBaseUrl) {
-    return window.REACT_NATIVE_AUTH.apiBaseUrl;
-  }
-
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL;
-  }
-
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'http://localhost:5000/api';
-  }
-
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-
-    if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      return `http://${hostname}:5000/api`;
-    }
-  }
-
-  return 'http://localhost:5000/api';
-};
-
-const BASE_URL = getApiBase();
+const BASE_URL = API_URL;
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');

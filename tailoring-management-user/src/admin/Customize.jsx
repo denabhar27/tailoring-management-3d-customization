@@ -18,6 +18,8 @@ import { getAllGarmentTypesAdmin, createGarmentType, updateGarmentType, deleteGa
 
 import { getAllPatterns, uploadPatternImage, createPattern, updatePattern, deletePattern } from '../api/PatternApi';
 
+import { API_BASE_URL } from '../api/config';
+
 import ImagePreviewModal from '../components/ImagePreviewModal';
 
 import { getMeasurements, saveMeasurements } from '../api/CustomerApi';
@@ -1230,7 +1232,7 @@ const Customize = () => {
 
     if (pattern.image_url) {
 
-      const baseUrl = window.location.origin.includes('localhost') ? 'http://localhost:5000' : '';
+      const baseUrl = window.location.origin.includes('localhost') ? '${API_BASE_URL}' : '';
 
       setPatternImagePreview(`${baseUrl}${pattern.image_url}`);
 
@@ -1258,7 +1260,7 @@ const Customize = () => {
 
     if (pattern.image_url.startsWith('http')) return pattern.image_url;
 
-    const baseUrl = window.location.origin.includes('localhost') ? 'http://localhost:5000' : '';
+    const baseUrl = window.location.origin.includes('localhost') ? '${API_BASE_URL}' : '';
 
     return `${baseUrl}${pattern.image_url}`;
 
@@ -3074,10 +3076,10 @@ const Customize = () => {
                   <div
                     className="clickable-image"
                     style={{ marginTop: '10px', cursor: 'pointer' }}
-                    onClick={() => openImagePreview(`http://localhost:5000/${selectedOrder.specific_data.referenceImage}`, 'Reference image')}
+                    onClick={() => openImagePreview(`${API_BASE_URL}/${selectedOrder.specific_data.referenceImage}`, 'Reference image')}
                   >
                     <img
-                      src={`http://localhost:5000/${selectedOrder.specific_data.referenceImage}`}
+                      src={`${API_BASE_URL}/${selectedOrder.specific_data.referenceImage}`}
                       alt="Reference image"
                       style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px', border: '1px solid #ddd' }}
                       onError={(e) => {
@@ -3595,10 +3597,10 @@ const Customize = () => {
                   <div
                     className="clickable-image"
                     style={{ marginTop: '10px', cursor: 'pointer' }}
-                    onClick={() => openImagePreview(`http://localhost:5000/${selectedOrder.specific_data.referenceImage}`, 'Reference image')}
+                    onClick={() => openImagePreview(`${API_BASE_URL}/${selectedOrder.specific_data.referenceImage}`, 'Reference image')}
                   >
                     <img
-                      src={`http://localhost:5000/${selectedOrder.specific_data.referenceImage}`}
+                      src={`${API_BASE_URL}/${selectedOrder.specific_data.referenceImage}`}
                       alt="Reference image"
                       style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid #ddd' }}
                       onError={(e) => {
@@ -3757,13 +3759,13 @@ const Customize = () => {
 
                         style={{ marginTop: '10px', cursor: 'pointer' }}
 
-                        onClick={() => openImagePreview(`http://localhost:5000${selectedOrder.specific_data.imageUrl}`, 'Design preview')}
+                        onClick={() => openImagePreview(`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`, 'Design preview')}
 
                       >
 
                         <img
 
-                          src={`http://localhost:5000${selectedOrder.specific_data.imageUrl}`}
+                          src={`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`}
 
                           alt="Design preview"
 

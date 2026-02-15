@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import styles from './CustomizationPanel.module.css';
+import { API_BASE_URL } from '../../api/config';
 
 export default function CustomizationPanel({ garment, setGarment, size, setSize, fit, setFit, modelSize, setModelSize, colors, setColors, fabric, setFabric, patterns, pattern, setPattern, fabrics, designImage, setDesignImage, notes, setNotes, buttons, setButtons, accessories, setAccessories, pantsType, setPantsType, style, setStyle, onReview, customModels = [] }) {
   const [selectedButtonModel, setSelectedButtonModel] = useState('/orange button 3d model.glb');
@@ -492,7 +493,7 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                   <option key={model.path} value={model.path}>{model.name}</option>
                 ))}
                 {customButtonModels.map(model => (
-                  <option key={model.model_id} value={model.file_url.startsWith('http') ? model.file_url : `http://localhost:5000${model.file_url}`}>
+                  <option key={model.model_id} value={model.file_url.startsWith('http') ? model.file_url : `${API_BASE_URL}${model.file_url}`}>
                     {model.model_name} (Custom)
                   </option>
                 ))}
@@ -555,8 +556,8 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                   const modelUrl = model.file_url.startsWith('http') 
                     ? model.file_url 
                     : model.file_url.startsWith('/')
-                    ? `http://localhost:5000${model.file_url}`
-                    : `http://localhost:5000/${model.file_url}`;
+                    ? `${API_BASE_URL}${model.file_url}`
+                    : `${API_BASE_URL}/${model.file_url}`;
                   return (
                     <option key={model.model_id} value={modelUrl}>
                       {model.model_name} (Custom)

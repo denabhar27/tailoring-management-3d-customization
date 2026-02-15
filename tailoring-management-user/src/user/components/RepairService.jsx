@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAllRepairServices, getPriceEstimate, uploadRepairImage, addRepairToCart } from '../../api/RepairApi';
 import repairBg from "../../assets/repair.png";
+import { API_BASE_URL } from '../../api/config';
 
 const RepairService = ({ openAuthModal, showAll = false }) => {
   const [repairServices, setRepairServices] = useState([]);
@@ -340,7 +341,7 @@ const RepairService = ({ openAuthModal, showAll = false }) => {
                   />
                   {uploadedImage && (
                     <div className="uploaded-image-preview">
-                      <img src={`http://localhost:5000${uploadedImage.url}`} alt="Damage" />
+                      <img src={`${API_BASE_URL}${uploadedImage.url}`} alt="Damage" />
                       <p>✅ Photo uploaded</p>
                     </div>
                   )}

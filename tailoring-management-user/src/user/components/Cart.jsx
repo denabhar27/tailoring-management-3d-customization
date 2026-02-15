@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import '../../styles/Cart.css';
 import { 
   getUserCart, 
@@ -13,6 +13,7 @@ import ImagePreviewModal from '../../components/ImagePreviewModal';
 import { useAlert } from '../../context/AlertContext';
 import { getRentalImageUrl } from '../../api/RentalApi';
 import SimpleImageCarousel from '../../components/SimpleImageCarousel';
+import { API_BASE_URL } from '../../api/config';
 
 const Cart = ({ isOpen, onClose, onCartUpdate }) => {
   const { confirm } = useAlert();
@@ -286,7 +287,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   const formatPrice = (price) => {
-    return `₱${parseFloat(price || 0).toFixed(2)}`;
+    return `â‚±${parseFloat(price || 0).toFixed(2)}`;
   };
 
   const formatDateTo12Hour = (dateString) => {
@@ -517,7 +518,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
               />
               Select All
             </label>
-            <button className="cart-close-btn" onClick={onClose}>×</button>
+            <button className="cart-close-btn" onClick={onClose}>Ã—</button>
           </div>
         </div>
 
@@ -623,7 +624,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                               </p>
                               {item.specific_data.garments.map((garment, idx) => (
                                 <div key={idx} className="garment-item-cart">
-                                  <p>• {garment.garmentType} ({garment.damageLevel}): ₱{garment.basePrice}</p>
+                                  <p>â€¢ {garment.garmentType} ({garment.damageLevel}): â‚±{garment.basePrice}</p>
                                   {garment.notes && <p className="garment-notes">  Notes: {garment.notes}</p>}
                                 </div>
                               ))}
@@ -639,10 +640,10 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           {item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
                             <div className="cart-item-image">
                               <img 
-                                src={`http://localhost:5000${item.specific_data.imageUrl}`} 
+                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`} 
                                 alt="Damage preview" 
                                 className="cart-damage-photo clickable-image"
-                                onClick={() => openImagePreview(`http://localhost:5000${item.specific_data.imageUrl}`, 'Damage Photo')}
+                                onClick={() => openImagePreview(`${API_BASE_URL}${item.specific_data.imageUrl}`, 'Damage Photo')}
                                 title="Click to enlarge"
                                 onError={(e) => {
                                   e.target.style.display = 'none';
@@ -663,7 +664,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                               </p>
                               {item.specific_data.garments.map((garment, idx) => (
                                 <div key={idx} className="garment-item-cart">
-                                  <p>• {garment.garmentType} ({garment.brand}) × {garment.quantity}: ₱{garment.pricePerItem * garment.quantity}</p>
+                                  <p>â€¢ {garment.garmentType} ({garment.brand}) Ã— {garment.quantity}: â‚±{garment.pricePerItem * garment.quantity}</p>
                                 </div>
                               ))}
                             </>
@@ -675,7 +676,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                               <p>Brand: {item.specific_data.brand || 'N/A'}</p>
                               <p>Quantity: {item.specific_data.quantity || 'N/A'} items</p>
                               {item.specific_data.pricePerItem && (
-                                <p>Price per item: ₱{parseFloat(item.specific_data.pricePerItem).toFixed(2)}</p>
+                                <p>Price per item: â‚±{parseFloat(item.specific_data.pricePerItem).toFixed(2)}</p>
                               )}
                             </>
                           )}
@@ -683,10 +684,10 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           {item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
                             <div className="cart-item-image">
                               <img 
-                                src={`http://localhost:5000${item.specific_data.imageUrl}`} 
+                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`} 
                                 alt="Clothing preview" 
                                 className="cart-damage-photo clickable-image"
-                                onClick={() => openImagePreview(`http://localhost:5000${item.specific_data.imageUrl}`, 'Clothing Photo')}
+                                onClick={() => openImagePreview(`${API_BASE_URL}${item.specific_data.imageUrl}`, 'Clothing Photo')}
                                 title="Click to enlarge"
                                 onError={(e) => {
                                   e.target.style.display = 'none';
@@ -756,10 +757,10 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           {!item.specific_data.designData?.angleImages && item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
                             <div className="cart-item-image" style={{ marginTop: '10px' }}>
                               <img 
-                                src={`http://localhost:5000${item.specific_data.imageUrl}`} 
+                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`} 
                                 alt="Design preview" 
                                 className="cart-damage-photo clickable-image"
-                                onClick={() => openImagePreview(`http://localhost:5000${item.specific_data.imageUrl}`, 'Design Preview')}
+                                onClick={() => openImagePreview(`${API_BASE_URL}${item.specific_data.imageUrl}`, 'Design Preview')}
                                 title="Click to enlarge"
                                 onError={(e) => {
                                   e.target.style.display = 'none';
@@ -785,7 +786,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                                     fontWeight: '400'
                                   }}
                                 >
-                                  {expandedDetails.has(item.cart_id) ? '▼ Hide' : '▶ Show'}
+                                  {expandedDetails.has(item.cart_id) ? 'â–¼ Hide' : 'â–¶ Show'}
                                 </button>
                               </div>
                               
@@ -842,10 +843,10 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           {item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && !item.specific_data.designData?.angleImages && (
                             <div className="cart-item-image">
                               <img 
-                                src={`http://localhost:5000${item.specific_data.imageUrl}`} 
+                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`} 
                                 alt="Design preview" 
                                 className="cart-damage-photo clickable-image"
-                                onClick={() => openImagePreview(`http://localhost:5000${item.specific_data.imageUrl}`, 'Design Preview')}
+                                onClick={() => openImagePreview(`${API_BASE_URL}${item.specific_data.imageUrl}`, 'Design Preview')}
                                 title="Click to enlarge"
                                 onError={(e) => {
                                   e.target.style.display = 'none';
@@ -983,7 +984,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                   justifyContent: 'center'
                 }}
               >
-                ×
+                Ã—
               </button>
             </div>
             {parentBundleData && (
@@ -1088,7 +1089,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                       </p>
                     )}
                     <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: '#007bff' }}>
-                      Click to view details →
+                      Click to view details â†’
                     </p>
                   </div>
                 </div>
@@ -1151,7 +1152,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                   justifyContent: 'center'
                 }}
               >
-                ×
+                Ã—
               </button>
             </div>
             {selectedBundleItem.image_url && (
@@ -1266,7 +1267,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                   justifyContent: 'center'
                 }}
               >
-                ×
+                Ã—
               </button>
             </div>
             {(() => {

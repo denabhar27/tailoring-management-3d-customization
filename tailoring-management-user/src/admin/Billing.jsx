@@ -14,6 +14,8 @@ import ImagePreviewModal from '../components/ImagePreviewModal';
 
 import AnalyticsDashboard from '../components/analytics/AnalyticsDashboard';
 
+import { API_BASE_URL } from '../api/config';
+
 const Billing = () => {
 
   const { alert } = useAlert();
@@ -254,7 +256,7 @@ const Billing = () => {
 
     }
 
-    return `http://localhost:5000${imageUrl}`;
+    return `${API_BASE_URL}${imageUrl}`;
 
   };
 

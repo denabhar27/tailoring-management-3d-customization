@@ -7,6 +7,7 @@ import {
   addRepairToCart
 } from '../../api/RepairApi';
 import '../../styles/RepairModal.css';
+import { API_BASE_URL } from '../../api/config';
 
 const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
   const [step, setStep] = useState(1); 
@@ -254,7 +255,7 @@ const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
                     />
                     {uploadedImage && (
                       <div className="uploaded-preview">
-                        <img src={`http://localhost:5000${uploadedImage.url}`} alt="Preview" />
+                        <img src={`${API_BASE_URL}${uploadedImage.url}`} alt="Preview" />
                       </div>
                     )}
                   </div>
@@ -298,7 +299,7 @@ const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
                 {uploadedImage && (
                   <div className="summary-item">
                     <label>Damage Photo:</label>
-                    <img src={`http://localhost:5000${uploadedImage.url}`} alt="Damage" className="summary-image" />
+                    <img src={`${API_BASE_URL}${uploadedImage.url}`} alt="Damage" className="summary-image" />
                   </div>
                 )}
                 <div className="summary-item price">

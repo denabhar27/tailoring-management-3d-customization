@@ -4,22 +4,22 @@ import { API_URL } from './config';
 const BASE_URL = API_URL;
 
 const getAuthHeaders = () => {
-  
+
   let token = null;
   if (typeof window !== 'undefined' && window.REACT_NATIVE_AUTH?.token) {
     token = window.REACT_NATIVE_AUTH.token;
   } else if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     token = localStorage.getItem('token');
   }
-  
+
   const headers = {
     'Content-Type': 'application/json'
   };
-  
+
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
   return headers;
 };
 
@@ -140,14 +140,14 @@ export async function updateCustomizationApprovalStatus(itemId, status) {
 
 export async function addCustomizationToCart(customizationData) {
   try {
-    
+
     const isUniform = customizationData.isUniform || customizationData.garmentType?.toLowerCase() === 'uniform';
-    
+
     const price = isUniform ? 0 : (customizationData.estimatedPrice || 500);
-    
+
     const cartItem = {
       serviceType: 'customization',
-      serviceId: null, 
+      serviceId: null,
       quantity: 1,
       basePrice: price,
       finalPrice: price,
@@ -168,7 +168,7 @@ export async function addCustomizationToCart(customizationData) {
         preferredTime: customizationData.preferredTime,
         imageUrl: customizationData.imageUrl || 'no-image',
         isUniform: isUniform,
-        designData: customizationData.designData || {}, 
+        designData: customizationData.designData || {},
         uploadedAt: new Date().toISOString()
       }
     };
@@ -212,10 +212,10 @@ export async function uploadGLBFile(file, modelData) {
     const response = await axios.post(`${BASE_URL}/customization/upload-glb`, formData, {
       headers: {
         'Authorization': `Bearer ${token}`
-        
+
       },
-      
-      timeout: 60000 
+
+      timeout: 60000
     });
     return response.data;
   } catch (error) {
@@ -230,7 +230,7 @@ export async function uploadGLBFile(file, modelData) {
         requiresAuth: true
       };
     }
-    
+
     return {
       success: false,
       message: error.response?.data?.message || error.message || "Error uploading GLB file"

@@ -45,8 +45,8 @@ export async function getOrderItemTrackingHistory(orderItemId) {
 
 export async function updateTrackingStatus(orderItemId, status, notes) {
   try {
-    const response = await axios.post(`${BASE_URL}/tracking/update/${orderItemId}`, 
-      { status, notes }, 
+    const response = await axios.post(`${BASE_URL}/tracking/update/${orderItemId}`,
+      { status, notes },
       {
         headers: getAuthHeaders()
       }

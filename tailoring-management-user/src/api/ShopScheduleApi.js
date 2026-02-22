@@ -36,7 +36,7 @@ export const getShopScheduleAdmin = async () => {
 
 export const updateShopSchedule = async (schedule) => {
   try {
-    const response = await axios.put(`${BASE_URL}/shop-schedule/admin`, 
+    const response = await axios.put(`${BASE_URL}/shop-schedule/admin`,
       { schedule },
       { headers: getAuthHeaders() }
     );

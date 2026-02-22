@@ -14,7 +14,7 @@ function Rental() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [viewFilter, setViewFilter] = useState('all'); 
+  const [viewFilter, setViewFilter] = useState('all');
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -25,7 +25,7 @@ function Rental() {
     damageNotes: ''
   });
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [pendingRentedStatus, setPendingRentedStatus] = useState(null); 
+  const [pendingRentedStatus, setPendingRentedStatus] = useState(null);
 
   useEffect(() => {
     loadRentalOrders();
@@ -36,7 +36,7 @@ function Rental() {
     try {
       const result = await getAllRentalOrders();
       if (result.success) {
-        
+
         setRentals([...result.orders]);
       } else {
         console.error('Failed to load rental orders:', result.message);
@@ -50,10 +50,10 @@ function Rental() {
 
   const stats = {
     pending: rentals.filter(r => r.approval_status === 'pending' || r.approval_status === 'pending_review').length,
-    ready_to_pickup: rentals.filter(r => 
-      r.approval_status === 'ready_to_pickup' || 
+    ready_to_pickup: rentals.filter(r =>
+      r.approval_status === 'ready_to_pickup' ||
       r.approval_status === 'ready_for_pickup' ||
-      r.approval_status === 'accepted' 
+      r.approval_status === 'accepted'
     ).length,
     rented: rentals.filter(r => r.approval_status === 'rented').length,
     returned: rentals.filter(r => r.approval_status === 'returned').length,
@@ -65,10 +65,10 @@ function Rental() {
       case 'pending':
         return rentals.filter(r => r.approval_status === 'pending' || r.approval_status === 'pending_review');
       case 'ready-to-pickup':
-        return rentals.filter(r => 
-          r.approval_status === 'ready_to_pickup' || 
+        return rentals.filter(r =>
+          r.approval_status === 'ready_to_pickup' ||
           r.approval_status === 'ready_for_pickup' ||
-          r.approval_status === 'accepted' 
+          r.approval_status === 'accepted'
         );
       case 'rented':
         return rentals.filter(r => r.approval_status === 'rented');
@@ -96,19 +96,19 @@ function Rental() {
     } else if (rental.approval_status === 'ready_for_pickup') {
       normalizedStatus = 'ready_to_pickup';
     } else if (rental.approval_status === 'accepted') {
-      normalizedStatus = 'ready_to_pickup'; 
+      normalizedStatus = 'ready_to_pickup';
     } else if (rental.approval_status === 'cancelled') {
-      normalizedStatus = 'cancelled'; 
+      normalizedStatus = 'cancelled';
     }
 
     const matchesStatus = !statusFilter || normalizedStatus === statusFilter;
 
     return matchesSearch && matchesStatus;
   }).sort((a, b) => {
-    
+
     const isPendingA = a.approval_status === 'pending' || a.approval_status === 'pending_review' || !a.approval_status;
     const isPendingB = b.approval_status === 'pending' || b.approval_status === 'pending_review' || !b.approval_status;
-    
+
     if (isPendingA && !isPendingB) return -1;
     if (!isPendingA && isPendingB) return 1;
     return 0;
@@ -119,10 +119,10 @@ function Rental() {
     if (!confirmed) return;
 
     try {
-      
+
       const isWalkIn = rental.order_type === 'walk_in';
       const nextStatus = isWalkIn ? 'rented' : 'ready_to_pickup';
-      const successMessage = isWalkIn 
+      const successMessage = isWalkIn
         ? 'Walk-in rental accepted! Status changed to "Rented" (customer is already in-person)'
         : 'Rental accepted! Status changed to "Ready to Pick Up"';
 
@@ -145,19 +145,19 @@ function Rental() {
   const handleDecline = async (rental) => {
     try {
       console.log('[DECLINE] Button clicked for rental:', rental.item_id, rental);
-      
+
     const reason = await prompt('Please enter reason for declining this rental:', 'Decline Rental', 'Enter reason...');
       console.log('[DECLINE] Prompt returned:', reason);
-      
+
       if (reason === null || reason === undefined) {
         console.log('[DECLINE] User cancelled the prompt');
-        return; 
+        return;
       }
-      
+
       if (!reason || reason.trim() === '') {
         console.log('[DECLINE] Empty reason provided');
         await alert('Please provide a reason for declining the rental', 'Warning', 'warning');
-        return; 
+        return;
       }
 
       console.log('[DECLINE] Updating rental with reason:', reason.trim());
@@ -203,9 +203,9 @@ function Rental() {
       'danger',
       { confirmText: 'Delete', cancelText: 'Cancel' }
     );
-    
+
     if (!confirmed) return;
-    
+
     try {
       const result = await deleteOrderItem(rental.item_id);
       if (result.success) {
@@ -237,14 +237,14 @@ function Rental() {
         );
 
         if (recordPayment) {
-          
+
           setShowEditModal(false);
           setPaymentAmount(downpayment.toFixed(2));
           setPendingRentedStatus(selectedRental.item_id);
           setShowPaymentModal(true);
           return;
         } else {
-          return; 
+          return;
         }
       }
     }
@@ -257,7 +257,7 @@ function Rental() {
     if (editData.approvalStatus === 'returned' && editData.damageNotes && editData.damageNotes.trim()) {
       updateData.damageNotes = editData.damageNotes.trim();
     } else if (editData.approvalStatus === 'returned' && (!editData.damageNotes || !editData.damageNotes.trim())) {
-      
+
       updateData.damageNotes = null;
     }
 
@@ -281,16 +281,16 @@ function Rental() {
   };
 
   const handleStatusUpdate = async (itemId, newStatus, rental = null) => {
-    
+
     if (newStatus === 'rented') {
-      
+
       const currentRental = rental || rentals.find(r => r.item_id === itemId);
       const paidAmount = parseFloat(currentRental?.specific_data?.paid_amount || currentRental?.paid_amount || 0);
       const totalPrice = parseFloat(currentRental?.specific_data?.total_price || currentRental?.total_price || 0);
       const downpayment = totalPrice * 0.5;
 
       if (paidAmount < downpayment) {
-        
+
         const recordPayment = await confirm(
           `Before marking as "Rented", you need to record the downpayment.\n\nRequired Downpayment: ₱${downpayment.toFixed(2)}\nAmount Paid: ₱${paidAmount.toFixed(2)}\n\nWould you like to record the payment now?`,
           'Payment Required',
@@ -299,14 +299,14 @@ function Rental() {
         );
 
         if (recordPayment) {
-          
+
           setSelectedRental(currentRental);
           setPaymentAmount(downpayment.toFixed(2));
           setShowPaymentModal(true);
-          setPendingRentedStatus(itemId); 
+          setPendingRentedStatus(itemId);
           return;
         } else {
-          return; 
+          return;
         }
       }
     }
@@ -315,51 +315,51 @@ function Rental() {
     if (!confirmed) return;
 
     let damageNotes = null;
-    let itemDamageNotes = {}; 
-    
+    let itemDamageNotes = {};
+
     if (newStatus === 'returned') {
       if (rental && rental.specific_data) {
         const isBundle = rental.specific_data?.is_bundle === true || rental.specific_data?.category === 'rental_bundle';
         const bundleItems = rental.specific_data?.bundle_items || [];
-        
+
         if (isBundle && bundleItems.length > 0) {
-          
+
           for (const bundleItem of bundleItems) {
             const hasDamage = await confirm(
-              `Is "${bundleItem.item_name}" damaged?`, 
-              'Check for Damage', 
-              'question', 
+              `Is "${bundleItem.item_name}" damaged?`,
+              'Check for Damage',
+              'question',
               { confirmText: 'Yes', cancelText: 'No' }
             );
-            
+
             if (hasDamage) {
               const damageDescription = await prompt(
-                `Please describe the damage for "${bundleItem.item_name}":`, 
-                'Damage Notes', 
+                `Please describe the damage for "${bundleItem.item_name}":`,
+                'Damage Notes',
                 'Enter damage description...'
               );
-              
+
               if (damageDescription === null || damageDescription === undefined) {
-                return; 
+                return;
               }
-              
+
               if (!damageDescription || damageDescription.trim() === '') {
                 await alert('Please provide a damage description', 'Warning', 'warning');
                 return;
               }
-              
+
               itemDamageNotes[bundleItem.item_name] = damageDescription.trim();
             }
           }
 
           damageNotes = Object.keys(itemDamageNotes).length > 0 ? JSON.stringify(itemDamageNotes) : null;
         } else {
-          
+
           const hasDamage = await confirm('Is the returned item damaged?', 'Check for Damage', 'question', { confirmText: 'Yes', cancelText: 'No' });
           if (hasDamage) {
             damageNotes = await prompt('Please describe the damage:', 'Damage Notes', 'Enter damage description...');
             if (damageNotes === null || damageNotes === undefined) {
-              return; 
+              return;
             }
             if (!damageNotes || damageNotes.trim() === '') {
               await alert('Please provide a damage description', 'Warning', 'warning');
@@ -383,7 +383,7 @@ function Rental() {
       const result = await updateRentalOrderItem(itemId, updateData);
 
       if (result.success) {
-        const message = damageNotes 
+        const message = damageNotes
           ? `Status updated to "${getStatusLabel(newStatus)}". Damage noted - item set to maintenance.`
           : `Status updated to "${getStatusLabel(newStatus)}"`;
         await alert(message, 'Success', 'success');
@@ -391,9 +391,9 @@ function Rental() {
         if (newStatus === 'returned' && rental && rental.specific_data) {
           const isBundle = rental.specific_data?.is_bundle === true || rental.specific_data?.category === 'rental_bundle';
           const bundleItems = rental.specific_data?.bundle_items || [];
-          
+
           if (isBundle && bundleItems.length > 0) {
-            
+
             let damagedItems = {};
             if (damageNotes) {
               try {
@@ -410,7 +410,7 @@ function Rental() {
                 const newStatus = itemDamageNote ? 'maintenance' : 'available';
 
                 await updateRentalStatus(bundleItem.item_id || bundleItem.id, newStatus, itemDamageNote, itemDamageNote ? customerName : null);
-                
+
                 console.log(`Updated ${bundleItem.item_name} status to ${newStatus}${itemDamageNote ? ` with damage notes: "${itemDamageNote}" (damaged by: ${customerName})` : ''}`);
               } catch (error) {
                 console.warn(`Failed to update rental inventory item status for ${bundleItem.item_name}:`, error);
@@ -457,14 +457,14 @@ function Rental() {
           const statusResult = await updateRentalOrderItem(itemIdToUpdate, {
             approvalStatus: 'rented'
           });
-          
+
           if (statusResult.success) {
             await alert('Payment recorded and status updated to "Rented"', 'Success', 'success');
           } else {
             await alert('Payment recorded but failed to update status. Please update manually.', 'Warning', 'warning');
           }
         }
-        
+
         await loadRentalOrders();
       } else {
         await alert(result.message || 'Failed to record payment', 'Error', 'error');
@@ -476,13 +476,13 @@ function Rental() {
   };
 
   const getStatusClass = (status) => {
-    
+
     let normalizedStatus = status === 'accepted' ? 'ready_to_pickup' : status;
-    
+
     normalizedStatus = normalizedStatus === 'ready_for_pickup' ? 'ready_to_pickup' : normalizedStatus;
-    
+
     normalizedStatus = normalizedStatus === 'cancelled' ? 'rejected' : normalizedStatus;
-    
+
     const statusMap = {
       'pending': 'pending',
       'pending_review': 'pending',
@@ -499,12 +499,12 @@ function Rental() {
   };
 
   const getStatusLabel = (status) => {
-    
+
     let normalizedStatus = status === 'accepted' ? 'ready_to_pickup' : status;
     normalizedStatus = normalizedStatus === 'ready_for_pickup' ? 'ready_to_pickup' : normalizedStatus;
-    
+
     normalizedStatus = normalizedStatus === 'cancelled' ? 'rejected' : normalizedStatus;
-    
+
     const labelMap = {
       'pending': 'Pending',
       'pending_review': 'Pending',
@@ -521,13 +521,13 @@ function Rental() {
   };
 
   const getNextStatus = (currentStatus, serviceType = 'rental', item = null) => {
-    
+
     if (serviceType === 'rental') {
-      
+
       const isWalkIn = item?.order_type === 'walk_in';
 
       if (!currentStatus || currentStatus === 'pending_review' || currentStatus === 'pending') {
-        
+
         return isWalkIn ? 'rented' : 'ready_to_pickup';
       }
 
@@ -543,7 +543,7 @@ function Rental() {
       } else if (normalizedStatus === 'returned') {
         return 'completed';
       }
-      return null; 
+      return null;
     }
 
     const statusFlow = {
@@ -551,16 +551,16 @@ function Rental() {
       'customization': ['pending', 'accepted', 'price_confirmation', 'confirmed', 'ready_for_pickup', 'completed'],
       'dry_cleaning': ['pending', 'accepted', 'price_confirmation', 'confirmed', 'ready_for_pickup', 'completed']
     };
-    
+
     const flow = statusFlow[serviceType];
     if (!flow) return null;
-    
+
     const currentIndex = flow.indexOf(currentStatus);
-    
+
     if (currentIndex === -1 || currentIndex === flow.length - 1) {
-      return null; 
+      return null;
     }
-    
+
     return flow[currentIndex + 1];
   };
 
@@ -688,9 +688,9 @@ function Rental() {
                   filteredRentals.map(rental => {
                     const isPending = rental.approval_status === 'pending' || rental.approval_status === 'pending_review';
                     const downpaymentAmount = rental.pricing_factors?.downpayment || rental.specific_data?.downpayment || 0;
-                    
-                    const pricingFactors = typeof rental.pricing_factors === 'string' 
-                      ? JSON.parse(rental.pricing_factors || '{}') 
+
+                    const pricingFactors = typeof rental.pricing_factors === 'string'
+                      ? JSON.parse(rental.pricing_factors || '{}')
                       : (rental.pricing_factors || {});
                     const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
                     const finalPrice = parseFloat(rental.final_price || 0);
@@ -702,7 +702,7 @@ function Rental() {
                         <td>
                           {rental.order_type === 'walk_in' ? (
                             <span>
-                              <span style={{ 
+                              <span style={{
                                 display: 'inline-block',
                                 backgroundColor: '#ff9800',
                                 color: 'white',
@@ -730,7 +730,7 @@ function Rental() {
                                 endDate.setHours(0, 0, 0, 0);
                                 const diffTime = endDate - today;
                                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                
+
                                 if (diffDays < 0) {
                                   const daysOverdue = Math.abs(diffDays);
                                   return (
@@ -795,9 +795,9 @@ function Rental() {
                           </div>
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
-                          <span 
+                          <span
                             className={`status-badge ${getStatusClass(rental.approval_status || 'pending')}`}
-                            style={{ 
+                            style={{
                               display: 'inline-block',
                               visibility: 'visible',
                               opacity: 1,
@@ -816,12 +816,12 @@ function Rental() {
                             if (isCompleted) {
                               return (
                                 <div className="action-buttons">
-                                  <button 
-                                    className="icon-btn delete" 
+                                  <button
+                                    className="icon-btn delete"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleDeleteOrder(rental);
-                                    }} 
+                                    }}
                                     title="Delete Order"
                                     style={{ backgroundColor: '#f44336', color: 'white' }}
                                   >
@@ -839,12 +839,12 @@ function Rental() {
                             if (isRejected) {
                               return (
                                 <div className="action-buttons">
-                                  <button 
-                                    className="icon-btn delete" 
+                                  <button
+                                    className="icon-btn delete"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleDeleteOrder(rental);
-                                    }} 
+                                    }}
                                     title="Delete Order"
                                     style={{ backgroundColor: '#f44336', color: 'white' }}
                                   >
@@ -858,7 +858,7 @@ function Rental() {
                                 </div>
                               );
                             }
-                            
+
                             return (
                             <div className="action-buttons">
                                 {(() => {
@@ -882,23 +882,23 @@ function Rental() {
                                   } else if (isCurrentlyRented && hasRemainingBalance) {
                                     disableMessage = `Full payment required (₱${remainingBalance.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})} remaining) before moving to ${nextStatusLabel}`;
                                   }
-                                  
+
                                   return (
-                                    <button 
-                                      className="icon-btn next-status" 
+                                    <button
+                                      className="icon-btn next-status"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         if (shouldDisable) {
-                                          
+
                                           return;
                                         }
                                         handleStatusUpdate(rental.item_id, nextStatus, rental);
-                                      }} 
+                                      }}
                                       title={shouldDisable ? disableMessage : `Move to ${nextStatusLabel}`}
                                       disabled={shouldDisable}
-                                      style={{ 
-                                        backgroundColor: shouldDisable ? '#ccc' : '#4CAF50', 
-                                        color: 'white', 
+                                      style={{
+                                        backgroundColor: shouldDisable ? '#ccc' : '#4CAF50',
+                                        color: 'white',
                                         zIndex: 10,
                                         cursor: shouldDisable ? 'not-allowed' : 'pointer',
                                         opacity: shouldDisable ? 0.6 : 1
@@ -911,8 +911,8 @@ function Rental() {
                                   );
                                 })()}
                                 {isPending && (
-                                  <button 
-                                    className="icon-btn decline" 
+                                  <button
+                                    className="icon-btn decline"
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
@@ -921,7 +921,7 @@ function Rental() {
                                         console.error('[DECLINE] Unhandled error:', err);
                                         alert('An unexpected error occurred while declining the rental', 'Error', 'error');
                                       });
-                                    }} 
+                                    }}
                                     title="Decline"
                                     type="button"
                                     style={{ cursor: 'pointer', zIndex: 10, position: 'relative' }}
@@ -933,22 +933,22 @@ function Rental() {
                               </button>
                                 )}
                                 {rental.approval_status !== 'cancelled' && (
-                                <button 
-                                    className="icon-btn" 
+                                <button
+                                    className="icon-btn"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      
+
                                       const isWalkIn = rental.order_type === 'walk_in';
                                       if (!isPending || isWalkIn) {
                                         setSelectedRental(rental);
                                         setPaymentAmount('');
                                         setShowPaymentModal(true);
                                       }
-                                    }} 
+                                    }}
                                     title={isPending && rental.order_type !== 'walk_in' ? "Record Payment (Disabled - Status is Pending)" : "Record Payment"}
                                     disabled={isPending && rental.order_type !== 'walk_in'}
-                                    style={{ 
-                                      backgroundColor: '#2196F3', 
+                                    style={{
+                                      backgroundColor: '#2196F3',
                                       color: 'white',
                                       opacity: (isPending && rental.order_type !== 'walk_in') ? 0.5 : 1,
                                       cursor: (isPending && rental.order_type !== 'walk_in') ? 'not-allowed' : 'pointer'
@@ -1004,7 +1004,7 @@ function Rental() {
                 <select
                   value={editData.approvalStatus}
                   onChange={(e) => {
-                    
+
                     const newStatus = e.target.value;
                     const isWalkIn = selectedRental.order_type === 'walk_in';
                     if (isWalkIn && (newStatus === 'ready_to_pickup' || newStatus === 'ready_for_pickup')) {
@@ -1100,22 +1100,22 @@ function Rental() {
                 </span>
               </div>
               {(() => {
-                const pricingFactors = typeof selectedRental.pricing_factors === 'string' 
-                  ? JSON.parse(selectedRental.pricing_factors || '{}') 
+                const pricingFactors = typeof selectedRental.pricing_factors === 'string'
+                  ? JSON.parse(selectedRental.pricing_factors || '{}')
                   : (selectedRental.pricing_factors || {});
                 const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
                 const finalPrice = parseFloat(selectedRental.final_price || 0);
                 const remaining = finalPrice - amountPaid;
                 const penalty = parseFloat(pricingFactors.penalty || 0);
                 const penaltyDays = parseInt(pricingFactors.penaltyDays || 0);
-                
+
                 return (
                   <>
                     {penalty > 0 && penaltyDays > 0 && (
-                      <div className="detail-row" style={{ 
-                        backgroundColor: '#fff3cd', 
-                        padding: '12px', 
-                        borderRadius: '6px', 
+                      <div className="detail-row" style={{
+                        backgroundColor: '#fff3cd',
+                        padding: '12px',
+                        borderRadius: '6px',
                         border: '1px solid #ffc107',
                         marginBottom: '10px'
                       }}>
@@ -1140,7 +1140,7 @@ function Rental() {
                   </>
                 );
               })()}
-              
+
               <div className="payment-form-group">
                 <label>Payment Amount *</label>
                 <input
@@ -1185,7 +1185,7 @@ function Rental() {
               {(() => {
                 const isBundle = selectedRental.specific_data?.is_bundle === true || selectedRental.specific_data?.category === 'rental_bundle';
                 const bundleItems = selectedRental.specific_data?.bundle_items || [];
-                
+
                 if (isBundle && bundleItems.length > 0) {
                   return (
                     <>
@@ -1193,18 +1193,18 @@ function Rental() {
                         <strong style={{ display: 'block', marginBottom: '10px' }}>Rental Items:</strong>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                           {bundleItems.map((bundleItem, idx) => {
-                            
+
                             const itemImages = [
                               bundleItem.front_image && { url: getRentalImageUrl(bundleItem.front_image), label: 'Front' },
                               bundleItem.back_image && { url: getRentalImageUrl(bundleItem.back_image), label: 'Back' },
                               bundleItem.side_image && { url: getRentalImageUrl(bundleItem.side_image), label: 'Side' },
                               bundleItem.image_url && bundleItem.image_url !== 'no-image' && { url: getRentalImageUrl(bundleItem.image_url), label: 'Main' }
                             ].filter(Boolean);
-                            
+
                             return (
-                              <div key={idx} style={{ 
-                                border: '1px solid #e0e0e0', 
-                                borderRadius: '8px', 
+                              <div key={idx} style={{
+                                border: '1px solid #e0e0e0',
+                                borderRadius: '8px',
                                 padding: '15px',
                                 backgroundColor: '#f9f9f9'
                               }}>
@@ -1212,7 +1212,7 @@ function Rental() {
                                   {bundleItem.item_name || `Item ${idx + 1}`}
                                 </strong>
                                 {itemImages.length > 0 && (
-                                  <SimpleImageCarousel 
+                                  <SimpleImageCarousel
                                     images={itemImages}
                                     itemName={bundleItem.item_name}
                                     height="180px"
@@ -1238,20 +1238,20 @@ function Rental() {
                     </>
                   );
                 } else {
-                  
+
                   const singleItemImages = [
                     selectedRental.specific_data?.front_image && { url: getRentalImageUrl(selectedRental.specific_data.front_image), label: 'Front' },
                     selectedRental.specific_data?.back_image && { url: getRentalImageUrl(selectedRental.specific_data.back_image), label: 'Back' },
                     selectedRental.specific_data?.side_image && { url: getRentalImageUrl(selectedRental.specific_data.side_image), label: 'Side' },
                     selectedRental.specific_data?.image_url && { url: getRentalImageUrl(selectedRental.specific_data.image_url), label: 'Main' }
                   ].filter(Boolean);
-                  
+
                   return (
                     <>
                       {singleItemImages.length > 0 && (
                         <div className="detail-row" style={{ marginBottom: '15px' }}>
                           <strong style={{ display: 'block', marginBottom: '10px' }}>Item Photos:</strong>
-                          <SimpleImageCarousel 
+                          <SimpleImageCarousel
                             images={singleItemImages}
                             itemName={selectedRental.specific_data?.item_name}
                             height="200px"
@@ -1281,7 +1281,7 @@ function Rental() {
               {selectedRental.order_type === 'walk_in' && (
                 <div className="detail-row">
                   <strong>Order Type:</strong>
-                  <span style={{ 
+                  <span style={{
                     display: 'inline-block',
                     backgroundColor: '#ff9800',
                     color: 'white',
@@ -1296,7 +1296,7 @@ function Rental() {
               <div className="detail-row">
                 <strong>Customer:</strong>
                 <span>
-                  {selectedRental.order_type === 'walk_in' 
+                  {selectedRental.order_type === 'walk_in'
                     ? (selectedRental.walk_in_customer_name || 'Walk-in Customer')
                     : `${selectedRental.first_name || ''} ${selectedRental.last_name || ''}`.trim() || 'N/A'}
                 </span>
@@ -1328,23 +1328,23 @@ function Rental() {
                   {(() => {
                     const isBundle = selectedRental.specific_data?.is_bundle === true || selectedRental.specific_data?.category === 'rental_bundle';
                     const bundleItems = selectedRental.specific_data?.bundle_items || [];
-                    
+
                     if (isBundle && bundleItems.length > 0) {
                       return bundleItems.map((item, idx) => {
                         const formatSize = (size) => {
                           if (!size) return null;
-                          
+
                           if (typeof size === 'string' && !size.trim().startsWith('{')) {
                             return [{ label: 'Size', value: size }];
                           }
-                          
+
                           try {
                             let measurements = typeof size === 'string' ? JSON.parse(size) : size;
-                            
+
                             if (!measurements || typeof measurements !== 'object' || Array.isArray(measurements)) {
                               return [{ label: 'Size', value: typeof size === 'string' ? size : JSON.stringify(size) }];
                             }
-                            
+
                             const labelMap = {
                               'chest': 'Chest',
                               'shoulders': 'Shoulders',
@@ -1353,7 +1353,7 @@ function Rental() {
                               'waist': 'Waist',
                               'length': 'Length'
                             };
-                            
+
                             const parts = Object.entries(measurements)
                               .filter(([key, value]) => value !== null && value !== undefined && value !== '' && value !== '0')
                               .map(([key, value]) => {
@@ -1376,17 +1376,17 @@ function Rental() {
                                 }
                                 return { label, value: displayValue };
                               });
-                            
+
                             return parts.length > 0 ? parts : null;
                           } catch (e) {
                             return [{ label: 'Size', value: typeof size === 'string' ? size : 'N/A' }];
                           }
                         };
-                        
+
                         const sizeData = formatSize(item.size);
                         return (
-                          <div key={idx} style={{ 
-                            fontSize: '0.9rem', 
+                          <div key={idx} style={{
+                            fontSize: '0.9rem',
                             lineHeight: '1.8',
                             padding: '12px 16px',
                             backgroundColor: '#f5f5f5',
@@ -1414,21 +1414,21 @@ function Rental() {
                         );
                       });
                     } else {
-                      
+
                       const formatSize = (size) => {
                         if (!size) return null;
-                        
+
                         if (typeof size === 'string' && !size.trim().startsWith('{')) {
                           return [{ label: 'Size', value: size }];
                         }
-                        
+
                         try {
                           let measurements = typeof size === 'string' ? JSON.parse(size) : size;
-                          
+
                           if (!measurements || typeof measurements !== 'object' || Array.isArray(measurements)) {
                             return [{ label: 'Size', value: typeof size === 'string' ? size : JSON.stringify(size) }];
                           }
-                          
+
                           const labelMap = {
                             'chest': 'Chest',
                             'shoulders': 'Shoulders',
@@ -1437,7 +1437,7 @@ function Rental() {
                             'waist': 'Waist',
                             'length': 'Length'
                           };
-                          
+
                           const parts = Object.entries(measurements)
                             .filter(([key, value]) => value !== null && value !== undefined && value !== '' && value !== '0')
                             .map(([key, value]) => {
@@ -1460,18 +1460,18 @@ function Rental() {
                               }
                               return { label, value: displayValue };
                             });
-                          
+
                           return parts.length > 0 ? parts : null;
                         } catch (e) {
                           return [{ label: 'Size', value: typeof size === 'string' ? size : 'N/A' }];
                         }
                       };
-                      
+
                       const sizeData = formatSize(selectedRental.specific_data?.size);
                       if (sizeData && Array.isArray(sizeData)) {
                         return (
-                          <div style={{ 
-                            fontSize: '0.9rem', 
+                          <div style={{
+                            fontSize: '0.9rem',
                             lineHeight: '1.8',
                             padding: '12px 16px',
                             backgroundColor: '#f5f5f5',
@@ -1504,7 +1504,7 @@ function Rental() {
                     : 'N/A'}
                 </span>
               </div>
-              {(selectedRental.approval_status === 'rented' || selectedRental.approval_status === 'picked_up') && 
+              {(selectedRental.approval_status === 'rented' || selectedRental.approval_status === 'picked_up') &&
                selectedRental.rental_end_date && (() => {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
@@ -1512,7 +1512,7 @@ function Rental() {
                 endDate.setHours(0, 0, 0, 0);
                 const diffTime = endDate - today;
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                
+
                 if (diffDays < 0) {
                   const daysOverdue = Math.abs(diffDays);
                   const currentPenalty = daysOverdue * 100;
@@ -1587,15 +1587,15 @@ function Rental() {
                 }
                 return null;
               })()}
-              
+
               <div className="detail-row">
                 <strong>Order Date:</strong>
                 <span>{selectedRental.order_date || 'N/A'}</span>
               </div>
               <div className="detail-row">
                 <strong>Total Price:</strong>
-                <span style={{ 
-                  color: selectedRental.approval_status === 'cancelled' ? '#999' : '#2e7d32', 
+                <span style={{
+                  color: selectedRental.approval_status === 'cancelled' ? '#999' : '#2e7d32',
                   fontWeight: 'bold',
                   textDecoration: selectedRental.approval_status === 'cancelled' ? 'line-through' : 'none'
                 }}>
@@ -1603,22 +1603,22 @@ function Rental() {
                 </span>
               </div>
               {(() => {
-                const pricingFactors = typeof selectedRental.pricing_factors === 'string' 
-                  ? JSON.parse(selectedRental.pricing_factors || '{}') 
+                const pricingFactors = typeof selectedRental.pricing_factors === 'string'
+                  ? JSON.parse(selectedRental.pricing_factors || '{}')
                   : (selectedRental.pricing_factors || {});
                 const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
                 const finalPrice = parseFloat(selectedRental.final_price || 0);
                 const remaining = finalPrice - amountPaid;
                 const penalty = parseFloat(pricingFactors.penalty || 0);
                 const penaltyDays = parseInt(pricingFactors.penaltyDays || 0);
-                
+
                 return (
                   <>
                     {penalty > 0 && penaltyDays > 0 && (
-                      <div className="detail-row" style={{ 
-                        backgroundColor: '#fff3cd', 
-                        padding: '12px', 
-                        borderRadius: '6px', 
+                      <div className="detail-row" style={{
+                        backgroundColor: '#fff3cd',
+                        padding: '12px',
+                        borderRadius: '6px',
                         border: '1px solid #ffc107',
                         marginBottom: '10px'
                       }}>
@@ -1663,10 +1663,10 @@ function Rental() {
                 </div>
               )}
               {selectedRental.specific_data?.damageNotes && (
-                <div className="detail-row" style={{ 
-                  backgroundColor: '#ffebee', 
-                  padding: '12px', 
-                  borderRadius: '6px', 
+                <div className="detail-row" style={{
+                  backgroundColor: '#ffebee',
+                  padding: '12px',
+                  borderRadius: '6px',
                   border: '1px solid #f44336',
                   marginTop: '10px'
                 }}>

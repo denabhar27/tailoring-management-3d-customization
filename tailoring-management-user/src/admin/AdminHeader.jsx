@@ -3,7 +3,7 @@ import "../adminStyle/appointments.css"
 
 function AdminHeader() {
     return (
-        <nav className="navbar"> 
+        <nav className="navbar">
           <div className="logo">
             Welcome back, Admin!
           </div>

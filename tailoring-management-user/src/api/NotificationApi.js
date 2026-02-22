@@ -11,20 +11,20 @@ const getAuthHeaders = () => {
 };
 
 export const notificationApi = {
-  
+
   getNotifications: async () => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); 
-      
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const res = await fetch(`${API_BASE}/api/notifications`, {
         method: 'GET',
         headers: getAuthHeaders(),
         signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       if (!res.ok) {
         throw new Error(`Failed to fetch notifications: ${res.status} ${res.statusText}`);
       }
@@ -43,16 +43,16 @@ export const notificationApi = {
   getUnreadCount: async () => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); 
-      
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const res = await fetch(`${API_BASE}/api/notifications/unread-count`, {
         method: 'GET',
         headers: getAuthHeaders(),
         signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       if (!res.ok) {
         throw new Error(`Failed to fetch unread count: ${res.status} ${res.statusText}`);
       }
@@ -63,7 +63,7 @@ export const notificationApi = {
         throw new Error('Request timeout: Backend server may be unavailable.');
       }
       if (err.message.includes('Failed to fetch') || err.message.includes('ERR_CONNECTION')) {
-        
+
         console.warn('Failed to fetch unread count, returning 0:', err.message);
         return 0;
       }

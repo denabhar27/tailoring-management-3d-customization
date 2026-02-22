@@ -129,9 +129,9 @@ export default function AppointmentSelection() {
           <Ionicons name="cut" size={20} color="#7A5A00" />
         </View>
 
-        <TouchableOpacity onPress={() => router.push("/(tabs)/cart/Cart")}>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/faq")}>
           <View style={styles.navItemWrap}>
-            <Ionicons name="cart-outline" size={20} color="#9CA3AF" />
+            <Ionicons name="help-circle-outline" size={20} color="#9CA3AF" />
           </View>
         </TouchableOpacity>
 

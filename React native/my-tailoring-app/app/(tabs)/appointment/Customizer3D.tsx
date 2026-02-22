@@ -12,6 +12,7 @@ import {
   Platform,
   Linking,
   Share,
+  Dimensions,
  Image, Modal, ScrollView, TextInput } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,11 +23,12 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
 import DateTimePickerModal from '../../../components/DateTimePickerModal';
-import { 
-  uploadCustomizationImage, 
+import {
+  uploadCustomizationImage,
   addCustomizationToCart,
-  convertBase64ToFormData 
+  convertBase64ToFormData
 } from '../../../utils/customizationService';
+import { appointmentSlotService } from '../../../utils/apiService';
 
 const WEB_3D_CUSTOMIZER_URL = process.env.EXPO_PUBLIC_WEB_3D_URL || 'http://192.168.254.102:5174/3d-customizer';
 
@@ -37,9 +39,9 @@ interface CustomizationData {
   garmentType?: string;
   garmentCode?: string;
   fabricType?: string;
-  designImage?: string; 
-  angleImages?: { front?: string; back?: string; right?: string; left?: string }; 
-  imageData?: string; 
+  designImage?: string;
+  angleImages?: { front?: string; back?: string; right?: string; left?: string };
+  imageData?: string;
   garmentName?: string;
   designData?: any;
   measurements?: any;
@@ -64,19 +66,19 @@ const presetColors = [
 
 const getColorName = (hex: string | undefined): string => {
   if (!hex) return 'Not specified';
-  
+
   if (typeof hex === 'string' && !hex.startsWith('#') && !hex.match(/^[0-9a-fA-F]{3,6}$/)) {
     return hex.charAt(0).toUpperCase() + hex.slice(1);
   }
-  
+
   let normalizedHex = String(hex).toLowerCase().trim();
   if (!normalizedHex.startsWith('#')) {
     normalizedHex = `#${normalizedHex}`;
   }
-  
+
   const presetMatch = presetColors.find(color => color.value.toLowerCase() === normalizedHex);
   if (presetMatch) return presetMatch.name;
-  
+
   return 'Custom Color';
 };
 
@@ -117,7 +119,7 @@ export default function Customizer3DScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const webViewRef = useRef<WebView>(null);
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
@@ -141,6 +143,11 @@ export default function Customizer3DScreen() {
   const [showGarmentPicker, setShowGarmentPicker] = useState(false);
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
 
+  const [timeSlots, setTimeSlots] = useState<any[]>([]);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [isShopOpen, setIsShopOpen] = useState(true);
+
   useEffect(() => {
     if (showConfirmModal) {
       loadFabricTypes();
@@ -150,7 +157,7 @@ export default function Customizer3DScreen() {
 
   useEffect(() => {
     if (showConfirmModal && pendingCustomization && Object.keys(garmentCodeToName).length > 0) {
-      
+
       if (pendingCustomization?.fabricType && !selectedFabric) {
         const fabricName = pendingCustomization.fabricType.charAt(0).toUpperCase() + pendingCustomization.fabricType.slice(1);
         setSelectedFabric(fabricName);
@@ -159,15 +166,15 @@ export default function Customizer3DScreen() {
       if (pendingCustomization?.garmentType && !selectedGarment) {
         const garmentCode = pendingCustomization.garmentCode || '';
         const garmentTypeName = pendingCustomization.garmentType || '';
-        
+
         console.log('🎯 Trying to match garment:', { garmentCode, garmentTypeName });
-        
+
         let mappedGarment = '';
 
         if (garmentCode && garmentCodeToName[garmentCode.toLowerCase()]) {
           mappedGarment = garmentCodeToName[garmentCode.toLowerCase()];
         }
-        
+
         else if (garmentCode) {
           for (const [code, name] of Object.entries(garmentCodeToName)) {
             if (garmentCode.toLowerCase().includes(code) || code.includes(garmentCode.toLowerCase())) {
@@ -176,7 +183,7 @@ export default function Customizer3DScreen() {
             }
           }
         }
-        
+
         if (!mappedGarment && garmentTypeName) {
           const garmentTypeLower = garmentTypeName.toLowerCase();
           if (garmentCodeToName[garmentTypeLower]) {
@@ -191,9 +198,9 @@ export default function Customizer3DScreen() {
             }
           }
         }
-        
+
         console.log('🎯 Mapped garment to:', mappedGarment || '(no match)');
-        
+
         if (mappedGarment) {
           setSelectedGarment(mappedGarment);
         }
@@ -220,7 +227,7 @@ export default function Customizer3DScreen() {
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.fabrics && data.fabrics.length > 0) {
@@ -233,7 +240,7 @@ export default function Customizer3DScreen() {
       }
     } catch (error) {
       console.log('Error loading fabric types:', error);
-      
+
     }
   };
 
@@ -246,23 +253,23 @@ export default function Customizer3DScreen() {
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.garments && data.garments.length > 0) {
           const garmentTypesObj: { [key: string]: number } = {};
           const codeToNameMap: { [key: string]: string } = {};
-          
+
           data.garments.forEach((garment: { garment_name: string; garment_price: string; garment_code?: string }) => {
             garmentTypesObj[garment.garment_name] = parseFloat(garment.garment_price);
-            
+
             if (garment.garment_code) {
               codeToNameMap[garment.garment_code.toLowerCase()] = garment.garment_name;
             }
-            
+
             codeToNameMap[garment.garment_name.toLowerCase()] = garment.garment_name;
           });
-          
+
           setGarmentTypes(garmentTypesObj);
           setGarmentCodeToName(codeToNameMap);
           console.log('✅ Loaded garment types:', garmentTypesObj);
@@ -271,7 +278,7 @@ export default function Customizer3DScreen() {
       }
     } catch (error) {
       console.log('Error loading garment types:', error);
-      
+
     }
   };
 
@@ -325,7 +332,7 @@ export default function Customizer3DScreen() {
 
   const injectedJavaScript = `
     (function() {
-      
+
       window.REACT_NATIVE_AUTH = {
         token: ${authToken ? `"${authToken}"` : 'null'},
         userId: ${userId ? `"${userId}"` : 'null'},
@@ -333,7 +340,6 @@ export default function Customizer3DScreen() {
         version: '1.0.0'
       };
 
-      
       const originalLog = console.log;
       console.log = function(...args) {
         originalLog.apply(console, args);
@@ -345,7 +351,6 @@ export default function Customizer3DScreen() {
         }
       };
 
-      
       window.addEventListener('webglcontextlost', function(e) {
         e.preventDefault();
         console.log('WebGL context lost - attempting recovery...');
@@ -353,7 +358,7 @@ export default function Customizer3DScreen() {
 
       window.addEventListener('webglcontextrestored', function(e) {
         console.log('WebGL context restored');
-        
+
         if (window.location.reload) {
           setTimeout(() => {
             window.location.reload();
@@ -361,7 +366,6 @@ export default function Customizer3DScreen() {
         }
       }, false);
 
-      
       const observeCanvases = () => {
         const canvases = document.querySelectorAll('canvas');
         canvases.forEach(canvas => {
@@ -378,12 +382,10 @@ export default function Customizer3DScreen() {
         });
       };
 
-      
       const observer = new MutationObserver(observeCanvases);
       observer.observe(document.body, { childList: true, subtree: true });
       setTimeout(observeCanvases, 1000);
 
-      
       window.sendToReactNative = function(data) {
         if (window.ReactNativeWebView) {
           window.ReactNativeWebView.postMessage(JSON.stringify(data));
@@ -392,27 +394,24 @@ export default function Customizer3DScreen() {
         return false;
       };
 
-      
       window.IS_REACT_NATIVE_WEBVIEW = true;
-      
-      
-      document.dispatchEvent(new CustomEvent('reactNativeReady', { 
-        detail: window.REACT_NATIVE_AUTH 
+
+      document.dispatchEvent(new CustomEvent('reactNativeReady', {
+        detail: window.REACT_NATIVE_AUTH
       }));
 
-      
       if (typeof window.initReactNativeMode === 'function') {
         window.initReactNativeMode(window.REACT_NATIVE_AUTH);
       }
 
-      true; 
+      true;
     })();
   `;
 
   const handleMessage = useCallback(async (event: WebViewMessageEvent) => {
     try {
       const data: CustomizationData = JSON.parse(event.nativeEvent.data);
-      
+
       console.log('[Customizer3D] Received message from WebView:', data.type);
       console.log('[Customizer3D] Full data keys:', Object.keys(data));
 
@@ -420,24 +419,24 @@ export default function Customizer3DScreen() {
         case 'CUSTOMIZATION_COMPLETE':
           await handleCustomizationComplete(data);
           break;
-          
+
         case 'CUSTOMIZATION_CANCEL':
           handleCustomizationCancel();
           break;
-          
+
         case 'CUSTOMIZATION_ERROR':
           Alert.alert('Error', data.error || 'An error occurred in the customizer');
           break;
-          
+
         case 'DESIGN_IMAGE_READY':
           await handleSaveDesignImage(data);
           break;
-          
+
         case 'CONSOLE_LOG':
-          
+
           console.log('[WebView]:', data.message);
           break;
-          
+
         default:
           console.log('Unknown message type:', data.type);
       }
@@ -455,7 +454,7 @@ export default function Customizer3DScreen() {
     setIsSaving(true);
 
     try {
-      
+
       const base64Data = data.imageData.replace(/^data:image\/\w+;base64,/, '');
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -468,13 +467,13 @@ export default function Customizer3DScreen() {
       });
 
       if (await Sharing.isAvailableAsync()) {
-        
+
         await Sharing.shareAsync(fileUri, {
           mimeType: 'image/png',
           dialogTitle: 'Save or Share your design',
           UTI: 'public.png',
         });
-        
+
         Alert.alert(
           '✅ Design Ready!',
           'Use the share menu to save to your gallery or share with others.',
@@ -492,7 +491,7 @@ export default function Customizer3DScreen() {
         try {
           await FileSystem.deleteAsync(fileUri, { idempotent: true });
         } catch (e) {
-          
+
         }
       }, 5000);
 
@@ -513,16 +512,48 @@ export default function Customizer3DScreen() {
     console.log('[Customizer3D] angleImages:', data.angleImages);
     console.log('[Customizer3D] designImage:', data.designImage ? 'present' : 'missing');
     console.log('[Customizer3D] designData:', data.designData);
-    
+
     setPendingCustomization(data);
     setNotes(data.notes || '');
-    setPreferredDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+    const defaultDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    setPreferredDate(defaultDate);
     setShowConfirmModal(true);
+    await loadTimeSlotsForDate(defaultDate);
   };
 
-  const handleDateConfirm = (selectedDate: Date) => {
+  const handleDateConfirm = async (selectedDate: Date) => {
     setPreferredDate(selectedDate);
     setShowDatePicker(false);
+    setSelectedTimeSlot('');
+    await loadTimeSlotsForDate(selectedDate);
+  };
+
+  const loadTimeSlotsForDate = async (date: Date) => {
+    setLoadingSlots(true);
+    setSelectedTimeSlot('');
+    try {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      const result = await appointmentSlotService.getAllSlotsWithAvailability('customization', dateStr);
+      if (result.success) {
+        if (!result.isShopOpen) {
+          setIsShopOpen(false);
+          setTimeSlots([]);
+          return;
+        }
+        setIsShopOpen(true);
+        setTimeSlots(result.slots || []);
+      } else {
+        setTimeSlots([]);
+      }
+    } catch (error: any) {
+      console.log('[Customizer3D] ERROR loading time slots:', error.message || error);
+      setTimeSlots([]);
+    } finally {
+      setLoadingSlots(false);
+    }
   };
 
   const handleDateCancel = () => {
@@ -539,7 +570,11 @@ export default function Customizer3DScreen() {
     if (!selectedGarment) {
       errors.garment = 'Please select a garment type';
     }
-    
+    if (!selectedTimeSlot) {
+      Alert.alert('Missing Information', 'Please select a time slot');
+      return;
+    }
+
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;
@@ -548,7 +583,7 @@ export default function Customizer3DScreen() {
 
     setIsSaving(true);
     setShowConfirmModal(false);
-    
+
     try {
       let imageUrl = 'no-image';
 
@@ -557,7 +592,7 @@ export default function Customizer3DScreen() {
         try {
           const { formData, fileUri } = await convertBase64ToFormData(pendingCustomization.designImage, 'custom-design.png');
           tempFileUri = fileUri;
-          
+
           const uploadResponse = await uploadCustomizationImage(formData);
           imageUrl = uploadResponse.imageUrl || uploadResponse.data?.imageUrl || imageUrl;
 
@@ -565,21 +600,21 @@ export default function Customizer3DScreen() {
             try {
               await FileSystem.deleteAsync(tempFileUri, { idempotent: true });
             } catch (cleanupError) {
-              
+
               console.log('Cleanup error (non-critical):', cleanupError);
             }
           }
         } catch (uploadError) {
           console.error('Image upload failed:', uploadError);
-          
+
           if (tempFileUri) {
             try {
               await FileSystem.deleteAsync(tempFileUri, { idempotent: true });
             } catch (e) {
-              
+
             }
           }
-          
+
         }
       }
 
@@ -587,23 +622,33 @@ export default function Customizer3DScreen() {
         ...(pendingCustomization.designData || {}),
         angleImages: pendingCustomization.angleImages,
       };
-      
-      // Format date in local timezone to avoid UTC conversion issues
+
       const year = preferredDate.getFullYear();
       const month = String(preferredDate.getMonth() + 1).padStart(2, '0');
       const day = String(preferredDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-      
+
+      try {
+        const slotResult = await appointmentSlotService.bookSlot('customization', dateStr, selectedTimeSlot);
+        if (!slotResult?.success) {
+          throw new Error(slotResult?.message || 'Failed to book appointment slot.');
+        }
+        console.log('Slot booked successfully:', slotResult);
+      } catch (slotError: any) {
+        throw new Error(slotError.message || 'Failed to book appointment slot. Please try again.');
+      }
+
       const cartResponse = await addCustomizationToCart({
         garmentType: selectedGarment,
         fabricType: selectedFabric,
         preferredDate: dateStr,
+        preferredTime: selectedTimeSlot,
         notes: notes || pendingCustomization.notes || '',
         imageUrl: imageUrl,
         designData: designDataWithAngleImages,
         estimatedPrice: estimatedPrice || pendingCustomization.estimatedPrice || 500,
       });
-      
+
       Alert.alert(
         'Success!',
         'Your custom design has been added to cart.',
@@ -628,9 +673,11 @@ export default function Customizer3DScreen() {
     } finally {
       setIsSaving(false);
       setPendingCustomization(null);
-      
+
       setSelectedFabric('');
       setSelectedGarment('');
+      setSelectedTimeSlot('');
+      setTimeSlots([]);
       setNotes('');
       setFormErrors({});
     }
@@ -641,6 +688,8 @@ export default function Customizer3DScreen() {
     setPendingCustomization(null);
     setSelectedFabric('');
     setSelectedGarment('');
+    setSelectedTimeSlot('');
+    setTimeSlots([]);
     setNotes('');
     setFormErrors({});
   };
@@ -705,7 +754,7 @@ export default function Customizer3DScreen() {
           <Text style={styles.headerTitle}>3D Customizer</Text>
           <View style={styles.placeholder} />
         </View>
-        
+
         <View style={styles.errorContainer}>
           <Ionicons name="cloud-offline-outline" size={80} color="#5D4037" />
           <Text style={styles.errorTitle}>Connection Error</Text>
@@ -734,8 +783,8 @@ export default function Customizer3DScreen() {
           <Ionicons name="arrow-back" size={24} color="#5D4037" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>3D Customizer</Text>
-        <TouchableOpacity 
-          onPress={() => webViewRef.current?.reload()} 
+        <TouchableOpacity
+          onPress={() => webViewRef.current?.reload()}
           style={styles.refreshButton}
         >
           <Ionicons name="refresh" size={22} color="#5D4037" />
@@ -934,6 +983,84 @@ export default function Customizer3DScreen() {
                   <Ionicons name="chevron-forward" size={20} color="#8D6E63" />
                 </TouchableOpacity>
               </View>
+
+              <View style={styles.formSection}>
+                <Text style={styles.sectionLabel}>
+                  🕐 Select Time Slot <Text style={styles.required}>*</Text>
+                </Text>
+                <View style={styles.legendContainer}>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, styles.legendDotAvailable]} />
+                    <Text style={styles.legendText}>Available</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, styles.legendDotLimited]} />
+                    <Text style={styles.legendText}>Limited</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, styles.legendDotFull]} />
+                    <Text style={styles.legendText}>Full</Text>
+                  </View>
+                </View>
+                {loadingSlots ? (
+                  <View style={styles.tsLoadingContainer}>
+                    <ActivityIndicator size="small" color="#B8860B" />
+                    <Text style={styles.tsLoadingText}>Loading time slots...</Text>
+                  </View>
+                ) : !isShopOpen ? (
+                  <View style={styles.shopClosedContainer}>
+                    <Ionicons name="close-circle" size={40} color="#ef4444" />
+                    <Text style={styles.shopClosedText}>
+                      The shop is closed on this date. Please select another date.
+                    </Text>
+                  </View>
+                ) : timeSlots.length > 0 ? (
+                  <View style={styles.timeSlotsGrid}>
+                    {(() => {
+                      const seenTimes = new Set<string>();
+                      const uniqueSlots = timeSlots.filter((slot) => {
+                        if (seenTimes.has(slot.time_slot)) return false;
+                        seenTimes.add(slot.time_slot);
+                        return true;
+                      });
+                      return uniqueSlots.map((slot) => (
+                        <TouchableOpacity
+                          key={slot.slot_id || slot.time_slot}
+                          style={[
+                            styles.timeSlotButton,
+                            slot.status === 'available' && styles.timeSlotButtonAvailable,
+                            slot.status === 'limited' && styles.timeSlotButtonLimited,
+                            slot.status === 'full' && styles.timeSlotButtonFull,
+                            selectedTimeSlot === slot.time_slot && styles.timeSlotButtonSelected,
+                            !slot.isClickable && styles.timeSlotButtonDisabled,
+                          ]}
+                          onPress={() => {
+                            if (slot.isClickable) {
+                              setSelectedTimeSlot(slot.time_slot);
+                            }
+                          }}
+                          disabled={!slot.isClickable}
+                        >
+                          <Text style={styles.slotTime}>{slot.display_time}</Text>
+                          <Text style={styles.slotStatus}>
+                            {slot.status === 'full' ? 'Fully Booked' :
+                             slot.status === 'limited' ? `${slot.available} LEFT` :
+                             slot.status === 'available' ? `${slot.available} SPOTS` : 'Unavailable'}
+                          </Text>
+                        </TouchableOpacity>
+                      ));
+                    })()}
+                  </View>
+                ) : (
+                  <View style={styles.noSlotsContainer}>
+                    <Ionicons name="calendar-outline" size={40} color="#8D6E63" />
+                    <Text style={styles.noSlotsText}>
+                      Select a date above to see available time slots.
+                    </Text>
+                  </View>
+                )}
+              </View>
+
               {pendingCustomization?.designData && (
                 <View style={styles.customizationChoicesSection}>
                   <Text style={styles.customizationChoicesTitle}>🎨 3D Customization Choices</Text>
@@ -1214,7 +1341,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1351,7 +1478,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  
+
   angleImagesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1388,7 +1515,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textTransform: 'capitalize',
   },
-  
+
   formSection: {
     paddingHorizontal: 20,
     marginBottom: 16,
@@ -1453,7 +1580,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginLeft: 4,
   },
-  
+
   customizationChoicesSection: {
     marginHorizontal: 20,
     marginBottom: 16,
@@ -1506,7 +1633,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E8D5C4',
   },
-  
+
   priceEstimateSection: {
     marginHorizontal: 20,
     marginBottom: 16,
@@ -1532,5 +1659,120 @@ const styles = StyleSheet.create({
     color: '#666',
     fontStyle: 'italic',
     lineHeight: 18,
+  },
+
+  legendContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 20,
+    marginBottom: 16,
+    paddingVertical: 10,
+    backgroundColor: '#FFFEF9',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(93, 64, 55, 0.1)',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendDotAvailable: {
+    backgroundColor: '#22c55e',
+  },
+  legendDotLimited: {
+    backgroundColor: '#f59e0b',
+  },
+  legendDotFull: {
+    backgroundColor: '#ef4444',
+  },
+  legendText: {
+    fontSize: 13,
+    color: '#555',
+  },
+  timeSlotsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+    justifyContent: 'center',
+  },
+  timeSlotButton: {
+    width: (Dimensions.get('window').width - 88) / 3,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 72,
+  },
+  timeSlotButtonAvailable: {
+    backgroundColor: '#f0fdf4',
+    borderColor: '#22c55e',
+  },
+  timeSlotButtonLimited: {
+    backgroundColor: '#fffbeb',
+    borderColor: '#f59e0b',
+  },
+  timeSlotButtonFull: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#ef4444',
+    opacity: 0.75,
+  },
+  timeSlotButtonSelected: {
+    backgroundColor: '#22c55e',
+    borderColor: '#15803d',
+  },
+  timeSlotButtonDisabled: {
+    opacity: 0.6,
+  },
+  slotTime: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  slotStatus: {
+    fontSize: 11,
+    fontWeight: '500',
+    opacity: 0.85,
+  },
+  tsLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    gap: 12,
+  },
+  tsLoadingText: {
+    fontSize: 14,
+    color: '#8D6E63',
+  },
+  shopClosedContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    gap: 10,
+  },
+  shopClosedText: {
+    fontSize: 14,
+    color: '#ef4444',
+    textAlign: 'center',
+  },
+  noSlotsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    gap: 10,
+  },
+  noSlotsText: {
+    fontSize: 14,
+    color: '#8D6E63',
+    textAlign: 'center',
   },
 });

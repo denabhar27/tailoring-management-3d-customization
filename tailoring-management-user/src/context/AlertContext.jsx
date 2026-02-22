@@ -54,7 +54,7 @@ export const AlertProvider = ({ children }) => {
         message,
         onClose: () => {
           setAlertState(prev => ({ ...prev, isOpen: false }));
-          
+
           setTimeout(() => {
             document.body.style.overflow = 'auto';
           }, 100);
@@ -75,7 +75,7 @@ export const AlertProvider = ({ children }) => {
         cancelText: options.cancelText || 'Cancel',
         onConfirm: () => {
           setConfirmState(prev => ({ ...prev, isOpen: false }));
-          
+
           setTimeout(() => {
             document.body.style.overflow = 'auto';
           }, 100);
@@ -83,7 +83,7 @@ export const AlertProvider = ({ children }) => {
         },
         onCancel: () => {
           setConfirmState(prev => ({ ...prev, isOpen: false }));
-          
+
           setTimeout(() => {
             document.body.style.overflow = 'auto';
           }, 100);
@@ -103,7 +103,7 @@ export const AlertProvider = ({ children }) => {
         defaultValue,
         onConfirm: (value) => {
           setInputState(prev => ({ ...prev, isOpen: false }));
-          
+
           setTimeout(() => {
             document.body.style.overflow = 'auto';
           }, 100);
@@ -111,7 +111,7 @@ export const AlertProvider = ({ children }) => {
         },
         onCancel: () => {
           setInputState(prev => ({ ...prev, isOpen: false }));
-          
+
           setTimeout(() => {
             document.body.style.overflow = 'auto';
           }, 100);

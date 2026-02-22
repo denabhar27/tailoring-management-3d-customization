@@ -19,10 +19,10 @@ import { useRouter } from "expo-router";
 import { CartItem } from "../../../utils/cartStore";
 import { orderStore } from "../../../utils/orderStore";
 import { cartService, API_BASE_URL } from "../../../utils/apiService";
+import RentalImageCarousel from "../../../components/RentalImageCarousel";
 
 const { width, height } = Dimensions.get("window");
 
-// Helper function to format service type for display
 const formatServiceType = (serviceType: string): string => {
   switch (serviceType?.toLowerCase()) {
     case 'dry_cleaning':
@@ -36,6 +36,61 @@ const formatServiceType = (serviceType: string): string => {
       return 'Rental';
     default:
       return serviceType || 'Service';
+  }
+};
+
+const formatSize = (size: any): { label: string; value: string }[] | null => {
+  if (!size) return null;
+
+  if (typeof size === 'string' && !size.trim().startsWith('{')) {
+    return [{ label: 'Size', value: size }];
+  }
+
+  try {
+    let measurements = typeof size === 'string' ? JSON.parse(size) : size;
+
+    if (!measurements || typeof measurements !== 'object' || Array.isArray(measurements)) {
+      return [{ label: 'Size', value: typeof size === 'string' ? size : JSON.stringify(size) }];
+    }
+
+    const labelMap: { [key: string]: string } = {
+      'chest': 'Chest',
+      'shoulders': 'Shoulders',
+      'sleeveLength': 'Sleeve',
+      'neck': 'Neck',
+      'waist': 'Waist',
+      'length': 'Length'
+    };
+
+    const parts = Object.entries(measurements)
+      .filter(([key, value]) => value !== null && value !== undefined && value !== '' && value !== '0')
+      .map(([key, value]) => {
+        const label = labelMap[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim();
+
+        let displayValue: string;
+        if (typeof value === 'object' && value !== null) {
+          const val = value as { inch?: string; cm?: string; value?: string };
+
+          if (val.inch !== undefined && val.cm !== undefined) {
+            displayValue = `${val.inch} in / ${val.cm} cm`;
+          } else if (val.inch !== undefined) {
+            displayValue = `${val.inch} in`;
+          } else if (val.cm !== undefined) {
+            displayValue = `${val.cm} cm`;
+          } else if (val.value !== undefined) {
+            displayValue = `${val.value} in`;
+          } else {
+            displayValue = JSON.stringify(value);
+          }
+        } else {
+          displayValue = `${value} in`;
+        }
+        return { label, value: displayValue };
+      });
+
+    return parts.length > 0 ? parts : null;
+  } catch (e) {
+    return [{ label: 'Size', value: typeof size === 'string' ? size : JSON.stringify(size) }];
   }
 };
 
@@ -64,25 +119,25 @@ export default function CartScreen() {
       console.log('Raw cart response from backend:', response);
       if (response.success) {
         console.log('Cart items from backend:', response.items);
-        
+
           const transformedItems = response.items.map((item: any) => {
           console.log('Processing cart item:', item);
           console.log('Specific data:', item.specific_data);
           console.log('Image URL from backend:', item.specific_data?.imageUrl);
 
           const API_BASE = API_BASE_URL.replace('/api', '');
-          
+
           const isBundle = item.specific_data?.is_bundle || item.pricing_factors?.is_bundle;
           const bundleItems = item.specific_data?.bundle_items || [];
 
-          let imageUrl = item.specific_data?.imageUrl || 
-                        item.specific_data?.image_url || 
+          let imageUrl = item.specific_data?.imageUrl ||
+                        item.specific_data?.image_url ||
                         item.specific_data?.designImage;
 
           if (item.service_type === 'rental' && !imageUrl) {
             imageUrl = item.specific_data?.image_url || (bundleItems.length > 0 ? bundleItems[0]?.image_url : null);
           }
-          
+
           let processedImage = '';
           if (imageUrl && imageUrl !== 'no-image' && imageUrl.trim() !== '') {
             processedImage = imageUrl.startsWith('http') ? imageUrl : `${API_BASE}${imageUrl}`;
@@ -92,10 +147,10 @@ export default function CartScreen() {
           const rawDate = item.specific_data?.pickupDate || item.specific_data?.preferredDate || item.appointment_date;
           const appointmentTime = item.specific_data?.appointmentTime;
           let formattedDate = '';
-          
+
           if (rawDate) {
             try {
-              
+
               if (rawDate.includes('T') && rawDate.match(/\d{2}:\d{2}/)) {
                 const date = new Date(rawDate);
                 formattedDate = date.toLocaleString('en-US', {
@@ -108,7 +163,7 @@ export default function CartScreen() {
                   hour12: true
                 });
               } else if (appointmentTime) {
-                
+
                 const dateOnly = new Date(rawDate);
                 const timeParts = appointmentTime.split(':');
                 if (timeParts.length >= 2) {
@@ -123,7 +178,7 @@ export default function CartScreen() {
                     hour12: true
                   });
                 } else {
-                  
+
                   formattedDate = dateOnly.toLocaleDateString('en-US', {
                     weekday: 'short',
                     month: 'short',
@@ -132,7 +187,7 @@ export default function CartScreen() {
                   });
                 }
               } else {
-                
+
                 const date = new Date(rawDate);
                 formattedDate = date.toLocaleDateString('en-US', {
                   weekday: 'short',
@@ -145,7 +200,7 @@ export default function CartScreen() {
               formattedDate = rawDate;
             }
           }
-          
+
           return {
             id: item.cart_id,
             service: item.service_type,
@@ -155,7 +210,7 @@ export default function CartScreen() {
             price: parseFloat(item.final_price) || 0,
             basePrice: parseFloat(item.base_price) || 0,
             icon: getServiceIcon(item.service_type),
-            // Multiple garments support - get from array or legacy fields
+
             garments: item.specific_data?.garments || [],
             garmentType: item.specific_data?.garments?.[0]?.garmentType || item.specific_data?.garmentType || '',
             damageType: item.specific_data?.garments?.[0]?.damageLevel || item.specific_data?.damageLevel || item.specific_data?.damageType || '',
@@ -163,29 +218,53 @@ export default function CartScreen() {
             specialInstructions: item.specific_data?.specialInstructions || '',
             image: processedImage,
             appointmentDate: formattedDate,
-            
+
             clothingBrand: item.specific_data?.garments?.[0]?.brand || item.specific_data?.clothingBrand || item.specific_data?.brand || '',
             quantity: item.specific_data?.quantity || 1,
             fabricType: item.specific_data?.fabricType || '',
             style: item.specific_data?.style || '',
             buttonStyle: item.specific_data?.buttonStyle || '',
             sizeMeasurement: item.specific_data?.sizeMeasurement || '',
-            
+
             downpayment: item.pricing_factors?.downpayment || item.specific_data?.downpayment || 0,
             rentalStartDate: item.rental_start_date || '',
             rentalEndDate: item.rental_end_date || '',
-            
+
             pricePerItem: item.specific_data?.garments?.[0]?.pricePerItem || item.specific_data?.pricePerItem || '',
             isEstimatedPrice: item.specific_data?.isEstimatedPrice || false,
-            
+
             preferredDate: item.specific_data?.preferredDate || '',
             preferredTime: item.specific_data?.preferredTime || '',
             notes: item.specific_data?.notes || '',
             designData: item.specific_data?.designData || null,
-            
+
             isBundle: isBundle,
             bundleItems: bundleItems,
-            
+
+            frontImage: (() => {
+              const img = item.specific_data?.front_image;
+              if (!img || img === 'no-image' || img.trim() === '') return null;
+              return img.startsWith('http') ? img : `${API_BASE}${img}`;
+            })(),
+            backImage: (() => {
+              const img = item.specific_data?.back_image;
+              if (!img || img === 'no-image' || img.trim() === '') return null;
+              return img.startsWith('http') ? img : `${API_BASE}${img}`;
+            })(),
+            sideImage: (() => {
+              const img = item.specific_data?.side_image;
+              if (!img || img === 'no-image' || img.trim() === '') return null;
+              return img.startsWith('http') ? img : `${API_BASE}${img}`;
+            })(),
+
+            rentalItemName: item.specific_data?.item_name || '',
+            rentalBrand: item.specific_data?.brand || '',
+            rentalSize: item.specific_data?.size || '',
+            rentalColor: item.specific_data?.color || '',
+            rentalMaterial: item.specific_data?.material || '',
+            rentalCategory: item.specific_data?.category || '',
+            rentalDescription: item.specific_data?.description || '',
+
             rawItem: item,
           };
         });
@@ -199,7 +278,7 @@ export default function CartScreen() {
       setLoading(false);
     }
   };
-  
+
   const getServiceIcon = (serviceType: string): string => {
     switch (serviceType?.toLowerCase()) {
       case 'dry_cleaning':
@@ -263,10 +342,10 @@ export default function CartScreen() {
   const confirmBooking = async () => {
     try {
       setLoading(true);
-      
+
       const response = await cartService.submitCart(orderNotes, selectedItems);
       if (response.success) {
-        
+
         const selectedCartItems = cartItems.filter((item) =>
           selectedItems.includes(item.id)
         );
@@ -303,19 +382,19 @@ export default function CartScreen() {
         await fetchCartItems();
 
         Alert.alert(
-          "Success", 
+          "Success",
           "Order submitted successfully! Check your order history.",
           [
             {
               text: "OK",
               onPress: () => {
-                
+
                 setTimeout(() => {
                   try {
                     router.replace("/home");
                   } catch (navError) {
                     console.error("Navigation error:", navError);
-                    
+
                     try {
                       router.push("/home");
                     } catch (pushError) {
@@ -672,8 +751,29 @@ export default function CartScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               {selectedItemDetails && (
                 <>
+                  {/* For rental items, show 4-image carousel (front, back, side, main) */}
+                  {selectedItemDetails.service?.toLowerCase() === 'rental' && (() => {
+                    const rentalImages = [
+                      { url: selectedItemDetails.frontImage, label: 'Front' },
+                      { url: selectedItemDetails.backImage, label: 'Back' },
+                      { url: selectedItemDetails.sideImage, label: 'Side' },
+                      { url: selectedItemDetails.image, label: 'Main' },
+                    ].filter(img => img.url && img.url.trim() !== '' && img.url !== 'no-image');
+
+                    if (rentalImages.length > 0) {
+                      return (
+                        <RentalImageCarousel
+                          images={rentalImages}
+                          itemName={selectedItemDetails.item || 'Rental Item'}
+                          imageHeight={250}
+                          showFullscreen={true}
+                        />
+                      );
+                    }
+                    return null;
+                  })()}
                   {/* For customization with angle images, show 4 views at top */}
-                  {(selectedItemDetails.service?.toLowerCase() === 'customization' || selectedItemDetails.service?.toLowerCase() === 'customize') && 
+                  {(selectedItemDetails.service?.toLowerCase() === 'customization' || selectedItemDetails.service?.toLowerCase() === 'customize') &&
                    selectedItemDetails.designData?.angleImages ? (
                     <View style={styles.topAngleImagesContainer}>
                       <View style={styles.angleImagesGrid}>
@@ -695,7 +795,7 @@ export default function CartScreen() {
                         ))}
                       </View>
                     </View>
-                  ) : selectedItemDetails.image && selectedItemDetails.image !== 'no-image' && selectedItemDetails.image.trim() !== '' && !selectedItemDetails.image.includes('no-image') ? (
+                  ) : selectedItemDetails.service?.toLowerCase() !== 'rental' && selectedItemDetails.image && selectedItemDetails.image !== 'no-image' && selectedItemDetails.image.trim() !== '' && !selectedItemDetails.image.includes('no-image') ? (
                     <>
                       <Image
                         source={{ uri: selectedItemDetails.image }}
@@ -714,11 +814,11 @@ export default function CartScreen() {
                         </Text>
                       </View>
                     </>
-                  ) : (
-                    <View style={[styles.detailsImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f0f0' }]}> 
+                  ) : selectedItemDetails.service?.toLowerCase() !== 'rental' ? (
+                    <View style={[styles.detailsImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f0f0' }]}>
                       <Text style={{ color: '#666' }}>No image available</Text>
                     </View>
-                  )}
+                  ) : null}
 
                   <View style={styles.detailsSection}>
                     <Text style={styles.detailsLabel}>Service</Text>
@@ -947,11 +1047,70 @@ export default function CartScreen() {
                           </Text>
                         </View>
                       )}
-                      {selectedItemDetails.garmentType && !selectedItemDetails.isBundle && (
+                      {selectedItemDetails.rentalItemName && (
                         <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Item</Text>
+                          <Text style={styles.detailsLabel}>Item Name</Text>
                           <Text style={styles.detailsValue}>
-                            {selectedItemDetails.garmentType}
+                            {selectedItemDetails.rentalItemName}
+                          </Text>
+                        </View>
+                      )}
+                      {selectedItemDetails.rentalBrand && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Brand</Text>
+                          <Text style={styles.detailsValue}>
+                            {selectedItemDetails.rentalBrand}
+                          </Text>
+                        </View>
+                      )}
+                      {selectedItemDetails.rentalCategory && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Category</Text>
+                          <Text style={styles.detailsValue}>
+                            {selectedItemDetails.rentalCategory}
+                          </Text>
+                        </View>
+                      )}
+                      {selectedItemDetails.rentalSize && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Size Details</Text>
+                          <View style={styles.sizeContainer}>
+                            {(() => {
+                              const sizeData = formatSize(selectedItemDetails.rentalSize);
+                              if (sizeData && Array.isArray(sizeData)) {
+                                return sizeData.map((measurement, idx) => (
+                                  <View key={idx} style={styles.sizeRow}>
+                                    <Text style={styles.sizeLabel}>{measurement.label}:</Text>
+                                    <Text style={styles.sizeValue}>{measurement.value}</Text>
+                                  </View>
+                                ));
+                              }
+                              return <Text style={styles.detailsValue}>N/A</Text>;
+                            })()}
+                          </View>
+                        </View>
+                      )}
+                      {selectedItemDetails.rentalColor && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Color</Text>
+                          <Text style={styles.detailsValue}>
+                            {selectedItemDetails.rentalColor}
+                          </Text>
+                        </View>
+                      )}
+                      {selectedItemDetails.rentalMaterial && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Fabric/Material</Text>
+                          <Text style={styles.detailsValue}>
+                            {selectedItemDetails.rentalMaterial}
+                          </Text>
+                        </View>
+                      )}
+                      {selectedItemDetails.rentalDescription && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Description</Text>
+                          <Text style={styles.detailsValue}>
+                            {selectedItemDetails.rentalDescription}
                           </Text>
                         </View>
                       )}
@@ -967,7 +1126,7 @@ export default function CartScreen() {
                   )}
                   <View style={styles.detailsSection}>
                     <Text style={styles.detailsLabel}>
-                      {selectedItemDetails.service?.toLowerCase() === 'rental' ? 'Rental Price' : 
+                      {selectedItemDetails.service?.toLowerCase() === 'rental' ? 'Rental Price' :
                        selectedItemDetails.service?.toLowerCase() === 'dry_cleaning' && selectedItemDetails.isEstimatedPrice ? 'Estimated Price' :
                        selectedItemDetails.service?.toLowerCase() === 'dry_cleaning' ? 'Final Price' : 'Estimated Price'}
                     </Text>
@@ -1010,10 +1169,10 @@ export default function CartScreen() {
                 {bundleItems.map((bundleItem: any, index: number) => {
                   const imageUrl = bundleItem.image_url || bundleItem.imageUrl;
                   const API_BASE = API_BASE_URL.replace('/api', '');
-                  const fullImageUrl = imageUrl && imageUrl !== 'no-image' 
+                  const fullImageUrl = imageUrl && imageUrl !== 'no-image'
                     ? (imageUrl.startsWith('http') ? imageUrl : `${API_BASE}${imageUrl}`)
                     : null;
-                  
+
                   return (
                     <TouchableOpacity
                       key={index}
@@ -1317,10 +1476,10 @@ const styles = StyleSheet.create({
   itemPriceSmall: { fontSize: 14, fontWeight: "600", color: "#94665B", marginTop: 2 },
   itemPricePending: { fontSize: 14, fontWeight: "600", color: "#F59E0B", fontStyle: "italic", marginTop: 4 },
   removeButton: { padding: 10 },
-  cancelButtonText: { 
-    color: "#EF4444", 
-    fontSize: 14, 
-    fontWeight: "600" 
+  cancelButtonText: {
+    color: "#EF4444",
+    fontSize: 14,
+    fontWeight: "600"
   },
 
   summarySection: {
@@ -1513,7 +1672,36 @@ const styles = StyleSheet.create({
   },
   detailsValue: { fontSize: 17, color: "#1F2937", fontWeight: "500" },
   detailsPriceValue: { fontSize: 24, fontWeight: "800", color: "#94665B" },
-  
+
+  // Size measurement styles (matching web styling)
+  sizeContainer: {
+    backgroundColor: "#F5F5F5",
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  sizeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEEEEE",
+  },
+  sizeLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#555",
+    flex: 1,
+  },
+  sizeValue: {
+    fontSize: 14,
+    color: "#333",
+    flex: 1,
+    textAlign: "right",
+  },
+
   // Garment card styles
   garmentCard: {
     marginHorizontal: 24,
@@ -1667,7 +1855,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingBottom: 12,
   },
-  
+
   angleImagesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

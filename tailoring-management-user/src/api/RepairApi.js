@@ -161,7 +161,7 @@ export async function addRepairToCart(repairData) {
   try {
     const cartItem = {
       serviceType: 'repair',
-      serviceId: null, 
+      serviceId: null,
       quantity: 1,
       basePrice: repairData.basePrice,
       finalPrice: repairData.estimatedPrice,
@@ -175,10 +175,10 @@ export async function addRepairToCart(repairData) {
         imageUrl: repairData.imageUrl,
         pickupDate: repairData.pickupDate,
         uploadedAt: new Date().toISOString(),
-        // Multiple garments support
+
         garments: repairData.garments || [],
         isMultipleGarments: repairData.isMultipleGarments || false,
-        // Legacy single-garment fields (for backwards compatibility)
+
         damageLevel: repairData.garments?.[0]?.damageLevel || repairData.damageLevel,
         garmentType: repairData.garments?.[0]?.garmentType || repairData.garmentType,
         damageDescription: repairData.garments?.[0]?.notes || repairData.damageDescription,

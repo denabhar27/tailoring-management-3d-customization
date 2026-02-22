@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  getAllRepairServices, 
-  getRepairServicesByDamageLevel, 
+import {
+  getAllRepairServices,
+  getRepairServicesByDamageLevel,
   getPriceEstimate,
   uploadRepairImage,
   addRepairToCart
@@ -10,7 +10,7 @@ import { API_BASE_URL } from '../../api/config';
 import '../../styles/RepairModal.css';
 
 const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
-  const [step, setStep] = useState(1); 
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -57,9 +57,9 @@ const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
   const handleDamageLevelSelect = async (level) => {
     setLoading(true);
     setError('');
-    
+
     try {
-      
+
       const servicesResult = await getRepairServicesByDamageLevel(level);
       if (servicesResult.success) {
         setServices(servicesResult.data);
@@ -68,12 +68,12 @@ const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
       const priceResult = await getPriceEstimate(level);
       if (priceResult.success) {
         setPriceEstimates(priceResult.data);
-        
+
         if (priceResult.data.length > 0) {
           setEstimatedPrice(parseFloat(priceResult.data[0].base_price));
         }
       }
-      
+
       setDamageLevel(level);
       setStep(2);
     } catch (err) {
@@ -85,7 +85,7 @@ const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const handleServiceSelect = (service) => {
     setSelectedService(service);
-    
+
     const basePrice = parseFloat(service.base_price);
     const adjustment = parseFloat(service.price_adjustment);
     const finalPrice = basePrice + adjustment;
@@ -98,7 +98,7 @@ const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
 
     setLoading(true);
     setError('');
-    
+
     try {
       const result = await uploadRepairImage(file);
       if (result.success) {
@@ -123,7 +123,7 @@ const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
 
     setLoading(true);
     setError('');
-    
+
     try {
       const repairData = {
         serviceId: selectedService.service_id,
@@ -139,7 +139,7 @@ const RepairModal = ({ isOpen, onClose, onCartUpdate }) => {
       };
 
       const result = await addRepairToCart(repairData);
-      
+
       if (result.success) {
         setSuccess('Repair service added to cart!');
         setTimeout(() => {

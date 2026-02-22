@@ -52,7 +52,7 @@ export default function CustomizationService() {
   const [notes, setNotes] = useState('');
   const [preferredDate, setPreferredDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
   const [showDatePicker, setShowDatePicker] = useState(false);
-  
+
   const [timeSlots, setTimeSlots] = useState<any[]>([]);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -95,7 +95,7 @@ export default function CustomizationService() {
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.garments && data.garments.length > 0) {
@@ -111,7 +111,7 @@ export default function CustomizationService() {
           if (!hasUniform) {
             transformedGarments.push({ id: 'uniform', label: 'Uniform', price: 0 });
           }
-          
+
           if (transformedGarments.length > 0) {
             setGarmentTypes(transformedGarments);
             console.log('✅ Loaded garment types for service:', transformedGarments);
@@ -120,7 +120,7 @@ export default function CustomizationService() {
       }
     } catch (error) {
       console.log('Error loading garment types:', error);
-      
+
     } finally {
       setLoadingGarments(false);
     }
@@ -135,7 +135,7 @@ export default function CustomizationService() {
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.fabrics && data.fabrics.length > 0) {
@@ -148,7 +148,7 @@ export default function CustomizationService() {
       }
     } catch (error) {
       console.log('Error loading fabric types:', error);
-      
+
     }
   };
 
@@ -159,8 +159,8 @@ export default function CustomizationService() {
   const handleDateConfirm = async (selectedDate: Date) => {
     setPreferredDate(selectedDate);
     setShowDatePicker(false);
-    setSelectedTimeSlot(''); 
-    
+    setSelectedTimeSlot('');
+
     await loadTimeSlotsForDate(selectedDate);
   };
 
@@ -249,7 +249,7 @@ export default function CustomizationService() {
             type: 'image/jpeg',
             name: 'customization.jpg',
           } as any);
-          
+
           const uploadResponse = await uploadCustomizationImage(formData);
           imageUrl = uploadResponse.imageUrl || uploadResponse.data?.imageUrl || 'no-image';
         } catch (uploadError) {
@@ -257,7 +257,6 @@ export default function CustomizationService() {
         }
       }
 
-      // Format date in local timezone to avoid UTC conversion issues
       const year = preferredDate.getFullYear();
       const month = String(preferredDate.getMonth() + 1).padStart(2, '0');
       const day = String(preferredDate.getDate()).padStart(2, '0');
@@ -316,12 +315,12 @@ export default function CustomizationService() {
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.banner3D}
           onPress={handleOpen3DCustomizer}
           activeOpacity={0.8}
@@ -346,7 +345,7 @@ export default function CustomizationService() {
         {loadingGarments ? (
           <ActivityIndicator size="small" color="#B8860B" style={{ marginVertical: 20 }} />
         ) : (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.dropdownSelector}
           onPress={() => setShowGarmentPicker(true)}
         >
@@ -372,7 +371,7 @@ export default function CustomizationService() {
               animationType="fade"
               onRequestClose={() => setShowGarmentPicker(false)}
             >
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.modalOverlay}
                 activeOpacity={1}
                 onPress={() => setShowGarmentPicker(false)}
@@ -427,7 +426,7 @@ export default function CustomizationService() {
               </View>
             )}
             <Text style={styles.sectionTitle}>Select Fabric</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.dropdownSelector}
               onPress={() => setShowFabricPicker(true)}
             >
@@ -450,7 +449,7 @@ export default function CustomizationService() {
               animationType="fade"
               onRequestClose={() => setShowFabricPicker(false)}
             >
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.modalOverlay}
                 activeOpacity={1}
                 onPress={() => setShowFabricPicker(false)}
@@ -570,7 +569,7 @@ export default function CustomizationService() {
             ) : timeSlots.length > 0 ? (
               <View style={styles.timeSlotsGrid}>
                 {(() => {
-                  
+
                   const seenTimes = new Set<string>();
                   const uniqueSlots = timeSlots.filter((slot) => {
                     if (seenTimes.has(slot.time_slot)) {
@@ -579,7 +578,7 @@ export default function CustomizationService() {
                     seenTimes.add(slot.time_slot);
                     return true;
                   });
-                  
+
                   return uniqueSlots.map((slot) => (
                     <TouchableOpacity
                       key={slot.slot_id || slot.time_slot}
@@ -600,8 +599,8 @@ export default function CustomizationService() {
                     >
                       <Text style={styles.slotTime}>{slot.display_time}</Text>
                       <Text style={styles.slotStatus}>
-                        {slot.status === 'full' ? 'Fully Booked' : 
-                         slot.status === 'limited' ? `${slot.available} LEFT` : 
+                        {slot.status === 'full' ? 'Fully Booked' :
+                         slot.status === 'limited' ? `${slot.available} LEFT` :
                          slot.status === 'available' ? `${slot.available} SPOTS` : 'Unavailable'}
                       </Text>
                     </TouchableOpacity>
@@ -628,7 +627,7 @@ export default function CustomizationService() {
             />
             <TouchableOpacity
               style={[
-                styles.primaryButton, 
+                styles.primaryButton,
                 styles.addToCartButton,
                 (!selectedGarment || !selectedFabric || !selectedTimeSlot) && styles.buttonDisabled
               ]}
@@ -1126,7 +1125,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   timeSlotButton: {
-    width: (width - 88) / 3, 
+    width: (width - 88) / 3,
     paddingVertical: 14,
     paddingHorizontal: 8,
     borderRadius: 12,
@@ -1203,7 +1202,7 @@ const styles = StyleSheet.create({
     color: '#8D6E63',
     textAlign: 'center',
   },
-  
+
   uniformNotice: {
     flexDirection: 'row',
     backgroundColor: '#fff3e0',

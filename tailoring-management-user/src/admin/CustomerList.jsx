@@ -131,9 +131,9 @@ const CustomerList = () => {
 
         setMeasurements({
 
-          top: typeof result.measurements.top_measurements === 'string' 
+          top: typeof result.measurements.top_measurements === 'string'
 
-            ? JSON.parse(result.measurements.top_measurements) 
+            ? JSON.parse(result.measurements.top_measurements)
 
             : result.measurements.top_measurements || {},
 
@@ -157,9 +157,9 @@ const CustomerList = () => {
 
           setMeasurements({
 
-            top: typeof measResult.measurements.top_measurements === 'string' 
+            top: typeof measResult.measurements.top_measurements === 'string'
 
-              ? JSON.parse(measResult.measurements.top_measurements) 
+              ? JSON.parse(measResult.measurements.top_measurements)
 
               : measResult.measurements.top_measurements || {},
 
@@ -206,18 +206,18 @@ const CustomerList = () => {
 
       if (result.success) {
 
-        const hasMeasurements = Object.keys(measurements.top).length > 0 || 
+        const hasMeasurements = Object.keys(measurements.top).length > 0 ||
 
-                                Object.keys(measurements.bottom).length > 0 || 
+                                Object.keys(measurements.bottom).length > 0 ||
 
                                 measurements.notes.trim() !== '';
 
         if (hasMeasurements) {
 
-          const customerName = isWalkIn 
-            ? selectedCustomer.full_name 
+          const customerName = isWalkIn
+            ? selectedCustomer.full_name
             : `${selectedCustomer.first_name || ''} ${selectedCustomer.last_name || ''}`.trim() || editForm.first_name;
-          
+
           const measurementsData = {
             ...measurements,
             isWalkIn: isWalkIn,
@@ -290,13 +290,13 @@ const CustomerList = () => {
 
       const isWalkIn = customer.customer_type === 'walk_in';
 
-      const fullName = isWalkIn 
+      const fullName = isWalkIn
 
         ? (customer.full_name || customer.name || '').toLowerCase()
 
         : `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
 
-      const matchesSearch = 
+      const matchesSearch =
 
         fullName.includes(searchTerm.toLowerCase()) ||
 
@@ -326,13 +326,13 @@ const CustomerList = () => {
 
     const date = new Date(dateString);
 
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleDateString('en-US', {
 
-      year: 'numeric', 
+      year: 'numeric',
 
-      month: 'short', 
+      month: 'short',
 
-      day: 'numeric' 
+      day: 'numeric'
 
     });
 
@@ -456,7 +456,7 @@ const CustomerList = () => {
 
                         {isWalkIn && (
 
-                          <span style={{ 
+                          <span style={{
 
                             display: 'inline-block',
 
@@ -516,13 +516,13 @@ const CustomerList = () => {
 
                           {(customer.status === 'active' || !customer.status || customer.status === null) ? (
 
-                            <button 
+                            <button
 
-                              className="icon-btn decline" 
+                              className="icon-btn decline"
 
-                              onClick={async (e) => { 
+                              onClick={async (e) => {
 
-                                e.stopPropagation(); 
+                                e.stopPropagation();
 
                                 const customerName = isWalkIn ? fullName : `${customer.first_name} ${customer.last_name}`;
 
@@ -542,7 +542,7 @@ const CustomerList = () => {
 
                                 }
 
-                              }} 
+                              }}
 
                               title="Deactivate"
 
@@ -560,13 +560,13 @@ const CustomerList = () => {
 
                           ) : (
 
-                            <button 
+                            <button
 
-                              className="icon-btn accept" 
+                              className="icon-btn accept"
 
-                              onClick={async (e) => { 
+                              onClick={async (e) => {
 
-                                e.stopPropagation(); 
+                                e.stopPropagation();
 
                                 const customerName = isWalkIn ? fullName : `${customer.first_name} ${customer.last_name}`;
 
@@ -586,7 +586,7 @@ const CustomerList = () => {
 
                                 }
 
-                              }} 
+                              }}
 
                               title="Activate"
 

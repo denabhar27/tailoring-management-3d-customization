@@ -37,7 +37,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const [fabricTypes, setFabricTypes] = useState(defaultFabricTypes);
 
   const [garmentTypes, setGarmentTypes] = useState({});
-  
+
   const [garmentCodeToName, setGarmentCodeToName] = useState({});
 
   const presetColors = [
@@ -96,25 +96,25 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     }
 
     if (normalizedHex.match(/^#[0-9a-f]{6}$/)) {
-      
+
       const r = parseInt(normalizedHex.slice(1, 3), 16);
       const g = parseInt(normalizedHex.slice(3, 5), 16);
       const b = parseInt(normalizedHex.slice(5, 7), 16);
 
       let closestColor = presetColors[0];
       let minDistance = Infinity;
-      
+
       presetColors.forEach(preset => {
         const presetR = parseInt(preset.value.slice(1, 3), 16);
         const presetG = parseInt(preset.value.slice(3, 5), 16);
         const presetB = parseInt(preset.value.slice(5, 7), 16);
 
         const distance = Math.sqrt(
-          Math.pow(r - presetR, 2) + 
-          Math.pow(g - presetG, 2) + 
+          Math.pow(r - presetR, 2) +
+          Math.pow(g - presetG, 2) +
           Math.pow(b - presetB, 2)
         );
-        
+
         if (distance < minDistance) {
           minDistance = distance;
           closestColor = preset;
@@ -131,7 +131,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       if (g > r && g > b) return 'Greenish';
       if (b > r && b > g) return 'Bluish';
       if (r === g && g === b) return 'Gray';
-      
+
       return 'Custom Color';
     }
 
@@ -166,9 +166,9 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           console.log('✅ Fabric types API result:', result);
 
           const fabricTypesObj = { ...defaultFabricTypes };
-          
+
           if (result.success && result.fabrics && result.fabrics.length > 0) {
-            
+
             result.fabrics.forEach(fabric => {
               fabricTypesObj[fabric.fabric_name] = parseFloat(fabric.fabric_price);
             });
@@ -177,12 +177,12 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
             setFabricTypes(fabricTypesObj);
           } else {
             console.warn('⚠️ No fabric types found from API, using defaults only');
-            
+
             setFabricTypes(defaultFabricTypes);
           }
         } catch (error) {
           console.error('❌ Error loading fabric types:', error);
-          
+
           setFabricTypes(defaultFabricTypes);
         }
       };
@@ -192,18 +192,18 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           console.log('🔄 Loading garment types from API...');
           const result = await getAllGarmentTypes();
           console.log('✅ Garment types API result:', result);
-          
+
           if (result.success && result.garments && result.garments.length > 0) {
-            
+
             const garmentTypesObj = {};
             const codeToNameMap = {};
             result.garments.forEach(garment => {
               garmentTypesObj[garment.garment_name] = parseFloat(garment.garment_price);
-              
+
               if (garment.garment_code) {
                 codeToNameMap[garment.garment_code.toLowerCase()] = garment.garment_name;
               }
-              
+
               codeToNameMap[garment.garment_name.toLowerCase()] = garment.garment_name;
             });
             console.log('✅ Garment types from API:', garmentTypesObj);
@@ -243,13 +243,13 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const loadAvailableSlots = async (date) => {
     if (!date) return;
-    
+
     setLoadingSlots(true);
-    
+
     try {
-      
+
       const result = await getAllSlotsWithAvailability('customization', date);
-      
+
       if (result.success) {
         if (!result.isShopOpen) {
           setIsShopOpen(false);
@@ -257,7 +257,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           setErrors(prev => ({ ...prev, preferredDate: 'The shop is closed on this date. Please select another date.' }));
           return;
         }
-        
+
         setIsShopOpen(true);
         setAllTimeSlots(result.slots || []);
         setErrors(prev => ({ ...prev, preferredDate: null }));
@@ -279,7 +279,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       console.log('🎯 Processing pending garment auto-fill...');
       console.log('🎯 Design details:', designDetails);
       console.log('🎯 Available garment code mapping:', garmentCodeToName);
-      
+
       let mappedGarment = '';
 
       if (designDetails.garment) {
@@ -289,7 +289,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         if (garmentCodeToName[garmentCode]) {
           mappedGarment = garmentCodeToName[garmentCode];
         } else {
-          
+
           for (const [code, name] of Object.entries(garmentCodeToName)) {
             if (garmentCode.includes(code) || code.includes(garmentCode)) {
               mappedGarment = name;
@@ -306,7 +306,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         if (garmentCodeToName[garmentTypeLower]) {
           mappedGarment = garmentCodeToName[garmentTypeLower];
         } else {
-          
+
           for (const [code, name] of Object.entries(garmentCodeToName)) {
             const nameLower = name.toLowerCase();
             if (garmentTypeLower.includes(nameLower) || nameLower.includes(garmentTypeLower) ||
@@ -317,9 +317,9 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           }
         }
       }
-      
+
       console.log('🎯 Final mapped garment:', mappedGarment || '(no match found)');
-      
+
       if (mappedGarment) {
         setFormData(prev => ({
           ...prev,
@@ -355,15 +355,15 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               _pendingGarmentAutoFill: true
             });
           }
-          
+
           if (designImage) {
-            
+
             let imageData = designImage;
             if (designImage.startsWith('data:image')) {
               setImagePreview(designImage);
               imageData = designImage.split(',')[1];
             } else {
-              
+
               setImagePreview(`data:image/png;base64,${designImage}`);
             }
 
@@ -386,21 +386,21 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           }
 
           if (design.design?.fabric) {
-            
+
             const fabricMap = {
               'wool': 'Wool',
               'cotton': 'Cotton',
               'silk': 'Silk',
               'linen': 'Linen'
             };
-            const fabricName = fabricMap[design.design.fabric.toLowerCase()] || 
+            const fabricName = fabricMap[design.design.fabric.toLowerCase()] ||
                               (design.design.fabric.charAt(0).toUpperCase() + design.design.fabric.slice(1));
             setFormData(prev => ({
               ...prev,
               fabricType: fabricName in fabricTypes ? fabricName : fabricName
             }));
           }
-          
+
           if (design.notes || design.design?.notes) {
             setFormData(prev => ({
               ...prev,
@@ -420,7 +420,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   useEffect(() => {
     if (formData.garmentType === 'Uniform') {
-      
+
       setEstimatedPrice(0);
     } else if (formData.fabricType && formData.garmentType) {
       const fabricPrice = fabricTypes[formData.fabricType] || 0;
@@ -435,7 +435,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      
+
       if (!file.type.startsWith('image/')) {
         setErrors(prev => ({ ...prev, image: 'Please upload a valid image file' }));
         return;
@@ -475,10 +475,10 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         }
       } catch (error) {
         console.error('Error checking date availability:', error);
-        
+
       }
     }
-    
+
     setFormData(prev => ({
       ...prev,
       [name]: value,
@@ -533,13 +533,13 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
       let cleanDesignData = null;
       if (designDetails) {
-        
+
         cleanDesignData = JSON.parse(JSON.stringify(designDetails));
 
         if (cleanDesignData.designImage) {
           delete cleanDesignData.designImage;
         }
-        
+
         if (cleanDesignData.design && cleanDesignData.design.designImage) {
           delete cleanDesignData.design.designImage;
         }
@@ -563,7 +563,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         const errorMsg = slotError.response?.data?.message || slotError.message || 'Failed to book appointment slot. Please try again.';
         throw new Error(errorMsg);
       }
-      
+
       const cartResult = await addCustomizationToCart({
         fabricType: formData.fabricType,
         garmentType: formData.garmentType,
@@ -573,11 +573,11 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         imageUrl: imageUrl,
         estimatedPrice: priceToSubmit,
         isUniform: isUniform,
-        designData: cleanDesignData || {}, 
+        designData: cleanDesignData || {},
       });
 
       if (cartResult.success) {
-        
+
         setMessage('Added to cart successfully!');
 
         if (onCartUpdate) {
@@ -600,7 +600,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   const handleOpen3DCustomizer = () => {
-    
+
     sessionStorage.setItem('customizationFormData', JSON.stringify({
       fabricType: formData.fabricType,
       garmentType: formData.garmentType,
@@ -660,10 +660,10 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               <span className="required-indicator">*</span>
             </label>
             {isUniformSelected && (
-              <div style={{ 
-                backgroundColor: '#fff3e0', 
-                padding: '10px 15px', 
-                borderRadius: '8px', 
+              <div style={{
+                backgroundColor: '#fff3e0',
+                padding: '10px 15px',
+                borderRadius: '8px',
                 marginBottom: '10px',
                 border: '1px solid #ffb74d',
                 display: 'flex',
@@ -700,18 +700,18 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                     {['front', 'back', 'right', 'left'].map((angle) => (
                       designDetails.angleImages[angle] && (
                         <div key={angle} style={{ position: 'relative' }}>
-                          <img 
-                            src={designDetails.angleImages[angle]} 
+                          <img
+                            src={designDetails.angleImages[angle]}
                             alt={`${angle} view`}
                             style={{ width: '100%', height: 'auto', borderRadius: '8px', border: '2px solid #e0e0e0' }}
                           />
-                          <div style={{ 
-                            position: 'absolute', 
-                            bottom: '5px', 
-                            left: '5px', 
-                            background: 'rgba(0,0,0,0.7)', 
-                            color: 'white', 
-                            padding: '4px 8px', 
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '5px',
+                            left: '5px',
+                            background: 'rgba(0,0,0,0.7)',
+                            color: 'white',
+                            padding: '4px 8px',
                             borderRadius: '4px',
                             fontSize: '12px',
                             textTransform: 'capitalize',
@@ -844,7 +844,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                   <span>Full</span>
                 </div>
               </div>
-              
+
               {loadingSlots ? (
                 <div className="time-slots-loading">
                   <div className="loading-spinner"></div>
@@ -858,7 +858,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               ) : allTimeSlots.length > 0 ? (
                 <div className="time-slots-grid">
                   {(() => {
-                    
+
                     const seenTimes = new Set();
                     const uniqueSlots = allTimeSlots.filter(slot => {
                       if (seenTimes.has(slot.time_slot)) {
@@ -867,7 +867,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                       seenTimes.add(slot.time_slot);
                       return true;
                     });
-                    
+
                     return uniqueSlots.map(slot => (
                       <button
                         key={slot.slot_id || slot.time_slot}
@@ -879,8 +879,8 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                       >
                         <span className="slot-time">{slot.display_time}</span>
                         <span className="slot-status">
-                          {slot.status === 'full' ? 'Fully Booked' : 
-                           slot.status === 'limited' ? `${slot.available} left` : 
+                          {slot.status === 'full' ? 'Fully Booked' :
+                           slot.status === 'limited' ? `${slot.available} left` :
                            slot.status === 'available' ? `${slot.available} spots` : 'Unavailable'}
                         </span>
                       </button>
@@ -893,7 +893,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                   <p>No time slots available for this date. Please select another date.</p>
                 </div>
               )}
-              
+
               {formData.preferredTime && (
                 <div className="selected-slot-info">
                   <i className="fas fa-check"></i> Selected: <strong>{allTimeSlots.find(s => s.time_slot === formData.preferredTime)?.display_time}</strong>
@@ -929,7 +929,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 )}
                 {designDetails.personalization && designDetails.personalization.initials && (
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <strong>Personalization:</strong> {designDetails.personalization.initials} 
+                    <strong>Personalization:</strong> {designDetails.personalization.initials}
                     {designDetails.personalization.font && ` (${designDetails.personalization.font} font)`}
                   </div>
                 )}
@@ -989,7 +989,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
             <div className="price-estimate-shared">
               <h4>Estimated Price: ₱{estimatedPrice}</h4>
               <p>
-                Fabric: {formData.fabricType} (₱{fabricTypes[formData.fabricType]}) + 
+                Fabric: {formData.fabricType} (₱{fabricTypes[formData.fabricType]}) +
                 Garment: {formData.garmentType} (₱{garmentTypes[formData.garmentType]})
               </p>
               <p className="help-text-shared" style={{ marginTop: '12px', fontStyle: 'italic' }}>

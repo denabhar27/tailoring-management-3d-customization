@@ -9,10 +9,10 @@ const REQUEST_TIMEOUT = parseInt(process.env.EXPO_PUBLIC_REQUEST_TIMEOUT || '100
 
 export const uploadCustomizationImage = async (formData: FormData) => {
   const token = await AsyncStorage.getItem('userToken');
-  
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-  
+
   try {
     const response = await fetch(`${API_BASE_URL}/customization/upload-image`, {
       method: 'POST',
@@ -23,12 +23,12 @@ export const uploadCustomizationImage = async (formData: FormData) => {
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-    
+
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.message || 'Failed to upload image');
     }
-    
+
     return await response.json();
   } catch (error) {
     clearTimeout(timeoutId);
@@ -47,14 +47,14 @@ export const addCustomizationToCart = async (customizationData: {
   estimatedPrice?: number;
   isUniform?: boolean;
 }) => {
-  
+
   const isUniform = customizationData.isUniform || customizationData.garmentType?.toLowerCase() === 'uniform';
-  
+
   const price = isUniform ? 0 : (customizationData.estimatedPrice || 500);
 
   const cartData = {
     serviceType: 'customization',
-    serviceId: Date.now(), 
+    serviceId: Date.now(),
     quantity: 1,
     basePrice: price,
     finalPrice: price,
@@ -106,7 +106,7 @@ export const getCustomizationOrderById = async (itemId: number) => {
 };
 
 export const updateCustomizationOrderItem = async (
-  itemId: number, 
+  itemId: number,
   updateData: {
     finalPrice?: number;
     approvalStatus?: string;
@@ -126,7 +126,7 @@ export const getCustomizationStats = async () => {
 };
 
 export const convertBase64ToFormData = async (
-  base64Image: string, 
+  base64Image: string,
   filename: string = 'design.png'
 ): Promise<{ formData: FormData; fileUri: string }> => {
   if (!base64Image) {
@@ -134,7 +134,7 @@ export const convertBase64ToFormData = async (
   }
 
   const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
-  
+
   if (!base64Data) {
     throw new Error('Invalid base64 image data');
   }
@@ -155,7 +155,7 @@ export const convertBase64ToFormData = async (
   const timestamp = Date.now();
   const uniqueFilename = `${timestamp}-${filename}`;
   let fileUri = `${FileSystem.cacheDirectory}${uniqueFilename}`;
-  
+
   try {
     await FileSystem.writeAsStringAsync(fileUri, base64Data, {
       encoding: FileSystem.EncodingType.Base64,
@@ -173,6 +173,6 @@ export const convertBase64ToFormData = async (
     type: imageType,
     name: filename,
   } as any);
-  
+
   return { formData, fileUri };
 };

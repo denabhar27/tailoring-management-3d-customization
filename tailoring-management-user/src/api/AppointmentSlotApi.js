@@ -62,7 +62,7 @@ export async function checkSlotAvailability(serviceType, date, time) {
 
 export async function bookSlot(serviceType, date, time, cartItemId = null) {
   try {
-    
+
     let formattedTime = time;
     if (time && !time.includes(':')) {
       formattedTime = time;

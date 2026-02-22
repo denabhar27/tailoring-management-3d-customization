@@ -15,19 +15,19 @@ function Sidebar() {
   }, [isRentalActive]);
 
   return (
-    <aside className='sidebar'> 
-      <div className='profile'> 
+    <aside className='sidebar'>
+      <div className='profile'>
   <div className="profile-header">
-    <img 
-  src={logo} 
-  alt="D'jackman Tailor Deluxe Logo" 
+    <img
+  src={logo}
+  alt="D'jackman Tailor Deluxe Logo"
   className="profile-logo"
     />
     <h3 className="p" style={{ color: 'rgb(139, 69, 19)' }}>D'jackman Tailor Deluxe</h3>
   </div>
 </div>
 
-      <nav> 
+      <nav>
         <NavLink to="/admin" className={({ isActive }) => isActive ? 'active' : ''}>
           <i className="fas fa-home nav-icon"></i>
           Dashboard
@@ -51,15 +51,15 @@ function Sidebar() {
           </div>
           {rentalSubmenuOpen && (
             <div className="submenu-container">
-              <NavLink 
-                to="/rental" 
+              <NavLink
+                to="/rental"
                 className={({ isActive }) => isActive ? 'submenu-item active' : 'submenu-item'}
               >
                 <i className="fas fa-box nav-icon"></i>
                 Rental
               </NavLink>
-              <NavLink 
-                to="/Post" 
+              <NavLink
+                to="/Post"
                 className={({ isActive }) => isActive ? 'submenu-item active' : 'submenu-item'}
               >
                 <i className="fas fa-add nav-icon"></i>

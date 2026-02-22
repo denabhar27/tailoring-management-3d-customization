@@ -49,7 +49,7 @@ export default function OrderHistoryScreen() {
       setLoading(true);
       const result = await orderTrackingService.getUserOrderTracking();
       if (result.success && result.data) {
-        
+
         const allItems: OrderItem[] = [];
         result.data.forEach((order: OrderData) => {
           order.items.forEach((item: OrderItem) => {
@@ -141,7 +141,7 @@ export default function OrderHistoryScreen() {
     if (filter === "All") return true;
     const statusLower = status?.toLowerCase();
     const filterLower = filter.toLowerCase().replace(/ /g, '_');
-    
+
     if (filter === "In Progress") {
       return statusLower === "in_progress" || statusLower === "processing";
     }
@@ -267,7 +267,7 @@ export default function OrderHistoryScreen() {
           <Ionicons name="receipt-outline" size={16} color="#8B4513" />
           <Text style={styles.transactionLogButtonText}>Transaction Log</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.actionButton}
           onPress={(e) => {
             e.stopPropagation();
@@ -380,9 +380,9 @@ export default function OrderHistoryScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push("/(tabs)/cart/Cart")}>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/faq")}>
           <View style={styles.navItemWrap}>
-            <Ionicons name="cart-outline" size={20} color="#9CA3AF" />
+            <Ionicons name="help-circle-outline" size={20} color="#9CA3AF" />
           </View>
         </TouchableOpacity>
 
@@ -449,11 +449,11 @@ const styles = StyleSheet.create({
   filterText: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#4B5563", 
+    color: "#4B5563",
   },
 
   activeFilterText: {
-    color: "#FFFFFF", 
+    color: "#FFFFFF",
   },
   activeText: { color: "#fff" },
   badge: {

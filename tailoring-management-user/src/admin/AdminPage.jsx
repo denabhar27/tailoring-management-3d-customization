@@ -12,7 +12,7 @@ function AdminPage() {
   const [billingStats, setBillingStats] = useState({});
   const [recentActivities, setRecentActivities] = useState([]);
   const [allActivities, setAllActivities] = useState([]);
-  const [allPayments, setAllPayments] = useState([]); 
+  const [allPayments, setAllPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -20,7 +20,7 @@ function AdminPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [startDate, setStartDate] = useState(format(subMonths(new Date(), 1), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState('all'); 
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -31,7 +31,7 @@ function AdminPage() {
           getAdminDashboardOverview(),
           getBillingStats()
         ]);
-        
+
         if (data?.success) {
           setStats(data.stats || []);
           setAllActivities(data.recentActivities || []);
@@ -61,7 +61,7 @@ function AdminPage() {
           setLoading(true);
           const result = await getAllTransactionLogs();
           if (result.success && result.logs) {
-   
+
             const sortedLogs = [...result.logs].sort((a, b) => {
               if (a.order_item_id !== b.order_item_id) {
                 return a.order_item_id - b.order_item_id;
@@ -81,10 +81,10 @@ function AdminPage() {
             const runningTotals = {};
 
             const paymentActivities = sortedLogs.map(tx => {
-              const orderDate = tx.created_at instanceof Date 
-                ? tx.created_at 
+              const orderDate = tx.created_at instanceof Date
+                ? tx.created_at
                 : new Date(tx.created_at);
-              
+
               const formatDate = (date) => {
                 const d = date instanceof Date ? date : new Date(date);
                 const year = d.getFullYear();
@@ -117,14 +117,14 @@ function AdminPage() {
               }
               runningTotals[itemId] += paymentAmount;
               const totalPaid = runningTotals[itemId];
-              
+
               const paymentMethod = tx.payment_method === 'system_auto' ? 'cash' : (tx.payment_method || 'cash');
-              
+
               return {
                 customer: customerName,
                 service: mapService(tx.service_type),
                 status: tx.new_payment_status || 'paid',
-                statusText: tx.new_payment_status === 'paid' ? 'Paid' : 
+                statusText: tx.new_payment_status === 'paid' ? 'Paid' :
                            tx.new_payment_status === 'fully_paid' ? 'Fully Paid' :
                            tx.new_payment_status === 'down-payment' ? 'Down Payment' :
                            tx.new_payment_status === 'partial_payment' ? 'Partial Payment' : 'Payment',
@@ -154,10 +154,10 @@ function AdminPage() {
           setLoading(false);
         }
       } else {
-        
+
         setRecentActivities(allActivities);
         setAllPayments([]);
-        setPaymentStatusFilter('all'); 
+        setPaymentStatusFilter('all');
       }
     };
 
@@ -172,7 +172,7 @@ function AdminPage() {
         filtered = filtered.filter(activity => {
           const service = activity.service?.toLowerCase() || '';
           const filter = serviceFilter.toLowerCase();
-          return service.includes(filter) || 
+          return service.includes(filter) ||
                  (filter === 'dry' && service.includes('dry')) ||
                  (filter === 'dry_cleaning' && service.includes('dry')) ||
                  (filter === 'custom' && (service.includes('custom') || service.includes('customize')));
@@ -195,17 +195,17 @@ function AdminPage() {
           return false;
         });
       }
-      
+
       setRecentActivities(filtered);
     } else if (statusFilter === 'payment' && allPayments.length === 0) {
-      
+
       setRecentActivities([]);
     }
   }, [paymentStatusFilter, statusFilter, allPayments, serviceFilter]);
 
   useEffect(() => {
     if (statusFilter === 'payment') {
-      
+
       return;
     }
 
@@ -215,7 +215,7 @@ function AdminPage() {
       filtered = filtered.filter(activity => {
         const service = activity.service?.toLowerCase() || '';
         const filter = serviceFilter.toLowerCase();
-        return service.includes(filter) || 
+        return service.includes(filter) ||
                (filter === 'dry' && service.includes('dry')) ||
                (filter === 'custom' && (service.includes('custom') || service.includes('customize')));
       });
@@ -234,11 +234,11 @@ function AdminPage() {
       filtered = filtered.filter(activity => {
         const timeStr = activity.time || '';
         if (!timeStr) return true;
-        
+
         try {
           const activityDate = new Date(timeStr);
           const activityDateOnly = new Date(activityDate.getFullYear(), activityDate.getMonth(), activityDate.getDate());
-          
+
           if (startDate && endDate) {
             const start = new Date(startDate);
             const end = new Date(endDate);
@@ -266,7 +266,7 @@ function AdminPage() {
     <div className="admin-page">
       <Sidebar />
       <AdminHeader />
-      
+
       <div className="content">
         <div className="dashboard-title">
           <h2>Dashboard Overview</h2>
@@ -286,7 +286,7 @@ function AdminPage() {
           ) : (
             <>
               {stats.map((stat, index) => {
-                // Determine icon and color based on stat title
+
                 const getIconAndColor = (title) => {
                   switch(title?.toLowerCase()) {
                     case 'total orders':
@@ -319,9 +319,9 @@ function AdminPage() {
                       return { icon: '📊', color: '#f5f5f5', textColor: '#666' };
                   }
                 };
-                
+
                 const { icon, color, textColor } = getIconAndColor(stat.title);
-                
+
                 return (
                   <div className="stat-card" key={index}>
                     <div className="stat-header">
@@ -333,8 +333,7 @@ function AdminPage() {
                   </div>
                 );
               })}
-              
-              {/* Total Revenue Container */}
+
               <div className="stat-card">
                 <div className="stat-header">
                   <span>Total Revenue</span>
@@ -369,7 +368,7 @@ function AdminPage() {
               <option value="rental">Rental</option>
             </select>
           </div>
-          
+
           <div className="filter-dropdown">
             <label>Status:</label>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="filter-select">
@@ -380,7 +379,7 @@ function AdminPage() {
               <option value="completed">Completed</option>
             </select>
           </div>
-          
+
           <div className="filter-dropdown date-range-filter">
             <label>Date:</label>
             <div className="date-range-inputs">
@@ -410,11 +409,11 @@ function AdminPage() {
               </select>
             </div>
           )}
-          
+
           {(serviceFilter !== 'all' || statusFilter !== 'all' || startDate || endDate || paymentStatusFilter !== 'all') && (
-            <button className="clear-btn-dropdown" onClick={() => { 
-              setServiceFilter('all'); 
-              setStatusFilter('all'); 
+            <button className="clear-btn-dropdown" onClick={() => {
+              setServiceFilter('all');
+              setStatusFilter('all');
               setStartDate('');
               setEndDate('');
               setPaymentStatusFilter('all');
@@ -448,9 +447,9 @@ function AdminPage() {
                     <td>
                       {activity.isPayment ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <span className={`status ${activity.paymentInfo?.payment_status || activity.status}`} style={{ 
-                            backgroundColor: activity.paymentInfo?.payment_status === 'paid' || activity.paymentInfo?.payment_status === 'fully_paid' 
-                              ? '#d4edda' 
+                          <span className={`status ${activity.paymentInfo?.payment_status || activity.status}`} style={{
+                            backgroundColor: activity.paymentInfo?.payment_status === 'paid' || activity.paymentInfo?.payment_status === 'fully_paid'
+                              ? '#d4edda'
                               : activity.paymentInfo?.payment_status === 'down-payment'
                               ? '#fff3cd'
                               : '#f8d7da',
@@ -464,7 +463,7 @@ function AdminPage() {
                             fontSize: '12px',
                             fontWeight: '600'
                           }}>
-                            Payment: {activity.paymentInfo?.payment_status === 'paid' ? 'Paid' : 
+                            Payment: {activity.paymentInfo?.payment_status === 'paid' ? 'Paid' :
                                          activity.paymentInfo?.payment_status === 'fully_paid' ? 'Fully Paid' :
                                          activity.paymentInfo?.payment_status === 'down-payment' ? 'Down Payment' :
                                          activity.paymentInfo?.payment_status === 'partial_payment' ? 'Partial Payment' :
@@ -482,8 +481,8 @@ function AdminPage() {
                         </span>
                       )}
                     </td>
-                    <td style={{ 
-                      color: activity.reason || activity.notes ? '#666' : '#999', 
+                    <td style={{
+                      color: activity.reason || activity.notes ? '#666' : '#999',
                       fontStyle: activity.reason || activity.notes ? 'normal' : 'italic',
                       maxWidth: '200px',
                       wordWrap: 'break-word',

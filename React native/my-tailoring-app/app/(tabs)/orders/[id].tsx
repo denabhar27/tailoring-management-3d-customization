@@ -16,6 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { orderTrackingService, API_BASE_URL } from "../../../utils/apiService";
+import RentalImageCarousel from "../../../components/RentalImageCarousel";
 
 const { width } = Dimensions.get("window");
 
@@ -25,9 +26,9 @@ const formatSize = (size: any): { label: string; value: string }[] | null => {
   if (typeof size === 'string' && !size.trim().startsWith('{')) {
     return [{ label: 'Size', value: size }];
   }
-  
+
   try {
-    
+
     let measurements = typeof size === 'string' ? JSON.parse(size) : size;
 
     if (!measurements || typeof measurements !== 'object' || Array.isArray(measurements)) {
@@ -42,16 +43,16 @@ const formatSize = (size: any): { label: string; value: string }[] | null => {
       'waist': 'Waist',
       'length': 'Length'
     };
-    
+
     const parts = Object.entries(measurements)
       .filter(([key, value]) => value !== null && value !== undefined && value !== '' && value !== '0')
       .map(([key, value]) => {
         const label = labelMap[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim();
-        
+
         let displayValue: string;
         if (typeof value === 'object' && value !== null) {
           const val = value as { inch?: string; cm?: string; value?: string };
-          
+
           if (val.inch !== undefined && val.cm !== undefined) {
             displayValue = `${val.inch} in / ${val.cm} cm`;
           } else if (val.inch !== undefined) {
@@ -68,10 +69,10 @@ const formatSize = (size: any): { label: string; value: string }[] | null => {
         }
         return { label, value: displayValue };
       });
-    
+
     return parts.length > 0 ? parts : null;
   } catch (e) {
-    
+
     return [{ label: 'Size', value: typeof size === 'string' ? size : 'N/A' }];
   }
 };
@@ -92,7 +93,7 @@ export default function OrderDetails() {
       setLoading(true);
       const result = await orderTrackingService.getUserOrderTracking();
       if (result.success) {
-        
+
         let foundItem = null;
         for (const order of result.data) {
           const item = order.items.find((i: any) => i.order_item_id === parseInt(id));
@@ -214,9 +215,37 @@ export default function OrderDetails() {
           </Text>
 
           <View style={styles.divider} />
-          
+
+          {/* For rental items, show 4-image carousel (front, back, side, main) */}
+          {order.service_type === 'rental' && (() => {
+            const API_BASE = API_BASE_URL.replace('/api', '');
+            const buildUrl = (url: string | null | undefined) => {
+              if (!url || url === 'no-image' || url.trim() === '') return null;
+              return url.startsWith('http') ? url : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+            };
+
+            const rentalImages = [
+              { url: buildUrl(order.specific_data?.front_image), label: 'Front' },
+              { url: buildUrl(order.specific_data?.back_image), label: 'Back' },
+              { url: buildUrl(order.specific_data?.side_image), label: 'Side' },
+              { url: buildUrl(order.specific_data?.image_url || order.specific_data?.imageUrl || order.image_url), label: 'Main' },
+            ].filter(img => img.url);
+
+            if (rentalImages.length > 0) {
+              return (
+                <RentalImageCarousel
+                  images={rentalImages}
+                  itemName={order.specific_data?.item_name || 'Rental Item'}
+                  imageHeight={280}
+                  showFullscreen={true}
+                />
+              );
+            }
+            return null;
+          })()}
+
           {/* For customization, show 4 angle images at the top instead of single image */}
-          {(order.service_type === 'customization' || order.service_type === 'customize') && 
+          {(order.service_type === 'customization' || order.service_type === 'customize') &&
            order.specific_data?.designData?.angleImages && (
             <View style={styles.topAngleImagesContainer}>
               <View style={styles.angleImagesGrid}>
@@ -239,58 +268,45 @@ export default function OrderDetails() {
               </View>
             </View>
           )}
-          
-          {/* For non-customization services, show single image */}
-          {order.service_type !== 'customization' && order.service_type !== 'customize' && (() => {
-            
-            let imageUrl = order.specific_data?.imageUrl || 
-                          order.specific_data?.image_url || 
+
+          {/* For non-customization, non-rental services, show single image */}
+          {order.service_type !== 'customization' && order.service_type !== 'customize' && order.service_type !== 'rental' && (() => {
+
+            let imageUrl = order.specific_data?.imageUrl ||
+                          order.specific_data?.image_url ||
                           order.specific_data?.designImage ||
                           order.specific_data?.item_image ||
                           order.specific_data?.completed_item_image ||
                           order.image_url;
-
-            if (order.service_type === 'rental' && !imageUrl) {
-              const bundleItems = order.specific_data?.bundle_items || [];
-              if (bundleItems.length > 0) {
-                imageUrl = bundleItems[0]?.image_url || 
-                          bundleItems[0]?.imageUrl || 
-                          bundleItems[0]?.item_image;
-              }
-              
-              if (!imageUrl) {
-                imageUrl = order.specific_data?.item_image;
-              }
-            }
 
             if (order.service_type === 'dry_cleaning' && !imageUrl) {
               imageUrl = order.specific_data?.completed_item_image || order.specific_data?.item_image;
             }
 
             if (order.service_type === 'repair' && !imageUrl) {
-              imageUrl = order.specific_data?.damageImage || 
+              imageUrl = order.specific_data?.damageImage ||
                         order.specific_data?.repairImage ||
                         order.specific_data?.item_image;
             }
-            
+
             const hasValidImage = imageUrl && imageUrl !== 'no-image' && imageUrl.trim() !== '';
-            
+
             console.log('=== ORDER IMAGE DEBUG ===');
             console.log('Service type:', order.service_type);
             console.log('Image URL found:', imageUrl);
             console.log('Has valid image:', hasValidImage);
             console.log('Full specific_data:', JSON.stringify(order.specific_data, null, 2));
             console.log('========================');
-            
+
             if (hasValidImage) {
-              
+
               const API_BASE = API_BASE_URL.replace('/api', '');
-              const fullImageUrl = imageUrl.startsWith('http') 
-                ? imageUrl 
+              const fullImageUrl = imageUrl.startsWith('http')
+                ? imageUrl
                 : `${API_BASE}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
-              
+
               console.log('Constructed full image URL:', fullImageUrl);
-              
+
               return (
                 <View>
                   <Image
@@ -374,13 +390,13 @@ export default function OrderDetails() {
                     </View>
                   )}
                   {/* Display uploaded image */}
-                  {(order.specific_data.imageUrl || order.specific_data.image_url) && 
+                  {(order.specific_data.imageUrl || order.specific_data.image_url) &&
                    (order.specific_data.imageUrl !== 'no-image' && order.specific_data.image_url !== 'no-image') && (
                     <View style={styles.detailRow}>
                       <Text style={styles.label}>Uploaded Image</Text>
                       <Image
-                        source={{ 
-                          uri: (order.specific_data.imageUrl || order.specific_data.image_url).startsWith('http') 
+                        source={{
+                          uri: (order.specific_data.imageUrl || order.specific_data.image_url).startsWith('http')
                             ? (order.specific_data.imageUrl || order.specific_data.image_url)
                             : `${API_BASE_URL.replace('/api', '')}${order.specific_data.imageUrl || order.specific_data.image_url}`
                         }}
@@ -448,13 +464,13 @@ export default function OrderDetails() {
                     </View>
                   )}
                   {/* Display uploaded image */}
-                  {(order.specific_data.imageUrl || order.specific_data.image_url) && 
+                  {(order.specific_data.imageUrl || order.specific_data.image_url) &&
                    (order.specific_data.imageUrl !== 'no-image' && order.specific_data.image_url !== 'no-image') && (
                     <View style={styles.detailRow}>
                       <Text style={styles.label}>Damage Image</Text>
                       <Image
-                        source={{ 
-                          uri: (order.specific_data.imageUrl || order.specific_data.image_url).startsWith('http') 
+                        source={{
+                          uri: (order.specific_data.imageUrl || order.specific_data.image_url).startsWith('http')
                             ? (order.specific_data.imageUrl || order.specific_data.image_url)
                             : `${API_BASE_URL.replace('/api', '')}${order.specific_data.imageUrl || order.specific_data.image_url}`
                         }}
@@ -524,11 +540,29 @@ export default function OrderDetails() {
                       ))}
                     </View>
                   )}
-                  
+
                   {order.specific_data.category && (
                     <View style={styles.detailRow}>
                       <Text style={styles.label}>Category</Text>
                       <Text style={styles.value}>{order.specific_data.category}</Text>
+                    </View>
+                  )}
+                  {order.specific_data.color && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.label}>Color</Text>
+                      <Text style={styles.value}>{order.specific_data.color}</Text>
+                    </View>
+                  )}
+                  {order.specific_data.material && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.label}>Fabric/Material</Text>
+                      <Text style={styles.value}>{order.specific_data.material}</Text>
+                    </View>
+                  )}
+                  {order.specific_data.description && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.label}>Description</Text>
+                      <Text style={[styles.value, styles.multiline]}>{order.specific_data.description}</Text>
                     </View>
                   )}
                   {order.rental_period && (
@@ -602,7 +636,7 @@ export default function OrderDetails() {
           <View style={styles.priceSection}>
             <Text style={styles.totalLabel}>Total Amount</Text>
             {(() => {
-              
+
               if (order.service_type === 'rental') {
                 const price = parseFloat(order.final_price || order.base_price || '0');
                 if (price > 0) {
@@ -613,7 +647,7 @@ export default function OrderDetails() {
                   );
                 }
               }
-              
+
               if (order.price_confirmed || order.final_price) {
                 const price = parseFloat(order.final_price || order.base_price || '0');
                 if (price > 0) {
@@ -624,7 +658,7 @@ export default function OrderDetails() {
                   );
                 }
               }
-              
+
               return (
                 <Text style={styles.pricePending}>
                   To be confirmed by admin
@@ -663,9 +697,9 @@ export default function OrderDetails() {
             <Ionicons name="cut-outline" size={20} color="#9CA3AF" />
           </View>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push("/(tabs)/cart/Cart")}>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/faq")}>
           <View style={styles.navItemWrap}>
-            <Ionicons name="cart-outline" size={20} color="#9CA3AF" />
+            <Ionicons name="help-circle-outline" size={20} color="#9CA3AF" />
           </View>
         </TouchableOpacity>
         <TouchableOpacity
@@ -818,7 +852,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  
+
   sizeSection: {
     marginVertical: 16,
   },
@@ -861,7 +895,7 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "center",
   },
-  
+
   bundleItemContainer: {
     marginBottom: 12,
     backgroundColor: "#FAFAFA",
@@ -880,7 +914,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#DDD",
     textAlign: "center",
   },
-  
+
   garmentCard: {
     backgroundColor: '#f9f9f9',
     padding: 12,
@@ -906,7 +940,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 8,
   },
-  
+
   angleImagesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

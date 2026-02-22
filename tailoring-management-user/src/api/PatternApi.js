@@ -119,16 +119,16 @@ export async function uploadPatternImage(file, patternData) {
     const response = await axios.post(`${BASE_URL}/patterns/upload`, formData, {
       headers: {
         'Authorization': `Bearer ${token}`
-        
+
       },
-      timeout: 120000 
+      timeout: 120000
     });
     return response.data;
   } catch (error) {
     console.error("Upload pattern image error:", error);
     console.error("Error response:", error.response?.data);
     console.error("Error status:", error.response?.status);
-    
+
     if (error.response?.status === 401) {
       return {
         success: false,
@@ -136,7 +136,7 @@ export async function uploadPatternImage(file, patternData) {
         requiresAuth: true
       };
     }
-    
+
     return {
       success: false,
       message: error.response?.data?.message || error.message || "Error uploading pattern image"
@@ -155,9 +155,9 @@ export async function updatePattern(patternId, updateData, file = null) {
     }
 
     let response;
-    
+
     if (file) {
-      
+
       const formData = new FormData();
       formData.append('patternImage', file);
       Object.keys(updateData).forEach(key => {
@@ -165,7 +165,7 @@ export async function updatePattern(patternId, updateData, file = null) {
           formData.append(key, updateData[key]);
         }
       });
-      
+
       response = await axios.put(`${BASE_URL}/patterns/${patternId}`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -173,12 +173,12 @@ export async function updatePattern(patternId, updateData, file = null) {
         timeout: 60000
       });
     } else {
-      
+
       response = await axios.put(`${BASE_URL}/patterns/${patternId}`, updateData, {
         headers: getAuthHeaders()
       });
     }
-    
+
     return response.data;
   } catch (error) {
     console.error("Update pattern error:", error);
@@ -221,7 +221,7 @@ export async function restorePattern(patternId) {
 
 export function getPatternImageUrl(pattern) {
   if (!pattern || !pattern.image_url) return null;
-  
+
   if (pattern.image_url.startsWith('http')) {
     return pattern.image_url;
   }

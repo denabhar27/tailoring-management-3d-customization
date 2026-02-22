@@ -25,7 +25,7 @@ const SimpleImageCarousel = ({ images, itemName, height = '250px' }) => {
   if (validImages.length === 1) {
     return (
       <div style={{ width: '100%', textAlign: 'center' }}>
-        <img 
+        <img
           src={validImages[0].url}
           alt={itemName || 'Image'}
           style={{
@@ -49,20 +49,20 @@ const SimpleImageCarousel = ({ images, itemName, height = '250px' }) => {
 
   return (
     <div style={{ width: '100%' }}>
-      <div style={{ 
-        position: 'relative', 
+      <div style={{
+        position: 'relative',
         width: '100%',
         backgroundColor: '#f9f9f9',
         borderRadius: '8px',
         overflow: 'hidden'
       }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
           alignItems: 'center',
           minHeight: height
         }}>
-          <img 
+          <img
             src={validImages[currentIndex].url}
             alt={`${itemName || 'Image'} - ${validImages[currentIndex].label || ''}`}
             style={{
@@ -157,13 +157,13 @@ const SimpleImageCarousel = ({ images, itemName, height = '250px' }) => {
               backgroundColor: '#fff'
             }}
           >
-            <img 
+            <img
               src={img.url}
               alt={img.label || `View ${index + 1}`}
-              style={{ 
-                width: '100%', 
-                height: '100%', 
-                objectFit: 'cover' 
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover'
               }}
             />
           </button>

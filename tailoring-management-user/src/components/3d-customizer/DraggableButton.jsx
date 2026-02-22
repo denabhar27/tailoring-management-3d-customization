@@ -17,8 +17,8 @@ export default function DraggableButton({ id, modelPath, position, color, scale 
 
     useLayoutEffect(() => {
         if (clonedScene) {
-            
-            clonedScene.rotation.y = -Math.PI / 2; 
+
+            clonedScene.rotation.y = -Math.PI / 2;
 
             clonedScene.traverse((child) => {
                 if (child.isMesh) {
@@ -56,7 +56,7 @@ export default function DraggableButton({ id, modelPath, position, color, scale 
             );
 
             if (hit) {
-                
+
                 const targetPos = hit.point.clone();
                 groupRef.current.position.lerp(targetPos, 0.3);
             }
@@ -67,13 +67,13 @@ export default function DraggableButton({ id, modelPath, position, color, scale 
         e.stopPropagation();
 
         if (!isMoving) {
-            
+
             setIsMoving(true);
             onSelect(id);
             gl.domElement.style.cursor = 'move';
             if (onMovingChange) onMovingChange(true);
         } else {
-            
+
             setIsMoving(false);
             if (groupRef.current) {
                 const newPos = groupRef.current.position.toArray();

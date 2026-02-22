@@ -10,7 +10,6 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
-  TouchableWithoutFeedback,
 } from "react-native";
 import { Text } from "react-native-paper";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -20,11 +19,12 @@ import { Picker } from "@react-native-picker/picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { rentalService } from "../../../utils/rentalService";
 import { cartService } from "../../../utils/apiService";
+import RentalImageCarousel from "../../../components/RentalImageCarousel";
 
 export default function RentalDetail() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  
+
   const [item, setItem] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -32,12 +32,11 @@ export default function RentalDetail() {
 
   const today = new Date();
   const [startDate, setStartDate] = useState<Date | null>(null);
-  const [rentalDuration, setRentalDuration] = useState(3); 
-  const [endDate, setEndDate] = useState<Date | null>(null); 
+  const [rentalDuration, setRentalDuration] = useState(3);
+  const [endDate, setEndDate] = useState<Date | null>(null);
   const [tempStartDate, setTempStartDate] = useState<Date | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [showImageModal, setShowImageModal] = useState(false); 
   const [measurementUnit, setMeasurementUnit] = useState<'inch' | 'cm'>('inch');
   const [showMeasurements, setShowMeasurements] = useState(false);
 
@@ -57,25 +56,25 @@ export default function RentalDetail() {
       if (unit === 'inch') {
         return `${inchValue}"`;
       } else {
-        
+
         const num = parseFloat(inchValue);
         if (isNaN(num)) return null;
         return `${(num * 2.54).toFixed(1)} cm`;
       }
     }
-    
+
     return null;
   };
 
   const getMeasurements = (): { label: string; value: string }[] => {
     if (!item || !item.size) return [];
-    
+
     try {
       let measurements;
       let sizeString = item.size;
-      
+
       if (typeof sizeString === 'string') {
-        
+
         if (sizeString.startsWith('{') && !sizeString.endsWith('}')) {
           return [];
         }
@@ -87,7 +86,7 @@ export default function RentalDetail() {
       } else {
         measurements = sizeString;
       }
-      
+
       if (!measurements || typeof measurements !== 'object' || Array.isArray(measurements)) {
         return [];
       }
@@ -95,7 +94,7 @@ export default function RentalDetail() {
       const parts: { label: string; value: string }[] = [];
       const checkValue = (val: any) => {
         if (typeof val === 'object' && val !== null) {
-          return (val.inch && val.inch !== '' && val.inch !== '0') || 
+          return (val.inch && val.inch !== '' && val.inch !== '0') ||
                  (val.cm && val.cm !== '' && val.cm !== '0');
         }
         return val && val !== '' && val !== '0';
@@ -130,7 +129,7 @@ export default function RentalDetail() {
   const calculateEndDate = (start: Date | null, duration: number): Date | null => {
     if (!start) return null;
     const endDateObj = new Date(start);
-    endDateObj.setDate(start.getDate() + duration - 1); 
+    endDateObj.setDate(start.getDate() + duration - 1);
     return endDateObj;
   };
 
@@ -155,7 +154,7 @@ export default function RentalDetail() {
       setError('');
       const result = await rentalService.getRentalById(id as string);
       console.log('Rental details:', result);
-      
+
       if (result.item) {
         setItem(result.item);
       } else {
@@ -177,6 +176,24 @@ export default function RentalDetail() {
       }
     }
     return require("../../../assets/images/rent.jpg");
+  };
+
+  const getRentalImages = () => {
+    if (!item) return [];
+
+    console.log('=== RENTAL IMAGES DEBUG ===');
+    console.log('front_image:', item.front_image);
+    console.log('back_image:', item.back_image);
+    console.log('side_image:', item.side_image);
+    console.log('image_url:', item.image_url);
+    console.log('===========================');
+
+    return [
+      { url: item.front_image ? rentalService.getImageUrl(item.front_image) : null, label: 'Front' },
+      { url: item.back_image ? rentalService.getImageUrl(item.back_image) : null, label: 'Back' },
+      { url: item.side_image ? rentalService.getImageUrl(item.side_image) : null, label: 'Side' },
+      { url: item.image_url ? rentalService.getImageUrl(item.image_url) : null, label: 'Main' },
+    ].filter(img => img.url);
   };
 
   const formatDate = (date: Date | null): string => {
@@ -202,7 +219,7 @@ export default function RentalDetail() {
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
         <Ionicons name="alert-circle-outline" size={60} color="#EF4444" />
         <Text style={{ marginTop: 12, color: '#EF4444', fontSize: 16 }}>{error || 'Item not found'}</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={{ marginTop: 16, backgroundColor: '#94665B', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
           onPress={() => router.push('/rental')}
         >
@@ -218,15 +235,15 @@ export default function RentalDetail() {
     const validDuration = Math.floor(duration / 3) * 3;
     if (validDuration < 3) return 0;
 
-    let basePrice = 500; 
+    let basePrice = 500;
     if (rentalItem.price) {
-      const priceStr = String(rentalItem.price).replace(/[^\d.]/g, ''); 
+      const priceStr = String(rentalItem.price).replace(/[^\d.]/g, '');
       const parsedPrice = parseFloat(priceStr);
       if (!isNaN(parsedPrice) && parsedPrice > 0) {
         basePrice = parsedPrice;
       }
     } else if (rentalItem.daily_rate) {
-      
+
       const dailyRate = parseFloat(rentalItem.daily_rate) || 0;
       basePrice = dailyRate * 3;
     }
@@ -259,7 +276,7 @@ export default function RentalDetail() {
   const applyStartDate = () => {
     if (tempStartDate) {
       setStartDate(tempStartDate);
-      
+
     }
     setShowCalendar(false);
   };
@@ -299,7 +316,7 @@ export default function RentalDetail() {
         serviceType: 'rental',
         serviceId: item.item_id,
         quantity: 1,
-        basePrice: item.price || item.daily_rate * 3 || '0', 
+        basePrice: item.price || item.daily_rate * 3 || '0',
         finalPrice: totalPrice.toString(),
         pricingFactors: {
           rental_duration: rentalDuration,
@@ -311,7 +328,13 @@ export default function RentalDetail() {
           brand: item.brand || '',
           size: item.size || '',
           category: item.category || '',
-          image_url: item.image_url
+          color: item.color || '',
+          material: item.material || '',
+          description: item.description || '',
+          image_url: item.image_url,
+          front_image: item.front_image || null,
+          back_image: item.back_image || null,
+          side_image: item.side_image || null,
         },
         rentalDates: {
           startDate: `${startDate!.getFullYear()}-${String(startDate!.getMonth() + 1).padStart(2, '0')}-${String(startDate!.getDate()).padStart(2, '0')}`,
@@ -320,7 +343,7 @@ export default function RentalDetail() {
       };
 
       const result = await cartService.addToCart(rentalData);
-      
+
       if (result.success) {
         setShowConfirmModal(false);
         Alert.alert("Success!", "Rental added to cart!", [
@@ -347,17 +370,13 @@ export default function RentalDetail() {
         >
           <Ionicons name="arrow-back" size={26} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.95}
-          onPress={() => setShowImageModal(true)}
-          style={styles.imageContainer}
-        >
-          <Image source={getImageSource()} style={styles.image} resizeMode="cover" />
-          <View style={styles.imageOverlay}>
-            <Ionicons name="expand-outline" size={28} color="#fff" />
-            <Text style={styles.tapToZoom}>Tap to zoom</Text>
-          </View>
-        </TouchableOpacity>
+        <RentalImageCarousel
+          images={getRentalImages()}
+          itemName={item.item_name}
+          fallbackImage={require("../../../assets/images/rent.jpg")}
+          imageHeight={380}
+          showFullscreen={true}
+        />
 
         <View style={styles.sheet}>
           <LinearGradient
@@ -371,7 +390,7 @@ export default function RentalDetail() {
             <Text style={styles.priceLabel}>Rental Price</Text>
             <Text style={styles.priceValue}>
               ₱{(() => {
-                
+
                 const basePrice = item.price || (item.daily_rate ? item.daily_rate * 3 : 0);
                 return parseFloat(String(basePrice).replace(/[^\d.]/g, '') || "0").toLocaleString();
               })()}/3 days
@@ -407,10 +426,10 @@ export default function RentalDetail() {
                   <Text style={styles.measurementsToggleBtnText}>
                     {showMeasurements ? 'Hide Measurements' : 'Show Measurements'}
                   </Text>
-                  <Ionicons 
-                    name={showMeasurements ? "chevron-up" : "chevron-down"} 
-                    size={16} 
-                    color="#fff" 
+                  <Ionicons
+                    name={showMeasurements ? "chevron-up" : "chevron-down"}
+                    size={16}
+                    color="#fff"
                   />
                 </TouchableOpacity>
               </View>
@@ -658,25 +677,7 @@ export default function RentalDetail() {
             </View>
           </View>
         </Modal>
-        <Modal visible={showImageModal} transparent={true} animationType="fade">
-          <TouchableWithoutFeedback onPress={() => setShowImageModal(false)}>
-            <View style={styles.fullImageOverlay}>
-              <View style={styles.fullImageHeader}>
-                <TouchableOpacity
-                  style={styles.closeImageBtn}
-                  onPress={() => setShowImageModal(false)}
-                >
-                  <Ionicons name="close" size={30} color="#fff" />
-                </TouchableOpacity>
-              </View>
-              <Image
-                source={getImageSource()}
-                style={styles.fullImage}
-                resizeMode="contain"
-              />
-            </View>
-          </TouchableWithoutFeedback>
-        </Modal>
+
       </ScrollView>
     </>
   );
@@ -1048,26 +1049,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#1F2937",
   },
-  fullImageOverlay: {
-    flex: 1,
-    backgroundColor: "#000",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  fullImageHeader: {
-    position: "absolute",
-    top: Platform.OS === "ios" ? 60 : 30,
-    left: 20,
-    zIndex: 10,
-  },
-  closeImageBtn: {
-    backgroundColor: "rgba(0,0,0,0.5)",
-    padding: 12,
-    borderRadius: 30,
-  },
-  fullImage: {
-    width: "100%",
-    height: "100%",
+  policyCard: {
+    marginTop: 36,
+    backgroundColor: "#FAFAFA",
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
   },
   policyTitle: {
     fontSize: 18,
@@ -1082,15 +1070,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   policyText: { fontSize: 15, color: "#52525B", flex: 1 },
-  policyCard: {
-    marginTop: 36,
-    backgroundColor: "#FAFAFA",
-    padding: 24,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: "#E5E7EB",
-  },
-  
+
   measurementsSection: {
     marginTop: 20,
   },

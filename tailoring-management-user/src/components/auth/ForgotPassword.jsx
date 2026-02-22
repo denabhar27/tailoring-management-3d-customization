@@ -2,33 +2,22 @@ import React, { useState } from 'react';
 import { forgotPassword, verifyResetCode, resetPassword, resendResetCode } from '../../api/AuthApi';
 import './ForgotPassword.css';
 
-/**
- * ForgotPassword Component
- * 
- * Provides a complete forgot password flow:
- * 1. Enter username/email to request security code
- * 2. Enter security code to verify identity
- * 3. Enter new password to reset
- */
 const ForgotPassword = ({ onClose, onSuccess }) => {
-  // Current step: 'forgot' | 'verify' | 'reset' | 'success'
+
   const [step, setStep] = useState('forgot');
-  
-  // Form data
+
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetToken, setResetToken] = useState('');
-  
-  // UI states
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  // Password validation
   const validatePassword = (password) => {
     if (!password) {
       return { isValid: false, message: 'Password is required' };
@@ -43,7 +32,6 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
     return { isValid: true };
   };
 
-  // Step 1: Request security code
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     setError('');
@@ -57,11 +45,11 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
     setIsLoading(true);
     try {
       const result = await forgotPassword(usernameOrEmail.trim());
-      
+
       if (result.success) {
         setSuccessMessage('Security code sent! Check your email.');
         setStep('verify');
-        // Start resend cooldown
+
         startResendCooldown();
       } else {
         setError(result.message || 'Failed to send security code');
@@ -73,7 +61,6 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
     }
   };
 
-  // Step 2: Verify security code
   const handleVerifyCode = async (e) => {
     e.preventDefault();
     setError('');
@@ -92,7 +79,7 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
     setIsLoading(true);
     try {
       const result = await verifyResetCode(code.trim(), usernameOrEmail);
-      
+
       if (result.success && result.resetToken) {
         setResetToken(result.resetToken);
         setSuccessMessage('Code verified! Enter your new password.');
@@ -107,13 +94,11 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
     }
   };
 
-  // Step 3: Reset password
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setError('');
     setSuccessMessage('');
 
-    // Validate passwords
     if (!newPassword || !confirmPassword) {
       setError('Please enter and confirm your new password');
       return;
@@ -133,7 +118,7 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
     setIsLoading(true);
     try {
       const result = await resetPassword(resetToken, newPassword, confirmPassword);
-      
+
       if (result.success) {
         setStep('success');
         setSuccessMessage(result.message || 'Password reset successful!');
@@ -147,7 +132,6 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
     }
   };
 
-  // Resend code with cooldown
   const startResendCooldown = () => {
     setResendCooldown(60);
     const timer = setInterval(() => {
@@ -168,7 +152,7 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
     setIsLoading(true);
     try {
       const result = await resendResetCode(usernameOrEmail);
-      
+
       if (result.success) {
         setSuccessMessage('New security code sent!');
         startResendCooldown();
@@ -182,7 +166,6 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
     }
   };
 
-  // Handle going back
   const handleBack = () => {
     setError('');
     setSuccessMessage('');
@@ -196,7 +179,6 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
     }
   };
 
-  // Handle code input (auto-format)
   const handleCodeChange = (e) => {
     const value = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     if (value.length <= 6) {
@@ -204,7 +186,6 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
     }
   };
 
-  // Render step content
   const renderStepContent = () => {
     switch (step) {
       case 'forgot':
@@ -217,10 +198,10 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
               <div className="step-line"></div>
               <div className="step">3</div>
             </div>
-            
+
             <h3>Forgot Password</h3>
             <p className="subtitle">Enter your username or email to receive a security code.</p>
-            
+
             <div className="form-group">
               <label htmlFor="usernameOrEmail">Username or Email</label>
               <input
@@ -233,7 +214,7 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
                 autoFocus
               />
             </div>
-            
+
             <button type="submit" className="btn-primary" disabled={isLoading}>
               {isLoading ? 'Sending...' : 'Send Security Code'}
             </button>
@@ -250,12 +231,12 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
               <div className="step-line"></div>
               <div className="step">3</div>
             </div>
-            
+
             <h3>Enter Security Code</h3>
             <p className="subtitle">
               We sent a 6-character code to your email. Enter it below to continue.
             </p>
-            
+
             <div className="form-group">
               <label htmlFor="code">Security Code</label>
               <input
@@ -270,11 +251,11 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
                 autoFocus
               />
             </div>
-            
+
             <button type="submit" className="btn-primary" disabled={isLoading}>
               {isLoading ? 'Verifying...' : 'Verify Code'}
             </button>
-            
+
             <div className="resend-section">
               <p>Didn't receive the code?</p>
               <button
@@ -286,7 +267,7 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
                 {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
               </button>
             </div>
-            
+
             <button type="button" className="btn-back" onClick={handleBack}>
               ← Back
             </button>
@@ -303,10 +284,10 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
               <div className="step-line completed"></div>
               <div className="step active">3</div>
             </div>
-            
+
             <h3>Reset Password</h3>
             <p className="subtitle">Create a new password for your account.</p>
-            
+
             <div className="form-group">
               <label htmlFor="newPassword">New Password</label>
               <div className="password-input-wrapper">
@@ -331,7 +312,7 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
                 Must be 8+ characters with at least one special character
               </small>
             </div>
-            
+
             <div className="form-group">
               <label htmlFor="confirmPassword">Confirm Password</label>
               <input
@@ -343,11 +324,11 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
                 disabled={isLoading}
               />
             </div>
-            
+
             <button type="submit" className="btn-primary" disabled={isLoading}>
               {isLoading ? 'Resetting...' : 'Reset Password'}
             </button>
-            
+
             <button type="button" className="btn-back" onClick={handleBack}>
               ← Back
             </button>
@@ -386,7 +367,7 @@ const ForgotPassword = ({ onClose, onSuccess }) => {
         {successMessage && step !== 'success' && (
           <div className="success-message">{successMessage}</div>
         )}
-        
+
         {renderStepContent()}
       </div>
     </div>

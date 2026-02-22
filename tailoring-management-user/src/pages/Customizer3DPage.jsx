@@ -77,7 +77,7 @@ const Customizer3DPage = () => {
   const [style, setStyle] = useState(coatStyle);
 
   useEffect(() => {
-    
+
     const checkRNWebView = () => {
       if (isReactNativeWebView() || window.IS_REACT_NATIVE_WEBVIEW) {
         setIsRNWebView(true);
@@ -109,7 +109,7 @@ const Customizer3DPage = () => {
   }, []);
 
   useEffect(() => {
-    
+
     const data = sessionStorage.getItem('customizationFormData');
     if (data) {
       try {
@@ -174,14 +174,14 @@ const Customizer3DPage = () => {
     const loadFabricTypes = async () => {
       try {
         const result = await getAllFabricTypes();
-        
+
         const fabricNames = [...defaultFabrics];
-        
+
         if (result.success && result.fabrics && result.fabrics.length > 0) {
-          
+
           result.fabrics.forEach(fabric => {
             const fabricNameLower = fabric.fabric_name.toLowerCase();
-            
+
             if (!fabricNames.includes(fabricNameLower)) {
               fabricNames.push(fabricNameLower);
             }
@@ -194,7 +194,7 @@ const Customizer3DPage = () => {
         }
       } catch (error) {
         console.error('❌ Error loading fabric types:', error);
-        
+
         setFabrics(defaultFabrics);
       }
     };
@@ -209,11 +209,11 @@ const Customizer3DPage = () => {
           console.log('✅ Patterns loaded from API:', result.patterns);
 
           const sortedPatterns = result.patterns.sort((a, b) => {
-            
+
             const defaultPatternCodes = ['none', 'minimal-stripe', 'minimal-check', 'embroidery-1', 'embroidery-2'];
             const aIsDefault = defaultPatternCodes.includes(a.pattern_code);
             const bIsDefault = defaultPatternCodes.includes(b.pattern_code);
-            
+
             if (aIsDefault && !bIsDefault) return -1;
             if (!aIsDefault && bIsDefault) return 1;
 
@@ -223,7 +223,7 @@ const Customizer3DPage = () => {
 
             return (a.pattern_name || '').localeCompare(b.pattern_name || '');
           });
-          
+
           setPatterns(sortedPatterns);
         } else {
           console.warn('⚠️ No patterns found from API, using defaults');
@@ -231,7 +231,7 @@ const Customizer3DPage = () => {
         }
       } catch (error) {
         console.error('❌ Error loading patterns:', error);
-        
+
         setPatterns(defaultPatterns);
       }
     };
@@ -261,12 +261,12 @@ const Customizer3DPage = () => {
     localStorage.setItem('tailorDesign', JSON.stringify(summary));
 
     try {
-      
+
       const viewerElement = document.querySelector('.viewer');
       let sourceCanvas = viewerElement ? viewerElement.querySelector('canvas') : document.querySelector('canvas');
-      
+
       if (sourceCanvas) {
-        
+
         const combinedCanvas = document.createElement('canvas');
         const ctx = combinedCanvas.getContext('2d');
 
@@ -289,16 +289,16 @@ const Customizer3DPage = () => {
         ctx.lineTo(combinedCanvas.width, sourceCanvas.height);
         ctx.stroke();
 
-        const garmentName = garment === 'coat-men' ? 'Blazer (Men)' : 
+        const garmentName = garment === 'coat-men' ? 'Blazer (Men)' :
                           garment === 'coat-women' ? 'Blazer (Women)' :
                           garment === 'barong' ? 'Barong Tagalog' :
                           garment === 'suit-1' ? 'Business Suit' :
                           garment === 'pants' ? 'Pants' : garment;
-        
-        const buttonsList = buttons && buttons.length > 0 
+
+        const buttonsList = buttons && buttons.length > 0
           ? buttons.map(b => b.modelPath?.split('/').pop()?.replace('.glb', '') || 'Button').join(', ')
           : 'None';
-        
+
         const accessoriesList = accessories && accessories.length > 0
           ? accessories.map(a => a.modelPath?.split('/').pop()?.replace('.glb', '').replace(' 3d model', '') || 'Accessory').join(', ')
           : 'None';
@@ -314,7 +314,7 @@ const Customizer3DPage = () => {
 
         const patternObj = patterns.find(p => p.pattern_code === pattern);
         const patternDisplayName = patternObj ? patternObj.pattern_name : (pattern === 'none' ? 'Solid' : pattern);
-        
+
         const infoLines = [
           `🎨 Garment Type: ${garmentName}`,
           `📏 Size: ${size.charAt(0).toUpperCase() + size.slice(1)} | Fit: ${fit.charAt(0).toUpperCase() + fit.slice(1)}`,
@@ -325,7 +325,7 @@ const Customizer3DPage = () => {
           `📝 Notes: ${notes || 'None'}`,
           `📅 Created: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`
         ];
-        
+
         infoLines.forEach(line => {
           ctx.fillText(line, 20, y);
           y += lineHeight;
@@ -334,7 +334,7 @@ const Customizer3DPage = () => {
         const dataUrl = combinedCanvas.toDataURL('image/png');
 
         if (isRNWebView) {
-          
+
           sendToReactNative({
             type: 'DESIGN_IMAGE_READY',
             imageData: dataUrl,
@@ -342,7 +342,7 @@ const Customizer3DPage = () => {
           });
           await alert('✓ Design image ready!', 'Success', 'success');
         } else {
-          
+
           const link = document.createElement('a');
           link.href = dataUrl;
           link.download = `tailoring-design-${garmentName.replace(/[^a-z0-9]/gi, '-')}-${new Date().getTime()}.png`;
@@ -371,7 +371,7 @@ const Customizer3DPage = () => {
       const modelId = parseInt(garment.replace('custom-', ''));
       const customModel = customModels?.find(m => m.model_id === modelId);
       if (customModel?.garment_category) {
-        
+
         return customModel.garment_category;
       }
       if (customModel?.model_name) {
@@ -382,9 +382,9 @@ const Customizer3DPage = () => {
   };
 
   const getGarmentCode = () => {
-    
+
     if (!garment.startsWith('custom-')) {
-      return garment; 
+      return garment;
     }
 
     const modelId = parseInt(garment.replace('custom-', ''));
@@ -411,7 +411,7 @@ const Customizer3DPage = () => {
   const captureMultipleAngles = async () => {
     const angles = ['front', 'back', 'right', 'left'];
     const images = {};
-    
+
     return new Promise((resolve) => {
       let capturedCount = 0;
       const callbackId = `capture-${Date.now()}-${Math.random()}`;
@@ -421,14 +421,14 @@ const Customizer3DPage = () => {
         if (eventCallbackId === callbackId) {
           images[angle] = imageData;
           capturedCount++;
-          
+
           if (capturedCount === angles.length) {
             window.removeEventListener('angle-captured', handleAngleCaptured);
             resolve(images);
           }
         }
       };
-      
+
       window.addEventListener('angle-captured', handleAngleCaptured);
 
       angles.forEach((angle, index) => {
@@ -436,14 +436,14 @@ const Customizer3DPage = () => {
           window.dispatchEvent(new CustomEvent('capture-angle', {
             detail: { angle, callbackId }
           }));
-        }, index * 300); 
+        }, index * 300);
       });
 
       setTimeout(() => {
         if (capturedCount < angles.length) {
           console.warn('Some angle captures may have failed');
           window.removeEventListener('angle-captured', handleAngleCaptured);
-          resolve(images); 
+          resolve(images);
         }
       }, 5000);
     });
@@ -466,11 +466,11 @@ const Customizer3DPage = () => {
     const designImage = angleImages.front || captureCanvasImage();
 
     const garmentCode = getGarmentCode();
-    
+
     const finalDesign = {
       ...customizationData,
       design: {
-        garment: garmentCode, 
+        garment: garmentCode,
         garmentType: garmentTypeName,
         size,
         fit,
@@ -483,8 +483,8 @@ const Customizer3DPage = () => {
         buttons,
         accessories,
         pantsType,
-        designImage: designImage, 
-        angleImages: angleImages, 
+        designImage: designImage,
+        angleImages: angleImages,
       },
       timestamp: new Date().toISOString(),
     };
@@ -495,7 +495,7 @@ const Customizer3DPage = () => {
         garmentType: garmentTypeName,
         fabricType: fabric,
         designImage: designImage,
-        angleImages: angleImages, 
+        angleImages: angleImages,
         designData: finalDesign.design,
         notes: notes,
         estimatedPrice: estimatedPrice,
@@ -512,7 +512,7 @@ const Customizer3DPage = () => {
   };
 
   const handleBackToCustomization = () => {
-    
+
     if (isRNWebView) {
       sendToReactNative({
         type: 'CUSTOMIZATION_CANCEL',
@@ -533,7 +533,7 @@ const Customizer3DPage = () => {
         if (!exists) acc.push(model);
         return acc;
       }, []);
-    
+
     return uniqueModels;
   };
 
@@ -544,26 +544,26 @@ const Customizer3DPage = () => {
   return (
     <div className="app">
       <div className="nav">
-        <button 
-          className={garment.startsWith('coat') && !garment.startsWith('custom-') ? 'active' : ''} 
+        <button
+          className={garment.startsWith('coat') && !garment.startsWith('custom-') ? 'active' : ''}
           onClick={() => setGarment('coat-men')}
         >
           Blazer
         </button>
-        <button 
-          className={garment === 'barong' ? 'active' : ''} 
+        <button
+          className={garment === 'barong' ? 'active' : ''}
           onClick={() => setGarment('barong')}
         >
           Barong
         </button>
-        <button 
-          className={garment.startsWith('suit') && !garment.startsWith('custom-') ? 'active' : ''} 
+        <button
+          className={garment.startsWith('suit') && !garment.startsWith('custom-') ? 'active' : ''}
           onClick={() => setGarment('suit-1')}
         >
           Suit
         </button>
-        <button 
-          className={garment === 'pants' ? 'active' : ''} 
+        <button
+          className={garment === 'pants' ? 'active' : ''}
           onClick={() => setGarment('pants')}
         >
           Pants
@@ -578,22 +578,22 @@ const Customizer3DPage = () => {
             {model.model_name}
           </button>
         ))}
-        
-        <button 
+
+        <button
           className="save-btn"
           onClick={handleSaveDesign}
           title="Save design to localStorage"
         >
           💾 Save
         </button>
-        <button 
+        <button
           className="apply-btn"
           onClick={handleApplyDesign}
           title="Apply design and return"
         >
           ✓ Apply
         </button>
-        <button 
+        <button
           className="back-btn"
           onClick={handleBackToCustomization}
           title="Go back"

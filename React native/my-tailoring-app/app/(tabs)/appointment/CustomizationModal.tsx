@@ -67,15 +67,15 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [garmentTypes, setGarmentTypes] = useState(DEFAULT_GARMENT_TYPES);
   const [loadingGarments, setLoadingGarments] = useState(false);
-  
+
   const [fabricTypes, setFabricTypes] = useState(DEFAULT_FABRIC_TYPES);
   const [loadingFabrics, setLoadingFabrics] = useState(false);
-  
+
   const [timeSlots, setTimeSlots] = useState<any[]>([]);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [isShopOpen, setIsShopOpen] = useState(true);
-  
+
   const [showGarmentPicker, setShowGarmentPicker] = useState(false);
   const [showFabricPicker, setShowFabricPicker] = useState(false);
 
@@ -92,14 +92,14 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
     if (visible && preferredDate) {
       loadTimeSlots();
     }
-  }, [visible, preferredDate.getTime()]); 
+  }, [visible, preferredDate.getTime()]);
 
   const loadTimeSlots = async () => {
     console.log('=== [Customization] loadTimeSlots called ===');
     setLoadingSlots(true);
     setSelectedTimeSlot('');
     try {
-      
+
       const year = preferredDate.getFullYear();
       const month = String(preferredDate.getMonth() + 1).padStart(2, '0');
       const day = String(preferredDate.getDate()).padStart(2, '0');
@@ -173,7 +173,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.garments && data.garments.length > 0) {
@@ -190,7 +190,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
           if (!hasUniform) {
             transformedGarments.push({ id: 'uniform', label: 'Uniform', icon: 'school-outline', price: 0 });
           }
-          
+
           if (transformedGarments.length > 0) {
             setGarmentTypes(transformedGarments);
             console.log('✅ Loaded garment types for modal:', transformedGarments);
@@ -199,7 +199,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
       }
     } catch (error) {
       console.log('Error loading garment types:', error);
-      
+
     } finally {
       setLoadingGarments(false);
     }
@@ -215,7 +215,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.fabrics && data.fabrics.length > 0) {
@@ -224,7 +224,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
             label: fabric.fabric_name,
             price: parseFloat(fabric.fabric_price) || 0,
           }));
-          
+
           if (transformedFabrics.length > 0) {
             setFabricTypes(transformedFabrics);
             console.log('✅ Loaded fabric types for modal:', transformedFabrics);
@@ -233,7 +233,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
       }
     } catch (error) {
       console.log('Error loading fabric types:', error);
-      
+
     } finally {
       setLoadingFabrics(false);
     }
@@ -257,8 +257,8 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
   const handleDateConfirm = async (selectedDate: Date) => {
     setPreferredDate(selectedDate);
     setShowDatePicker(false);
-    setSelectedTimeSlot(''); 
-    
+    setSelectedTimeSlot('');
+
     await loadTimeSlotsForDate(selectedDate);
   };
 
@@ -313,7 +313,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
             type: 'image/jpeg',
             name: 'customization.jpg',
           } as any);
-          
+
           const uploadResponse = await uploadCustomizationImage(formData);
           imageUrl = uploadResponse.imageUrl || uploadResponse.data?.imageUrl || 'no-image';
         } catch (uploadError) {
@@ -321,7 +321,6 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
         }
       }
 
-      // Format date in local timezone to avoid UTC conversion issues
       const year = preferredDate.getFullYear();
       const month = String(preferredDate.getMonth() + 1).padStart(2, '0');
       const day = String(preferredDate.getDate()).padStart(2, '0');
@@ -343,7 +342,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
 
       const isUniform = selectedGarment === 'uniform';
       const garmentLabel = garmentTypes.find(g => g.id === selectedGarment)?.label || selectedGarment;
-      
+
       await addCustomizationToCart({
         garmentType: garmentLabel,
         fabricType: fabricTypes.find((f: any) => f.id === selectedFabric)?.label || selectedFabric,
@@ -396,12 +395,12 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
           <View style={styles.placeholder} />
         </View>
 
-        <ScrollView 
+        <ScrollView
           style={styles.content}
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.banner3D}
             onPress={handleOpen3DCustomizer}
             activeOpacity={0.8}
@@ -426,7 +425,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
           {loadingGarments ? (
             <ActivityIndicator size="small" color="#B8860B" style={{ marginVertical: 20 }} />
           ) : (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.dropdownSelector}
               onPress={() => setShowGarmentPicker(true)}
             >
@@ -452,7 +451,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
             animationType="fade"
             onRequestClose={() => setShowGarmentPicker(false)}
           >
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.pickerModalOverlay}
               activeOpacity={1}
               onPress={() => setShowGarmentPicker(false)}
@@ -510,7 +509,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
           {loadingFabrics ? (
             <ActivityIndicator size="small" color="#B8860B" style={{ marginVertical: 20 }} />
           ) : (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.dropdownSelector}
             onPress={() => setShowFabricPicker(true)}
           >
@@ -536,7 +535,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
             animationType="fade"
             onRequestClose={() => setShowFabricPicker(false)}
           >
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.pickerModalOverlay}
               activeOpacity={1}
               onPress={() => setShowFabricPicker(false)}
@@ -639,7 +638,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
           ) : timeSlots.length > 0 ? (
             <View style={styles.timeSlotsGrid}>
               {(() => {
-                
+
                 const seenTimes = new Set<string>();
                 const uniqueSlots = timeSlots.filter((slot) => {
                   if (seenTimes.has(slot.time_slot)) {
@@ -648,7 +647,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
                   seenTimes.add(slot.time_slot);
                   return true;
                 });
-                
+
                 return uniqueSlots.map((slot) => (
                   <TouchableOpacity
                     key={slot.slot_id || slot.time_slot}
@@ -669,8 +668,8 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
                   >
                     <Text style={styles.slotTime}>{slot.display_time}</Text>
                     <Text style={styles.slotStatus}>
-                      {slot.status === 'full' ? 'Fully Booked' : 
-                       slot.status === 'limited' ? `${slot.available} LEFT` : 
+                      {slot.status === 'full' ? 'Fully Booked' :
+                       slot.status === 'limited' ? `${slot.available} LEFT` :
                        slot.status === 'available' ? `${slot.available} SPOTS` : 'Unavailable'}
                     </Text>
                   </TouchableOpacity>
@@ -727,7 +726,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
           )}
           <TouchableOpacity
             style={[
-              styles.primaryButton, 
+              styles.primaryButton,
               styles.addToCartButton,
               (!selectedGarment || !selectedFabric || !selectedTimeSlot) && styles.buttonDisabled
             ]}
@@ -1093,7 +1092,7 @@ const styles = StyleSheet.create({
   addToCartButton: {
     flex: 1,
   },
-  
+
   uniformCard: {
     borderColor: '#ffb74d',
     backgroundColor: '#fff3e0',
@@ -1140,7 +1139,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderStyle: 'dashed',
   },
-  
+
   legendContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -1183,7 +1182,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   timeSlotButton: {
-    width: (width - 88) / 3, 
+    width: (width - 88) / 3,
     paddingVertical: 14,
     paddingHorizontal: 8,
     borderRadius: 12,

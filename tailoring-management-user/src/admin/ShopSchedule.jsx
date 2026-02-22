@@ -30,18 +30,18 @@ const ShopSchedule = () => {
       setLoading(true);
       const result = await getShopScheduleAdmin();
       if (result.success) {
-        
+
         const scheduleMap = {};
         result.schedule.forEach(item => {
           scheduleMap[item.day_of_week] = item;
         });
-        
+
         const fullSchedule = daysOfWeek.map(day => ({
           day_of_week: day.value,
           day_name: day.name,
           is_open: scheduleMap[day.value]?.is_open || false
         }));
-        
+
         setSchedule(fullSchedule);
       }
     } catch (error) {
@@ -53,8 +53,8 @@ const ShopSchedule = () => {
   };
 
   const handleToggle = (dayOfWeek) => {
-    setSchedule(prev => prev.map(day => 
-      day.day_of_week === dayOfWeek 
+    setSchedule(prev => prev.map(day =>
+      day.day_of_week === dayOfWeek
         ? { ...day, is_open: !day.is_open }
         : day
     ));
@@ -95,17 +95,17 @@ const ShopSchedule = () => {
     <div className="admin-page">
       <Sidebar />
       <AdminHeader />
-      
+
       <div className="content">
         <div className="dashboard-title">
           <h2>Shop Schedule</h2>
           <p>Configure which days the shop is open for appointments</p>
         </div>
 
-        <div style={{ 
-          backgroundColor: 'white', 
-          borderRadius: '8px', 
-          padding: '30px', 
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          padding: '30px',
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
           maxWidth: '800px',
           margin: '20px auto'
@@ -119,7 +119,7 @@ const ShopSchedule = () => {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             {schedule.map(day => (
-              <div 
+              <div
                 key={day.day_of_week}
                 style={{
                   display: 'flex',
@@ -136,8 +136,8 @@ const ShopSchedule = () => {
                   <strong style={{ fontSize: '16px', color: '#333' }}>
                     {day.day_name}
                   </strong>
-                  <span style={{ 
-                    marginLeft: '10px', 
+                  <span style={{
+                    marginLeft: '10px',
                     padding: '4px 12px',
                     borderRadius: '12px',
                     fontSize: '12px',
@@ -148,7 +148,7 @@ const ShopSchedule = () => {
                     {day.is_open ? 'OPEN' : 'CLOSED'}
                   </span>
                 </div>
-                <label style={{ 
+                <label style={{
                   position: 'relative',
                   display: 'inline-block',
                   width: '60px',

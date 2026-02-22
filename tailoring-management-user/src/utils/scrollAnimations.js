@@ -43,7 +43,7 @@ export const initHeaderScroll = () => {
   };
 
   window.addEventListener('scroll', handleScroll, { passive: true });
-  
+
   return () => window.removeEventListener('scroll', handleScroll);
 };
 
@@ -68,14 +68,14 @@ export const initParallax = () => {
   const handleScroll = () => {
     const scrolled = window.pageYOffset;
     const rate = scrolled * 0.5;
-    
+
     if (scrolled < window.innerHeight) {
       hero.style.transform = `translateY(${rate}px)`;
     }
   };
 
   window.addEventListener('scroll', handleScroll, { passive: true });
-  
+
   return () => window.removeEventListener('scroll', handleScroll);
 };
 

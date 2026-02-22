@@ -6,7 +6,7 @@ import '../../styles/RepairFormModal.css';
 import '../../styles/SharedModal.css';
 
 const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
-  // Multiple garments support - array of garment items
+
   const [garments, setGarments] = useState([
     { id: 1, damageLevel: '', garmentType: '', notes: '' }
   ]);
@@ -45,7 +45,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       if (result.success && result.garments) {
         setRepairGarmentTypes(result.garments.filter(g => g.is_active === 1));
       } else {
-        
+
         setRepairGarmentTypes([
           { repair_garment_id: 1, garment_name: 'Shirt' },
           { repair_garment_id: 2, garment_name: 'Pants' },
@@ -61,7 +61,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       }
     } catch (err) {
       console.error("Load repair garment types error:", err);
-      
+
       setRepairGarmentTypes([
         { repair_garment_id: 1, garment_name: 'Shirt' },
         { repair_garment_id: 2, garment_name: 'Pants' },
@@ -91,11 +91,11 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
       const refreshInterval = setInterval(() => {
         if (formData.date) {
-          
+
           getAllSlotsWithAvailability('repair', formData.date)
             .then((result) => {
               if (result.success && result.slots) {
-                
+
                 const currentSlots = JSON.stringify(allTimeSlots.map(s => ({ time: s.time_slot, available: s.available })));
                 const newSlots = JSON.stringify(result.slots.map(s => ({ time: s.time_slot, available: s.available })));
                 if (currentSlots !== newSlots) {
@@ -122,7 +122,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               console.error('[POLLING] Error refreshing slots:', error);
             });
         }
-      }, 5000); 
+      }, 5000);
 
       return () => clearInterval(refreshInterval);
     } else {
@@ -160,10 +160,10 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     }
 
     setPriceLoading(true);
-    
+
     try {
       let totalPrice = 0;
-      
+
       garments.forEach(garment => {
         if (garment.damageLevel) {
           const damageLevel = damageLevels.find(level => level.value === garment.damageLevel);
@@ -180,7 +180,6 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     }
   };
 
-  // Garment management functions
   const addGarment = () => {
     const newId = Math.max(...garments.map(g => g.id)) + 1;
     setGarments([...garments, { id: newId, damageLevel: '', garmentType: '', notes: '' }]);
@@ -193,10 +192,10 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   const updateGarment = (id, field, value) => {
-    setGarments(garments.map(g => 
+    setGarments(garments.map(g =>
       g.id === id ? { ...g, [field]: value } : g
     ));
-    // Clear error for this field
+
     if (errors[`garment_${id}_${field}`]) {
       setErrors(prev => ({ ...prev, [`garment_${id}_${field}`]: '' }));
     }
@@ -208,7 +207,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       ...prev,
       [name]: value
     }));
-    
+
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -216,14 +215,14 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const loadAvailableSlots = async (date) => {
     if (!date) return;
-    
+
     setLoadingSlots(true);
     setMessage('');
-    
+
     try {
-      
+
       const result = await getAllSlotsWithAvailability('repair', date);
-      
+
       if (result.success) {
         if (!result.isShopOpen) {
           setIsShopOpen(false);
@@ -232,7 +231,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           setMessage('The shop is closed on this date. Please select another date.');
           return;
         }
-        
+
         setIsShopOpen(true);
         setAllTimeSlots(result.slots || []);
 
@@ -260,7 +259,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const getMinDate = () => {
     const today = new Date();
-    
+
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
@@ -281,7 +280,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         }
       } catch (error) {
         console.error('Error checking date availability:', error);
-        
+
         const date = new Date(selectedDate);
         const dayOfWeek = date.getDay();
         if (dayOfWeek === 0) {
@@ -292,10 +291,10 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         }
       }
     }
-    
+
     setFormData(prev => ({ ...prev, date: selectedDate, time: '' }));
     setMessage('');
-    
+
     if (errors.date) {
       setErrors(prev => ({ ...prev, date: '' }));
     }
@@ -319,7 +318,6 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    // Validate each garment
     garments.forEach((garment, index) => {
       if (!garment.damageLevel) {
         newErrors[`garment_${garment.id}_damageLevel`] = 'Please select a damage level';
@@ -345,7 +343,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -354,7 +352,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     setMessage('');
 
     try {
-      
+
       let slotResult = null;
       try {
         slotResult = await bookSlot('repair', formData.date, formData.time);
@@ -383,10 +381,10 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           size: imageFile.size,
           type: imageFile.type
         });
-        
+
         const uploadResult = await uploadRepairImage(imageFile);
         console.log('Upload result:', uploadResult);
-        
+
         if (uploadResult.success) {
           imageUrl = uploadResult.data.url || uploadResult.data.filename || '';
           console.log('Image uploaded successfully, URL:', imageUrl);
@@ -400,7 +398,6 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
       const pickupDateTime = `${formData.date}T${formData.time}`;
 
-      // Build garments array for submission
       const garmentsData = garments.map(garment => {
         const damageLevel = damageLevels.find(level => level.value === garment.damageLevel);
         const basePrice = damageLevel ? damageLevel.basePrice : 500;
@@ -429,9 +426,9 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
       const result = await addRepairToCart(repairData);
       console.log('Add to cart result:', result);
-      
+
       if (result.success) {
-        
+
         setMessage(`✅ Repair service added to cart! Estimated price: ₱${estimatedPrice}${imageUrl ? ' (Image uploaded)' : ''}`);
         setTimeout(() => {
           onClose();
@@ -499,14 +496,14 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           {garments.map((garment, index) => (
             <div key={garment.id} className="garment-inputs-group">
               {index > 0 && <hr className="garment-divider" />}
-              
+
               <div className="garment-row-header">
                 {garments.length > 1 && (
                   <span className="garment-label">Garment #{index + 1}</span>
                 )}
                 {garments.length > 1 && (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="remove-garment-link"
                     onClick={() => removeGarment(garment.id)}
                   >
@@ -579,9 +576,9 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               </div>
             </div>
           ))}
-          
-          <button 
-            type="button" 
+
+          <button
+            type="button"
             className="add-garment-link"
             onClick={addGarment}
           >
@@ -606,8 +603,8 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
             {imagePreview && (
               <div className="image-preview-shared">
                 <img src={imagePreview} alt="Damage preview" />
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="remove-image-btn-shared"
                   onClick={() => {
                     setImageFile(null);
@@ -619,7 +616,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 </button>
               </div>
             )}
-            
+
             {imageFile && !imagePreview && (
               <div className="help-text-shared" style={{ marginTop: '8px' }}>
                 <i className="fas fa-paperclip"></i> {imageFile.name}
@@ -665,7 +662,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                   <span>Full</span>
                 </div>
               </div>
-              
+
               {loadingSlots ? (
                 <div className="time-slots-loading">
                   <div className="loading-spinner"></div>
@@ -679,7 +676,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               ) : allTimeSlots.length > 0 ? (
                 <div className="time-slots-grid">
                   {(() => {
-                    
+
                     const seenTimes = new Set();
                     const uniqueSlots = allTimeSlots.filter(slot => {
                       if (seenTimes.has(slot.time_slot)) {
@@ -688,7 +685,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                       seenTimes.add(slot.time_slot);
                       return true;
                     });
-                    
+
                     return uniqueSlots.map(slot => (
                       <button
                         key={slot.slot_id || slot.time_slot}
@@ -707,8 +704,8 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                       >
                         <span className="slot-time">{slot.display_time}</span>
                         <span className="slot-status">
-                          {slot.status === 'full' ? 'Fully Booked' : 
-                           slot.status === 'limited' ? `${slot.available} left` : 
+                          {slot.status === 'full' ? 'Fully Booked' :
+                           slot.status === 'limited' ? `${slot.available} left` :
                            slot.status === 'available' ? `${slot.available} spots` : 'Unavailable'}
                         </span>
                       </button>
@@ -727,7 +724,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 value={formData.time}
                 required
               />
-              
+
               {formData.time && (
                 <div className="selected-slot-info">
                   <i className="fas fa-check"></i> Selected: <strong>{allTimeSlots.find(s => s.time_slot === formData.time)?.display_time}</strong>

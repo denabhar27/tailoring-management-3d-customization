@@ -80,9 +80,9 @@ const Profile = () => {
     const fetchOrders = async () => {
       try {
         const result = await getUserOrderTracking();
-        console.log("Orders fetched:", result); 
+        console.log("Orders fetched:", result);
         if (result.success) {
-          
+
           const filteredOrders = result.data.map(order => ({
             ...order,
             items: order.items.filter(item =>
@@ -93,7 +93,7 @@ const Profile = () => {
           })).filter(order => order.items.length > 0);
 
           setOrders(filteredOrders);
-          console.log("Filtered orders data:", filteredOrders); 
+          console.log("Filtered orders data:", filteredOrders);
         } else {
           setError(result.message || 'Failed to fetch orders');
         }
@@ -116,13 +116,13 @@ const Profile = () => {
         );
 
         if (priceConfirmationOrders.length > 0) {
-          
+
           const notificationMessage = `You have ${priceConfirmationOrders.length} order(s) awaiting price confirmation!`;
           await alert(notificationMessage, 'Price Confirmation Required', 'info');
         }
       }
     };
-    
+
     checkPriceConfirmation();
   }, [orders]);
 
@@ -141,19 +141,19 @@ const Profile = () => {
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return 'N/A';
-      
+
       const dateStr = date.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric'
       });
-      
+
       const timeStr = date.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true
       });
-      
+
       return `${dateStr} at ${timeStr}`;
     } catch (e) {
       return 'N/A';
@@ -166,9 +166,9 @@ const Profile = () => {
     if (typeof size === 'string' && !size.trim().startsWith('{')) {
       return [{ label: 'Size', value: size }];
     }
-    
+
     try {
-      
+
       let measurements = typeof size === 'string' ? JSON.parse(size) : size;
 
       if (!measurements || typeof measurements !== 'object' || Array.isArray(measurements)) {
@@ -183,15 +183,15 @@ const Profile = () => {
         'waist': 'Waist',
         'length': 'Length'
       };
-      
+
       const parts = Object.entries(measurements)
         .filter(([key, value]) => value !== null && value !== undefined && value !== '' && value !== '0')
         .map(([key, value]) => {
           const label = labelMap[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim();
-          
+
           let displayValue;
           if (typeof value === 'object' && value !== null) {
-            
+
             if (value.inch !== undefined && value.cm !== undefined) {
               displayValue = `${value.inch} in / ${value.cm} cm`;
             } else if (value.inch !== undefined) {
@@ -208,17 +208,17 @@ const Profile = () => {
           }
           return { label, value: displayValue };
         });
-      
+
       return parts.length > 0 ? parts : null;
     } catch (e) {
-      
+
       return [{ label: 'Size', value: typeof size === 'string' ? size : 'N/A' }];
     }
   };
 
   const getStatusBadgeClass = (status) => {
     if (!status) return 'unknown';
-    
+
     const statusMap = {
       'pending': 'pending',
       'pending_review': 'pending',
@@ -235,7 +235,7 @@ const Profile = () => {
       'returned': 'returned',
       'completed': 'completed'
     };
-    
+
     const normalizedStatus = (status || '').toLowerCase().trim();
     return statusMap[normalizedStatus] || 'unknown';
   };
@@ -265,9 +265,9 @@ const Profile = () => {
 
   const formatServiceName = (serviceName) => {
     if (!serviceName) return '';
-    
+
     let formatted = serviceName.replace(/^[\s\-–—]+/, '');
-    
+
     return formatted.charAt(0).toUpperCase() + formatted.slice(1);
   };
 
@@ -313,7 +313,7 @@ const Profile = () => {
       '#ffd700': 'Gold',
       '#c0c0c0': 'Silver',
     };
-    
+
     if (colorMap[normalizedHex]) {
       return colorMap[normalizedHex];
     }
@@ -322,7 +322,7 @@ const Profile = () => {
       const r = parseInt(normalizedHex.slice(1, 3), 16);
       const g = parseInt(normalizedHex.slice(3, 5), 16);
       const b = parseInt(normalizedHex.slice(5, 7), 16);
-      
+
       if (r > 200 && g > 200 && b > 200) return 'Light';
       if (r < 50 && g < 50 && b < 50) return 'Dark';
       if (r > g && r > b) return 'Reddish';
@@ -330,9 +330,9 @@ const Profile = () => {
       if (b > r && b > g) return 'Bluish';
       if (r === g && g === b) return 'Gray';
     } catch (e) {
-      
+
     }
-    
+
     return normalizedHex;
   };
 
@@ -362,7 +362,7 @@ const Profile = () => {
 
   const handleAcceptPrice = async (item) => {
     try {
-      
+
       const response = await fetch(`${API_URL}/orders/${item.order_item_id}/accept-price`, {
         method: 'POST',
         headers: {
@@ -375,7 +375,7 @@ const Profile = () => {
 
       if (result.success) {
         await alert('Price accepted! Your order is now accepted.', 'Success', 'success');
-        
+
         const ordersResult = await getUserOrderTracking();
         if (ordersResult.success) {
           setOrders(ordersResult.data);
@@ -392,7 +392,7 @@ const Profile = () => {
 
   const handleDeclinePrice = async (item) => {
     try {
-      
+
       const response = await fetch(`${API_URL}/orders/${item.order_item_id}/decline-price`, {
         method: 'POST',
         headers: {
@@ -405,7 +405,7 @@ const Profile = () => {
 
       if (result.success) {
         await alert('Price declined. Your order has been cancelled.', 'Success', 'success');
-        
+
         const ordersResult = await getUserOrderTracking();
         if (ordersResult.success) {
           setOrders(ordersResult.data);
@@ -437,7 +437,7 @@ const Profile = () => {
         console.log('Matched rental case');
         const isBundle = specific_data?.is_bundle === true || specific_data?.category === 'rental_bundle';
         const bundleItems = specific_data?.bundle_items || [];
-        
+
         return (
           <div className="service-details rental-details">
             <h4>Rental Details</h4>
@@ -446,18 +446,18 @@ const Profile = () => {
                 <span className="detail-label">Rental Items:</span>
                 <div className="detail-value" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   {bundleItems.map((bundleItem, idx) => {
-                    
+
                     const itemImages = [
                       bundleItem.front_image && { url: bundleItem.front_image, label: 'Front' },
                       bundleItem.back_image && { url: bundleItem.back_image, label: 'Back' },
                       bundleItem.side_image && { url: bundleItem.side_image, label: 'Side' },
                       bundleItem.image_url && bundleItem.image_url !== 'no-image' && { url: bundleItem.image_url, label: 'Main' }
                     ].filter(Boolean);
-                    
+
                     return (
-                      <div key={idx} style={{ 
-                        border: '1px solid #e0e0e0', 
-                        borderRadius: '8px', 
+                      <div key={idx} style={{
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '8px',
                         padding: '15px',
                         backgroundColor: '#f9f9f9'
                       }}>
@@ -465,7 +465,7 @@ const Profile = () => {
                           {bundleItem.item_name || `Item ${idx + 1}`}
                         </strong>
                         {itemImages.length > 0 && (
-                          <SimpleImageCarousel 
+                          <SimpleImageCarousel
                             images={itemImages}
                             itemName={bundleItem.item_name}
                             height="180px"
@@ -477,7 +477,7 @@ const Profile = () => {
                 </div>
               </div>
             ) : (
-              
+
               (() => {
                 const singleItemImages = [
                   specific_data.front_image && { url: specific_data.front_image, label: 'Front' },
@@ -485,13 +485,13 @@ const Profile = () => {
                   specific_data.side_image && { url: specific_data.side_image, label: 'Side' },
                   specific_data.image_url && specific_data.image_url !== 'no-image' && { url: specific_data.image_url, label: 'Main' }
                 ].filter(Boolean);
-                
+
                 if (singleItemImages.length > 0) {
                   return (
                     <div className="detail-row" style={{ marginBottom: '15px' }}>
                       <span className="detail-label">Item Photos:</span>
                       <div className="detail-value">
-                        <SimpleImageCarousel 
+                        <SimpleImageCarousel
                           images={singleItemImages}
                           itemName={specific_data.item_name}
                           height="200px"
@@ -507,7 +507,7 @@ const Profile = () => {
             <div className="detail-row">
               <span className="detail-label">Item Name:</span>
               <span className="detail-value">
-                {isBundle && bundleItems.length > 0 
+                {isBundle && bundleItems.length > 0
                   ? bundleItems.map(item => item.item_name).join(', ')
                   : (specific_data.item_name || 'N/A')}
               </span>
@@ -535,8 +535,8 @@ const Profile = () => {
                   ? bundleItems.map((item, idx) => {
                       const sizeData = formatSize(item.size);
                       return (
-                        <div key={idx} style={{ 
-                          fontSize: '0.9rem', 
+                        <div key={idx} style={{
+                          fontSize: '0.9rem',
                           lineHeight: '1.8',
                           padding: '12px 16px',
                           backgroundColor: '#f5f5f5',
@@ -564,8 +564,8 @@ const Profile = () => {
                       );
                     })
                   : (
-                      <div style={{ 
-                        fontSize: '0.9rem', 
+                      <div style={{
+                        fontSize: '0.9rem',
                         lineHeight: '1.8',
                         padding: '12px 16px',
                         backgroundColor: '#f5f5f5',
@@ -601,9 +601,9 @@ const Profile = () => {
 
                   const startDate = rental_start_date || item?.rental_start_date || specific_data?.rental_start_date || specific_data?.rentalDates?.startDate;
                   const endDate = rental_end_date || item?.rental_end_date || specific_data?.rental_end_date || specific_data?.rentalDates?.endDate;
-                  
+
                   console.log('Rental dates check:', { rental_start_date, rental_end_date, item_rental_start: item?.rental_start_date, item_rental_end: item?.rental_end_date, startDate, endDate });
-                  
+
                   if (startDate && endDate) {
                     try {
                       return `${formatDate(startDate)} to ${formatDate(endDate)}`;
@@ -628,18 +628,18 @@ const Profile = () => {
               </span>
             </div>
             {(() => {
-              const pricingFactors = typeof item.pricing_factors === 'string' 
-                ? JSON.parse(item.pricing_factors || '{}') 
+              const pricingFactors = typeof item.pricing_factors === 'string'
+                ? JSON.parse(item.pricing_factors || '{}')
                 : (item.pricing_factors || {});
               const penalty = parseFloat(pricingFactors.penalty || 0);
               const penaltyDays = parseInt(pricingFactors.penaltyDays || 0);
-              
+
               if (penalty > 0 && penaltyDays > 0) {
                 return (
-                  <div className="detail-row" style={{ 
-                    backgroundColor: '#fff3cd', 
-                    padding: '12px', 
-                    borderRadius: '6px', 
+                  <div className="detail-row" style={{
+                    backgroundColor: '#fff3cd',
+                    padding: '12px',
+                    borderRadius: '6px',
                     border: '1px solid #ffc107',
                     marginTop: '10px'
                   }}>
@@ -662,7 +662,7 @@ const Profile = () => {
         );
 
       case 'repair':
-        
+
         const getEstimatedPrice = (damageLevel) => {
           const prices = {
             'minor': 300,
@@ -712,7 +712,7 @@ const Profile = () => {
               <span className="detail-label">Service Name:</span>
               <span className="detail-value">{formatServiceName(specific_data.serviceName) || 'N/A'}</span>
             </div>
-            
+
             {/* Multiple garments support */}
             {specific_data.garments && specific_data.garments.length > 0 ? (
               <>
@@ -721,11 +721,11 @@ const Profile = () => {
                   <span className="detail-value"><strong>{specific_data.garments.length} item{specific_data.garments.length > 1 ? 's' : ''}</strong></span>
                 </div>
                 {specific_data.garments.map((garment, idx) => (
-                  <div key={idx} className="garment-card" style={{ 
-                    marginTop: '10px', 
-                    padding: '12px 16px', 
-                    backgroundColor: '#f9f9f9', 
-                    borderRadius: '8px', 
+                  <div key={idx} className="garment-card" style={{
+                    marginTop: '10px',
+                    padding: '12px 16px',
+                    backgroundColor: '#f9f9f9',
+                    borderRadius: '8px',
                     border: '1px solid #e0e0e0',
                     textAlign: 'left',
                     marginLeft: '0',
@@ -754,7 +754,7 @@ const Profile = () => {
                 </div>
               </>
             )}
-            
+
             <div className="detail-row">
               <span className="detail-label">Drop Off Item Date:</span>
               <span className="detail-value">{formatDateTo12Hour(specific_data.pickupDate)}</span>
@@ -799,13 +799,13 @@ const Profile = () => {
                               console.log(`${angle} view image failed to load`);
                             }}
                           />
-                          <div style={{ 
-                            position: 'absolute', 
-                            bottom: '5px', 
-                            left: '5px', 
-                            background: 'rgba(0,0,0,0.7)', 
-                            color: 'white', 
-                            padding: '4px 8px', 
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '5px',
+                            left: '5px',
+                            background: 'rgba(0,0,0,0.7)',
+                            color: 'white',
+                            padding: '4px 8px',
                             borderRadius: '4px',
                             fontSize: '11px',
                             textTransform: 'capitalize',
@@ -838,7 +838,7 @@ const Profile = () => {
                 </div>
               </div>
             ) : null}
-            
+
             <div className="detail-row">
               <span className="detail-label">Garment Type:</span>
               <span className="detail-value">{specific_data.garmentType || 'N/A'}</span>
@@ -943,10 +943,10 @@ const Profile = () => {
       case 'dry-cleaning':
       case 'dry cleaning':
         console.log('Matched dry cleaning case');
-        
+
         console.log('Processing dry cleaning service');
         const getDryCleaningEstimatedPrice = (serviceName, quantity) => {
-          
+
           const basePrices = {
             'Basic Dry Cleaning': 200,
             'Premium Dry Cleaning': 350,
@@ -979,7 +979,7 @@ const Profile = () => {
 
         const cleaningServiceName = specific_data.serviceName || 'N/A';
         const cleaningQuantity = specific_data.quantity || 1;
-        
+
         let dryCleaningPrice = parseFloat(item.final_price) || 0;
         if (!dryCleaningPrice && specific_data?.pricePerItem) {
           const pricePerItem = parseFloat(specific_data.pricePerItem) || 0;
@@ -1016,7 +1016,7 @@ const Profile = () => {
               <span className="detail-label">Service Name:</span>
               <span className="detail-value">{formatServiceName(cleaningServiceName)}</span>
             </div>
-            
+
             {/* Multiple garments support */}
             {specific_data.garments && specific_data.garments.length > 0 ? (
               <>
@@ -1025,11 +1025,11 @@ const Profile = () => {
                   <span className="detail-value"><strong>{specific_data.garments.length} item{specific_data.garments.length > 1 ? 's' : ''}</strong></span>
                 </div>
                 {specific_data.garments.map((garment, idx) => (
-                  <div key={idx} className="garment-card" style={{ 
-                    marginTop: '10px', 
-                    padding: '12px 16px', 
-                    backgroundColor: '#f9f9f9', 
-                    borderRadius: '8px', 
+                  <div key={idx} className="garment-card" style={{
+                    marginTop: '10px',
+                    padding: '12px 16px',
+                    backgroundColor: '#f9f9f9',
+                    borderRadius: '8px',
                     border: '1px solid #e0e0e0',
                     textAlign: 'left'
                   }}>
@@ -1056,7 +1056,7 @@ const Profile = () => {
                 </div>
               </>
             )}
-            
+
             <div className="detail-row">
               <span className="detail-label">Special Instructions:</span>
               <span className="detail-value">{specific_data.notes || 'None'}</span>
@@ -1095,7 +1095,7 @@ const Profile = () => {
   const getStatusDotClass = (currentStatus, stepStatus, serviceType = null) => {
 
     const rentalFlow = ['pending', 'ready_to_pickup', 'ready_for_pickup', 'rented', 'returned'];
-    
+
     const defaultFlow = ['pending', 'price_confirmation', 'accepted', 'in_progress', 'ready_to_pickup', 'completed'];
 
     const statusFlow = serviceType === 'rental' ? rentalFlow : defaultFlow;
@@ -1107,7 +1107,7 @@ const Profile = () => {
     const stepIndex = statusFlow.indexOf(normalizedStep);
 
     if (stepStatus === 'price_confirmation' && currentIndex > 0) {
-      
+
       return 'completed';
     }
 
@@ -1121,7 +1121,7 @@ const Profile = () => {
   const getTimelineDate = (updatedAt, currentStatus, stepStatus, serviceType = null) => {
 
     const rentalFlow = ['pending', 'ready_to_pickup', 'ready_for_pickup', 'rented', 'returned'];
-    
+
     const defaultFlow = ['pending', 'price_confirmation', 'accepted', 'in_progress', 'ready_to_pickup', 'completed'];
 
     const statusFlow = serviceType === 'rental' ? rentalFlow : defaultFlow;
@@ -1133,17 +1133,17 @@ const Profile = () => {
     const stepIndex = statusFlow.indexOf(normalizedStep);
 
     if (stepStatus === 'price_confirmation' && currentIndex > 1 && currentIndex !== 1) {
-      
+
       return formatDate(updatedAt);
     }
 
     if (currentIndex >= stepIndex) {
       if (stepIndex === 0) {
-        return formatDate(updatedAt); 
+        return formatDate(updatedAt);
       } else if (currentIndex === stepIndex) {
-        return formatDate(updatedAt); 
+        return formatDate(updatedAt);
       } else {
-        return formatDate(updatedAt); 
+        return formatDate(updatedAt);
       }
     } else {
       return 'Pending';
@@ -1153,7 +1153,7 @@ const Profile = () => {
   const getTimelineItemClass = (currentStatus, stepStatus, serviceType = null) => {
 
     const rentalFlow = ['pending', 'ready_to_pickup', 'ready_for_pickup', 'rented', 'returned'];
-    
+
     const defaultFlow = ['pending', 'price_confirmation', 'accepted', 'in_progress', 'ready_to_pickup', 'completed'];
 
     const statusFlow = serviceType === 'rental' ? rentalFlow : defaultFlow;
@@ -1184,11 +1184,11 @@ const Profile = () => {
 
   const getEstimatedPrice = (specificData, serviceType) => {
     if (serviceType === 'repair') {
-      
+
       if (specificData?.estimatedPrice) {
         return specificData.estimatedPrice;
       }
-      
+
       const damageLevel = specificData?.damageLevel;
       const prices = {
         'minor': 300,
@@ -1198,7 +1198,7 @@ const Profile = () => {
       };
       return prices[damageLevel] || 0;
     } else if (serviceType === 'dry_cleaning') {
-      
+
       if (specificData?.finalPrice) {
         return parseFloat(specificData.finalPrice) || 0;
       }
@@ -1245,19 +1245,19 @@ const Profile = () => {
       console.log('Admin price updated flag is TRUE');
       return true;
     }
-    
+
     console.log('adminPriceUpdated flag in pricing_factors:', pricingFactors?.adminPriceUpdated);
     console.log('adminPriceUpdated flag in specific_data:', specificData?.adminPriceUpdated);
 
     const estimatedPrice = getEstimatedPrice(specificData, serviceType);
     console.log('Estimated price:', estimatedPrice);
-    
+
     const adminNotes = pricingFactors?.adminNotes || specificData?.adminNotes;
     if (estimatedPrice > 0 && adminNotes) {
       const difference = Math.abs(finalPrice - estimatedPrice);
       console.log('Price difference:', difference);
       console.log('Difference > 0.01:', difference > 0.01);
-      return difference > 0.01; 
+      return difference > 0.01;
     }
 
     console.log('No price change detected');
@@ -1270,7 +1270,7 @@ const Profile = () => {
     console.log('Item final_price:', item.final_price);
     console.log('Item specific_data:', item.specific_data);
     console.log('Item service_type:', item.service_type);
-    
+
     const isPriceConfirmationStatus = item.status === 'price_confirmation';
     console.log('Is price confirmation status:', isPriceConfirmationStatus);
 
@@ -1278,7 +1278,7 @@ const Profile = () => {
       console.log('Price confirmation status detected - showing buttons');
       return true;
     }
-    
+
     return false;
   };
 
@@ -1296,7 +1296,7 @@ const Profile = () => {
 
     orders.forEach(order => {
       order.items.forEach(item => {
-        
+
         const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
 
         let matchesService = false;
@@ -1336,7 +1336,7 @@ const Profile = () => {
     });
 
     allItems.sort((a, b) => {
-      
+
       const dateA = a.status_updated_at ? new Date(a.status_updated_at) : new Date(a.order_date);
       const dateB = b.status_updated_at ? new Date(b.status_updated_at) : new Date(b.order_date);
 
@@ -1364,7 +1364,7 @@ const Profile = () => {
         if (counts[item.status] !== undefined) {
           counts[item.status]++;
         }
-        counts.all++; 
+        counts.all++;
       });
     });
 
@@ -1382,7 +1382,7 @@ const Profile = () => {
 
     orders.forEach(order => {
       order.items.forEach(item => {
-        
+
         let serviceKey = item.service_type;
 
         if (serviceKey === 'customization' || serviceKey === 'customize') {
@@ -1447,7 +1447,7 @@ const Profile = () => {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', marginTop: '15px', flexWrap: 'wrap' }}>
-                  <button 
+                  <button
                     type="button"
                     onClick={(e) => {
                       e.preventDefault();
@@ -1473,7 +1473,7 @@ const Profile = () => {
                   >
                     Edit Profile
                   </button>
-                  <button 
+                  <button
                     onClick={async () => {
                       setLoadingMeasurements(true);
                       setMeasurementsModalOpen(true);
@@ -1611,19 +1611,19 @@ const Profile = () => {
                 const isDryCleaning = item.service_type === 'dry_cleaning' || item.service_type === 'drycleaning';
                 const isCustomization = item.service_type === 'customization' || item.service_type === 'customize';
 
-                const pricingFactors = typeof item.pricing_factors === 'string' 
-                  ? JSON.parse(item.pricing_factors || '{}') 
+                const pricingFactors = typeof item.pricing_factors === 'string'
+                  ? JSON.parse(item.pricing_factors || '{}')
                   : (item.pricing_factors || {});
                 const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
                 const downpayment = parseFloat(pricingFactors.downpayment || item.specific_data?.downpayment || 0);
                 const finalPrice = parseFloat(item.final_price || 0);
-                
+
                 const totalPaid = amountPaid;
                 const remainingAmount = Math.max(0, finalPrice - totalPaid);
                 const hasPayment = totalPaid > 0 && (isRental || isRepair || isDryCleaning || isCustomization);
-                
+
                 const isUniform = isCustomization && (
-                  item.specific_data?.garmentType?.toLowerCase() === 'uniform' || 
+                  item.specific_data?.garmentType?.toLowerCase() === 'uniform' ||
                   item.specific_data?.isUniform === true ||
                   item.pricing_factors?.isUniform === true
                 );
@@ -1714,7 +1714,7 @@ const Profile = () => {
                           </div>
                         );
                       }
-                      
+
                       else if (diffDays === 0) {
                         return (
                           <div style={{
@@ -1739,7 +1739,7 @@ const Profile = () => {
                           </div>
                         );
                       }
-                      
+
                       else if (diffDays <= 3) {
                         return (
                           <div style={{
@@ -1789,7 +1789,7 @@ const Profile = () => {
                             </div>
                           </>
                         ) : item.status === 'pending' ? (
-                          
+
                           (() => {
                             const isDryCleaning = item.service_type === 'dry_cleaning' || item.service_type === 'drycleaning';
                             const isEstimated = item.specific_data?.isEstimatedPrice === true;
@@ -1820,7 +1820,7 @@ const Profile = () => {
                             ) : null;
                           })()
                         ) : item.status === 'price_confirmation' && estimatedPrice > 0 ? (
-                          
+
                           <>
                             <div className="price-row">
                               <span className="price-label">Estimated Price:</span>
@@ -1857,7 +1857,7 @@ const Profile = () => {
                             )}
                           </>
                         ) : (
-                          
+
                           (() => {
                             const isDryCleaning = item.service_type === 'dry_cleaning' || item.service_type === 'drycleaning';
                             const isEstimated = item.specific_data?.isEstimatedPrice === true;
@@ -2155,17 +2155,17 @@ const Profile = () => {
                         const isDryCleaning = selectedItem.service_type === 'dry_cleaning' || selectedItem.service_type === 'drycleaning';
                         const isCustomization = selectedItem.service_type === 'customization' || selectedItem.service_type === 'customize';
 
-                        const pricingFactors = typeof selectedItem.pricing_factors === 'string' 
-                          ? JSON.parse(selectedItem.pricing_factors || '{}') 
+                        const pricingFactors = typeof selectedItem.pricing_factors === 'string'
+                          ? JSON.parse(selectedItem.pricing_factors || '{}')
                           : (selectedItem.pricing_factors || {});
                         const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
                         const downpayment = parseFloat(pricingFactors.downpayment || selectedItem.specific_data?.downpayment || 0);
                         const finalPrice = parseFloat(selectedItem.final_price || 0);
-                        
+
                         const totalPaid = amountPaid;
                         const remainingAmount = Math.max(0, finalPrice - totalPaid);
                         const hasPayment = totalPaid > 0 && (isRental || isRepair || isDryCleaning || isCustomization);
-                        
+
                         if (hasPayment && remainingAmount > 0) {
                           return (
                             <div>
@@ -2184,7 +2184,7 @@ const Profile = () => {
 
                         if (selectedItem.status === 'pending') {
                           const estimatedPrice = getEstimatedPrice(selectedItem.specific_data, selectedItem.service_type);
-                          
+
                           // For dry cleaning: only show "(Estimated)" if user selected "others" in garment dropdown
                           if (isDryCleaning) {
                             const isEstimated = selectedItem.specific_data?.isEstimatedPrice === true;
@@ -2195,7 +2195,7 @@ const Profile = () => {
                               return `₱${finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
                             }
                           }
-                          
+
                           // For other services, show estimated if price > 0
                           if (estimatedPrice > 0) {
                             return `₱${estimatedPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (Estimated)`;
@@ -2293,8 +2293,8 @@ const Profile = () => {
         orderItemId={selectedOrderItemId}
       />
       {measurementsModalOpen && (
-        <div 
-          className="details-modal-overlay" 
+        <div
+          className="details-modal-overlay"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setMeasurementsModalOpen(false);
@@ -2324,7 +2324,7 @@ const Profile = () => {
                         <tbody>
                           {Object.entries(measurements.top).map(([key, value], idx) => {
                             if (!value || value === '' || value === '0') return null;
-                            
+
                             const labelMap = {
                               'chest': 'Chest',
                               'shoulders': 'Shoulders',
@@ -2360,7 +2360,7 @@ const Profile = () => {
                         <tbody>
                           {Object.entries(measurements.bottom).map(([key, value], idx) => {
                             if (!value || value === '' || value === '0') return null;
-                            
+
                             const labelMap = {
                               'waist': 'Waist',
                               'hips': 'Hips',
@@ -2389,7 +2389,7 @@ const Profile = () => {
                     </div>
                   )}
 
-                  {(!measurements.top || Object.keys(measurements.top).length === 0) && 
+                  {(!measurements.top || Object.keys(measurements.top).length === 0) &&
                    (!measurements.bottom || Object.keys(measurements.bottom).length === 0) && (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
                       No measurements have been recorded yet. Please contact the admin to add your measurements.
@@ -2411,12 +2411,12 @@ const Profile = () => {
         </div>
       )}
       {isEditingProfile && (
-        <div 
-          className="details-modal-overlay" 
+        <div
+          className="details-modal-overlay"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setIsEditingProfile(false);
-              
+
               const currentUser = getUser();
               if (currentUser) {
                 setProfileData({
@@ -2434,7 +2434,7 @@ const Profile = () => {
               <h3 className="modal-title-black">Edit Profile</h3>
               <button className="details-modal-close" onClick={() => {
                 setIsEditingProfile(false);
-                
+
                 const currentUser = getUser();
                 if (currentUser) {
                   setProfileData({
@@ -2526,7 +2526,7 @@ const Profile = () => {
               <button
                 onClick={() => {
                   setIsEditingProfile(false);
-                  
+
                   const currentUser = getUser();
                   if (currentUser) {
                     setProfileData({
@@ -2572,10 +2572,10 @@ const Profile = () => {
                     });
 
                     if (result.success) {
-                      
+
                       if (result.user) {
                         setUser(result.user);
-                        
+
                         localStorage.setItem("user", JSON.stringify(result.user));
                       }
                       await alert('Profile updated successfully!', 'Success', 'success');
@@ -2613,8 +2613,8 @@ const Profile = () => {
         </div>
       )}
       {cancelModalOpen && itemToCancel && (
-        <div 
-          className="details-modal-overlay" 
+        <div
+          className="details-modal-overlay"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setCancelModalOpen(false);
@@ -2659,8 +2659,8 @@ const Profile = () => {
               </div>
             </div>
             <div className="details-modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button 
-                className="btn-secondary" 
+              <button
+                className="btn-secondary"
                 onClick={() => {
                   setCancelModalOpen(false);
                   setItemToCancel(null);
@@ -2679,13 +2679,13 @@ const Profile = () => {
 
                   setCancelling(true);
                   const result = await cancelOrderItem(itemToCancel.order_item_id, cancelReason.trim());
-                  
+
                   if (result.success) {
                     await alert('Service cancelled successfully', 'Success', 'success');
                     setCancelModalOpen(false);
                     setItemToCancel(null);
                     setCancelReason('');
-                    
+
                     const ordersResult = await getUserOrderTracking();
                     if (ordersResult.success) {
                       const filteredOrders = ordersResult.data.map(order => ({

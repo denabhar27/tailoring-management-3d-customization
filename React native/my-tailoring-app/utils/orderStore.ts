@@ -19,23 +19,23 @@ export interface Order {
 }
 
 class OrderStore {
-  private orders: Order[] = [];  
+  private orders: Order[] = [];
   private listeners: (() => void)[] = [];
-  private orderCounter = 1; 
+  private orderCounter = 1;
 
   addOrder(order: Omit<Order, 'id' | 'orderNo' | 'date'>) {
     const newOrder: Order = {
       ...order,
       id: Date.now().toString(),
       orderNo: `ORD-2025-${String(this.orderCounter).padStart(3, '0')}`,
-      date: new Date().toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric' 
+      date: new Date().toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
       }),
       status: order.status || "Pending",
     };
-    
+
     this.orders.unshift(newOrder);
     this.orderCounter++;
     this.notifyListeners();

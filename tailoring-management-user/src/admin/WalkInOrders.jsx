@@ -69,7 +69,7 @@ const WalkInOrders = () => {
   const [referenceImage, setReferenceImage] = useState(null);
   const [referenceImagePreview, setReferenceImagePreview] = useState(null);
 
-  const [selectedRentalItems, setSelectedRentalItems] = useState([]); 
+  const [selectedRentalItems, setSelectedRentalItems] = useState([]);
   const [rentalDuration, setRentalDuration] = useState(3);
   const [eventDate, setEventDate] = useState('');
   const [damageDeposit, setDamageDeposit] = useState('');
@@ -90,7 +90,7 @@ const WalkInOrders = () => {
     try {
       const result = await getAllDCGarmentTypesAdmin();
       if (result.success) {
-        
+
         const types = result.data || result.types || result.garments || [];
         setGarmentTypes(types);
       }
@@ -139,7 +139,7 @@ const WalkInOrders = () => {
     try {
       const result = await getAllPatterns();
       if (result.success) {
-        
+
         const activePatterns = (result.patterns || []).filter(p => p.is_active !== 0);
         setPatterns(activePatterns);
       }
@@ -150,25 +150,25 @@ const WalkInOrders = () => {
 
   const loadAvailableRentals = async () => {
     try {
-      
+
       const result = await getAllRentals();
-      console.log('All rentals result:', result); 
-      
+      console.log('All rentals result:', result);
+
       let items = [];
       if (result.items && Array.isArray(result.items)) {
-        
-        items = result.items.filter(item => 
-          item.status === 'available' && 
+
+        items = result.items.filter(item =>
+          item.status === 'available' &&
           (item.total_available === null || item.total_available === undefined || item.total_available > 0)
         );
       } else if (Array.isArray(result)) {
-        
-        items = result.filter(item => 
-          item.status === 'available' && 
+
+        items = result.filter(item =>
+          item.status === 'available' &&
           (item.total_available === null || item.total_available === undefined || item.total_available > 0)
         );
       }
-      
+
       console.log('Loaded available rental items:', items.length);
       setAvailableRentals(items);
     } catch (error) {
@@ -219,19 +219,19 @@ const WalkInOrders = () => {
 
   const formatMeasurements = (item) => {
     if (!item || !item.size) return null;
-    
+
     try {
       let measurements;
       if (typeof item.size === 'string') {
         try {
           measurements = JSON.parse(item.size);
         } catch (e) {
-          return null; 
+          return null;
         }
       } else {
         measurements = item.size;
       }
-      
+
       if (!measurements || typeof measurements !== 'object' || Array.isArray(measurements)) {
         return null;
       }
@@ -239,13 +239,13 @@ const WalkInOrders = () => {
       const measurementRows = Object.entries(measurements)
         .filter(([key, value]) => {
           if (typeof value === 'object' && value !== null) {
-            return (value.inch && value.inch !== '' && value.inch !== '0') || 
+            return (value.inch && value.inch !== '' && value.inch !== '0') ||
                    (value.cm && value.cm !== '' && value.cm !== '0');
           }
           return value && value !== '' && value !== '0';
         })
         .map(([key, value]) => {
-          
+
           let label = key.replace(/([A-Z])/g, ' $1');
           label = label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
 
@@ -257,11 +257,11 @@ const WalkInOrders = () => {
             const cmValue = (parseFloat(inchValue) * 2.54).toFixed(2);
             displayValue = `${inchValue}" (${cmValue} cm)`;
           }
-          
+
           return displayValue ? { label, value: displayValue } : null;
         })
         .filter(row => row !== null && row.value);
-      
+
       return measurementRows.length > 0 ? measurementRows : null;
     } catch (e) {
       console.error('Error formatting measurements:', e);
@@ -318,7 +318,7 @@ const WalkInOrders = () => {
 
     try {
       let result;
-      
+
       if (serviceType === 'dry_cleaning') {
         const pricePerItem = garmentTypes.find(gt => gt.garment_name === garmentType)?.garment_price || 200;
         result = await createWalkInDryCleaningOrder({
@@ -350,13 +350,13 @@ const WalkInOrders = () => {
           notes
         });
       } else if (serviceType === 'customization') {
-        
+
         const structuredMeasurements = {
           top: topMeasurements,
           bottom: bottomMeasurements,
           notes: measurementNotes
         };
-        
+
         result = await createWalkInCustomizationOrder({
           customerName,
           customerEmail,
@@ -372,16 +372,16 @@ const WalkInOrders = () => {
           referenceImage: referenceImage
         });
       } else if (serviceType === 'rental') {
-        
+
         const totalDownpayment = selectedRentalItems.reduce((sum, item) => {
           return sum + parseFloat(item.downpayment || '0');
         }, 0);
-        
+
         result = await createWalkInRentalOrder({
           customerName,
           customerEmail,
           customerPhone,
-          rentalItemIds: selectedRentalItems.map(item => item.item_id), 
+          rentalItemIds: selectedRentalItems.map(item => item.item_id),
           rentalDuration: parseInt(rentalDuration),
           eventDate,
           damageDeposit: damageDeposit || totalDownpayment.toString(),
@@ -392,7 +392,7 @@ const WalkInOrders = () => {
 
       if (result.success) {
         alert('Walk-in order created successfully!', 'success');
-        
+
         setCustomerName('');
         setCustomerEmail('');
         setCustomerPhone('');
@@ -406,7 +406,7 @@ const WalkInOrders = () => {
         setEventDate('');
         setDamageDeposit('');
         setNotes('');
-        
+
         setCustomGarmentType('');
         setFabricType('');
         setPatternType('');
@@ -418,7 +418,7 @@ const WalkInOrders = () => {
         setEstimatedCustomPrice('');
         setReferenceImage(null);
         setReferenceImagePreview(null);
-        
+
         if (serviceType === 'rental') {
           loadAvailableRentals();
         }
@@ -437,7 +437,7 @@ const WalkInOrders = () => {
     <div className="admin-page">
       <Sidebar />
       <AdminHeader />
-      
+
       <div className="content">
         <div className="dashboard-title">
           <h2>New Walk-In Order</h2>
@@ -446,8 +446,8 @@ const WalkInOrders = () => {
         <div className="form-container" style={{ maxWidth: '800px', margin: '0 auto' }}>
           <div className="form-group">
             <label>Service Type *</label>
-            <select 
-              value={serviceType} 
+            <select
+              value={serviceType}
               onChange={(e) => setServiceType(e.target.value)}
               className="form-control"
             >
@@ -459,7 +459,7 @@ const WalkInOrders = () => {
           </div>
           <div className="form-section">
             <h3>Customer Information</h3>
-            
+
             <div className="form-group">
               <label>Phone Number *</label>
               <input
@@ -473,8 +473,8 @@ const WalkInOrders = () => {
               {showCustomerSearch && customerSearchResults.length > 0 && (
                 <div className="customer-search-results">
                   {customerSearchResults.map(customer => (
-                    <div 
-                      key={customer.id} 
+                    <div
+                      key={customer.id}
                       className="customer-search-item"
                       onClick={() => selectCustomer(customer)}
                     >
@@ -512,7 +512,7 @@ const WalkInOrders = () => {
           {serviceType === 'dry_cleaning' && (
             <div className="form-section">
               <h3>Dry Cleaning Details</h3>
-              
+
               <div className="form-group">
                 <label>Garment Type *</label>
                 <select
@@ -585,7 +585,7 @@ const WalkInOrders = () => {
           {serviceType === 'repair' && (
             <div className="form-section">
               <h3>Repair Details</h3>
-              
+
               <div className="form-group">
                 <label>Garment Type *</label>
                 <select
@@ -671,7 +671,7 @@ const WalkInOrders = () => {
           {serviceType === 'customization' && (
             <div className="form-section">
               <h3>Customization Details</h3>
-              
+
               <div className="form-group">
                 <label>Garment Type *</label>
                 <select
@@ -690,10 +690,10 @@ const WalkInOrders = () => {
                 </select>
               </div>
               {customGarmentType === 'Uniform' && (
-                <div style={{ 
-                  backgroundColor: '#fff3e0', 
-                  padding: '12px 15px', 
-                  borderRadius: '8px', 
+                <div style={{
+                  backgroundColor: '#fff3e0',
+                  padding: '12px 15px',
+                  borderRadius: '8px',
                   marginBottom: '15px',
                   border: '1px solid #ffb74d',
                   display: 'flex',
@@ -766,15 +766,15 @@ const WalkInOrders = () => {
                 />
                 {referenceImagePreview && (
                   <div style={{ marginTop: '10px', position: 'relative', display: 'inline-block' }}>
-                    <img 
-                      src={referenceImagePreview} 
-                      alt="Reference preview" 
-                      style={{ 
-                        maxWidth: '200px', 
-                        maxHeight: '200px', 
+                    <img
+                      src={referenceImagePreview}
+                      alt="Reference preview"
+                      style={{
+                        maxWidth: '200px',
+                        maxHeight: '200px',
                         borderRadius: '8px',
                         border: '2px solid #8b4513'
-                      }} 
+                      }}
                     />
                     <button
                       type="button"
@@ -804,7 +804,7 @@ const WalkInOrders = () => {
               </div>
               <div className="measurements-section" style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
                 <h4 style={{ marginBottom: '15px', color: '#5D4037' }}>Customer Measurements</h4>
-                
+
                 <div style={{ display: 'flex', gap: '20px' }}>
                   <div style={{ flex: 1, padding: '15px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #eee' }}>
                     <p style={{ fontWeight: '600', marginBottom: '15px', color: '#333', textAlign: 'center' }}>Top Measurements</p>
@@ -1002,13 +1002,13 @@ const WalkInOrders = () => {
           {serviceType === 'rental' && (
             <div className="form-section">
               <h3>Rental Details</h3>
-              
+
               <div className="form-group">
                 <label>Select Rental Item *</label>
                 {availableRentals.length === 0 ? (
-                  <div style={{ 
-                    padding: '40px', 
-                    textAlign: 'center', 
+                  <div style={{
+                    padding: '40px',
+                    textAlign: 'center',
                     color: '#888',
                     backgroundColor: '#f9f9f9',
                     borderRadius: '8px'
@@ -1019,11 +1019,11 @@ const WalkInOrders = () => {
                   <div className="rental-items-grid">
                     {availableRentals.map(item => {
                       const isSelected = isRentalItemSelected(item);
-                      const imageUrl = item.front_image 
-                        ? getRentalImageUrl(item.front_image) 
+                      const imageUrl = item.front_image
+                        ? getRentalImageUrl(item.front_image)
                         : (item.image_url ? getRentalImageUrl(item.image_url) : null);
                       const measurements = formatMeasurements(item);
-                      
+
                       return (
                         <div
                           key={item.item_id}
@@ -1032,8 +1032,8 @@ const WalkInOrders = () => {
                         >
                           <div className="rental-item-image-container">
                             {imageUrl ? (
-                              <img 
-                                src={imageUrl} 
+                              <img
+                                src={imageUrl}
                                 alt={item.item_name}
                                 className="rental-item-image"
                               />

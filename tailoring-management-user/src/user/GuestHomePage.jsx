@@ -39,7 +39,7 @@ const App = ({ setIsLoggedIn }) => {
   useEffect(() => {
     const scrollObserver = initScrollAnimations();
     const headerCleanup = initHeaderScroll();
-    
+
     return () => {
       if (scrollObserver) scrollObserver.disconnect();
       if (headerCleanup) headerCleanup();
@@ -78,37 +78,36 @@ const App = ({ setIsLoggedIn }) => {
         message: 'Password must contain at least one special character (!@#$%^&* etc.)'
       };
     }
-    
+
     return { isValid: true };
   };
 
   const handleLogin = async () => {
     setAuthError('');
-    
-    
+
     if (isLogin) {
       if (!loginUsername || !loginPassword) {
         setAuthError('Please enter both username and password');
         return;
       }
     }
-    
+
     setIsLoading(true);
-    
+
     try {
       if (isLogin) {
-        
+
         const result = await loginUser({
           username: loginUsername,
           password: loginPassword
         });
-        
+
         if (result.message === 'Login successful' || result.message === 'Admin login successful') {
           if (typeof setIsLoggedIn === 'function') {
             setIsLoggedIn(true);
           }
           setIsAuthModalOpen(false);
-          
+
           const userRole = localStorage.getItem('role');
           if (userRole === 'admin') {
             navigate('/admin', { replace: true });
@@ -120,24 +119,21 @@ const App = ({ setIsLoggedIn }) => {
           setAuthError(errorMessage);
         }
       } else {
-        
-        
-        
+
         if (!signupFirstName || !signupLastName || !signupUsername || !signupEmail || !signupPassword) {
           setAuthError('Please fill in all required fields');
           alert('Please fill in all required fields (First Name, Last Name, Username, Email, Password)');
           setIsLoading(false);
           return;
         }
-        
+
         if (signupPassword !== signupConfirmPassword) {
           setAuthError('Passwords do not match');
           alert('Passwords do not match\n\nPassword Requirements:\n• Must be at least 8 characters (can be letters or numbers)\n• Must contain at least one special character (!@#$%^&* etc.)');
           setIsLoading(false);
           return;
         }
-        
-        
+
         const passwordValidation = validatePassword(signupPassword);
         if (!passwordValidation.isValid) {
           setAuthError(passwordValidation.message);
@@ -145,7 +141,7 @@ const App = ({ setIsLoggedIn }) => {
           setIsLoading(false);
           return;
         }
-        
+
         try {
           const result = await registerUser({
             first_name: signupFirstName.trim(),
@@ -155,17 +151,16 @@ const App = ({ setIsLoggedIn }) => {
             password: signupPassword,
             phone_number: signupPhone ? signupPhone.trim() : ''
           });
-          
+
           console.log('Registration result:', result);
-          
-          
+
           if (result.success || result.message === 'Registration successful' || result.token) {
-            
+
             if (typeof setIsLoggedIn === 'function') {
               setIsLoggedIn(true);
             }
             setIsAuthModalOpen(false);
-            
+
             setSignupFirstName('');
             setSignupLastName('');
             setSignupUsername('');
@@ -207,10 +202,10 @@ const App = ({ setIsLoggedIn }) => {
     <>
       <header className="header">
         <div className="logo">
-          <img 
-            src={logo} 
-            alt="Logo - Click to Login" 
-            className="logo-img clickable" 
+          <img
+            src={logo}
+            alt="Logo - Click to Login"
+            className="logo-img clickable"
             onClick={openAuthModal}
             style={{ cursor: 'pointer' }}
             title="Click to Login/Sign Up"
@@ -229,7 +224,7 @@ const App = ({ setIsLoggedIn }) => {
           <button className="login-btn" onClick={openAuthModal}>
           Login
         </button>
-        
+
       </header>
       <section className="hero" id="top" style={{ backgroundImage: `url(${heroBg})` }}>
         <div className="hero-overlay"></div>
@@ -267,10 +262,10 @@ const App = ({ setIsLoggedIn }) => {
         </div>
       </section>
       <RentalClothes openAuthModal={openAuthModal} />
-      <section className="customization fade-in-up" 
-          id="Customize" 
-          style={{ 
-            background: "(background: linear-gradient(to bottom, #fffff5 0%, #f0e9e2 100%))" 
+      <section className="customization fade-in-up"
+          id="Customize"
+          style={{
+            background: "(background: linear-gradient(to bottom, #fffff5 0%, #f0e9e2 100%))"
           }}
         >
         <div className="custom-text fade-in-left">
@@ -333,8 +328,8 @@ const App = ({ setIsLoggedIn }) => {
         <div className="auth-header">
           <h2>{isLogin ? 'Welcome Back' : 'Create Your Account'}</h2>
           <p className="auth-subtitle">
-            {isLogin 
-              ? 'Sign in to book appointments & rentals' 
+            {isLogin
+              ? 'Sign in to book appointments & rentals'
               : 'Join the Jackman Tailor Deluxe family'}
           </p>
         </div>
@@ -409,10 +404,10 @@ const App = ({ setIsLoggedIn }) => {
               onChange={(e) => isLogin ? setLoginPassword(e.target.value) : setSignupPassword(e.target.value)}
             />
             {!isLogin && (
-              <div style={{ 
-                fontSize: '11px', 
-                color: '#666', 
-                marginTop: '5px', 
+              <div style={{
+                fontSize: '11px',
+                color: '#666',
+                marginTop: '5px',
                 padding: '8px',
                 backgroundColor: '#f8f9fa',
                 borderRadius: '4px',
@@ -482,7 +477,7 @@ const App = ({ setIsLoggedIn }) => {
 )}
 
 {isForgotPasswordOpen && (
-  <ForgotPassword 
+  <ForgotPassword
     onClose={() => setIsForgotPasswordOpen(false)}
     onSuccess={() => {
       setIsForgotPasswordOpen(false);
@@ -491,7 +486,7 @@ const App = ({ setIsLoggedIn }) => {
     }}
   />
 )}
-      
+
     </>
   );
 };

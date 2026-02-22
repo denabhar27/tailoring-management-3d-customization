@@ -60,7 +60,7 @@ export async function createWalkInCustomizationOrder(orderData) {
       formData.append('estimatedPrice', orderData.estimatedPrice || '0');
       formData.append('notes', orderData.notes || '');
       formData.append('referenceImage', orderData.referenceImage);
-      
+
       const response = await axios.post(`${BASE_URL}/walk-in-orders/customization`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -69,7 +69,7 @@ export async function createWalkInCustomizationOrder(orderData) {
       });
       return response.data;
     } else {
-      
+
       const response = await axios.post(`${BASE_URL}/walk-in-orders/customization`, orderData, {
         headers: getAuthHeaders()
       });

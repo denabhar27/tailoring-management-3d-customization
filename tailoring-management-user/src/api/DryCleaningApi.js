@@ -65,7 +65,7 @@ export async function addDryCleaningToCart(dryCleaningData) {
   try {
     const cartItem = {
       serviceType: 'dry_cleaning',
-      serviceId: null, 
+      serviceId: null,
       quantity: dryCleaningData.quantity || 1,
       basePrice: dryCleaningData.basePrice,
       finalPrice: dryCleaningData.finalPrice,
@@ -83,10 +83,10 @@ export async function addDryCleaningToCart(dryCleaningData) {
         quantity: dryCleaningData.quantity,
         isEstimatedPrice: dryCleaningData.isEstimatedPrice || false,
         uploadedAt: new Date().toISOString(),
-        // Multiple garments support
+
         garments: dryCleaningData.garments || [],
         isMultipleGarments: dryCleaningData.isMultipleGarments || false,
-        // Legacy single-garment fields (for backwards compatibility)
+
         garmentType: dryCleaningData.garments?.[0]?.garmentType || dryCleaningData.garmentType,
         brand: dryCleaningData.garments?.[0]?.brand || dryCleaningData.brand,
         pricePerItem: dryCleaningData.garments?.[0]?.pricePerItem || dryCleaningData.pricePerItem

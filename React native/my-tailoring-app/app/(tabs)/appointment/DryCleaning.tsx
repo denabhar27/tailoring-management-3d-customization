@@ -26,7 +26,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get("window");
 
-
 const DEFAULT_GARMENT_TYPES: { [key: string]: number } = {
   "Shirt": 100,
   "Pants": 120,
@@ -65,17 +64,16 @@ interface GarmentItem {
 }
 
 export default function DryCleaningClothes() {
-  
+
   console.log('🧹🧹🧹 DRYCLEANING COMPONENT RENDERING 🧹🧹🧹');
-  
+
   const router = useRouter();
   const [image, setImage] = useState<string | null>(null);
-  
-  // Multiple garments support
+
   const [garments, setGarments] = useState<GarmentItem[]>([
     { id: 1, garmentType: '', brand: '', quantity: '1' }
   ]);
-  
+
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [pickupDate, setPickupDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -86,7 +84,6 @@ export default function DryCleaningClothes() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [isShopOpen, setIsShopOpen] = useState(true);
 
-  // Garment management functions
   const addGarment = () => {
     const newId = Math.max(...garments.map(g => g.id)) + 1;
     setGarments([...garments, { id: newId, garmentType: '', brand: '', quantity: '1' }]);
@@ -99,12 +96,11 @@ export default function DryCleaningClothes() {
   };
 
   const updateGarment = (id: number, field: keyof GarmentItem, value: string) => {
-    setGarments(garments.map(g => 
+    setGarments(garments.map(g =>
       g.id === id ? { ...g, [field]: value } : g
     ));
   };
 
-  // Calculate total price
   const calculateTotalPrice = (): number => {
     return garments.reduce((total, garment) => {
       if (!garment.garmentType) return total;
@@ -114,14 +110,12 @@ export default function DryCleaningClothes() {
     }, 0);
   };
 
-  
   useEffect(() => {
     console.log('=== [DryCleaning] Component MOUNTED - DYNAMIC VERSION ===');
     console.log('=== Loading DC garment types from API ===');
     loadDCGarmentTypes();
   }, []);
 
-  
   useFocusEffect(
     useCallback(() => {
       console.log('[DryCleaning] Screen focused, refreshing DC garment types...');
@@ -138,25 +132,24 @@ export default function DryCleaningClothes() {
     try {
       const token = await AsyncStorage.getItem('userToken');
       console.log('[DryCleaning] Token:', token ? 'Retrieved' : 'Missing');
-      
-      
+
       const baseUrl = API_BASE_URL || process.env.EXPO_PUBLIC_API_BASE_URL;
       const url = `${baseUrl}/dc-garment-types`;
       console.log('[DryCleaning] Fetching:', url);
-      
+
       const response = await fetch(url, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json',
         },
       });
-      
+
       console.log('[DryCleaning] Response status:', response.status);
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log('[DryCleaning] API returned', data.data?.length || 0, 'items');
-        
+
         if (data.success && data.data && data.data.length > 0) {
           const garmentTypesObj: { [key: string]: number } = {};
           data.data
@@ -164,7 +157,7 @@ export default function DryCleaningClothes() {
             .forEach((garment: any) => {
               garmentTypesObj[garment.garment_name] = parseFloat(garment.garment_price) || 0;
             });
-          
+
           if (Object.keys(garmentTypesObj).length > 0) {
             setGarmentPrices(garmentTypesObj);
             console.log('✅ [DryCleaning] SUCCESS - Loaded', Object.keys(garmentTypesObj).length, 'garment types from API');
@@ -197,7 +190,6 @@ export default function DryCleaningClothes() {
     }
   };
 
-  
   const handleDateConfirm = async (selectedDate: Date) => {
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
@@ -206,7 +198,7 @@ export default function DryCleaningClothes() {
 
     try {
       const checkResult = await apiCall(`/shop-schedule/check?date=${dateStr}`);
-      
+
       if (!checkResult.success || !checkResult.is_open) {
         Alert.alert(
           'Shop Closed',
@@ -229,7 +221,7 @@ export default function DryCleaningClothes() {
         return;
       }
     }
-    
+
     setPickupDate(selectedDate);
     setShowDatePicker(false);
     setSelectedTimeSlot("");
@@ -244,7 +236,7 @@ export default function DryCleaningClothes() {
       const day = String(date.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
       const result = await appointmentSlotService.getAllSlotsWithAvailability('dry_cleaning', dateStr);
-      
+
       if (result.success) {
         if (!result.isShopOpen) {
           setIsShopOpen(false);
@@ -252,7 +244,7 @@ export default function DryCleaningClothes() {
           Alert.alert('Shop Closed', 'The shop is closed on this date. Please select another date.');
           return;
         }
-        
+
         setIsShopOpen(true);
         setTimeSlots(result.slots || []);
       } else {
@@ -268,7 +260,6 @@ export default function DryCleaningClothes() {
     }
   };
 
-  
   useEffect(() => {
     if (!pickupDate) return;
 
@@ -277,14 +268,14 @@ export default function DryCleaningClothes() {
       const month = String(pickupDate.getMonth() + 1).padStart(2, '0');
       const day = String(pickupDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-      
+
       appointmentSlotService.getAllSlotsWithAvailability('dry_cleaning', dateStr, 5000)
         .then((result) => {
           if (result.success && result.slots) {
             setTimeSlots((currentSlots) => {
               const currentCounts = JSON.stringify(currentSlots.map(s => ({ time: s.time_slot, available: s.available })));
               const newCounts = JSON.stringify(result.slots.map((s: TimeSlot) => ({ time: s.time_slot, available: s.available })));
-              
+
               if (currentCounts !== newCounts) {
                 if (!result.isShopOpen) {
                   setIsShopOpen(false);
@@ -312,7 +303,6 @@ export default function DryCleaningClothes() {
     setShowDatePicker(false);
   };
 
-  
   const garmentTypes = Object.keys(garmentPrices);
   console.log('[DryCleaning] Current garmentTypes for picker:', garmentTypes.length, 'items -', garmentTypes.slice(0, 5).join(', '), garmentTypes.length > 5 ? '...' : '');
 
@@ -321,14 +311,13 @@ export default function DryCleaningClothes() {
   };
 
   const handleAddService = async () => {
-    // Validate garments
+
     const validGarments = garments.filter(g => g.garmentType && g.quantity);
     if (validGarments.length === 0) {
       Alert.alert("Missing Information", "Please add at least one garment with type and quantity");
       return;
     }
 
-    // Check all garments have required fields
     for (const garment of garments) {
       if (!garment.garmentType) {
         Alert.alert("Missing Information", "Please select a garment type for all items");
@@ -365,12 +354,12 @@ export default function DryCleaningClothes() {
     const totalQuantity = garments.reduce((sum, g) => sum + (parseInt(g.quantity) || 0), 0);
 
     try {
-      
+
       const year = pickupDate!.getFullYear();
       const month = String(pickupDate!.getMonth() + 1).padStart(2, '0');
       const day = String(pickupDate!.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-      
+
       const slotResult = await appointmentSlotService.bookSlot('dry_cleaning', dateStr, selectedTimeSlot);
       if (!slotResult || !slotResult.success) {
         const errorMsg = slotResult?.message || 'Failed to book appointment slot. This time may already be taken.';
@@ -380,7 +369,6 @@ export default function DryCleaningClothes() {
       }
       console.log('Slot booked successfully:', slotResult);
 
-      
       let imageUrl = '';
       if (image) {
         try {
@@ -401,7 +389,7 @@ export default function DryCleaningClothes() {
           });
 
           const uploadResult = await uploadResponse.json();
-          
+
           if (uploadResult.success) {
             imageUrl = uploadResult.data.url || uploadResult.data.filename || '';
             console.log('Image uploaded successfully, URL:', imageUrl);
@@ -414,10 +402,8 @@ export default function DryCleaningClothes() {
         }
       }
 
-      
       const pickupDateTime = `${dateStr}T${selectedTimeSlot}`;
 
-      // Build garments array for submission
       const garmentsData = garments.map(garment => ({
         garmentType: garment.garmentType,
         brand: garment.brand,
@@ -426,7 +412,6 @@ export default function DryCleaningClothes() {
         isEstimated: false
       }));
 
-      
       const dryCleaningData = {
         serviceType: 'dry_cleaning',
         serviceId: 3,
@@ -445,13 +430,13 @@ export default function DryCleaningClothes() {
       };
 
       const result = await cartService.addToCart(dryCleaningData);
-      
+
       if (result.success) {
-        
+
         if (pickupDate) {
           loadTimeSlots(pickupDate);
         }
-        
+
         Alert.alert("Success!", "Dry cleaning service added to cart!", [
           {
             text: "View Cart",
@@ -475,7 +460,7 @@ export default function DryCleaningClothes() {
     } catch (error: any) {
       console.error("Add service error:", error);
       Alert.alert(
-        "Error", 
+        "Error",
         error.message || "Failed to add dry cleaning service. Please try again."
       );
     }
@@ -525,11 +510,11 @@ export default function DryCleaningClothes() {
           {garments.map((garment, index) => (
             <View key={garment.id}>
               {index > 0 && <View style={styles.garmentDivider} />}
-              
+
               {garments.length > 1 && (
                 <View style={styles.garmentRowHeader}>
                   <Text style={styles.garmentLabel}>Garment #{index + 1}</Text>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.removeGarmentButton}
                     onPress={() => removeGarment(garment.id)}
                   >
@@ -538,7 +523,7 @@ export default function DryCleaningClothes() {
                   </TouchableOpacity>
                 </View>
               )}
-              
+
               <View style={styles.fieldContainer}>
                 <Text style={styles.label}>Garment Type *</Text>
                 {loadingGarments ? (
@@ -555,17 +540,17 @@ export default function DryCleaningClothes() {
                     >
                       <Picker.Item label="Select garment type..." value="" color="#999" />
                       {garmentTypes.map((item, idx) => (
-                        <Picker.Item 
-                          label={`${item} - ₱${getPriceForGarment(item)}`} 
-                          value={item} 
-                          key={`${garment.id}-${item}-${idx}`} 
+                        <Picker.Item
+                          label={`${item} - ₱${getPriceForGarment(item)}`}
+                          value={item}
+                          key={`${garment.id}-${item}-${idx}`}
                         />
                       ))}
                     </Picker>
                   </View>
                 )}
               </View>
-              
+
               <View style={styles.fieldContainer}>
                 <Text style={styles.label}>Brand</Text>
                 <TextInput
@@ -576,7 +561,7 @@ export default function DryCleaningClothes() {
                   onChangeText={(value) => updateGarment(garment.id, 'brand', value)}
                 />
               </View>
-              
+
               <View style={styles.fieldContainer}>
                 <Text style={styles.label}>Quantity *</Text>
                 <TextInput
@@ -590,13 +575,12 @@ export default function DryCleaningClothes() {
               </View>
             </View>
           ))}
-          
+
           <TouchableOpacity style={styles.addGarmentButton} onPress={addGarment}>
             <Ionicons name="add-circle-outline" size={20} color="#8D6E63" />
             <Text style={styles.addGarmentButtonText}>Add Another Garment</Text>
           </TouchableOpacity>
 
-          {/* Total Price Display */}
           {garments.some(g => g.garmentType && g.quantity) && (
             <View style={styles.totalPriceRow}>
               <Text style={styles.totalPriceLabel}>Total Price:</Text>
@@ -683,13 +667,13 @@ export default function DryCleaningClothes() {
                   {timeSlots.map((slot) => {
                     const isSelected = selectedTimeSlot === slot.time_slot;
                     const isDisabled = !slot.isClickable;
-                    
+
                     let buttonStyle = styles.timeSlotButtonAvailable;
                     if (slot.status === 'limited') buttonStyle = styles.timeSlotButtonLimited;
                     if (slot.status === 'full') buttonStyle = styles.timeSlotButtonFull;
                     if (slot.status === 'inactive') buttonStyle = styles.timeSlotButtonInactive;
                     if (isSelected) buttonStyle = styles.timeSlotButtonSelected;
-                    
+
                     return (
                       <TouchableOpacity
                         key={slot.slot_id}
@@ -750,9 +734,9 @@ export default function DryCleaningClothes() {
         <View style={styles.navItemWrapActive}>
           <Ionicons name="cut" size={20} color="#7A5A00" />
         </View>
-        <TouchableOpacity onPress={() => router.push("/(tabs)/cart/Cart")}>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/faq")}>
           <View style={styles.navItemWrap}>
-            <Ionicons name="cart-outline" size={20} color="#9CA3AF" />
+            <Ionicons name="help-circle-outline" size={20} color="#9CA3AF" />
           </View>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push("../UserProfile/profile")}>
@@ -995,7 +979,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  
+
   timeSlotLegend: {
     flexDirection: 'row',
     flexWrap: 'wrap',

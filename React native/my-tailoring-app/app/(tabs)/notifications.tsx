@@ -72,11 +72,11 @@ export default function NotificationsScreen() {
   };
 
   const handleNotificationPress = async (notification: Notification) => {
-    
+
     if (!notification.is_read) {
       try {
         await notificationService.markAsRead(notification.notification_id.toString());
-        
+
         setNotifications(prev =>
           prev.map(n =>
             n.notification_id === notification.notification_id
@@ -315,9 +315,9 @@ export default function NotificationsScreen() {
             <Ionicons name="cut-outline" size={20} color="#9CA3AF" />
           </View>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push("/(tabs)/cart/Cart")}>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/faq")}>
           <View style={styles.navItemWrap}>
-            <Ionicons name="cart-outline" size={20} color="#9CA3AF" />
+            <Ionicons name="help-circle-outline" size={20} color="#9CA3AF" />
           </View>
         </TouchableOpacity>
         <TouchableOpacity

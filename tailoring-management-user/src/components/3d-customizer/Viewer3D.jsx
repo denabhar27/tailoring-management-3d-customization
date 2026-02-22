@@ -44,9 +44,9 @@ function CameraController() {
       const distance = 5;
       const height = 1.6;
       const target = new THREE.Vector3(0, height, 0);
-      
+
       let x = 0, z = distance;
-      
+
       switch(angle) {
         case 'front':
           x = 0;
@@ -130,10 +130,10 @@ export default function Viewer3D({ garment, size, fit, modelSize, colors, fabric
   const devicePixelRatio = isMobileDevice ? [1, 1] : [1, 2];
 
   useEffect(() => {
-    
+
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, isMobileDevice ? 3000 : 2000); 
+    }, isMobileDevice ? 3000 : 2000);
     return () => clearTimeout(timer);
   }, [canvasKey, isMobileDevice]);
 
@@ -157,22 +157,22 @@ export default function Viewer3D({ garment, size, fit, modelSize, colors, fabric
   const handleContextRestored = () => {
     console.log('THREE.WebGLRenderer: Context Restored.');
     setContextLost(false);
-    
+
     setCanvasKey(prev => prev + 1);
   };
 
   useEffect(() => {
     if (contextLost) {
-      
+
       if (isMobileDevice && contextLostCount >= 3) {
         setRenderError('3D viewer ran out of memory. Please try refreshing the page.');
         return;
       }
-      
+
       const timer = setTimeout(() => {
         setContextLost(false);
         setCanvasKey(prev => prev + 1);
-      }, isMobileDevice ? 2000 : 1000); 
+      }, isMobileDevice ? 2000 : 1000);
       return () => clearTimeout(timer);
     }
   }, [contextLost, isMobileDevice, contextLostCount]);
@@ -202,7 +202,7 @@ export default function Viewer3D({ garment, size, fit, modelSize, colors, fabric
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff', padding: '20px', textAlign: 'center' }}>
         <p style={{ fontSize: '18px', color: '#d32f2f', marginBottom: '10px' }}>❌ Rendering Error</p>
         <p style={{ fontSize: '14px', color: '#666' }}>{renderError}</p>
-        <button 
+        <button
           onClick={() => { setRenderError(null); setCanvasKey(prev => prev + 1); }}
           style={{ marginTop: '15px', padding: '10px 20px', background: '#667eea', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
         >
@@ -240,17 +240,17 @@ export default function Viewer3D({ garment, size, fit, modelSize, colors, fabric
           <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
       )}
-      <Canvas 
+      <Canvas
         key={canvasKey}
-        camera={{ position: [0, 1.6, 5], fov: 50 }} 
-        shadows 
-        dpr={devicePixelRatio} 
+        camera={{ position: [0, 1.6, 5], fov: 50 }}
+        shadows
+        dpr={devicePixelRatio}
         onCreated={({ gl }) => {
           console.log('Canvas created successfully, WebGL version:', gl.capabilities.isWebGL2 ? 'WebGL2' : 'WebGL1');
-          
+
           gl.domElement.addEventListener('webglcontextlost', handleContextLost, false);
           gl.domElement.addEventListener('webglcontextrestored', handleContextRestored, false);
-          
+
           setTimeout(() => setIsLoading(false), 500);
         }}
         onError={(error) => {
@@ -258,13 +258,13 @@ export default function Viewer3D({ garment, size, fit, modelSize, colors, fabric
           setRenderError(error?.message || 'Failed to render 3D view');
           setIsLoading(false);
         }}
-        gl={{ 
+        gl={{
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.4, 
-          preserveDrawingBuffer: true,  
-          powerPreference: isMobile() ? 'default' : 'high-performance',  
-          antialias: !isMobile(),  
-          failIfMajorPerformanceCaveat: false,  
+          toneMappingExposure: 1.4,
+          preserveDrawingBuffer: true,
+          powerPreference: isMobile() ? 'default' : 'high-performance',
+          antialias: !isMobile(),
+          failIfMajorPerformanceCaveat: false,
         }}
       >
         <color attach="background" args={[1, 1, 1]} />

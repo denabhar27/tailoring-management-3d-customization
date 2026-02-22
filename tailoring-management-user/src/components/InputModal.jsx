@@ -7,22 +7,22 @@ const InputModal = ({ isOpen, title, message, placeholder = '', onConfirm, onCan
   useEffect(() => {
     if (isOpen) {
       setInputValue(defaultValue);
-      
+
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       return () => {
-        
+
         document.body.style.overflow = originalOverflow || 'auto';
       };
     } else {
-      
+
       document.body.style.overflow = 'auto';
     }
   }, [isOpen, defaultValue]);
 
   useEffect(() => {
     if (!isOpen) {
-      return; 
+      return;
     }
 
     const handleKeyDown = (e) => {
@@ -48,7 +48,7 @@ const InputModal = ({ isOpen, title, message, placeholder = '', onConfirm, onCan
   };
 
   const handleConfirm = () => {
-    
+
     onConfirm(inputValue);
   };
 

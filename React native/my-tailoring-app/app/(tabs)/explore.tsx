@@ -69,7 +69,7 @@ export default function TabTwoScreen() {
           source={require("@/assets/images/react-logo.png")}
           style={{ width: 100, height: 100, alignSelf: "center" }}
         />
-        <ExternalLink href="https://reactnative.dev/docs/images">
+        <ExternalLink href="https:
           <ThemedText type="link">Learn more</ThemedText>
         </ExternalLink>
       </Collapsible>

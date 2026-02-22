@@ -84,7 +84,7 @@ const UserHomePage = ({ setIsLoggedIn }) => {
     const shouldReopen = sessionStorage.getItem('reopenCustomizationModal');
     if (shouldReopen === 'true') {
       sessionStorage.removeItem('reopenCustomizationModal');
-      
+
       setTimeout(() => {
         setCustomizationFormModalOpen(true);
       }, 100);
@@ -100,7 +100,7 @@ const UserHomePage = ({ setIsLoggedIn }) => {
   useEffect(() => {
     const scrollObserver = initScrollAnimations();
     const headerCleanup = initHeaderScroll();
-    
+
     return () => {
       if (scrollObserver) scrollObserver.disconnect();
       if (headerCleanup) headerCleanup();
@@ -168,28 +168,28 @@ const UserHomePage = ({ setIsLoggedIn }) => {
   };
 
   const handleCartUpdate = () => {
-    fetchCartCount(); 
+    fetchCartCount();
     console.log('Cart was updated from repair modal!');
-   
+
   };
 
   const addServiceToCart = (type) => {
     if (type === 'Repair') {
-     
+
       setServiceModalOpen(false);
       setRepairFormModalOpen(true);
       return;
     }
 
     if (type === 'Customize') {
-     
+
       setServiceModalOpen(false);
       setCustomizationFormModalOpen(true);
       return;
     }
-    
+
     if (type === 'Dry Cleaning') {
-   
+
       setServiceModalOpen(false);
       setDryCleaningFormModalOpen(true);
       return;
@@ -415,26 +415,26 @@ const UserHomePage = ({ setIsLoggedIn }) => {
         </div>
       )}
 
-      <Cart 
-        isOpen={cartOpen} 
+      <Cart
+        isOpen={cartOpen}
         onClose={() => {
           setCartOpen(false);
-          fetchCartCount(); 
+          fetchCartCount();
         }}
         onCartUpdate={handleCartUpdate}
       />
-      <RepairFormModal 
-        isOpen={repairFormModalOpen} 
+      <RepairFormModal
+        isOpen={repairFormModalOpen}
         onClose={() => setRepairFormModalOpen(false)}
         onCartUpdate={handleCartUpdate}
       />
-      <DryCleaningFormModal 
-        isOpen={dryCleaningFormModalOpen} 
+      <DryCleaningFormModal
+        isOpen={dryCleaningFormModalOpen}
         onClose={() => setDryCleaningFormModalOpen(false)}
         onCartUpdate={handleCartUpdate}
       />
-      <CustomizationFormModal 
-        isOpen={customizationFormModalOpen} 
+      <CustomizationFormModal
+        isOpen={customizationFormModalOpen}
         onClose={() => setCustomizationFormModalOpen(false)}
         onCartUpdate={handleCartUpdate}
       />

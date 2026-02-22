@@ -31,12 +31,12 @@ export default function PreviewOrder() {
 
   const handleAddToCart = async () => {
     setLoading(true);
-    
+
     try {
-      
+
       const customizeData = {
         serviceType: 'customize',
-        serviceId: 2, 
+        serviceId: 2,
         serviceName: `Custom ${orderData.item}`,
         basePrice: orderData.price.toString(),
         finalPrice: orderData.price.toString(),
@@ -48,7 +48,7 @@ export default function PreviewOrder() {
       };
 
       const result = await cartService.addToCart(customizeData);
-      
+
       if (result.success) {
         Alert.alert("Success!", "Customize service added to cart!", [
           {
@@ -66,7 +66,7 @@ export default function PreviewOrder() {
     } catch (error: any) {
       console.error("Add service error:", error);
       Alert.alert(
-        "Error", 
+        "Error",
         error.message || "Failed to add customize service. Please try again."
       );
     } finally {
@@ -84,37 +84,37 @@ export default function PreviewOrder() {
         <View style={{ width: 26 }} />
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Service Details</Text>
-          
+
           <View style={styles.detailRow}>
             <Text style={styles.label}>Service</Text>
             <Text style={styles.value}>{orderData.service}</Text>
           </View>
-          
+
           <View style={styles.detailRow}>
             <Text style={styles.label}>Item</Text>
             <Text style={styles.value}>{orderData.item}</Text>
           </View>
-          
+
           <View style={styles.detailRow}>
             <Text style={styles.label}>Description</Text>
             <Text style={[styles.value, styles.multiline]}>
               {orderData.description}
             </Text>
           </View>
-          
+
           <View style={styles.detailRow}>
             <Text style={styles.label}>Special Instructions</Text>
             <Text style={[styles.value, styles.multiline]}>
               {orderData.specialInstructions}
             </Text>
           </View>
-          
+
           <View style={styles.priceSection}>
             <Text style={styles.totalLabel}>Total Amount</Text>
             <Text style={styles.totalPrice}>
@@ -122,12 +122,12 @@ export default function PreviewOrder() {
             </Text>
           </View>
         </View>
-        
+
         <View style={{ height: 20 }} />
       </ScrollView>
 
       <View style={styles.bottomBar}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.addToCartButton}
           onPress={handleAddToCart}
           disabled={loading}

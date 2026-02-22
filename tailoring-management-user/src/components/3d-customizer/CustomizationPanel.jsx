@@ -79,7 +79,7 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
     setAccessories(accessories.map(acc => acc.id === id ? { ...acc, scale } : acc));
   };
 
-  const moveStep = 0.05; 
+  const moveStep = 0.05;
 
   const moveSelectedItem = (axis, direction) => {
     const delta = direction * moveStep;
@@ -184,19 +184,19 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                     <option value="coat-teal">Teal Long Coat</option>
                     {customGarmentModels
                       .filter((model, index, self) => {
-                        
-                        const isUnique = index === self.findIndex(m => 
+
+                        const isUnique = index === self.findIndex(m =>
                           m.model_name.toLowerCase() === model.model_name.toLowerCase()
                         );
                         if (!isUnique) return false;
 
                         const category = model.garment_category || '';
-                        return category === 'coat-men' || 
+                        return category === 'coat-men' ||
                                category === 'coat-women' ||
                                (category.startsWith('coat-') && category.length > 5);
                       })
                       .map(model => {
-                        
+
                         const value = `custom-${model.model_id}`;
                         console.log('Adding custom model to coat dropdown:', model.model_name, 'with value:', value);
                         return (
@@ -254,8 +254,8 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                     <option value="suit-2">Business Suit Style 2</option>
                     {customGarmentModels
                       .filter((model, index, self) => {
-                        
-                        const isUnique = index === self.findIndex(m => 
+
+                        const isUnique = index === self.findIndex(m =>
                           m.model_name.toLowerCase() === model.model_name.toLowerCase()
                         );
                         if (!isUnique) return false;
@@ -264,7 +264,7 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                         return category === 'suit-1' || category === 'suit-2';
                       })
                       .map(model => {
-                        
+
                         const value = `custom-${model.model_id}`;
                         return (
                           <option key={model.model_id} value={value}>
@@ -303,8 +303,8 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                     <option value="barong">Barong Tagalog (Default)</option>
                     {customGarmentModels
                       .filter((model, index, self) => {
-                        
-                        const isUnique = index === self.findIndex(m => 
+
+                        const isUnique = index === self.findIndex(m =>
                           m.model_name.toLowerCase() === model.model_name.toLowerCase()
                         );
                         if (!isUnique) return false;
@@ -313,7 +313,7 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                         return category === 'barong';
                       })
                       .map(model => {
-                        
+
                         const value = `custom-${model.model_id}`;
                         return (
                           <option key={model.model_id} value={value}>
@@ -354,8 +354,8 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                     <option value="formal-women">Pants (Women Formal)</option>
                     {customGarmentModels
                       .filter((model, index, self) => {
-                        
-                        const isUnique = index === self.findIndex(m => 
+
+                        const isUnique = index === self.findIndex(m =>
                           m.model_name.toLowerCase() === model.model_name.toLowerCase()
                         );
                         if (!isUnique) return false;
@@ -364,7 +364,7 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                         return category === 'pants';
                       })
                       .map(model => {
-                        
+
                         const value = `custom-${model.model_id}`;
                         return (
                           <option key={model.model_id} value={value}>
@@ -406,7 +406,7 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                   <button
                     onClick={() => setColors({ ...colors, fabric: color.value })}
                     className={`${styles.presetColorButton} ${colors.fabric === color.value ? styles.selected : styles.unselected}`}
-                    style={{ 
+                    style={{
                       '--preset-color': color.value,
                       backgroundColor: color.value,
                       background: color.value
@@ -432,11 +432,11 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
               <select value={fabric} onChange={e => setFabric(e.target.value)}>
                 {fabrics
                   .filter(f => {
-                    
+
                     if (f === 'jusi' || f === 'Piña') {
                       return garment === 'barong';
                     }
-                    
+
                     if (garment === 'barong') {
                       return f === 'jusi' || f === 'Piña';
                     }
@@ -460,12 +460,12 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
             <div className="row" style={{ marginTop: '16px' }}>
               <label style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 Transparency: {Math.round((style?.transparency || 0.35) * 100)}%
-                <input 
-                  type="range" 
-                  min="0.15" 
-                  max="0.85" 
-                  step="0.05" 
-                  value={style?.transparency || 0.35} 
+                <input
+                  type="range"
+                  min="0.15"
+                  max="0.85"
+                  step="0.05"
+                  value={style?.transparency || 0.35}
                   onChange={e => {
                     const newTransparency = parseFloat(e.target.value);
                     if (setStyle) {
@@ -552,9 +552,9 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                   <option key={model.path} value={model.path}>{model.name}</option>
                 ))}
                 {customAccessoryModels.map(model => {
-                  
-                  const modelUrl = model.file_url.startsWith('http') 
-                    ? model.file_url 
+
+                  const modelUrl = model.file_url.startsWith('http')
+                    ? model.file_url
                     : model.file_url.startsWith('/')
                     ? `${API_BASE_URL}${model.file_url}`
                     : `${API_BASE_URL}/${model.file_url}`;
@@ -684,12 +684,12 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
             </label>
             {designImage && <img src={designImage} alt="Design Preview" style={{ width: '100%', maxHeight: 150, objectFit: 'contain', marginTop: 8, borderRadius: 8, border: '1px solid rgba(139, 69, 19, 0.2)' }} />}
             <label>Notes for Admin
-              <textarea 
-                value={notes} 
-                onChange={e => setNotes(e.target.value)} 
-                rows={3} 
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                rows={3}
                 className={styles.notesTextarea}
-                placeholder="Enter any specific instructions..." 
+                placeholder="Enter any specific instructions..."
               />
             </label>
           </div>

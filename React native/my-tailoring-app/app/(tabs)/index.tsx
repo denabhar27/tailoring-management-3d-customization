@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -19,11 +20,13 @@ import {
   Poppins_700Bold,
 } from "@expo-google-fonts/poppins";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get("window");
 
 export default function LandingScreen() {
   const router = useRouter();
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   const [fontsLoaded] = useFonts({
     Poppins_300Light_Italic,
@@ -33,14 +36,39 @@ export default function LandingScreen() {
     Poppins_700Bold,
   });
 
-  if (!fontsLoaded) return null;
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (token) {
+
+          router.replace("/home");
+        } else {
+          setCheckingAuth(false);
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        setCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  if (!fontsLoaded || checkingAuth) {
+    return (
+      <View style={[styles.background, { backgroundColor: '#1F2937', justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#A0522D" />
+      </View>
+    );
+  }
 
   return (
     <ImageBackground
       source={require("../../assets/images/tailorbackground.jpg")}
       style={styles.background}
       resizeMode="cover"
-      blurRadius={1.2} 
+      blurRadius={1.2}
     >
       <LinearGradient
         colors={[

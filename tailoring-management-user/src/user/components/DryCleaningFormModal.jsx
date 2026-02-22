@@ -6,12 +6,11 @@ import '../../styles/DryCleaningFormModal.css';
 import '../../styles/SharedModal.css';
 
 const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
-  
+
   const [garmentTypes, setGarmentTypes] = useState({});
   const [garmentTypesList, setGarmentTypesList] = useState([]);
   const [loadingGarments, setLoadingGarments] = useState(false);
 
-  // Multiple garments support - array of garment items
   const [garments, setGarments] = useState([
     { id: 1, garmentType: '', customGarmentType: '', brand: '', quantity: 1 }
   ]);
@@ -36,12 +35,10 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const [priceLoading, setPriceLoading] = useState(false);
   const [services, setServices] = useState([]);
 
-  // Load garment types on mount
   useEffect(() => {
     loadGarmentTypes();
   }, []);
 
-  // Also load garment types when modal opens (in case first load failed)
   useEffect(() => {
     if (isOpen && garmentTypesList.length === 0) {
       console.log('[DryCleaningFormModal] Modal opened with empty garment list, reloading...');
@@ -78,7 +75,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   useEffect(() => {
     if (isOpen) {
       loadDryCleaningServices();
-      
+
       setFormData({
         serviceName: '',
         notes: '',
@@ -99,11 +96,11 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
       const refreshInterval = setInterval(() => {
         if (formData.date) {
-          
+
           getAllSlotsWithAvailability('dry_cleaning', formData.date)
             .then((result) => {
               if (result.success && result.slots) {
-                
+
                 const currentSlots = JSON.stringify(allTimeSlots.map(s => ({ time: s.time_slot, available: s.available })));
                 const newSlots = JSON.stringify(result.slots.map(s => ({ time: s.time_slot, available: s.available })));
                 if (currentSlots !== newSlots) {
@@ -130,7 +127,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               console.error('[POLLING] Error refreshing slots:', error);
             });
         }
-      }, 5000); 
+      }, 5000);
 
       return () => clearInterval(refreshInterval);
     } else {
@@ -143,7 +140,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const loadDryCleaningServices = async () => {
     try {
-      
+
       const { getDryCleaningServices } = await import('../../api/DryCleaningApi');
       const result = await getDryCleaningServices();
       if (result.success && result.data) {
@@ -156,14 +153,14 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const loadAvailableSlots = async (date) => {
     if (!date) return;
-    
+
     setLoadingSlots(true);
     setMessage('');
-    
+
     try {
-      
+
       const result = await getAllSlotsWithAvailability('dry_cleaning', date);
-      
+
       if (result.success) {
         if (!result.isShopOpen) {
           setIsShopOpen(false);
@@ -172,7 +169,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           setMessage('The shop is closed on this date. Please select another date.');
           return;
         }
-        
+
         setIsShopOpen(true);
         setAllTimeSlots(result.slots || []);
 
@@ -201,11 +198,11 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const getMinDate = () => {
     const today = new Date();
     const dayOfWeek = today.getDay();
-    
+
     if (dayOfWeek === 0) {
       today.setDate(today.getDate() + 1);
     }
-    
+
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
@@ -226,7 +223,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         }
       } catch (error) {
         console.error('Error checking date availability:', error);
-        
+
         const date = new Date(selectedDate);
         const dayOfWeek = date.getDay();
         if (dayOfWeek === 0) {
@@ -237,10 +234,10 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         }
       }
     }
-    
+
     setFormData(prev => ({ ...prev, date: selectedDate, time: '' }));
     setMessage('');
-    
+
     if (errors.date) {
       setErrors(prev => ({ ...prev, date: '' }));
     }
@@ -267,9 +264,9 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
     garments.forEach(garment => {
       if (!garment.garmentType) return;
-      
+
       const quantity = parseInt(garment.quantity) || 1;
-      
+
       if (garment.garmentType === 'others') {
         const estimatedPricePerItem = 350;
         totalPrice += estimatedPricePerItem * quantity;
@@ -285,7 +282,6 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     setIsEstimatedPrice(hasEstimatedItem);
   };
 
-  // Garment management functions
   const addGarment = () => {
     const newId = Math.max(...garments.map(g => g.id)) + 1;
     setGarments([...garments, { id: newId, garmentType: '', customGarmentType: '', brand: '', quantity: 1 }]);
@@ -298,10 +294,10 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   const updateGarment = (id, field, value) => {
-    setGarments(garments.map(g => 
+    setGarments(garments.map(g =>
       g.id === id ? { ...g, [field]: value } : g
     ));
-    // Clear error for this field
+
     if (errors[`garment_${id}_${field}`]) {
       setErrors(prev => ({ ...prev, [`garment_${id}_${field}`]: '' }));
     }
@@ -313,7 +309,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       ...prev,
       [name]: value
     }));
-    
+
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -337,7 +333,6 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    // Validate each garment
     garments.forEach((garment, index) => {
       if (!garment.garmentType) {
         newErrors[`garment_${garment.id}_garmentType`] = 'Please select a garment type';
@@ -372,7 +367,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     setMessage('');
 
     try {
-      
+
       let slotResult = null;
       try {
         slotResult = await bookSlot('dry_cleaning', formData.date, formData.time);
@@ -416,19 +411,18 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         console.log('No image file provided');
       }
 
-      const defaultService = services && services.length > 0 
+      const defaultService = services && services.length > 0
         ? (services.find(service => service.service_name === 'Basic Dry Cleaning') || services[0])
         : null;
 
       const pickupDateTime = `${formData.date}T${formData.time}`;
 
-      // Build garments array for submission
       const garmentsData = garments.map(garment => {
-        const actualGarmentType = garment.garmentType === 'others' 
-          ? garment.customGarmentType.trim() 
+        const actualGarmentType = garment.garmentType === 'others'
+          ? garment.customGarmentType.trim()
           : garment.garmentType;
 
-        let pricePerItem = 350; 
+        let pricePerItem = 350;
         if (garment.garmentType !== 'others') {
           const selectedGarment = garmentTypesList.find(g => g.garment_name.toLowerCase() === garment.garmentType);
           pricePerItem = selectedGarment ? parseFloat(selectedGarment.garment_price) : (garmentTypes[garment.garmentType] || 200);
@@ -446,7 +440,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       const dryCleaningData = {
         serviceId: defaultService?.service_id || 1,
         serviceName: 'Basic Dry Cleaning',
-        basePrice: '0', 
+        basePrice: '0',
         finalPrice: estimatedPrice.toString(),
         quantity: garments.reduce((sum, g) => sum + parseInt(g.quantity), 0),
         notes: formData.notes,
@@ -467,7 +461,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       console.log('Result message:', result?.message);
 
       if (result && result.success) {
-        
+
         const priceLabel = isEstimatedPrice ? 'Estimated price' : 'Final price';
         setMessage(`✅ Dry cleaning service added to cart! ${priceLabel}: ₱${estimatedPrice}${imageUrl ? ' (Image uploaded)' : ''}`);
         setTimeout(() => {
@@ -490,7 +484,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   const handleClose = () => {
-    
+
     setFormData({
       serviceName: '',
       notes: '',
@@ -528,14 +522,14 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
             {garments.map((garment, index) => (
               <div key={garment.id} className="garment-inputs-group">
                 {index > 0 && <hr className="garment-divider" />}
-                
+
                 <div className="garment-row-header">
                   {garments.length > 1 && (
                     <span className="garment-label">Garment #{index + 1}</span>
                   )}
                   {garments.length > 1 && (
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className="remove-garment-link"
                       onClick={() => removeGarment(garment.id)}
                     >
@@ -614,9 +608,9 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 </div>
               </div>
             ))}
-            
-            <button 
-              type="button" 
+
+            <button
+              type="button"
               className="add-garment-link"
               onClick={addGarment}
             >
@@ -673,7 +667,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                     <span>Full</span>
                   </div>
                 </div>
-                
+
                 {loadingSlots ? (
                   <div className="time-slots-loading">
                     <div className="loading-spinner"></div>
@@ -687,7 +681,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 ) : allTimeSlots.length > 0 ? (
                   <div className="time-slots-grid">
                     {(() => {
-                      
+
                       const seenTimes = new Set();
                       const uniqueSlots = allTimeSlots.filter(slot => {
                         if (seenTimes.has(slot.time_slot)) {
@@ -696,7 +690,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                         seenTimes.add(slot.time_slot);
                         return true;
                       });
-                      
+
                       return uniqueSlots.map(slot => (
                         <button
                           key={slot.slot_id || slot.time_slot}
@@ -715,8 +709,8 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                         >
                           <span className="slot-time">{slot.display_time}</span>
                           <span className="slot-status">
-                            {slot.status === 'full' ? 'Fully Booked' : 
-                             slot.status === 'limited' ? `${slot.available} left` : 
+                            {slot.status === 'full' ? 'Fully Booked' :
+                             slot.status === 'limited' ? `${slot.available} left` :
                              slot.status === 'available' ? `${slot.available} spots` : 'Unavailable'}
                           </span>
                         </button>
@@ -735,7 +729,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                   value={formData.time}
                   required
                 />
-                
+
                 {formData.time && (
                   <div className="selected-slot-info">
                     <i className="fas fa-check"></i> Selected: <strong>{allTimeSlots.find(s => s.time_slot === formData.time)?.display_time}</strong>
@@ -791,11 +785,11 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 <div className="price-breakdown">
                   {garments.filter(g => g.garmentType).map((garment, index) => {
                     const selectedGarment = garmentTypesList.find(g => g.garment_name.toLowerCase() === garment.garmentType);
-                    const pricePerItem = garment.garmentType === 'others' 
-                      ? 350 
+                    const pricePerItem = garment.garmentType === 'others'
+                      ? 350
                       : (selectedGarment ? parseFloat(selectedGarment.garment_price) : (garmentTypes[garment.garmentType] || 200));
-                    const garmentName = garment.garmentType === 'others' 
-                      ? (garment.customGarmentType || 'Custom') 
+                    const garmentName = garment.garmentType === 'others'
+                      ? (garment.customGarmentType || 'Custom')
                       : garment.garmentType.charAt(0).toUpperCase() + garment.garmentType.slice(1);
                     return (
                       <p key={garment.id}>

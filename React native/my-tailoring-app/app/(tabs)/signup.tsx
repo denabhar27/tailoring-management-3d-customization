@@ -45,7 +45,7 @@ export default function SignupScreen() {
   });
 
   const handleSignup = async () => {
-    
+
     if (!firstName || !lastName || !username || !email || !password || !confirmPassword) {
       Alert.alert("Error", "Please fill in all required fields");
       return;
@@ -73,7 +73,7 @@ export default function SignupScreen() {
       });
 
       if (response.token) {
-        
+
         await AsyncStorage.setItem('userToken', response.token);
         await AsyncStorage.setItem('userRole', response.role);
         await AsyncStorage.setItem('userData', JSON.stringify(response.user));
@@ -100,15 +100,15 @@ export default function SignupScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.container}>
             <View style={styles.card}>
               <View style={styles.header}>
-                <Image 
-                  source={require("../../assets/images/logo copy.png")} 
+                <Image
+                  source={require("../../assets/images/logo copy.png")}
                   style={styles.logo}
                   resizeMode="contain"
                 />

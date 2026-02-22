@@ -22,7 +22,6 @@ import { addRepairToCart, uploadRepairImage } from "../../../utils/repairService
 import apiCall, { appointmentSlotService, API_BASE_URL } from "../../../utils/apiService";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-
 const DEFAULT_REPAIR_GARMENT_TYPES = [
   "Shirt", "Pants", "Jacket", "Coat", "Dress", "Skirt", "Suit", "Blouse", "Sweater", "Other"
 ];
@@ -53,12 +52,11 @@ export default function RepairClothes() {
 
   const [image, setImage] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  
-  // Multiple garments support
+
   const [garments, setGarments] = useState<RepairGarmentItem[]>([
     { id: 1, garmentType: '', damageLevel: '', notes: '' }
   ]);
-  
+
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>("");
@@ -77,7 +75,6 @@ export default function RepairClothes() {
     { value: 'severe', label: 'Severe', basePrice: 1500, description: 'Complete reconstruction, multiple major issues' }
   ];
 
-  // Garment management functions
   const addGarment = () => {
     const newId = Math.max(...garments.map(g => g.id)) + 1;
     setGarments([...garments, { id: newId, garmentType: '', damageLevel: '', notes: '' }]);
@@ -90,37 +87,33 @@ export default function RepairClothes() {
   };
 
   const updateGarment = (id: number, field: keyof RepairGarmentItem, value: string) => {
-    setGarments(garments.map(g => 
+    setGarments(garments.map(g =>
       g.id === id ? { ...g, [field]: value } : g
     ));
   };
 
-  // Calculate total price based on all garments
   const calculateTotalPrice = (): number => {
     return garments.reduce((total, garment) => {
       if (!garment.damageLevel) return total;
       const damageLevelObj = damageLevels.find(level => level.value === garment.damageLevel);
       let basePrice = damageLevelObj ? damageLevelObj.basePrice : 500;
-      
-      // Apply garment multiplier
+
       let garmentMultiplier = 1.0;
       if (garment.garmentType === 'Suit' || garment.garmentType === 'Coat') {
         garmentMultiplier = 1.3;
       } else if (garment.garmentType === 'Dress') {
         garmentMultiplier = 1.2;
       }
-      
+
       return total + Math.round(basePrice * garmentMultiplier);
     }, 0);
   };
 
-  
   useEffect(() => {
     console.log('=== [RepairClothes] Component MOUNTED - DYNAMIC VERSION ===');
     loadRepairGarmentTypes();
   }, []);
 
-  
   useFocusEffect(
     useCallback(() => {
       console.log('[RepairClothes] Screen focused, refreshing repair garment types...');
@@ -134,31 +127,30 @@ export default function RepairClothes() {
     try {
       const token = await AsyncStorage.getItem('userToken');
       console.log('[RepairClothes] Token:', token ? 'Retrieved' : 'Missing');
-      
+
       const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.180:5000/api';
       const url = `${baseUrl}/repair-garment-types`;
       console.log('[RepairClothes] Fetching:', url);
-      
+
       const response = await fetch(url, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json',
         },
       });
-      
+
       console.log('[RepairClothes] Response status:', response.status);
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log('[RepairClothes] API returned', data.garments?.length || 0, 'items');
         console.log('[RepairClothes] Raw API response:', JSON.stringify(data));
-        
-        
+
         if (data.success && data.garments && data.garments.length > 0) {
           const garmentTypes = data.garments
             .filter((g: any) => g.is_active === 1 || g.is_active === true)
             .map((garment: any) => garment.garment_name);
-          
+
           if (garmentTypes.length > 0) {
             setRepairGarmentTypes(garmentTypes);
             console.log('✅ [RepairClothes] SUCCESS - Loaded', garmentTypes.length, 'garment types from API');
@@ -216,7 +208,7 @@ export default function RepairClothes() {
   };
 
   const handleDateConfirm = async (selectedDate: Date) => {
-    
+
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
     const day = String(selectedDate.getDate()).padStart(2, '0');
@@ -224,7 +216,7 @@ export default function RepairClothes() {
 
     try {
       const checkResult = await apiCall(`/shop-schedule/check?date=${dateStr}`);
-      
+
       if (!checkResult.success || !checkResult.is_open) {
         Alert.alert(
           'Shop Closed',
@@ -232,11 +224,11 @@ export default function RepairClothes() {
           [{ text: 'OK' }]
         );
         setShowDatePicker(false);
-        return; 
+        return;
       }
     } catch (error: any) {
       console.error('Error checking date availability:', error);
-      
+
       const dayOfWeek = selectedDate.getDay();
       if (dayOfWeek === 0) {
         Alert.alert(
@@ -248,23 +240,23 @@ export default function RepairClothes() {
         return;
       }
     }
-    
+
     setAppointmentDate(selectedDate);
     setShowDatePicker(false);
-    setSelectedTimeSlot(""); 
+    setSelectedTimeSlot("");
     await loadTimeSlots(selectedDate);
   };
 
   const loadTimeSlots = async (date: Date) => {
     setLoadingSlots(true);
     try {
-      
+
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
       const result = await appointmentSlotService.getAllSlotsWithAvailability('repair', dateStr);
-      
+
       if (result.success) {
         if (!result.isShopOpen) {
           setIsShopOpen(false);
@@ -272,7 +264,7 @@ export default function RepairClothes() {
           Alert.alert('Shop Closed', 'The shop is closed on this date. Please select another date.');
           return;
         }
-        
+
         setIsShopOpen(true);
         setTimeSlots(result.slots || []);
       } else {
@@ -294,7 +286,7 @@ export default function RepairClothes() {
 
   useFocusEffect(
     useCallback(() => {
-      
+
       if (appointmentDate) {
         loadTimeSlots(appointmentDate);
       }
@@ -307,23 +299,23 @@ export default function RepairClothes() {
     loadTimeSlots(appointmentDate);
 
     const refreshInterval = setInterval(() => {
-      
+
       const year = appointmentDate.getFullYear();
       const month = String(appointmentDate.getMonth() + 1).padStart(2, '0');
       const day = String(appointmentDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-      
+
       appointmentSlotService.getAllSlotsWithAvailability('repair', dateStr, 5000)
         .then((result) => {
           if (result.success && result.slots) {
-            
+
             setTimeSlots((currentSlots) => {
-              
+
               const currentCounts = JSON.stringify(currentSlots.map(s => ({ time: s.time_slot, available: s.available })));
               const newCounts = JSON.stringify(result.slots.map(s => ({ time: s.time_slot, available: s.available })));
-              
+
               if (currentCounts !== newCounts) {
-                
+
                 if (!result.isShopOpen) {
                   setIsShopOpen(false);
                   return [];
@@ -332,7 +324,7 @@ export default function RepairClothes() {
                   return result.slots || [];
                 }
               }
-              
+
               return currentSlots;
             });
           }
@@ -343,10 +335,10 @@ export default function RepairClothes() {
             console.warn('[POLLING] Error polling time slots:', error.message);
           }
         });
-    }, 5000); 
+    }, 5000);
 
     return () => clearInterval(refreshInterval);
-  }, [appointmentDate]); 
+  }, [appointmentDate]);
 
   const uploadImageIfNeeded = async () => {
     if (!image) return null;
@@ -361,7 +353,7 @@ export default function RepairClothes() {
 
       const response = await uploadRepairImage(formData);
       const result = await response.json();
-      
+
       if (result.success) {
         return result.data.url || result.data.filename;
       } else {
@@ -374,7 +366,7 @@ export default function RepairClothes() {
   };
 
   const handleAddService = async () => {
-    // Validate garments
+
     const validGarments = garments.filter(g => g.garmentType && g.damageLevel && g.notes);
     if (validGarments.length === 0) {
       Alert.alert(
@@ -384,7 +376,6 @@ export default function RepairClothes() {
       return;
     }
 
-    // Check all required fields for each garment
     for (const garment of garments) {
       if (!garment.garmentType || !garment.damageLevel || !garment.notes) {
         Alert.alert(
@@ -422,12 +413,12 @@ export default function RepairClothes() {
     }
 
     setLoading(true);
-    
+
     try {
-      
+
       let slotResult = null;
       try {
-        
+
         const year = appointmentDate.getFullYear();
         const month = String(appointmentDate.getMonth() + 1).padStart(2, '0');
         const day = String(appointmentDate.getDate()).padStart(2, '0');
@@ -465,7 +456,6 @@ export default function RepairClothes() {
       const dateStr = `${year}-${month}-${day}`;
       const pickupDateTime = `${dateStr}T${selectedTimeSlot}`;
 
-      // Build garments array for submission
       const garmentsData = garments.map(garment => {
         const damageLevelObj = damageLevels.find(level => level.value === garment.damageLevel);
         const basePrice = damageLevelObj ? damageLevelObj.basePrice : 500;
@@ -478,14 +468,14 @@ export default function RepairClothes() {
       });
 
       const repairData = {
-        serviceType: 'repair', 
-        serviceId: 1, 
-        quantity: garments.length, 
+        serviceType: 'repair',
+        serviceId: 1,
+        quantity: garments.length,
         serviceName: 'Repair Service',
         basePrice: estimatedPrice.toString(),
-        finalPrice: estimatedPrice.toString(), 
-        pickupDate: pickupDateTime, 
-        appointmentTime: selectedTimeSlot, 
+        finalPrice: estimatedPrice.toString(),
+        pickupDate: pickupDateTime,
+        appointmentTime: selectedTimeSlot,
         imageUrl: imageUrl || 'no-image',
         garments: garmentsData,
         isMultipleGarments: garments.length > 1
@@ -494,11 +484,11 @@ export default function RepairClothes() {
       console.log('Sending repair data to cart:', JSON.stringify(repairData, null, 2));
 
       const result = await addRepairToCart(repairData);
-      
+
       if (result.success) {
         Alert.alert(
-          "Success!", 
-          `Repair service added to cart! Estimated price: ₱${estimatedPrice}`, 
+          "Success!",
+          `Repair service added to cart! Estimated price: ₱${estimatedPrice}`,
           [
             {
               text: "View Cart",
@@ -523,15 +513,15 @@ export default function RepairClothes() {
       }
     } catch (error: any) {
       console.error("Add service error:", error);
-      
+
       let errorMessage = error.message || "Failed to add repair service. Please try again.";
 
       if (error.name === 'TypeError' && error.message.includes('Network request failed')) {
         errorMessage = "Network error: Unable to connect to the server. Please check your internet connection and ensure the backend server is running."
       }
-      
+
       Alert.alert(
-        "Error Adding to Cart", 
+        "Error Adding to Cart",
         errorMessage
       );
     } finally {
@@ -553,7 +543,7 @@ export default function RepairClothes() {
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
@@ -581,15 +571,14 @@ export default function RepairClothes() {
             )}
           </TouchableOpacity>
 
-          {/* Garments - Simple repeated inputs */}
           {garments.map((garment, index) => (
             <View key={garment.id}>
               {index > 0 && <View style={styles.garmentDivider} />}
-              
+
               {garments.length > 1 && (
                 <View style={styles.garmentRowHeader}>
                   <Text style={styles.garmentLabel}>Garment #{index + 1}</Text>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.removeGarmentButton}
                     onPress={() => removeGarment(garment.id)}
                   >
@@ -630,7 +619,7 @@ export default function RepairClothes() {
                   </TouchableOpacity>
                 ))}
               </View>
-              
+
               <Text style={styles.sectionTitle}>Garment Type *</Text>
               {loadingGarments ? (
                 <View style={[styles.pickerWrapper, { justifyContent: 'center', alignItems: 'center', paddingVertical: 15 }]}>
@@ -650,7 +639,7 @@ export default function RepairClothes() {
                   </Picker>
                 </View>
               )}
-              
+
               <Text style={styles.sectionTitle}>Damage Description *</Text>
               <TextInput
                 placeholder="Describe the damage in detail..."
@@ -663,13 +652,12 @@ export default function RepairClothes() {
               />
             </View>
           ))}
-          
+
           <TouchableOpacity style={styles.addGarmentButton} onPress={addGarment}>
             <Ionicons name="add-circle-outline" size={20} color="#8D6E63" />
             <Text style={styles.addGarmentButtonText}>Add Another Garment</Text>
           </TouchableOpacity>
 
-          {/* Total Price Display */}
           {garments.some(g => g.damageLevel) && (
             <View style={styles.totalPriceRow}>
               <Text style={styles.totalPriceLabel}>Estimated Total:</Text>
@@ -728,7 +716,7 @@ export default function RepairClothes() {
               ) : timeSlots.length > 0 ? (
                 <View style={styles.timeSlotsGrid}>
                   {(() => {
-                    
+
                     const seenTimes = new Set<string>();
                     const uniqueSlots = timeSlots.filter((slot) => {
                       if (seenTimes.has(slot.time_slot)) {
@@ -737,7 +725,7 @@ export default function RepairClothes() {
                       seenTimes.add(slot.time_slot);
                       return true;
                     });
-                    
+
                     return uniqueSlots.map((slot) => (
                       <TouchableOpacity
                         key={slot.slot_id || slot.time_slot}
@@ -756,8 +744,8 @@ export default function RepairClothes() {
                       >
                         <Text style={styles.slotTime}>{slot.display_time}</Text>
                         <Text style={styles.slotStatus}>
-                          {slot.status === 'full' ? 'Fully Booked' : 
-                           slot.status === 'limited' ? `${slot.available} LEFT` : 
+                          {slot.status === 'full' ? 'Fully Booked' :
+                           slot.status === 'limited' ? `${slot.available} LEFT` :
                            slot.status === 'available' ? `${slot.available} SPOTS` : 'Unavailable'}
                         </Text>
                       </TouchableOpacity>
@@ -1114,7 +1102,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  
+
   timeSlotLegend: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1157,7 +1145,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   timeSlotButton: {
-    width: (width - 88) / 3, 
+    width: (width - 88) / 3,
     paddingVertical: 14,
     paddingHorizontal: 8,
     borderRadius: 12,
@@ -1240,7 +1228,7 @@ const styles = StyleSheet.create({
     color: '#8D6E63',
     textAlign: 'center',
   },
-  // Simple multi-garment styles
+
   garmentDivider: {
     height: 1,
     backgroundColor: '#D7CCC8',

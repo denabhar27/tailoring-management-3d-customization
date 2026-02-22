@@ -34,7 +34,7 @@ const DryCleaning = () => {
   const [confirmAction, setConfirmAction] = useState(null);
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmButtonText, setConfirmButtonText] = useState('Confirm');
-  const [confirmButtonStyle, setConfirmButtonStyle] = useState('blue'); 
+  const [confirmButtonStyle, setConfirmButtonStyle] = useState('blue');
 
   const [showPriceConfirmationModal, setShowPriceConfirmationModal] = useState(false);
   const [priceConfirmationItem, setPriceConfirmationItem] = useState(null);
@@ -124,7 +124,7 @@ const DryCleaning = () => {
       } else {
         result = await createDCGarmentType(garmentTypeForm);
       }
-      
+
       if (result.success) {
         showToast(editingGarmentType ? 'Garment type updated successfully!' : 'Garment type created successfully!', 'success');
         setShowGarmentTypeModal(false);
@@ -146,9 +146,9 @@ const DryCleaning = () => {
         const result = await deleteDCGarmentType(garmentId);
         if (result.success) {
           showToast('Garment type deleted successfully', 'success');
-          
+
           setGarmentTypes(prevGarments => prevGarments.filter(garment => garment.dc_garment_id !== garmentId));
-          
+
           await loadGarmentTypes();
         } else {
           showToast(result.message || 'Failed to delete garment type', 'error');
@@ -156,7 +156,7 @@ const DryCleaning = () => {
       } catch (err) {
         console.error("Delete garment type error:", err);
         showToast('Failed to delete garment type', 'error');
-        
+
         await loadGarmentTypes();
       }
     }, 'Delete', 'danger');
@@ -221,43 +221,43 @@ const DryCleaning = () => {
     if (currentStatus === 'accepted') {
       return 'confirmed';
     }
-    
+
     const statusFlow = {
       'repair': ['pending', 'price_confirmation', 'accepted', 'confirmed', 'ready_for_pickup', 'completed'],
       'customization': ['pending', 'price_confirmation', 'accepted', 'confirmed', 'ready_for_pickup', 'completed'],
       'dry_cleaning': ['pending', 'price_confirmation', 'accepted', 'confirmed', 'ready_for_pickup', 'completed'],
       'rental': ['pending', 'ready_for_pickup', 'picked_up', 'rented', 'returned', 'completed']
     };
-    
+
     const flow = statusFlow[serviceType] || statusFlow['dry_cleaning'];
     const currentIndex = flow.indexOf(currentStatus);
-    
+
     if (currentIndex === -1 || currentIndex === flow.length - 1) {
-      return null; 
+      return null;
     }
-    
+
     const nextStatus = flow[currentIndex + 1];
 
     if (nextStatus === 'completed' && item) {
-      const pricingFactors = typeof item.pricing_factors === 'string' 
-        ? JSON.parse(item.pricing_factors || '{}') 
+      const pricingFactors = typeof item.pricing_factors === 'string'
+        ? JSON.parse(item.pricing_factors || '{}')
         : (item.pricing_factors || {});
       const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
       const finalPrice = parseFloat(item.final_price || 0);
       const remainingBalance = finalPrice - amountPaid;
 
-      if (remainingBalance > 0.01) { 
+      if (remainingBalance > 0.01) {
         return null;
       }
     }
-    
+
     return nextStatus;
   };
 
   const getNextStatusLabel = (currentStatus, serviceType = 'dry_cleaning', item = null) => {
     const nextStatus = getNextStatus(currentStatus, serviceType, item);
     if (!nextStatus) return null;
-    
+
     const labelMap = {
       'accepted': 'Accept',
       'price_confirmation': 'Price Confirm',
@@ -268,7 +268,7 @@ const DryCleaning = () => {
       'rented': 'Mark Rented',
       'returned': 'Mark Returned'
     };
-    
+
     return labelMap[nextStatus] || getStatusText(nextStatus);
   };
 
@@ -337,13 +337,13 @@ const DryCleaning = () => {
     items = items.filter(item => {
       if (!searchTerm) return true;
       const searchLower = searchTerm.toLowerCase();
-      const customerName = item.order_type === 'walk_in' 
+      const customerName = item.order_type === 'walk_in'
         ? (item.walk_in_customer_name || '').toLowerCase()
         : `${item.first_name || ''} ${item.last_name || ''}`.toLowerCase();
       const customerEmail = item.order_type === 'walk_in'
         ? (item.walk_in_customer_email || '').toLowerCase()
         : (item.email || '').toLowerCase();
-      
+
       return (
         item.order_id?.toString().includes(searchLower) ||
         customerName.includes(searchLower) ||
@@ -354,11 +354,11 @@ const DryCleaning = () => {
 
     if (statusFilter && viewFilter === 'all') {
       items = items.filter(item => {
-        
+
         let normalizedStatus = item.approval_status;
-        if (item.approval_status === 'pending_review' || 
-            item.approval_status === null || 
-            item.approval_status === undefined || 
+        if (item.approval_status === 'pending_review' ||
+            item.approval_status === null ||
+            item.approval_status === undefined ||
             item.approval_status === '') {
           normalizedStatus = 'pending';
         }
@@ -369,7 +369,7 @@ const DryCleaning = () => {
     items.sort((a, b) => {
       const isPendingA = a.approval_status === 'pending' || a.approval_status === 'pending_review' || !a.approval_status;
       const isPendingB = b.approval_status === 'pending' || b.approval_status === 'pending_review' || !b.approval_status;
-      
+
       if (isPendingA && !isPendingB) return -1;
       if (!isPendingA && isPendingB) return 1;
       return 0;
@@ -413,7 +413,7 @@ const DryCleaning = () => {
 
   const handlePriceConfirmationSubmit = async () => {
     if (!priceConfirmationItem) return;
-    
+
     const finalPrice = parseFloat(priceConfirmationPrice);
     if (isNaN(finalPrice) || finalPrice <= 0) {
       showToast("Please enter a valid price", "error");
@@ -427,7 +427,7 @@ const DryCleaning = () => {
       });
       if (result.success) {
         await loadDryCleaningOrders();
-        
+
         if (viewFilter !== 'all') {
           setViewFilter('price-confirmation');
         }
@@ -469,19 +469,19 @@ const DryCleaning = () => {
     const currentStatusLabel = item ? getStatusText(item.approval_status) : 'current';
 
     if (status === 'completed' && item) {
-      const pricingFactors = typeof item.pricing_factors === 'string' 
-        ? JSON.parse(item.pricing_factors || '{}') 
+      const pricingFactors = typeof item.pricing_factors === 'string'
+        ? JSON.parse(item.pricing_factors || '{}')
         : (item.pricing_factors || {});
       const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
       const finalPrice = parseFloat(item.final_price || 0);
       const remainingBalance = finalPrice - amountPaid;
 
-      if (remainingBalance > 0.01) { 
+      if (remainingBalance > 0.01) {
         showToast(`Cannot mark as completed. Payment is not complete. Remaining balance: ₱${remainingBalance.toFixed(2)}`, "error");
         return;
       }
     }
-    
+
     openConfirmModal(
       `Are you sure you want to move this order from "${currentStatusLabel}" to "${statusLabel}"?`,
       async () => {
@@ -493,7 +493,7 @@ const DryCleaning = () => {
             await loadDryCleaningOrders();
 
             if (viewFilter !== 'all') {
-              
+
               if (status === 'accepted') {
                 setViewFilter('accepted');
               } else if (status === 'price_confirmation') {
@@ -593,24 +593,24 @@ const DryCleaning = () => {
     if (!item || !item.specific_data) return null;
     const serviceName = item.specific_data.serviceName || '';
     const quantity = item.specific_data.quantity || 1;
-    
+
     const basePrices = {
       'Basic Dry Cleaning': 200,
       'Premium Dry Cleaning': 350,
       'Delicate Items': 450,
       'Express Service': 500
     };
-    
+
     const pricePerItem = {
       'Basic Dry Cleaning': 150,
       'Premium Dry Cleaning': 250,
       'Delicate Items': 350,
       'Express Service': 400
     };
-    
+
     const basePrice = basePrices[serviceName] || 200;
     const perItemPrice = pricePerItem[serviceName] || 150;
-    
+
     return item.specific_data.finalPrice || (basePrice + (perItemPrice * quantity));
   };
 
@@ -750,9 +750,9 @@ const DryCleaning = () => {
                 <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px' }}>No dry cleaning orders found</td></tr>
               ) : (
                 getFilteredItems().map(item => {
-                  
-                  const pricingFactors = typeof item.pricing_factors === 'string' 
-                    ? JSON.parse(item.pricing_factors || '{}') 
+
+                  const pricingFactors = typeof item.pricing_factors === 'string'
+                    ? JSON.parse(item.pricing_factors || '{}')
                     : (item.pricing_factors || {});
                   const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
                   const finalPrice = parseFloat(item.final_price || 0);
@@ -764,7 +764,7 @@ const DryCleaning = () => {
                     <td>
                       {item.order_type === 'walk_in' ? (
                         <span>
-                          <span style={{ 
+                          <span style={{
                             display: 'inline-block',
                             backgroundColor: '#ff9800',
                             color: 'white',
@@ -781,7 +781,7 @@ const DryCleaning = () => {
                       )}
                     </td>
                     <td>
-                      {item.specific_data?.garments && item.specific_data.garments.length > 0 
+                      {item.specific_data?.garments && item.specific_data.garments.length > 0
                         ? `${item.specific_data.garments.length} garment${item.specific_data.garments.length > 1 ? 's' : ''}`
                         : (item.specific_data?.garmentType || 'N/A')}
                     </td>
@@ -816,14 +816,14 @@ const DryCleaning = () => {
                             </svg>
                           </button>
                           {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
-                            <button 
-                              className="icon-btn" 
+                            <button
+                              className="icon-btn"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedOrder(item);
                                 setPaymentAmount('');
                                 setShowPaymentModal(true);
-                              }} 
+                              }}
                               title="Record Payment"
                               style={{ backgroundColor: '#2196F3', color: 'white' }}
                             >
@@ -834,9 +834,9 @@ const DryCleaning = () => {
                       ) : (
                         <div className="action-buttons">
                           {getNextStatus(item.approval_status, 'dry_cleaning', item) && (
-                            <button 
-                              className="icon-btn next-status" 
-                              onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'dry_cleaning', item))} 
+                            <button
+                              className="icon-btn next-status"
+                              onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'dry_cleaning', item))}
                               title={`Move to ${getNextStatusLabel(item.approval_status, 'dry_cleaning', item)}`}
                               style={{ backgroundColor: '#4CAF50', color: 'white' }}
                             >
@@ -846,14 +846,14 @@ const DryCleaning = () => {
                             </button>
                           )}
                           {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
-                            <button 
-                              className="icon-btn" 
+                            <button
+                              className="icon-btn"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedOrder(item);
                                 setPaymentAmount('');
                                 setShowPaymentModal(true);
-                              }} 
+                              }}
                               title="Record Payment"
                               style={{ backgroundColor: '#2196F3', color: 'white' }}
                             >
@@ -861,12 +861,12 @@ const DryCleaning = () => {
                             </button>
                           )}
                           {(item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
-                            <button 
-                              className="icon-btn delete" 
+                            <button
+                              className="icon-btn delete"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteOrder(item);
-                              }} 
+                              }}
                               title="Delete Order"
                               style={{ backgroundColor: '#f44336', color: 'white' }}
                             >
@@ -927,16 +927,16 @@ const DryCleaning = () => {
 
                     let newStatus = editForm.approvalStatus;
                     const isWalkIn = selectedOrder.order_type === 'walk_in';
-                    
+
                     if (newPrice && (editForm.approvalStatus === 'pending' || editForm.approvalStatus === 'accepted')) {
-                      const priceChanged = estimatedPrice ? Math.abs(parseFloat(newPrice) - estimatedPrice) > 0.01 : 
+                      const priceChanged = estimatedPrice ? Math.abs(parseFloat(newPrice) - estimatedPrice) > 0.01 :
                                           Math.abs(parseFloat(newPrice) - originalPrice) > 0.01;
                       if (priceChanged) {
-                        
+
                         newStatus = isWalkIn ? 'accepted' : 'price_confirmation';
                       }
                     }
-                    
+
                     setEditForm({...editForm, finalPrice: newPrice, approvalStatus: newStatus});
                   }}
                   placeholder="Enter final price"
@@ -953,7 +953,7 @@ const DryCleaning = () => {
                           <strong>⚠️ Price Changed:</strong> Estimated: ₱{estimatedPrice.toFixed(2)} → New: ₱{parseFloat(editForm.finalPrice).toFixed(2)}
                           <br />
                           <span style={{ color: '#666', fontSize: '0.85em' }}>
-                            {isWalkIn 
+                            {isWalkIn
                               ? 'Status will be set to "Accepted" (walk-in orders skip price confirmation).'
                               : 'Status will be set to "Price Confirmation" to notify customer.'}
                           </span>
@@ -970,7 +970,7 @@ const DryCleaning = () => {
                 <select
                   value={editForm.approvalStatus}
                   onChange={(e) => {
-                    
+
                     const newStatus = e.target.value;
                     const isWalkIn = selectedOrder.order_type === 'walk_in';
                     if (isWalkIn && newStatus === 'price_confirmation') {
@@ -1034,7 +1034,7 @@ const DryCleaning = () => {
               {selectedOrder.order_type === 'walk_in' && (
                 <div className="detail-row">
                   <strong>Order Type:</strong>
-                  <span style={{ 
+                  <span style={{
                     display: 'inline-block',
                     backgroundColor: '#ff9800',
                     color: 'white',
@@ -1049,7 +1049,7 @@ const DryCleaning = () => {
               <div className="detail-row">
                 <strong>Customer:</strong>
                 <span>
-                  {selectedOrder.order_type === 'walk_in' 
+                  {selectedOrder.order_type === 'walk_in'
                     ? (selectedOrder.walk_in_customer_name || 'Walk-in Customer')
                     : `${selectedOrder.first_name || ''} ${selectedOrder.last_name || ''}`.trim() || 'N/A'}
                 </span>
@@ -1146,7 +1146,7 @@ const DryCleaning = () => {
                   <div className="detail-row"><strong>Quantity:</strong> {priceConfirmationItem.specific_data?.quantity || 1}</div>
                 </>
               )}
-              
+
               <div className="payment-form-group">
                 <label>Final Price (₱)</label>
                 <input
@@ -1172,7 +1172,7 @@ const DryCleaning = () => {
                   return null;
                 })()}
               </div>
-              
+
               <div style={{ marginTop: '15px', padding: '12px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '0.9em', color: '#1976d2' }}>
                 ℹ️ Customer will be notified to confirm the price before proceeding.
               </div>
@@ -1212,7 +1212,7 @@ const DryCleaning = () => {
           setGarmentTypeForm({ garment_name: '', garment_price: '', description: '', is_active: 1 });
         }}>×</span>
       </div>
-      
+
       <div className="garment-modal-body">
         <div className="garment-form-group">
           <label>Garment Name *</label>
@@ -1261,8 +1261,8 @@ const DryCleaning = () => {
             <h3>Existing Dry Cleaning Garment Types ({garmentTypes.length})</h3>
             <div className="garment-types-scrollable">
               {garmentTypes.map(garment => (
-                <div 
-                  key={garment.dc_garment_id} 
+                <div
+                  key={garment.dc_garment_id}
                   className={`garment-item-card ${garment.is_active ? 'active' : 'inactive'}`}
                 >
                   <div className="garment-item-info">
@@ -1293,7 +1293,7 @@ const DryCleaning = () => {
           </div>
         )}
       </div>
-      
+
       <div className="garment-modal-footer">
         <button className="garment-btn-cancel" onClick={() => {
           setShowGarmentTypeModal(false);
@@ -1328,7 +1328,7 @@ const DryCleaning = () => {
               <div className="detail-row">
                 <strong>Customer:</strong>
                 <span>
-                  {selectedOrder.order_type === 'walk_in' 
+                  {selectedOrder.order_type === 'walk_in'
                     ? (selectedOrder.walk_in_customer_name || 'Walk-in Customer')
                     : `${selectedOrder.first_name || ''} ${selectedOrder.last_name || ''}`.trim() || 'N/A'}
                 </span>
@@ -1342,13 +1342,13 @@ const DryCleaning = () => {
                 <span>₱{parseFloat(selectedOrder.final_price || 0).toLocaleString()}</span>
               </div>
               {(() => {
-                const pricingFactors = typeof selectedOrder.pricing_factors === 'string' 
-                  ? JSON.parse(selectedOrder.pricing_factors || '{}') 
+                const pricingFactors = typeof selectedOrder.pricing_factors === 'string'
+                  ? JSON.parse(selectedOrder.pricing_factors || '{}')
                   : (selectedOrder.pricing_factors || {});
                 const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
                 const finalPrice = parseFloat(selectedOrder.final_price || 0);
                 const remaining = finalPrice - amountPaid;
-                
+
                 if (amountPaid > 0) {
                   return (
                     <>
@@ -1367,7 +1367,7 @@ const DryCleaning = () => {
                 }
                 return null;
               })()}
-              
+
               <div className="payment-form-group">
                 <label>Payment Amount *</label>
                 <input

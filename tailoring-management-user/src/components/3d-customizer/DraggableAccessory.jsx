@@ -9,8 +9,8 @@ function AccessoryModel({ modelPath, color }) {
 
     useLayoutEffect(() => {
         if (clonedScene) {
-            
-            clonedScene.rotation.y = -Math.PI / 2; 
+
+            clonedScene.rotation.y = -Math.PI / 2;
 
             clonedScene.traverse((child) => {
                 if (child.isMesh) {
@@ -66,7 +66,7 @@ export default function DraggableAccessory({ id, modelPath, position, color, sca
             );
 
             if (hit) {
-                
+
                 const targetPos = hit.point.clone();
                 groupRef.current.position.lerp(targetPos, 0.3);
             }
@@ -77,13 +77,13 @@ export default function DraggableAccessory({ id, modelPath, position, color, sca
         e.stopPropagation();
 
         if (!isMoving) {
-            
+
             setIsMoving(true);
             onSelect(id);
             gl.domElement.style.cursor = 'move';
             if (onMovingChange) onMovingChange(true);
         } else {
-            
+
             setIsMoving(false);
             if (groupRef.current) {
                 const newPos = groupRef.current.position.toArray();
@@ -119,10 +119,10 @@ export default function DraggableAccessory({ id, modelPath, position, color, sca
             return modelPath;
         }
 
-        const fullPath = modelPath.startsWith('/') 
-            ? modelPath  
+        const fullPath = modelPath.startsWith('/')
+            ? modelPath
             : `/${modelPath}`;
-        
+
         console.log('DraggableAccessory: Using local path:', fullPath, 'from:', modelPath);
         return fullPath;
     }, [modelPath]);

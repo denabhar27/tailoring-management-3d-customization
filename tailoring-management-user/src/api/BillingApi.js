@@ -45,7 +45,7 @@ export async function getBillingRecordsByStatus(status) {
 
 export async function updateBillingRecordStatus(recordId, status) {
     try {
-        const response = await axios.put(`${BASE_URL}/billing/records/${recordId}/status`, 
+        const response = await axios.put(`${BASE_URL}/billing/records/${recordId}/status`,
             { status },
             {
                 headers: getAuthHeaders()

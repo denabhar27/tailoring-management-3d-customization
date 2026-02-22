@@ -115,20 +115,20 @@ export default function TransactionLogScreen() {
     switch (type) {
       case "payment":
       case "final_payment":
-        return "#10B981"; 
+        return "#10B981";
       case "down_payment":
-        return "#3B82F6"; 
+        return "#3B82F6";
       case "refund":
-        return "#EF4444"; 
+        return "#EF4444";
       case "adjustment":
-        return "#F59E0B"; 
+        return "#F59E0B";
       default:
-        return "#6B7280"; 
+        return "#6B7280";
     }
   };
 
   const handleClose = () => {
-    // Navigate back to order details
+
     if (orderItemId) {
       router.replace(`/(tabs)/orders/${orderItemId}`);
     } else {
@@ -138,7 +138,7 @@ export default function TransactionLogScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header matching web design */}
+
       <View style={styles.header}>
         <TouchableOpacity onPress={handleClose}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
@@ -198,7 +198,7 @@ export default function TransactionLogScreen() {
               </View>
             ))}
           </ScrollView>
-          
+
           {/* Close button at bottom */}
           <View style={styles.footerContainer}>
             <TouchableOpacity style={styles.closeButtonBottom} onPress={handleClose}>

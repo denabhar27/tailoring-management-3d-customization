@@ -56,16 +56,16 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel, confirmText
   React.useEffect(() => {
     if (isOpen) {
       document.addEventListener('keydown', handleKeyDown);
-      
+
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       return () => {
         document.removeEventListener('keydown', handleKeyDown);
-        
+
         document.body.style.overflow = originalOverflow || 'auto';
       };
     } else {
-      
+
       document.body.style.overflow = 'auto';
     }
   }, [isOpen]);

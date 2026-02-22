@@ -56,14 +56,14 @@ export default function DateTimePickerModal({
 
   const handleConfirm = () => {
     let finalDate = new Date(selectedYear, selectedMonth, selectedDay);
-    
+
     if (mode === 'time' || mode === 'datetime') {
       let hours = selectedHour;
       if (selectedAmPm === 'PM' && hours !== 12) hours += 12;
       if (selectedAmPm === 'AM' && hours === 12) hours = 0;
       finalDate.setHours(hours, selectedMinute);
     }
-    
+
     onConfirm(finalDate);
   };
 
@@ -242,10 +242,10 @@ export default function DateTimePickerModal({
           <View style={styles.previewSection}>
             <Text style={styles.previewLabel}>Selected:</Text>
             <Text style={styles.previewText}>
-              {(mode === 'date' || mode === 'datetime') && 
+              {(mode === 'date' || mode === 'datetime') &&
                 `${months[selectedMonth]} ${selectedDay}, ${selectedYear}`}
               {mode === 'datetime' && ' at '}
-              {(mode === 'time' || mode === 'datetime') && 
+              {(mode === 'time' || mode === 'datetime') &&
                 `${selectedHour}:${selectedMinute.toString().padStart(2, '0')} ${selectedAmPm}`}
             </Text>
           </View>

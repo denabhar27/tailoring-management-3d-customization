@@ -65,7 +65,7 @@ export async function createRental(rentalData, imageFiles) {
     });
 
     if (imageFiles && typeof imageFiles === 'object' && !imageFiles.name) {
-      
+
       if (imageFiles.front_image) {
         formData.append('front_image', imageFiles.front_image);
       }
@@ -76,16 +76,16 @@ export async function createRental(rentalData, imageFiles) {
         formData.append('side_image', imageFiles.side_image);
       }
     } else if (imageFiles && imageFiles.name) {
-      
+
       formData.append('image', imageFiles);
     }
-    
+
     const response = await axios.post(`${BASE_URL}/rentals`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
-    
+
     return response.data;
   } catch (error) {
     console.error("Create rental error:", error);
@@ -107,7 +107,7 @@ export async function updateRental(item_id, rentalData, imageFiles) {
     });
 
     if (imageFiles && typeof imageFiles === 'object' && !imageFiles.name) {
-      
+
       if (imageFiles.front_image) {
         formData.append('front_image', imageFiles.front_image);
       }
@@ -118,16 +118,16 @@ export async function updateRental(item_id, rentalData, imageFiles) {
         formData.append('side_image', imageFiles.side_image);
       }
     } else if (imageFiles && imageFiles.name) {
-      
+
       formData.append('image', imageFiles);
     }
-    
+
     const response = await axios.put(`${BASE_URL}/rentals/${item_id}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
-    
+
     return response.data;
   } catch (error) {
     console.error("Update rental error:", error);
@@ -213,7 +213,7 @@ export async function getRentalCategories() {
 export function getRentalImageUrl(imageUrl) {
   if (!imageUrl) return null;
   if (imageUrl.startsWith('http')) return imageUrl;
-  
+
   const cleanUrl = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
   return `${BASE_URL.replace('/api', '')}${cleanUrl}`;
 }

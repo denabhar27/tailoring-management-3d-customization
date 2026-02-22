@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import '../../styles/Cart.css';
-import { 
-  getUserCart, 
-  addToCart, 
-  updateCartItem, 
-  removeFromCart, 
-  clearCart, 
+import {
+  getUserCart,
+  addToCart,
+  updateCartItem,
+  removeFromCart,
+  clearCart,
   submitCart,
   getCartSummary
 } from '../../api/CartApi';
@@ -25,7 +25,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
   const [submitting, setSubmitting] = useState(false);
   const [orderNotes, setOrderNotes] = useState('');
   const [selectedItems, setSelectedItems] = useState([]);
-  const [expandedDetails, setExpandedDetails] = useState(new Set()); 
+  const [expandedDetails, setExpandedDetails] = useState(new Set());
 
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState('');
@@ -94,21 +94,21 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
     if (isOpen) {
       loadCart();
       loadSummary();
-      
+
       setSelectedItems([]);
     }
   }, [isOpen]);
 
   useEffect(() => {
     if (cartItems.length > 0 && selectedItems.length === 0) {
-      
+
       setSelectedItems(cartItems.map(item => item.cart_id));
     }
   }, [cartItems]);
 
   const toggleItemSelection = (cartId) => {
-    setSelectedItems(prev => 
-      prev.includes(cartId) 
+    setSelectedItems(prev =>
+      prev.includes(cartId)
         ? prev.filter(id => id !== cartId)
         : [...prev, cartId]
     );
@@ -137,7 +137,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
   const loadCart = async () => {
     setLoading(true);
     setError('');
-    
+
     try {
       const result = await getUserCart();
       if (result.success) {
@@ -175,7 +175,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
 
     setLoading(true);
     setError('');
-    
+
     try {
       const result = await removeFromCart(cartId);
       if (result.success) {
@@ -200,7 +200,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
 
     setLoading(true);
     setError('');
-    
+
     try {
       const result = await updateCartItem(cartId, { quantity: newQuantity });
       if (result.success) {
@@ -231,13 +231,13 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
 
     setSubmitting(true);
     setError('');
-    
+
     try {
-      
+
       const result = await submitCart(orderNotes, selectedItems);
       if (result.success) {
         setSuccess('Order submitted successfully!');
-        
+
         setCartItems(prev => prev.filter(item => !selectedItems.includes(item.cart_id)));
         setSelectedItems([]);
         await loadSummary();
@@ -266,7 +266,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
 
     setLoading(true);
     setError('');
-    
+
     try {
       const result = await clearCart();
       if (result.success) {
@@ -349,7 +349,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
       '#ffd700': 'Gold',
       '#c0c0c0': 'Silver',
     };
-    
+
     if (colorMap[normalizedHex]) {
       return colorMap[normalizedHex];
     }
@@ -358,7 +358,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
       const r = parseInt(normalizedHex.slice(1, 3), 16);
       const g = parseInt(normalizedHex.slice(3, 5), 16);
       const b = parseInt(normalizedHex.slice(5, 7), 16);
-      
+
       if (r > 200 && g > 200 && b > 200) return 'Light';
       if (r < 50 && g < 50 && b < 50) return 'Dark';
       if (r > g && r > b) return 'Reddish';
@@ -366,9 +366,9 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
       if (b > r && b > g) return 'Bluish';
       if (r === g && g === b) return 'Gray';
     } catch (e) {
-      
+
     }
-    
+
     return normalizedHex;
   };
 
@@ -409,7 +409,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
       try {
         measurements = JSON.parse(sizeData);
       } catch (e) {
-        
+
         return (
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
             <span style={{ fontWeight: '500', color: '#666' }}>Size</span>
@@ -448,28 +448,28 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
     const measurementRows = [];
     for (const [key, value] of Object.entries(measurements)) {
       const label = measurementLabels[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
-      
+
       if (value && typeof value === 'object') {
-        
+
         const inch = value.inch || value.in || '0';
         const cm = value.cm || (parseFloat(inch) * 2.54).toFixed(2);
         measurementRows.push({ label, inch, cm });
       } else if (value && value !== '0' && value !== '') {
-        
+
         const inch = value;
         const cm = (parseFloat(value) * 2.54).toFixed(2);
         measurementRows.push({ label, inch, cm });
       }
     }
-    
+
     if (measurementRows.length === 0) return null;
-    
+
     return (
       <div style={{ marginTop: '10px' }}>
         <p style={{ fontWeight: '600', color: '#333', marginBottom: '10px', textAlign: 'center' }}>Size:</p>
-        <div style={{ 
-          border: '1px solid #e0e0e0', 
-          borderRadius: '8px', 
+        <div style={{
+          border: '1px solid #e0e0e0',
+          borderRadius: '8px',
           overflow: 'hidden',
           backgroundColor: '#fff'
         }}>
@@ -477,16 +477,16 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
             <tbody>
               {measurementRows.map((row, index) => (
                 <tr key={index} style={{ borderBottom: index < measurementRows.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
-                  <td style={{ 
-                    padding: '10px 15px', 
-                    fontWeight: '500', 
+                  <td style={{
+                    padding: '10px 15px',
+                    fontWeight: '500',
                     color: '#666',
                     width: '40%'
                   }}>
                     {row.label}:
                   </td>
-                  <td style={{ 
-                    padding: '10px 15px', 
+                  <td style={{
+                    padding: '10px 15px',
                     color: '#8B4513',
                     textAlign: 'right'
                   }}>
@@ -539,26 +539,26 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
             <>
               <div className="cart-items">
                 {cartItems.map((item) => {
-                  
+
                   const isBundle = item.specific_data?.is_bundle || item.pricing_factors?.is_bundle;
                   const bundleItems = item.specific_data?.bundle_items || [];
 
-                  const rentalImageUrl = item.service_type === 'rental' 
+                  const rentalImageUrl = item.service_type === 'rental'
                     ? (item.specific_data?.image_url || (bundleItems.length > 0 ? bundleItems[0]?.image_url : null))
                     : null;
 
                   return (
-                  <div 
-                    key={item.cart_id} 
-                    className="cart-item" 
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'flex-start', 
+                  <div
+                    key={item.cart_id}
+                    className="cart-item"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
                       gap: '10px',
                       cursor: item.service_type === 'rental' ? 'pointer' : 'default'
                     }}
                     onClick={
-                      item.service_type === 'rental' 
+                      item.service_type === 'rental'
                         ? (isBundle ? () => openBundleModalWithData(bundleItems, item) : () => openRentalDetailModal(item))
                         : undefined
                     }
@@ -572,8 +572,8 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                     />
                     {item.service_type === 'rental' && rentalImageUrl && (
                       <div style={{ width: '80px', height: '80px', flexShrink: 0 }}>
-                        <img 
-                          src={rentalImageUrl} 
+                        <img
+                          src={rentalImageUrl}
                           alt={item.specific_data?.item_name || 'Rental Item'}
                           style={{
                             width: '100%',
@@ -588,7 +588,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                         />
                       </div>
                     )}
-                    
+
                     <div className="cart-item-info" style={{ flex: 1 }}>
                       <h4>{getServiceTypeDisplay(item.service_type)}</h4>
                       {isBundle && (
@@ -639,9 +639,9 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           <p>Drop off preferred date: {formatDateTo12Hour(item.specific_data.pickupDate) || 'N/A'}</p>
                           {item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
                             <div className="cart-item-image">
-                              <img 
-                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`} 
-                                alt="Damage preview" 
+                              <img
+                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`}
+                                alt="Damage preview"
                                 className="cart-damage-photo clickable-image"
                                 onClick={() => openImagePreview(`${API_BASE_URL}${item.specific_data.imageUrl}`, 'Damage Photo')}
                                 title="Click to enlarge"
@@ -683,9 +683,9 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           <p>Drop off date: {formatDateTo12Hour(item.specific_data.pickupDate) || 'N/A'}</p>
                           {item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
                             <div className="cart-item-image">
-                              <img 
-                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`} 
-                                alt="Clothing preview" 
+                              <img
+                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`}
+                                alt="Clothing preview"
                                 className="cart-damage-photo clickable-image"
                                 onClick={() => openImagePreview(`${API_BASE_URL}${item.specific_data.imageUrl}`, 'Clothing Photo')}
                                 title="Click to enlarge"
@@ -717,15 +717,15 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                                 {['front', 'back', 'right', 'left'].map((angle) => (
                                   item.specific_data.designData.angleImages[angle] && (
                                     <div key={angle} style={{ position: 'relative' }}>
-                                      <img 
-                                        src={item.specific_data.designData.angleImages[angle]} 
+                                      <img
+                                        src={item.specific_data.designData.angleImages[angle]}
                                         alt={`${angle} view`}
                                         className="clickable-image"
                                         onClick={() => openImagePreview(item.specific_data.designData.angleImages[angle], `${angle} view`)}
-                                        style={{ 
-                                          width: '100%', 
-                                          height: 'auto', 
-                                          borderRadius: '6px', 
+                                        style={{
+                                          width: '100%',
+                                          height: 'auto',
+                                          borderRadius: '6px',
                                           border: '2px solid #e0e0e0',
                                           cursor: 'pointer'
                                         }}
@@ -733,13 +733,13 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                                           e.target.style.display = 'none';
                                         }}
                                       />
-                                      <div style={{ 
-                                        position: 'absolute', 
-                                        bottom: '4px', 
-                                        left: '4px', 
-                                        background: 'rgba(0,0,0,0.7)', 
-                                        color: 'white', 
-                                        padding: '2px 6px', 
+                                      <div style={{
+                                        position: 'absolute',
+                                        bottom: '4px',
+                                        left: '4px',
+                                        background: 'rgba(0,0,0,0.7)',
+                                        color: 'white',
+                                        padding: '2px 6px',
                                         borderRadius: '3px',
                                         fontSize: '10px',
                                         textTransform: 'capitalize',
@@ -756,9 +756,9 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           )}
                           {!item.specific_data.designData?.angleImages && item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
                             <div className="cart-item-image" style={{ marginTop: '10px' }}>
-                              <img 
-                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`} 
-                                alt="Design preview" 
+                              <img
+                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`}
+                                alt="Design preview"
                                 className="cart-damage-photo clickable-image"
                                 onClick={() => openImagePreview(`${API_BASE_URL}${item.specific_data.imageUrl}`, 'Design Preview')}
                                 title="Click to enlarge"
@@ -789,7 +789,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                                   {expandedDetails.has(item.cart_id) ? '▼ Hide' : '▶ Show'}
                                 </button>
                               </div>
-                              
+
                               {expandedDetails.has(item.cart_id) ? (
                                 <div>
                                   {item.specific_data.designData.size && (
@@ -842,9 +842,9 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           )}
                           {item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && !item.specific_data.designData?.angleImages && (
                             <div className="cart-item-image">
-                              <img 
-                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`} 
-                                alt="Design preview" 
+                              <img
+                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`}
+                                alt="Design preview"
                                 className="cart-damage-photo clickable-image"
                                 onClick={() => openImagePreview(`${API_BASE_URL}${item.specific_data.imageUrl}`, 'Design Preview')}
                                 title="Click to enlarge"
@@ -857,11 +857,11 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           )}
                         </div>
                       )}
-                      
+
                       {item.appointment_date && (
                         <p>Appointment: {new Date(item.appointment_date).toLocaleDateString()}</p>
                       )}
-                      
+
                       {item.rental_start_date && item.rental_end_date && (
                         <p style={{ color: '#000' }}>
                           Rental: <span style={{ color: '#000', fontWeight: '600' }}>{new Date(item.rental_start_date).toLocaleDateString()}</span> - {' '}
@@ -876,7 +876,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                         <span className="quantity-display">{item.quantity || 1}</span>
                       </div>
 
-                      <button 
+                      <button
                         className="cart-remove-btn"
                         onClick={() => handleRemoveItem(item.cart_id)}
                         disabled={loading}
@@ -896,8 +896,8 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                     cartItems
                       .filter(item => selectedItems.includes(item.cart_id))
                       .reduce((total, item) => {
-                        
-                        const isBundleRental = item.service_type === 'rental' && 
+
+                        const isBundleRental = item.service_type === 'rental' &&
                           (item.specific_data?.is_bundle || item.pricing_factors?.is_bundle);
                         if (isBundleRental) {
                           return total + parseFloat(item.final_price || 0);
@@ -906,7 +906,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                       }, 0)
                   )}</span>
                 </div>
-                
+
                 <div className="cart-notes">
                   <label>Order Notes (optional):</label>
                   <textarea
@@ -918,15 +918,15 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                 </div>
 
                 <div className="cart-actions">
-                  <button 
+                  <button
                     className="cart-clear-btn"
                     onClick={handleClearCart}
                     disabled={loading || submitting}
                   >
                     Clear Cart
                   </button>
-                  
-                  <button 
+
+                  <button
                     className="cart-submit-btn"
                     onClick={handleSubmitOrder}
                     disabled={loading || submitting || selectedItems.length === 0}
@@ -947,8 +947,8 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
       />
       {bundleModalOpen && (
         <div className="cart-overlay" style={{ zIndex: 2000 }} onClick={closeBundleModal}>
-          <div 
-            className="bundle-modal" 
+          <div
+            className="bundle-modal"
             onClick={(e) => e.stopPropagation()}
             style={{
               position: 'fixed',
@@ -988,10 +988,10 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
               </button>
             </div>
             {parentBundleData && (
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(2, 1fr)', 
-                gap: '10px', 
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '10px',
                 marginBottom: '20px',
                 padding: '15px',
                 backgroundColor: '#f8f9fa',
@@ -1025,10 +1025,10 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
             )}
 
             <p style={{ color: '#666', marginBottom: '15px', fontSize: '14px' }}>Click on an item to view details</p>
-            
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
               {bundleItems.map((bundleItem, index) => (
-                <div 
+                <div
                   key={index}
                   style={{
                     border: '1px solid #e0e0e0',
@@ -1096,10 +1096,10 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
               ))}
             </div>
             {parentBundleData && (
-              <div style={{ 
-                marginTop: '20px', 
-                padding: '15px', 
-                backgroundColor: '#fff3cd', 
+              <div style={{
+                marginTop: '20px',
+                padding: '15px',
+                backgroundColor: '#fff3cd',
                 borderRadius: '8px',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -1116,7 +1116,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
       )}
       {bundleItemDetailOpen && selectedBundleItem && (
         <div className="cart-overlay" style={{ zIndex: 2100 }} onClick={closeBundleItemDetail}>
-          <div 
+          <div
             onClick={(e) => e.stopPropagation()}
             style={{
               position: 'fixed',
@@ -1177,21 +1177,21 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                 <span style={{ fontWeight: '500', color: '#666' }}>Item Name</span>
                 <span style={{ fontWeight: '600', color: '#333' }}>{selectedBundleItem.item_name || 'N/A'}</span>
               </div>
-              
+
               {selectedBundleItem.brand && selectedBundleItem.brand !== 'Unknown' && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
                   <span style={{ fontWeight: '500', color: '#666' }}>Brand</span>
                   <span style={{ fontWeight: '600', color: '#333' }}>{selectedBundleItem.brand}</span>
                 </div>
               )}
-              
+
               {selectedBundleItem.color && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
                   <span style={{ fontWeight: '500', color: '#666' }}>Color</span>
                   <span style={{ fontWeight: '600', color: '#333' }}>{selectedBundleItem.color}</span>
                 </div>
               )}
-              
+
               {selectedBundleItem.material && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
                   <span style={{ fontWeight: '500', color: '#666' }}>Material</span>
@@ -1199,7 +1199,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                 </div>
               )}
               {selectedBundleItem.size && renderSizeMeasurements(selectedBundleItem.size)}
-              
+
               {selectedBundleItem.price && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#e8f4e8', borderRadius: '6px', marginTop: '10px' }}>
                   <span style={{ fontWeight: '500', color: '#2d5a3d' }}>Base Price (per 3 days)</span>
@@ -1207,7 +1207,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                 </div>
               )}
             </div>
-            
+
             <button
               onClick={closeBundleItemDetail}
               style={{
@@ -1230,8 +1230,8 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
       )}
       {rentalDetailModalOpen && selectedRentalItem && (
         <div className="cart-overlay" style={{ zIndex: 2000 }} onClick={closeRentalDetailModal}>
-          <div 
-            className="rental-detail-modal" 
+          <div
+            className="rental-detail-modal"
             onClick={(e) => e.stopPropagation()}
             style={{
               position: 'fixed',
@@ -1277,11 +1277,11 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                 selectedRentalItem.specific_data?.side_image && { url: selectedRentalItem.specific_data.side_image, label: 'Side' },
                 selectedRentalItem.specific_data?.image_url && { url: selectedRentalItem.specific_data.image_url, label: 'Main' }
               ].filter(Boolean);
-              
+
               if (rentalImages.length > 0) {
                 return (
                   <div style={{ marginBottom: '20px' }}>
-                    <SimpleImageCarousel 
+                    <SimpleImageCarousel
                       images={rentalImages}
                       itemName={selectedRentalItem.specific_data?.item_name || 'Rental Item'}
                       height="220px"
@@ -1296,21 +1296,21 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                 <span style={{ fontWeight: '500', color: '#666' }}>Item Name</span>
                 <span style={{ fontWeight: '600', color: '#333' }}>{selectedRentalItem.specific_data?.item_name || 'N/A'}</span>
               </div>
-              
+
               {selectedRentalItem.specific_data?.brand && selectedRentalItem.specific_data.brand !== 'Unknown' && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
                   <span style={{ fontWeight: '500', color: '#666' }}>Brand</span>
                   <span style={{ fontWeight: '600', color: '#333' }}>{selectedRentalItem.specific_data.brand}</span>
                 </div>
               )}
-              
+
               {selectedRentalItem.specific_data?.color && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
                   <span style={{ fontWeight: '500', color: '#666' }}>Color</span>
                   <span style={{ fontWeight: '600', color: '#333' }}>{selectedRentalItem.specific_data.color}</span>
                 </div>
               )}
-              
+
               {selectedRentalItem.specific_data?.material && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
                   <span style={{ fontWeight: '500', color: '#666' }}>Material</span>
@@ -1318,27 +1318,27 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                 </div>
               )}
               {selectedRentalItem.specific_data?.size && renderSizeMeasurements(selectedRentalItem.specific_data.size)}
-              
+
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
                 <span style={{ fontWeight: '500', color: '#666' }}>Rental Duration</span>
                 <span style={{ fontWeight: '600', color: '#333' }}>{selectedRentalItem.pricing_factors?.duration || selectedRentalItem.pricing_factors?.rental_days || 'N/A'} days</span>
               </div>
-              
+
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
                 <span style={{ fontWeight: '500', color: '#666' }}>Start Date</span>
                 <span style={{ fontWeight: '600', color: '#333' }}>{selectedRentalItem.rental_start_date ? new Date(selectedRentalItem.rental_start_date).toLocaleDateString() : 'N/A'}</span>
               </div>
-              
+
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
                 <span style={{ fontWeight: '500', color: '#666' }}>End Date</span>
                 <span style={{ fontWeight: '600', color: '#333' }}>{selectedRentalItem.rental_end_date ? new Date(selectedRentalItem.rental_end_date).toLocaleDateString() : 'N/A'}</span>
               </div>
-              
+
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#e8f4e8', borderRadius: '6px' }}>
                 <span style={{ fontWeight: '500', color: '#2d5a3d' }}>Rental Price</span>
                 <span style={{ fontWeight: '700', color: '#2d5a3d', fontSize: '18px' }}>{formatPrice(selectedRentalItem.final_price)}</span>
               </div>
-              
+
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#fff3cd', borderRadius: '6px' }}>
                 <span style={{ fontWeight: '500', color: '#856404' }}>Downpayment (50%)</span>
                 <span style={{ fontWeight: '700', color: '#856404', fontSize: '18px' }}>{formatPrice(selectedRentalItem.pricing_factors?.downpayment || selectedRentalItem.specific_data?.downpayment || 0)}</span>

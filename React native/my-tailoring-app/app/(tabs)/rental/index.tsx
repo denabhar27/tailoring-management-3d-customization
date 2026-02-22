@@ -65,10 +65,10 @@ export default function RentalLanding() {
         setLoading(true);
       }
       setError('');
-      
+
       const result = await rentalService.getAvailableRentals();
       console.log('Rentals fetched:', result);
-      
+
       if (result.items && result.items.length > 0) {
         setRentals(result.items);
       } else {
@@ -97,7 +97,7 @@ export default function RentalLanding() {
         return { uri: imageUrl };
       }
     }
-    
+
     return require("../../../assets/images/rent.jpg");
   };
 
@@ -143,7 +143,7 @@ export default function RentalLanding() {
 
   const calculateBundleDownpayment = () => {
     const totalCost = calculateBundleTotal();
-    return totalCost * 0.5; 
+    return totalCost * 0.5;
   };
 
   useEffect(() => {
@@ -188,7 +188,7 @@ export default function RentalLanding() {
     setAddingToCart(true);
     try {
       const totalCost = calculateBundleTotal();
-      const totalDownpayment = totalCost * 0.5; 
+      const totalDownpayment = totalCost * 0.5;
 
       const bundleItems = selectedItems.map(item => ({
         id: item.item_id || item.id,
@@ -198,6 +198,9 @@ export default function RentalLanding() {
         category: item.category || 'rental',
         downpayment: item.downpayment || 0,
         image_url: rentalService.getImageUrl(item.image_url),
+        front_image: item.front_image ? rentalService.getImageUrl(item.front_image) : null,
+        back_image: item.back_image ? rentalService.getImageUrl(item.back_image) : null,
+        side_image: item.side_image ? rentalService.getImageUrl(item.side_image) : null,
         individual_cost: calculateItemCost(item, bundleDuration)
       }));
 
@@ -232,7 +235,7 @@ export default function RentalLanding() {
       };
 
       const result = await cartService.addToCart(rentalData);
-      
+
       if (result.success) {
         Alert.alert("Success!", `${selectedItems.length} items added to cart as bundle!`, [
           { text: "View Cart", onPress: () => router.push("/(tabs)/cart/Cart") },
@@ -356,10 +359,10 @@ export default function RentalLanding() {
                   isMultiSelectMode && styles.multiSelectButtonActive
                 ]}
               >
-                <Ionicons 
-                  name={isMultiSelectMode ? "close" : "checkbox-outline"} 
-                  size={18} 
-                  color={isMultiSelectMode ? "#fff" : "#78350F"} 
+                <Ionicons
+                  name={isMultiSelectMode ? "close" : "checkbox-outline"}
+                  size={18}
+                  color={isMultiSelectMode ? "#fff" : "#78350F"}
                 />
                 <Text style={[
                   styles.multiSelectButtonText,
@@ -389,7 +392,7 @@ export default function RentalLanding() {
             <Text style={styles.emptyText}>No rentals in this category</Text>
           </View>
         ) : (
-          
+
           <View style={styles.rentalGrid}>
             {filteredRentals.map((item) => {
               const selected = isItemSelected(item);
@@ -415,7 +418,7 @@ export default function RentalLanding() {
                       </View>
                     </View>
                   )}
-                  
+
                   <View style={styles.imageWrapper}>
                     <Image
                       source={getImageSource(item)}
@@ -508,7 +511,7 @@ export default function RentalLanding() {
               </View>
               <View style={styles.dateSection}>
                 <Text style={styles.dateSectionTitle}>Rental Dates *</Text>
-                
+
                 <View style={styles.dateInputGroup}>
                   <Text style={styles.dateLabel}>Start Date</Text>
                   <TouchableOpacity
@@ -574,7 +577,7 @@ export default function RentalLanding() {
               {bundleStartDate && bundleDuration && (
                 <View style={styles.costBreakdown}>
                   <Text style={styles.costBreakdownTitle}>Payment Summary</Text>
-                  
+
                   {selectedItems.map((item, idx) => {
                     const itemCost = calculateItemCost(item, bundleDuration);
                     return (
@@ -588,7 +591,7 @@ export default function RentalLanding() {
                   })}
 
                   <View style={styles.costDivider} />
-                  
+
                   <View style={styles.costTotalRow}>
                     <Text style={styles.costTotalLabel}>Total Downpayment (Due Upon Pickup):</Text>
                     <Text style={styles.costTotalValue}>
@@ -666,9 +669,9 @@ export default function RentalLanding() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push("/(tabs)/cart/Cart")}>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/faq")}>
           <View style={styles.navItemWrap}>
-            <Ionicons name="cart-outline" size={20} color="#9CA3AF" />
+            <Ionicons name="help-circle-outline" size={20} color="#9CA3AF" />
           </View>
         </TouchableOpacity>
 
@@ -1254,7 +1257,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  
+
   policyCard: {
     marginTop: 16,
     marginHorizontal: 20,
@@ -1277,9 +1280,9 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 8,
   },
-  policyText: { 
-    fontSize: 14, 
-    color: "#52525B", 
-    flex: 1 
+  policyText: {
+    fontSize: 14,
+    color: "#52525B",
+    flex: 1
   },
 });

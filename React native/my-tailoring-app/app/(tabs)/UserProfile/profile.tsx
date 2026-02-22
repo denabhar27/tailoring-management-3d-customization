@@ -19,6 +19,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter , useFocusEffect } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { orderStore, Order } from "../../../utils/orderStore";
 import { authService, orderTrackingService, notificationService, measurementsService } from "../../../utils/apiService";
@@ -94,7 +95,7 @@ export default function ProfileScreen() {
       const result = await orderTrackingService.getUserOrderTracking();
       console.log("Orders fetched:", result);
       if (result.success) {
-        
+
         const filteredOrders = result.data.map((order: any) => ({
           ...order,
           items: order.items.filter((item: any) =>
@@ -142,16 +143,16 @@ export default function ProfileScreen() {
       const response = await authService.getProfile();
       if (response && response.user) {
         const userData = response.user;
-        
+
         const fullName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || "User";
-        
+
         setUser({
           name: fullName,
           email: userData.email || "",
           phone: userData.phone_number || "",
         });
       } else {
-        
+
         setUser({
           name: "User",
           email: "user@example.com",
@@ -161,7 +162,7 @@ export default function ProfileScreen() {
     } catch (error) {
       console.error("Error fetching user profile:", error);
       Alert.alert("Error", "Failed to load profile data");
-      
+
       setUser({
         name: "User",
         email: "user@example.com",
@@ -232,9 +233,9 @@ export default function ProfileScreen() {
   };
 
   const getStatusDotClass = (currentStatus: string, stepStatus: string, serviceType: string | null = null) => {
-    
+
     const rentalFlow = ['pending', 'ready_to_pickup', 'ready_for_pickup', 'rented', 'returned', 'completed'];
-    
+
     const defaultFlow = ['pending', 'price_confirmation', 'accepted', 'in_progress', 'ready_to_pickup', 'completed'];
 
     const statusFlow = serviceType === 'rental' ? rentalFlow : defaultFlow;
@@ -253,9 +254,9 @@ export default function ProfileScreen() {
   };
 
   const getTimelineItemClass = (currentStatus: string, stepStatus: string, serviceType: string | null = null) => {
-    
+
     const rentalFlow = ['pending', 'ready_to_pickup', 'ready_for_pickup', 'rented', 'returned', 'completed'];
-    
+
     const defaultFlow = ['pending', 'price_confirmation', 'accepted', 'in_progress', 'ready_to_pickup', 'completed'];
 
     const statusFlow = serviceType === 'rental' ? rentalFlow : defaultFlow;
@@ -285,11 +286,11 @@ export default function ProfileScreen() {
 
   const getEstimatedPrice = (specificData: any, serviceType: string) => {
     if (serviceType === 'repair') {
-      
+
       if (specificData?.estimatedPrice) {
         return specificData.estimatedPrice;
       }
-      
+
       const damageLevel = specificData?.damageLevel;
       const prices: any = {
         'minor': 300,
@@ -326,16 +327,16 @@ export default function ProfileScreen() {
   };
 
   const hasPriceChanged = (specificData: any, finalPrice: number, serviceType: string) => {
-    
+
     if (specificData?.adminPriceUpdated === true) {
       return true;
     }
 
     const estimatedPrice = getEstimatedPrice(specificData, serviceType);
-    
+
     if (estimatedPrice > 0 && specificData?.adminNotes) {
       const difference = Math.abs(finalPrice - estimatedPrice);
-      return difference > 0.01; 
+      return difference > 0.01;
     }
 
     return false;
@@ -351,10 +352,10 @@ export default function ProfileScreen() {
   const handleAcceptPrice = async (item: any) => {
     try {
       const response = await orderTrackingService.acceptPrice(item.order_item_id);
-      
+
       if (response.success) {
         Alert.alert('Success', 'Price accepted! Your order is now accepted.');
-        
+
         fetchOrderTracking();
       } else {
         Alert.alert('Error', response.message || 'Failed to accept price');
@@ -369,10 +370,10 @@ export default function ProfileScreen() {
   const handleDeclinePrice = async (item: any) => {
     try {
       const response = await orderTrackingService.declinePrice(item.order_item_id);
-      
+
       if (response.success) {
         Alert.alert('Success', 'Price declined. Your order has been cancelled.');
-        
+
         fetchOrderTracking();
       } else {
         Alert.alert('Error', response.message || 'Failed to decline price');
@@ -409,20 +410,20 @@ export default function ProfileScreen() {
     }
 
     try {
-      
+
       const nameParts = editedUser.name.trim().split(' ');
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
-      
+
       const updateData = {
         first_name: firstName,
         last_name: lastName,
         email: editedUser.email,
         phone_number: editedUser.phone
       };
-      
+
       const response = await authService.updateProfile(updateData);
-      
+
       if (response.success) {
         setUser(editedUser);
         setEditModalVisible(false);
@@ -455,7 +456,7 @@ export default function ProfileScreen() {
             <Ionicons name="arrow-back" size={24} color="#000" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>My Profile</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.notificationBtn}
             onPress={() => router.push("/notifications")}
           >
@@ -525,10 +526,10 @@ export default function ProfileScreen() {
               <Ionicons name="resize-outline" size={22} color="#94665B" />
               <Text style={styles.measurementsDropdownTitle}>My Measurements</Text>
             </View>
-            <Ionicons 
-              name={measurementsExpanded ? "chevron-up" : "chevron-down"} 
-              size={22} 
-              color="#94665B" 
+            <Ionicons
+              name={measurementsExpanded ? "chevron-up" : "chevron-down"}
+              size={22}
+              color="#94665B"
             />
           </TouchableOpacity>
           {measurementsExpanded && (
@@ -681,14 +682,14 @@ export default function ProfileScreen() {
                 return order.items.map((item: any) => {
                   const estimatedPrice = getEstimatedPrice(item.specific_data, item.service_type);
                   const priceChanged = hasPriceChanged(item.specific_data, parseFloat(item.final_price), item.service_type);
-                  
+
                   const isUniform = (item.service_type === 'customize' || item.service_type === 'customization') && (
                     item.specific_data?.garmentType?.toLowerCase() === 'uniform' ||
                     item.specific_data?.isUniform === true ||
                     item.pricing_factors?.isUniform === true
                   );
                   const finalPrice = parseFloat(item.final_price);
-                  
+
                   return (
                     <View key={`${item.order_id}-${item.order_item_id}`} style={styles.orderCard}>
                       <View style={styles.orderHeader}>
@@ -902,8 +903,12 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <TouchableOpacity
             style={[styles.actionButton, { borderBottomWidth: 0 }]}
-            onPress={() => {
-              router.replace("/login");
+            onPress={async () => {
+              // Clear all auth data
+              await AsyncStorage.removeItem('userToken');
+              await AsyncStorage.removeItem('userRole');
+              await AsyncStorage.removeItem('userData');
+              router.replace("/");
             }}
           >
             <Ionicons name="log-out-outline" size={20} color="#EF4444" />
@@ -1048,9 +1053,9 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push("/(tabs)/cart/Cart")}>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/faq")}>
           <View style={styles.navItemWrap}>
-            <Ionicons name="cart-outline" size={20} color="#9CA3AF" />
+            <Ionicons name="help-circle-outline" size={20} color="#9CA3AF" />
           </View>
         </TouchableOpacity>
 
@@ -1283,7 +1288,7 @@ const styles = StyleSheet.create({
   },
 
   orderCards: {
-    
+
   },
   serviceType: {
     fontSize: 12,
@@ -1361,7 +1366,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   timelineItemCompleted: {
-    
+
   },
   timelineDot: {
     width: 12,
@@ -1490,12 +1495,12 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginBottom: 2,
   },
-  
+
   statusText: {
     fontSize: 12,
     fontWeight: "600",
   },
-  
+
   orderFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1687,19 +1692,19 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 16,
   },
-  
+
   viewDetailsBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
   },
-  
+
   viewDetailsText: {
     fontSize: 14,
     color: "#94665B",
     fontWeight: "600",
   },
-  
+
   serviceDetails: {
     backgroundColor: "#F9FAFB",
     borderRadius: 12,

@@ -12,7 +12,7 @@ import { exportRevenueTrend, exportRevenueComparison, exportBillingData } from '
 import './AnalyticsDashboard.css';
 
 const BillingAnalytics = () => {
-  
+
   const [trendData, setTrendData] = useState([]);
   const [comparisonData, setComparisonData] = useState({ data: [], periodLabel: {} });
 
@@ -30,7 +30,6 @@ const BillingAnalytics = () => {
     comparison: false
   });
 
-  
   const [exportLoading, setExportLoading] = useState({
     trend: false,
     comparison: false,
@@ -38,7 +37,6 @@ const BillingAnalytics = () => {
   });
   const [exportSuccess, setExportSuccess] = useState('');
 
-  
   const handleExport = async (type, exportFn, data, period = null) => {
     setExportLoading(prev => ({ ...prev, [type]: true }));
     try {
@@ -56,7 +54,6 @@ const BillingAnalytics = () => {
     }
   };
 
-  
   const handleExportAll = async () => {
     setExportLoading(prev => ({ ...prev, full: true }));
     try {
@@ -126,7 +123,7 @@ const BillingAnalytics = () => {
   const setQuickDateRange = (preset) => {
     const today = new Date();
     let start, end;
-    
+
     switch (preset) {
       case 'today':
         start = end = format(today, 'yyyy-MM-dd');
@@ -150,7 +147,7 @@ const BillingAnalytics = () => {
       default:
         return;
     }
-    
+
     setDateRange({ startDate: start, endDate: end });
   };
 
@@ -159,8 +156,8 @@ const BillingAnalytics = () => {
   };
 
   const toggleServiceFilter = (service) => {
-    setSelectedServices(prev => 
-      prev.includes(service) 
+    setSelectedServices(prev =>
+      prev.includes(service)
         ? prev.filter(s => s !== service)
         : [...prev, service]
     );
@@ -184,7 +181,7 @@ const BillingAnalytics = () => {
           <h2>Revenue Analytics</h2>
           <p>Revenue trends and performance comparisons</p>
         </div>
-        <button 
+        <button
           className={`export-all-btn ${exportLoading.full ? 'loading' : ''}`}
           onClick={handleExportAll}
           disabled={exportLoading.full || loading}
@@ -226,12 +223,12 @@ const BillingAnalytics = () => {
 
         <div className="filter-group">
           <label>Quick Select</label>
-          <select 
-            value="" 
+          <select
+            value=""
             onChange={(e) => {
               if (e.target.value) {
                 setQuickDateRange(e.target.value);
-                e.target.value = ''; 
+                e.target.value = '';
               }
             }}
             className="analytics-filter-select"
@@ -247,7 +244,7 @@ const BillingAnalytics = () => {
 
         <div className="filter-group">
           <label>Service Type</label>
-          <select 
+          <select
             value={selectedServices.length === 1 ? selectedServices[0] : ''}
             onChange={(e) => {
               const value = e.target.value;
@@ -286,7 +283,7 @@ const BillingAnalytics = () => {
                   <option value="yearly">Yearly</option>
                 </select>
               </div>
-              <button 
+              <button
                 className={`export-btn ${exportLoading.trend ? 'loading' : ''}`}
                 onClick={() => handleExport('trend', exportRevenueTrend, trendData, trendPeriod)}
                 disabled={exportLoading.trend || trendData.length === 0}
@@ -317,7 +314,7 @@ const BillingAnalytics = () => {
                   <option value="yearly">This Year vs Last Year</option>
                 </select>
               </div>
-              <button 
+              <button
                 className={`export-btn ${exportLoading.comparison ? 'loading' : ''}`}
                 onClick={() => handleExport('comparison', exportRevenueComparison, comparisonData.data, comparisonPeriod)}
                 disabled={exportLoading.comparison || !comparisonData.data}
@@ -331,9 +328,9 @@ const BillingAnalytics = () => {
             {chartLoading.comparison ? (
               <div className="chart-loading">Loading...</div>
             ) : (
-              <RevenueComparisonChart 
-                data={comparisonData.data} 
-                periodLabel={comparisonData.periodLabel} 
+              <RevenueComparisonChart
+                data={comparisonData.data}
+                periodLabel={comparisonData.periodLabel}
               />
             )}
           </div>

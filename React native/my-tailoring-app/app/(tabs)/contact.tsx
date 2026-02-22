@@ -26,7 +26,7 @@ export default function ContactSupportScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
         >
@@ -40,7 +40,7 @@ export default function ContactSupportScreen() {
         <Text style={styles.sectionSubtitle}>
           Our support team is here to assist you with any questions or concerns.
         </Text>
-        
+
         <TouchableOpacity style={styles.contactOption} onPress={handleEmail}>
           <View style={[styles.contactIconContainer, { backgroundColor: "#E3F2FD" }]}>
             <Ionicons name="mail-outline" size={28} color="#1976D2" />
@@ -52,7 +52,7 @@ export default function ContactSupportScreen() {
           </View>
           <Ionicons name="chevron-forward" size={24} color="#ccc" />
         </TouchableOpacity>
-        
+
         <TouchableOpacity style={styles.contactOption} onPress={handlePhone}>
           <View style={[styles.contactIconContainer, { backgroundColor: "#E8F5E9" }]}>
             <Ionicons name="call-outline" size={28} color="#388E3C" />
@@ -90,7 +90,7 @@ export default function ContactSupportScreen() {
             41 Rizal Street, Zamboanga City{"\n"}
             7000 Zamboanga del Sur
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.directionsButton}
             onPress={() => Linking.openURL("https://maps.google.com/?q=41+Rizal+Street+Zamboanga+City")}
           >
@@ -98,7 +98,7 @@ export default function ContactSupportScreen() {
             <Text style={styles.directionsButtonText}>Get Directions</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.faqLink}
           onPress={() => router.push("/(tabs)/faq")}
         >
@@ -127,9 +127,9 @@ export default function ContactSupportScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push("/(tabs)/cart/Cart")}>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/faq")}>
           <View style={styles.navItemWrap}>
-            <Ionicons name="cart-outline" size={20} color="#9CA3AF" />
+            <Ionicons name="help-circle-outline" size={20} color="#9CA3AF" />
           </View>
         </TouchableOpacity>
 

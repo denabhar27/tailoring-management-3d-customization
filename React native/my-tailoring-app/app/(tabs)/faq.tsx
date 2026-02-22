@@ -9,6 +9,7 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  Linking,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,13 +43,13 @@ const categories = [
   "Delivery"
 ];
 
-const SearchBar = ({ 
-  value, 
-  onChangeText, 
-  placeholder 
-}: { 
-  value: string; 
-  onChangeText: (text: string) => void; 
+const SearchBar = ({
+  value,
+  onChangeText,
+  placeholder
+}: {
+  value: string;
+  onChangeText: (text: string) => void;
   placeholder: string;
 }) => (
   <View style={styles.searchContainer}>
@@ -68,17 +69,17 @@ const SearchBar = ({
   </View>
 );
 
-const CategoryFilter = ({ 
-  categories, 
-  selectedCategory, 
-  onSelectCategory 
+const CategoryFilter = ({
+  categories,
+  selectedCategory,
+  onSelectCategory
 }: {
   categories: string[];
   selectedCategory: string;
   onSelectCategory: (category: string) => void;
 }) => (
-  <ScrollView 
-    horizontal 
+  <ScrollView
+    horizontal
     showsHorizontalScrollIndicator={false}
     style={styles.categoryContainer}
     contentContainerStyle={styles.categoryContent}
@@ -105,9 +106,9 @@ const CategoryFilter = ({
   </ScrollView>
 );
 
-const FAQItem = ({ 
-  item, 
-  isExpanded, 
+const FAQItem = ({
+  item,
+  isExpanded,
   onToggle,
   onVote,
   userVote,
@@ -121,10 +122,10 @@ const FAQItem = ({
   isVoting: boolean;
 }) => {
   const tags = typeof item.tags === 'string' ? JSON.parse(item.tags) : item.tags || [];
-  
+
   return (
     <View style={styles.faqItem}>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.questionRow}
         onPress={onToggle}
         activeOpacity={0.7}
@@ -133,13 +134,13 @@ const FAQItem = ({
           <Text style={styles.categoryBadge}>{item.category}</Text>
           <Text style={styles.question}>{item.question}</Text>
         </View>
-        <Ionicons 
-          name={isExpanded ? "chevron-up" : "chevron-down"} 
-          size={24} 
-          color="#991b1b" 
+        <Ionicons
+          name={isExpanded ? "chevron-up" : "chevron-down"}
+          size={24}
+          color="#991b1b"
         />
       </TouchableOpacity>
-      
+
       {isExpanded && (
         <View style={styles.answerContainer}>
           <Text style={styles.answer}>{item.answer}</Text>
@@ -153,7 +154,7 @@ const FAQItem = ({
           <View style={styles.helpfulContainer}>
             <Text style={styles.helpfulLabel}>Was this helpful?</Text>
             <View style={styles.helpfulButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
                   styles.helpfulButton,
                   userVote === 'helpful' && styles.helpfulButtonActive
@@ -161,17 +162,17 @@ const FAQItem = ({
                 onPress={() => onVote(true)}
                 disabled={isVoting}
               >
-                <Ionicons 
-                  name={userVote === 'helpful' ? "thumbs-up" : "thumbs-up-outline"} 
-                  size={18} 
-                  color={userVote === 'helpful' ? "#fff" : "#4CAF50"} 
+                <Ionicons
+                  name={userVote === 'helpful' ? "thumbs-up" : "thumbs-up-outline"}
+                  size={18}
+                  color={userVote === 'helpful' ? "#fff" : "#4CAF50"}
                 />
                 <Text style={[
                   styles.helpfulButtonText,
                   userVote === 'helpful' && styles.helpfulButtonTextActive
                 ]}>{item.helpful}</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
                   styles.helpfulButton,
                   userVote === 'not_helpful' && styles.notHelpfulButtonActive
@@ -179,10 +180,10 @@ const FAQItem = ({
                 onPress={() => onVote(false)}
                 disabled={isVoting}
               >
-                <Ionicons 
-                  name={userVote === 'not_helpful' ? "thumbs-down" : "thumbs-down-outline"} 
-                  size={18} 
-                  color={userVote === 'not_helpful' ? "#fff" : "#F44336"} 
+                <Ionicons
+                  name={userVote === 'not_helpful' ? "thumbs-down" : "thumbs-down-outline"}
+                  size={18}
+                  color={userVote === 'not_helpful' ? "#fff" : "#F44336"}
                 />
                 <Text style={[
                   styles.helpfulButtonText,
@@ -248,11 +249,11 @@ export default function FAQScreen() {
   const filteredFAQs = faqs.filter((item) => {
     const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
     const tags = typeof item.tags === 'string' ? JSON.parse(item.tags) : item.tags || [];
-    const matchesSearch = !searchQuery.trim() || 
+    const matchesSearch = !searchQuery.trim() ||
       item.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.answer.toLowerCase().includes(searchQuery.toLowerCase()) ||
       tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-    
+
     return matchesCategory && matchesSearch;
   });
 
@@ -272,9 +273,9 @@ export default function FAQScreen() {
     try {
       setVotingFaqId(faqId);
       const result = await faqService.voteFAQ(faqId, isHelpful);
-      
+
       if (result.success) {
-        
+
         setFaqs((prev) =>
           prev.map((faq) =>
             faq.id === faqId
@@ -289,7 +290,7 @@ export default function FAQScreen() {
             [faqId]: result.data.userVote
           }));
         } else {
-          
+
           setUserVotes((prev) => {
             const newVotes = { ...prev };
             delete newVotes[faqId];
@@ -308,7 +309,7 @@ export default function FAQScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
         >
@@ -323,7 +324,7 @@ export default function FAQScreen() {
           onChangeText={setSearchQuery}
           placeholder="Search for help..."
         />
-        
+
         <CategoryFilter
           categories={categories}
           selectedCategory={selectedCategory}
@@ -357,6 +358,79 @@ export default function FAQScreen() {
             keyExtractor={(item) => item.id.toString()}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.faqList}
+            ListFooterComponent={() => (
+              <View style={styles.contactSection}>
+                <Text style={styles.contactSectionTitle}>Need More Help?</Text>
+                <Text style={styles.contactSectionSubtitle}>
+                  Our support team is here to assist you with any questions or concerns.
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.contactOption}
+                  onPress={() => Linking.openURL("mailto:support@jackmantailor.com?subject=Support Request")}
+                >
+                  <View style={[styles.contactIconContainer, { backgroundColor: "#E3F2FD" }]}>
+                    <Ionicons name="mail-outline" size={24} color="#1976D2" />
+                  </View>
+                  <View style={styles.contactInfo}>
+                    <Text style={styles.contactTitle}>Email Support</Text>
+                    <Text style={styles.contactDetail}>support@jackmantailor.com</Text>
+                    <Text style={styles.contactNote}>Response within 24 hours</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#ccc" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.contactOption}
+                  onPress={() => Linking.openURL("tel:+630629912171")}
+                >
+                  <View style={[styles.contactIconContainer, { backgroundColor: "#E8F5E9" }]}>
+                    <Ionicons name="call-outline" size={24} color="#388E3C" />
+                  </View>
+                  <View style={styles.contactInfo}>
+                    <Text style={styles.contactTitle}>Phone Support</Text>
+                    <Text style={styles.contactDetail}>(062) 991 2171</Text>
+                    <Text style={styles.contactNote}>Mon-Sat, 8AM - 5PM</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#ccc" />
+                </TouchableOpacity>
+
+                <View style={styles.businessHours}>
+                  <View style={styles.businessHoursHeader}>
+                    <Ionicons name="time-outline" size={20} color="#991b1b" />
+                    <Text style={styles.businessHoursTitle}>Business Hours</Text>
+                  </View>
+                  <View style={styles.hoursRow}>
+                    <Text style={styles.dayText}>Monday - Saturday</Text>
+                    <Text style={styles.timeText}>8:00 AM - 5:00 PM</Text>
+                  </View>
+                  <View style={styles.hoursRow}>
+                    <Text style={styles.dayText}>Sunday</Text>
+                    <Text style={styles.timeText}>Closed</Text>
+                  </View>
+                </View>
+
+                <View style={styles.storeLocation}>
+                  <View style={styles.businessHoursHeader}>
+                    <Ionicons name="location-outline" size={20} color="#991b1b" />
+                    <Text style={styles.businessHoursTitle}>Visit Our Store</Text>
+                  </View>
+                  <Text style={styles.addressText}>
+                    Jackman Tailor Deluxe{"\n"}
+                    41 Rizal Street, Zamboanga City{"\n"}
+                    7000 Zamboanga del Sur
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.directionsButton}
+                    onPress={() => Linking.openURL("https://maps.google.com/?q=41+Rizal+Street+Zamboanga+City")}
+                  >
+                    <Ionicons name="navigate-outline" size={18} color="#fff" />
+                    <Text style={styles.directionsButtonText}>Get Directions</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={{ height: 80 }} />
+              </View>
+            )}
           />
         )}
       </View>
@@ -373,11 +447,9 @@ export default function FAQScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push("/(tabs)/cart/Cart")}>
-          <View style={styles.navItemWrap}>
-            <Ionicons name="cart-outline" size={20} color="#9CA3AF" />
-          </View>
-        </TouchableOpacity>
+        <View style={styles.navItemWrapActive}>
+          <Ionicons name="help-circle" size={20} color="#78350F" />
+        </View>
 
         <TouchableOpacity onPress={() => router.push("/(tabs)/UserProfile/profile")}>
           <View style={styles.navItemWrap}>
@@ -640,5 +712,134 @@ const styles = StyleSheet.create({
     backgroundColor: "#FDE68A",
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  // Contact Support Section Styles
+  contactSection: {
+    marginTop: 24,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  contactSectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 8,
+  },
+  contactSectionSubtitle: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  contactOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  contactIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  contactInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  contactTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1F2937",
+  },
+  contactDetail: {
+    fontSize: 14,
+    color: "#4B5563",
+    marginTop: 2,
+  },
+  contactNote: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    marginTop: 2,
+  },
+  businessHours: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  businessHoursHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  businessHoursTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1F2937",
+    marginLeft: 8,
+  },
+  hoursRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  dayText: {
+    fontSize: 14,
+    color: "#4B5563",
+  },
+  timeText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#1F2937",
+  },
+  storeLocation: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  addressText: {
+    fontSize: 14,
+    color: "#4B5563",
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  directionsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#991b1b",
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  directionsButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+    marginLeft: 8,
   },
 });

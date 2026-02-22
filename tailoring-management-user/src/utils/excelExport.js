@@ -1,9 +1,6 @@
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
-
-
-
 const getFormattedDate = () => {
   const now = new Date();
   const year = now.getFullYear();
@@ -12,12 +9,10 @@ const getFormattedDate = () => {
   return `${year}-${month}-${day}`;
 };
 
-
 const formatCurrency = (value) => {
   if (typeof value !== 'number' || isNaN(value)) return '₱0.00';
   return `₱${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
-
 
 const formatDate = (date) => {
   if (!date) return '';
@@ -29,7 +24,6 @@ const formatDate = (date) => {
     day: 'numeric'
   });
 };
-
 
 const getColumnWidths = (data, headers) => {
   const widths = headers.map(header => {
@@ -45,7 +39,6 @@ const getColumnWidths = (data, headers) => {
   return widths;
 };
 
-
 export const exportToExcel = async ({
   data,
   filename,
@@ -58,47 +51,40 @@ export const exportToExcel = async ({
       throw new Error('No data to export');
     }
 
-    
     const formattedData = data.map(row => {
       const formattedRow = {};
       const keys = headers || Object.keys(row);
-      
+
       keys.forEach(key => {
         let value = row[key];
-        
-        
+
         if (columnFormatters[key]) {
           value = columnFormatters[key](value);
-        } else if (typeof value === 'number' && key.toLowerCase().includes('price') || 
-                   key.toLowerCase().includes('amount') || 
+        } else if (typeof value === 'number' && key.toLowerCase().includes('price') ||
+                   key.toLowerCase().includes('amount') ||
                    key.toLowerCase().includes('revenue') ||
                    key.toLowerCase().includes('total')) {
           value = formatCurrency(value);
         } else if (key.toLowerCase().includes('date')) {
           value = formatDate(value);
         }
-        
+
         formattedRow[key] = value;
       });
-      
+
       return formattedRow;
     });
 
-    
     const worksheet = XLSX.utils.json_to_sheet(formattedData);
 
-    
     const keys = headers || Object.keys(data[0]);
     worksheet['!cols'] = getColumnWidths(formattedData, keys);
 
-    
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
-    
     const fullFilename = `${filename}_${getFormattedDate()}.xlsx`;
 
-    
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     saveAs(blob, fullFilename);
@@ -109,7 +95,6 @@ export const exportToExcel = async ({
     throw error;
   }
 };
-
 
 export const exportRevenueTrend = async (data, period = 'daily') => {
   if (!data || data.length === 0) {
@@ -134,7 +119,6 @@ export const exportRevenueTrend = async (data, period = 'daily') => {
   });
 };
 
-
 export const exportServiceRevenue = async (data) => {
   if (!data || data.length === 0) {
     throw new Error('No service revenue data to export');
@@ -149,7 +133,6 @@ export const exportServiceRevenue = async (data) => {
     'Orders': item.orders || item.count || 0
   }));
 
-  
   formattedData.push({
     'Service': 'TOTAL',
     'Revenue': total,
@@ -166,7 +149,6 @@ export const exportServiceRevenue = async (data) => {
     }
   });
 };
-
 
 export const exportTopServices = async (data) => {
   if (!data || data.length === 0) {
@@ -192,7 +174,6 @@ export const exportTopServices = async (data) => {
   });
 };
 
-
 export const exportRevenueComparison = async (data, periodLabel = '') => {
   if (!data) {
     throw new Error('No comparison data to export');
@@ -216,7 +197,7 @@ export const exportRevenueComparison = async (data, periodLabel = '') => {
       'Current Period': data.currentRevenue || data.current || 0,
       'Previous Period': data.previousRevenue || data.previous || 0,
       'Change': (data.currentRevenue || data.current || 0) - (data.previousRevenue || data.previous || 0),
-      'Change %': data.previousRevenue > 0 ? 
+      'Change %': data.previousRevenue > 0 ?
         `${(((data.currentRevenue - data.previousRevenue) / data.previousRevenue) * 100).toFixed(2)}%` : 'N/A'
     });
   }
@@ -232,7 +213,6 @@ export const exportRevenueComparison = async (data, periodLabel = '') => {
     }
   });
 };
-
 
 export const exportBillingData = async (data) => {
   if (!data || data.length === 0) {
@@ -260,55 +240,46 @@ export const exportBillingData = async (data) => {
   });
 };
 
-
 export const exportFullAnalytics = async (analyticsData) => {
   try {
     const workbook = XLSX.utils.book_new();
 
-    
     const serviceData = analyticsData.serviceData || [];
-    
+
     if (serviceData.length === 0) {
       throw new Error('No analytics data to export');
     }
 
-    
     const totalRevenue = serviceData.reduce((sum, item) => {
       return sum + (parseFloat(item.revenue) || 0);
     }, 0);
-    
-    
+
     const totalOrders = serviceData.reduce((sum, item) => {
       return sum + (parseInt(item.orderCount) || parseInt(item.order_count) || 0);
     }, 0);
 
-    
     const sortedData = [...serviceData].sort((a, b) => {
       const revenueA = parseFloat(a.revenue) || 0;
       const revenueB = parseFloat(b.revenue) || 0;
       return revenueB - revenueA;
     });
 
-    
     const excelData = [];
 
-    
     excelData.push(['REVENUE BY SERVICE TYPE & TOP PERFORMING SERVICES']);
     excelData.push([`Report Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`]);
     excelData.push([`Period: ${analyticsData.summary?.period || 'All Time'}`]);
-    excelData.push([]); 
-    
-    
+    excelData.push([]);
+
     excelData.push(['Rank', 'Service Name', 'Percentage (%)', 'Revenue', 'Number of Orders']);
-    
-    
+
     sortedData.forEach((item, index) => {
       const revenue = parseFloat(item.revenue) || 0;
       const orders = parseInt(item.orderCount) || parseInt(item.order_count) || parseInt(item.orders) || 0;
-      
+
       const serviceName = item.serviceType || item.service_type || item.service || item.label || item.name || 'Unknown';
       const percentage = item.percentage || (totalRevenue > 0 ? ((revenue / totalRevenue) * 100).toFixed(2) : '0.00');
-      
+
       excelData.push([
         index + 1,
         serviceName,
@@ -318,10 +289,8 @@ export const exportFullAnalytics = async (analyticsData) => {
       ]);
     });
 
-    
     excelData.push([]);
-    
-    
+
     excelData.push([
       '',
       'TOTAL',
@@ -330,31 +299,26 @@ export const exportFullAnalytics = async (analyticsData) => {
       totalOrders
     ]);
 
-    
     const worksheet = XLSX.utils.aoa_to_sheet(excelData);
 
-    
     worksheet['!cols'] = [
-      { wch: 8 },   
-      { wch: 20 },  
-      { wch: 15 },  
-      { wch: 18 },  
-      { wch: 18 }   
+      { wch: 8 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 18 },
+      { wch: 18 }
     ];
 
-    
     worksheet['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, 
-      { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } }, 
-      { s: { r: 2, c: 0 }, e: { r: 2, c: 4 } }  
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: 4 } }
     ];
 
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Service Analytics');
 
-    
     const fullFilename = `Service_Analytics_Report_${getFormattedDate()}.xlsx`;
 
-    
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     saveAs(blob, fullFilename);

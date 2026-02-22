@@ -3,7 +3,6 @@ import { API_URL } from './config';
 
 const BASE_URL = API_URL;
 
-
 const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
   return {
@@ -11,7 +10,6 @@ const getAuthHeaders = () => {
     "Content-Type": "application/json",
   };
 };
-
 
 export async function getAdminDashboardOverview() {
   try {
@@ -21,11 +19,11 @@ export async function getAdminDashboardOverview() {
     return response.data;
   } catch (error) {
     console.error("Get admin dashboard error:", error);
-    // Return a more detailed error message
-    const errorMessage = error.response?.data?.message || 
-                         error.message || 
+
+    const errorMessage = error.response?.data?.message ||
+                         error.message ||
                          "Error fetching admin dashboard data";
-    
+
     return {
       success: false,
       message: errorMessage,

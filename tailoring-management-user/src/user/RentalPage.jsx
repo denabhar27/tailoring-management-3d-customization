@@ -5,7 +5,7 @@ import '../styles/RentalPage.css';
 
 const RentalPage = () => {
   const navigate = useNavigate();
-  
+
   const openAuthModal = () => {
 
     console.log('Rental action triggered');

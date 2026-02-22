@@ -7,10 +7,10 @@ const REQUEST_TIMEOUT = parseInt(process.env.EXPO_PUBLIC_REQUEST_TIMEOUT || '100
 
 export const uploadRepairImage = async (formData: FormData) => {
   const token = await AsyncStorage.getItem('userToken');
-  
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-  
+
   try {
     const response = await fetch(`${API_BASE_URL}/repair/upload-image`, {
       method: 'POST',
@@ -29,7 +29,7 @@ export const uploadRepairImage = async (formData: FormData) => {
 };
 
 export const addRepairToCart = async (repairData: any) => {
-  
+
   const cartData = {
     serviceType: repairData.serviceType || 'repair',
     serviceId: repairData.serviceId || 1,
@@ -46,7 +46,7 @@ export const addRepairToCart = async (repairData: any) => {
       pickupDate: repairData.pickupDate,
       imageUrl: repairData.imageUrl,
       estimatedTime: repairData.estimatedTime,
-      ...repairData 
+      ...repairData
     },
     rentalDates: repairData.rentalDates || null
   };

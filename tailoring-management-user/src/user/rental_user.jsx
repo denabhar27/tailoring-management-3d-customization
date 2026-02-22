@@ -41,7 +41,7 @@ export default function ClothingRentalStore() {
       <header className="fixed top-0 left-0 w-full bg-white bg-opacity-95 shadow-lg z-50 px-8 py-6">
         <div className="flex justify-between items-center">
           <div className="text-2xl font-bold text-amber-900">RentStyle</div>
-          
+
           <nav className="hidden md:flex gap-8">
             <a href="#" className="text-gray-600 hover:text-amber-900 font-medium text-lg">Home</a>
             <a href="#" className="text-gray-600 hover:text-amber-900 font-medium text-lg">Services</a>
@@ -64,7 +64,7 @@ export default function ClothingRentalStore() {
             </div>
           </div>
 
-          <button 
+          <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="md:hidden ml-4"
           >
@@ -95,7 +95,7 @@ export default function ClothingRentalStore() {
       </section>
       <section className="px-8 py-12 bg-amber-50">
         <h2 className="text-3xl font-bold text-gray-900 mb-8">Rental Clothes</h2>
-        
+
         <div className="relative">
           {scrollIndex > 0 && (
             <button
@@ -116,8 +116,8 @@ export default function ClothingRentalStore() {
               >
                 <div className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-2xl hover:scale-105 transition">
                   <div className="relative h-80 overflow-hidden">
-                    <img 
-                      src={item.image} 
+                    <img
+                      src={item.image}
                       alt={item.name}
                       className="w-full h-full object-cover"
                     />

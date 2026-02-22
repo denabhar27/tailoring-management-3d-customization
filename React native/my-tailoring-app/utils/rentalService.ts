@@ -1,7 +1,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL as MAIN_API_URL } from './apiService';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.202:5000/api';
+const API_BASE_URL = MAIN_API_URL;
 const REQUEST_TIMEOUT = parseInt(process.env.EXPO_PUBLIC_REQUEST_TIMEOUT || '10000', 10);
 
 const getAuthHeaders = async () => {
@@ -16,7 +17,7 @@ const rentalApiCall = async (endpoint: string, options: RequestInit = {}) => {
   try {
     const url = `${API_BASE_URL}${endpoint}`;
     const headers = await getAuthHeaders();
-    
+
     const config: RequestInit = {
       ...options,
       headers: {
@@ -29,13 +30,13 @@ const rentalApiCall = async (endpoint: string, options: RequestInit = {}) => {
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-    
+
     try {
       const response = await fetch(url, { ...config, signal: controller.signal });
       clearTimeout(timeoutId);
-      
+
       console.log('Rental API Response Status:', response.status);
-      
+
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         try {
@@ -47,7 +48,7 @@ const rentalApiCall = async (endpoint: string, options: RequestInit = {}) => {
         }
         throw new Error(errorMessage);
       }
-      
+
       const result = await response.json();
       console.log('Rental API Success Result:', result);
       return result;
@@ -65,7 +66,7 @@ const rentalApiCall = async (endpoint: string, options: RequestInit = {}) => {
 };
 
 export const rentalService = {
-  
+
   getAvailableRentals: async () => {
     return rentalApiCall('/rentals/available');
   },

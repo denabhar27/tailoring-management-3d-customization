@@ -44,11 +44,11 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      
+
       const response = await authService.login(email, password);
-      
+
       if (response.token) {
-        
+
         await AsyncStorage.setItem('userToken', response.token);
         await AsyncStorage.setItem('userRole', response.role);
         await AsyncStorage.setItem('userData', JSON.stringify(response.user));
@@ -66,7 +66,7 @@ export default function LoginScreen() {
   };
 
   if (!fontsLoaded) {
-    return null; 
+    return null;
   }
 
   return (
@@ -78,8 +78,8 @@ export default function LoginScreen() {
         <View style={styles.container}>
           <View style={styles.card}>
             <View style={styles.header}>
-              <Image 
-                source={require("../../assets/images/logo copy.png")} 
+              <Image
+                source={require("../../assets/images/logo copy.png")}
                 style={styles.logo}
                 resizeMode="contain"
               />

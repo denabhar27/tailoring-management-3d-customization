@@ -11,7 +11,7 @@ import {
 import './AnalyticsDashboard.css';
 
 const AdminAnalytics = () => {
-  
+
   const [serviceData, setServiceData] = useState([]);
   const [topServices, setTopServices] = useState([]);
 
@@ -50,7 +50,7 @@ const AdminAnalytics = () => {
   const setQuickDateRange = (preset) => {
     const today = new Date();
     let start, end;
-    
+
     switch (preset) {
       case 'today':
         start = end = format(today, 'yyyy-MM-dd');
@@ -74,7 +74,7 @@ const AdminAnalytics = () => {
       default:
         return;
     }
-    
+
     setDateRange({ startDate: start, endDate: end });
   };
 
@@ -119,12 +119,12 @@ const AdminAnalytics = () => {
 
         <div className="filter-group">
           <label>Quick Select</label>
-          <select 
-            value="" 
+          <select
+            value=""
             onChange={(e) => {
               if (e.target.value) {
                 setQuickDateRange(e.target.value);
-                e.target.value = ''; 
+                e.target.value = '';
               }
             }}
             className="analytics-filter-select"

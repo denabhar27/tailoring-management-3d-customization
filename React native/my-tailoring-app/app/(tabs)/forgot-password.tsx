@@ -26,18 +26,15 @@ type Step = "forgot" | "verify" | "reset" | "success";
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  
-  // Current step
+
   const [step, setStep] = useState<Step>("forgot");
-  
-  // Form data
+
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resetToken, setResetToken] = useState("");
-  
-  // UI states
+
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -49,7 +46,6 @@ export default function ForgotPasswordScreen() {
     Poppins_700Bold,
   });
 
-  // Resend cooldown timer
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     if (resendCooldown > 0) {
@@ -58,7 +54,6 @@ export default function ForgotPasswordScreen() {
     return () => clearTimeout(timer);
   }, [resendCooldown]);
 
-  // Validate password
   const validatePassword = (password: string) => {
     if (!password) {
       return { isValid: false, message: "Password is required" };
@@ -73,7 +68,6 @@ export default function ForgotPasswordScreen() {
     return { isValid: true, message: "" };
   };
 
-  // Step 1: Request security code
   const handleForgotPassword = async () => {
     if (!usernameOrEmail.trim()) {
       Alert.alert("Error", "Please enter your username or email");
@@ -83,7 +77,7 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     try {
       const result = await authService.forgotPassword(usernameOrEmail.trim());
-      
+
       if (result.success) {
         Alert.alert("Success", "Security code sent! Check your email.");
         setStep("verify");
@@ -98,7 +92,6 @@ export default function ForgotPasswordScreen() {
     }
   };
 
-  // Step 2: Verify security code
   const handleVerifyCode = async () => {
     if (!code.trim()) {
       Alert.alert("Error", "Please enter the security code");
@@ -113,7 +106,7 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     try {
       const result = await authService.verifyResetCode(code.trim(), usernameOrEmail);
-      
+
       if (result.success && result.resetToken) {
         setResetToken(result.resetToken);
         Alert.alert("Success", "Code verified! Enter your new password.");
@@ -128,7 +121,6 @@ export default function ForgotPasswordScreen() {
     }
   };
 
-  // Step 3: Reset password
   const handleResetPassword = async () => {
     if (!newPassword || !confirmPassword) {
       Alert.alert("Error", "Please enter and confirm your new password");
@@ -149,7 +141,7 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     try {
       const result = await authService.resetPassword(resetToken, newPassword, confirmPassword);
-      
+
       if (result.success) {
         setStep("success");
       } else {
@@ -162,14 +154,13 @@ export default function ForgotPasswordScreen() {
     }
   };
 
-  // Resend code
   const handleResendCode = async () => {
     if (resendCooldown > 0) return;
 
     setLoading(true);
     try {
       const result = await authService.resendResetCode(usernameOrEmail);
-      
+
       if (result.success) {
         Alert.alert("Success", "New security code sent!");
         setResendCooldown(60);
@@ -183,7 +174,6 @@ export default function ForgotPasswordScreen() {
     }
   };
 
-  // Handle code input (auto-format)
   const handleCodeChange = (text: string) => {
     const value = text.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
     if (value.length <= 6) {
@@ -195,7 +185,6 @@ export default function ForgotPasswordScreen() {
     return null;
   }
 
-  // Render step indicator
   const renderStepIndicator = () => (
     <View style={styles.stepIndicator}>
       <View style={[styles.step, step !== "forgot" ? styles.stepCompleted : styles.stepActive]}>
@@ -203,7 +192,7 @@ export default function ForgotPasswordScreen() {
       </View>
       <View style={[styles.stepLine, step !== "forgot" && styles.stepLineCompleted]} />
       <View style={[
-        styles.step, 
+        styles.step,
         step === "verify" && styles.stepActive,
         (step === "reset" || step === "success") && styles.stepCompleted
       ]}>

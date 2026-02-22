@@ -81,7 +81,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (garmentResponse.ok) {
         const garmentData = await garmentResponse.json();
         if (garmentData.success && garmentData.garments && garmentData.garments.length > 0) {
@@ -101,7 +101,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (fabricResponse.ok) {
         const fabricData = await fabricResponse.json();
         if (fabricData.success && fabricData.fabrics && fabricData.fabrics.length > 0) {
@@ -115,7 +115,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
       }
     } catch (error) {
       console.log('Error loading types from API:', error);
-      
+
     } finally {
       setLoadingTypes(false);
     }
@@ -166,7 +166,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
   };
 
   const handleOpen3DCustomizer = () => {
-    
+
     onClose();
     router.push('/(tabs)/appointment/Customizer3D');
   };
@@ -204,7 +204,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
           imageUrl = uploadResponse.imageUrl || uploadResponse.data?.imageUrl || imageUrl;
         } catch (uploadError) {
           console.error('Image upload failed:', uploadError);
-          
+
         }
       }
 
@@ -264,11 +264,11 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
             </TouchableOpacity>
           </View>
 
-          <ScrollView 
+          <ScrollView
             style={styles.content}
             showsVerticalScrollIndicator={false}
           >
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.banner3D}
               onPress={handleOpen3DCustomizer}
               activeOpacity={0.8}

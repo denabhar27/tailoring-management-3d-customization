@@ -12,19 +12,19 @@ declare const ErrorUtils: {
 
 export default function RootLayout() {
   useEffect(() => {
-    
+
     SystemUI.setBackgroundColorAsync('#ffffff');
 
     const originalErrorHandler = ErrorUtils.getGlobalHandler();
     ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
-      
+
       if (error?.message?.includes('Failed to download remote update') ||
           error?.message?.includes('java.io.IOException') ||
           error?.message?.includes('remote update')) {
         console.warn('Update check failed (ignored):', error.message);
-        return; 
+        return;
       }
-      
+
       if (originalErrorHandler) {
         originalErrorHandler(error, isFatal);
       }
@@ -37,10 +37,10 @@ export default function RootLayout() {
           error?.message?.includes('java.io.IOException') ||
           error?.message?.includes('remote update')) {
         console.warn('Update check promise rejection (ignored):', error?.message);
-        event?.preventDefault?.(); 
+        event?.preventDefault?.();
         return;
       }
-      
+
       if (originalUnhandledRejection) {
         originalUnhandledRejection(event);
       }

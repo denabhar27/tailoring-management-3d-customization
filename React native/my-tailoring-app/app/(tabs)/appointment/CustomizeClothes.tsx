@@ -47,7 +47,7 @@ export default function CustomizeClothes() {
   const handleDateConfirm = (selectedDate: Date) => {
     setPreferredDate(selectedDate);
     setShowDatePicker(false);
-    // Show time picker after date is selected
+
     setTimeout(() => setShowTimePicker(true), 300);
   };
 
@@ -95,12 +95,12 @@ export default function CustomizeClothes() {
     }
 
     setLoading(true);
-    
+
     try {
-      // Prepare customize data for backend
+
       const customizeData = {
         serviceType: 'customize',
-        serviceId: 2, // Assuming customize service ID is 2
+        serviceId: 2,
         serviceName: `Custom ${garmentCategory}`,
         basePrice: getPriceForGarment(garmentCategory).toString(),
         finalPrice: getPriceForGarment(garmentCategory).toString(),
@@ -116,7 +116,7 @@ export default function CustomizeClothes() {
       };
 
       const result = await cartService.addToCart(customizeData);
-      
+
       if (result.success) {
         Alert.alert("Success!", "Customize service added to cart!", [
           {
@@ -134,7 +134,7 @@ export default function CustomizeClothes() {
     } catch (error: any) {
       console.error("Add service error:", error);
       Alert.alert(
-        "Error", 
+        "Error",
         error.message || "Failed to add customize service. Please try again."
       );
     } finally {
@@ -148,7 +148,7 @@ export default function CustomizeClothes() {
         style={styles.container}
         contentContainerStyle={{ paddingBottom: height * 0.2 }}
       >
-       
+
         <View style={styles.header}>
           <Image
             source={require("../../../assets/images/logo.png")}
@@ -160,8 +160,7 @@ export default function CustomizeClothes() {
           </TouchableOpacity>
         </View>
 
-        {/* 3D Customizer Button */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.customizer3DButton}
           onPress={() => router.push("/(tabs)/appointment/Customizer3D")}
         >
@@ -177,14 +176,12 @@ export default function CustomizeClothes() {
           </View>
         </TouchableOpacity>
 
-        {/* Divider */}
         <View style={styles.dividerContainer}>
           <View style={styles.dividerLine} />
           <Text style={styles.dividerText}>OR</Text>
           <View style={styles.dividerLine} />
         </View>
 
-        
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>
@@ -192,7 +189,6 @@ export default function CustomizeClothes() {
             </Text>
           </View>
 
-          {/* 3D Customizer Button */}
           <TouchableOpacity
             style={styles.customizer3DButton}
             onPress={() => router.push("/(tabs)/appointment/Customizer3D")}
@@ -209,14 +205,12 @@ export default function CustomizeClothes() {
             </View>
           </TouchableOpacity>
 
-          {/* Divider with OR text */}
           <View style={styles.dividerContainer}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>OR use form below</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          
           {step === 1 && (
             <View style={styles.section}>
               <Text style={styles.label}>Garment Category</Text>
@@ -264,7 +258,6 @@ export default function CustomizeClothes() {
             </View>
           )}
 
-          
           {step === 2 && (
             <View style={styles.section}>
               <Text style={styles.label}>Design Pattern</Text>
@@ -306,7 +299,7 @@ export default function CustomizeClothes() {
               <TextInput placeholder="Enter your size details" style={styles.input} value={sizeMeasurement} onChangeText={setSizeMeasurement} />
 
               <Text style={styles.label}>Preferred Date & Time *</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.dateTimeButton}
                 onPress={() => setShowDatePicker(true)}
               >
@@ -354,7 +347,6 @@ export default function CustomizeClothes() {
         </View>
       </ScrollView>
 
-     
       <View style={styles.bottomNav}>
         <TouchableOpacity onPress={() => router.push("../home")}>
           <Ionicons name="home-outline" size={22} color="#777" />
@@ -362,8 +354,8 @@ export default function CustomizeClothes() {
         <View style={styles.navItemWrapActive}>
           <Ionicons name="cut" size={22} color="#7A5A00" />
         </View>
-        <TouchableOpacity onPress={() => router.push("/(tabs)/cart/Cart")}>
-          <Ionicons name="cart-outline" size={22} color="#777" />
+        <TouchableOpacity onPress={() => router.push("/(tabs)/faq")}>
+          <Ionicons name="help-circle-outline" size={22} color="#777" />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push("/(tabs)/UserProfile/profile")}>
           <Ionicons name="person-outline" size={22} color="#777" />

@@ -58,16 +58,16 @@ const CartExample = () => {
 
       if (service.serviceType === 'rental') {
         itemData.rentalDates = {
-          startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
-          endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] 
+          startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
         };
       }
 
       const result = await addToCart(itemData);
-      
+
       if (result.success) {
         setMessage(`✅ ${service.name} added to cart!`);
-        setCartOpen(true); 
+        setCartOpen(true);
       } else {
         setMessage(`❌ Error: ${result.message}`);
       }
@@ -130,7 +130,7 @@ const CartExample = () => {
             <h3>{service.name}</h3>
             <p><strong>Type:</strong> {service.serviceType}</p>
             <p><strong>Price:</strong> ₱{parseFloat(service.finalPrice).toFixed(2)}</p>
-            
+
             <button
               onClick={() => handleAddToCart(service)}
               disabled={loading}
@@ -161,7 +161,7 @@ const CartExample = () => {
           <li>Try removing items or clearing the cart</li>
           <li>Submit the order to test the full flow</li>
         </ol>
-        
+
         <h4 style={{ marginTop: '20px' }}>Features to Test:</h4>
         <ul style={{ lineHeight: '1.6' }}>
           <li>✅ Add items to cart</li>
@@ -174,8 +174,8 @@ const CartExample = () => {
           <li>✅ Error handling and loading states</li>
         </ul>
       </div>
-      <Cart 
-        isOpen={cartOpen} 
+      <Cart
+        isOpen={cartOpen}
         onClose={() => setCartOpen(false)}
         onCartUpdate={handleCartUpdate}
       />

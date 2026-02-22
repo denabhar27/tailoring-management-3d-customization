@@ -18,7 +18,7 @@ function CustomModelContent({ modelUrl, materialProps, fabricColor, onLoad, map,
   useLayoutEffect(() => {
     if (clonedScene) {
       console.log('Applying materials to custom model, pattern:', pattern, 'hasMap:', !!map);
-      
+
       clonedScene.traverse((child) => {
         if (child.isMesh) {
           if (child.material && child.material.dispose) {
@@ -29,7 +29,7 @@ function CustomModelContent({ modelUrl, materialProps, fabricColor, onLoad, map,
               ...materialProps,
               color: fabricColor.clone(),
               sheenColor: fabricColor.clone(),
-              map: map, 
+              map: map,
               needsUpdate: true
             });
             newMaterial.needsUpdate = true;
@@ -39,7 +39,7 @@ function CustomModelContent({ modelUrl, materialProps, fabricColor, onLoad, map,
           child.receiveShadow = true;
         }
       });
-      
+
       clonedScene.rotation.y = -Math.PI / 2;
       if (onLoad) {
         onLoad(clonedScene);
@@ -82,7 +82,7 @@ export default function CustomModelLoader({ modelUrl, onLoad, materialProps, fab
 
   return (
     <Suspense fallback={<ModelLoadingFallback />}>
-      <CustomModelContent 
+      <CustomModelContent
         modelUrl={modelUrl}
         materialProps={materialProps}
         fabricColor={fabricColor}

@@ -98,7 +98,7 @@ const TransactionLogModal = ({ isOpen, onClose, orderItemId }) => {
                       <span className="amount-value">₱{parseFloat(log.amount || 0).toLocaleString()}</span>
                     </div>
                   </div>
-                  
+
                   <div className="transaction-log-details">
                     <div className="transaction-detail-row">
                       <span className="detail-label">Date:</span>

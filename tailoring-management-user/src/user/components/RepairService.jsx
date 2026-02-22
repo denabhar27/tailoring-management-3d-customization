@@ -20,25 +20,25 @@ const RepairService = ({ openAuthModal, showAll = false }) => {
   const navigate = useNavigate();
 
   const fallbackServices = [
-    { 
-      service_id: 1, 
-      service_name: 'Minor Stitch Repair', 
+    {
+      service_id: 1,
+      service_name: 'Minor Stitch Repair',
       description: 'Fix small tears and loose threads',
       base_price: '300.00',
       damage_level: 'minor',
       estimated_time: '2-3 days'
     },
-    { 
-      service_id: 2, 
-      service_name: 'Zipper Repair', 
+    {
+      service_id: 2,
+      service_name: 'Zipper Repair',
       description: 'Fix broken or stuck zippers',
       base_price: '500.00',
       damage_level: 'moderate',
       estimated_time: '3-4 days'
     },
-    { 
-      service_id: 3, 
-      service_name: 'Major Tear Repair', 
+    {
+      service_id: 3,
+      service_name: 'Major Tear Repair',
       description: 'Fix large tears and structural damage',
       base_price: '800.00',
       damage_level: 'major',
@@ -56,13 +56,13 @@ const RepairService = ({ openAuthModal, showAll = false }) => {
       if (result.success && result.data.length > 0) {
         setRepairServices(result.data);
       } else {
-        
+
         setRepairServices(fallbackServices);
         console.log('Using fallback repair services');
       }
     } catch (error) {
       console.error('Error fetching repair services:', error);
-      
+
       setRepairServices(fallbackServices);
     } finally {
       setLoading(false);
@@ -71,7 +71,7 @@ const RepairService = ({ openAuthModal, showAll = false }) => {
 
   const calculateEstimatedPrice = (level, service) => {
     if (!level || !service) return 0;
-    
+
     const basePrice = parseFloat(service.base_price || '0');
     let priceMultiplier = 1;
 
@@ -91,7 +91,7 @@ const RepairService = ({ openAuthModal, showAll = false }) => {
       default:
         priceMultiplier = 1.0;
     }
-    
+
     return basePrice * priceMultiplier;
   };
 
@@ -127,7 +127,7 @@ const RepairService = ({ openAuthModal, showAll = false }) => {
       console.error('Upload error:', error);
       setCartMessage('❌ Failed to upload image');
     }
-    
+
     setTimeout(() => setCartMessage(''), 3000);
   };
 
@@ -163,10 +163,10 @@ const RepairService = ({ openAuthModal, showAll = false }) => {
       };
 
       const result = await addRepairToCart(repairData);
-      
+
       if (result.success) {
         setCartMessage(`✅ ${selectedService.service_name} added to cart!`);
-        
+
         setTimeout(() => {
           setIsModalOpen(false);
           setSelectedService(null);
@@ -218,7 +218,7 @@ const RepairService = ({ openAuthModal, showAll = false }) => {
         <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ margin: 0 }}>Repair Services</h2>
         </div>
-        
+
         <div className="repair-grid">
           {displayServices.map((service) => (
             <div key={service.service_id} className="repair-card">
@@ -232,8 +232,8 @@ const RepairService = ({ openAuthModal, showAll = false }) => {
                   <span className="repair-time">⏱️ {service.estimated_time || '2-3 days'}</span>
                   <span className="repair-price">From {formatPrice(service.base_price)}</span>
                 </div>
-                <button 
-                  className="btn-repair" 
+                <button
+                  className="btn-repair"
                   onClick={() => openModal(service)}
                 >
                   Get Repair Quote
@@ -243,17 +243,17 @@ const RepairService = ({ openAuthModal, showAll = false }) => {
           ))}
         </div>
         {!showAll && repairServices.length > 3 && (
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
             marginTop: '20px',
             marginBottom: '10px'
           }}>
-            <span 
-              onClick={() => navigate('/repairs')} 
-              style={{ 
-                color: '#888', 
-                cursor: 'pointer', 
+            <span
+              onClick={() => navigate('/repairs')}
+              style={{
+                color: '#888',
+                cursor: 'pointer',
                 fontSize: '14px',
                 fontWeight: '500',
                 display: 'flex',
@@ -373,8 +373,8 @@ const RepairService = ({ openAuthModal, showAll = false }) => {
                 <button className="btn-cancel" onClick={closeModal}>
                   Cancel
                 </button>
-                <button 
-                  className="btn-add-cart" 
+                <button
+                  className="btn-add-cart"
                   onClick={handleAddToCart}
                   disabled={!damageLevel || !damageDescription || !damageLocation || !pickupDate || !uploadedImage || addingToCart}
                 >

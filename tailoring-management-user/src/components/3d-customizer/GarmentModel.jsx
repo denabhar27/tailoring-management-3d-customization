@@ -21,39 +21,39 @@ const logModelLoad = (name, scene) => {
 
 function makeProceduralPattern(type, base, accent, repeatX = 2, repeatY = 2) {
   const c = document.createElement('canvas');
-  
+
   c.width = 512; c.height = 512;
   const ctx = c.getContext('2d');
   ctx.fillStyle = base; ctx.fillRect(0, 0, 512, 512);
-  
+
   if (type === 'minimal-stripe') {
     ctx.fillStyle = accent;
     for (let i = 0; i < 512; i += 24) { ctx.fillRect(i, 0, 4, 512); }
   } else if (type === 'minimal-check') {
     ctx.strokeStyle = accent; ctx.lineWidth = 2;
-    for (let i = 0; i < 512; i += 28) { 
-      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke(); 
-      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(512, i); ctx.stroke(); 
+    for (let i = 0; i < 512; i += 28) {
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(512, i); ctx.stroke();
     }
   } else if (type === 'embroidery-1') {
     ctx.strokeStyle = accent; ctx.lineWidth = 3;
-    for (let i = 0; i < 12; i++) { 
-      const x = 40 + i * 40; 
-      ctx.beginPath(); ctx.arc(256, x, 24, 0, Math.PI * 2); ctx.stroke(); 
+    for (let i = 0; i < 12; i++) {
+      const x = 40 + i * 40;
+      ctx.beginPath(); ctx.arc(256, x, 24, 0, Math.PI * 2); ctx.stroke();
     }
   } else if (type === 'embroidery-2') {
     ctx.fillStyle = accent;
-    for (let i = 0; i < 10; i++) { 
-      ctx.beginPath(); 
-      ctx.moveTo(48 + i * 48, 80); 
-      ctx.lineTo(72 + i * 48, 112); 
-      ctx.lineTo(24 + i * 48, 112); 
-      ctx.closePath(); ctx.fill(); 
+    for (let i = 0; i < 10; i++) {
+      ctx.beginPath();
+      ctx.moveTo(48 + i * 48, 80);
+      ctx.lineTo(72 + i * 48, 112);
+      ctx.lineTo(24 + i * 48, 112);
+      ctx.closePath(); ctx.fill();
     }
   }
-  
+
   const tex = new THREE.CanvasTexture(c);
-  
+
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(repeatX, repeatY);
@@ -64,7 +64,7 @@ function makeProceduralPattern(type, base, accent, repeatX = 2, repeatY = 2) {
   tex.generateMipmaps = true;
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.needsUpdate = true;
-  
+
   return tex;
 }
 
@@ -97,11 +97,11 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
   const accent = colors.stitching;
 
   const [imageTexture, setImageTexture] = useState(null);
-  
+
   const [isLoadingTexture, setIsLoadingTexture] = useState(false);
-  
+
   const textureRef = React.useRef(null);
-  
+
   const currentPatternCodeRef = React.useRef(pattern);
 
   const currentPattern = useMemo(() => {
@@ -112,7 +112,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
   }, [patterns, pattern]);
 
   useEffect(() => {
-    
+
     currentPatternCodeRef.current = pattern;
 
     if (textureRef.current) {
@@ -121,7 +121,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
     }
     setImageTexture(null);
     setIsLoadingTexture(false);
-    
+
     if (currentPattern && currentPattern.pattern_type === 'image' && currentPattern.image_url) {
       console.log('🖼️ Loading image pattern:', currentPattern.pattern_name, 'URL:', currentPattern.image_url);
       setIsLoadingTexture(true);
@@ -130,18 +130,18 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
       if (!imageUrl.startsWith('http')) {
         imageUrl = `${API_BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
       }
-      
+
       console.log('📥 Full image URL:', imageUrl);
 
       const loader = new THREE.TextureLoader();
       loader.setCrossOrigin('anonymous');
 
       const loadingForPattern = pattern;
-      
+
       loader.load(
         imageUrl,
         (texture) => {
-          
+
           if (currentPatternCodeRef.current !== loadingForPattern) {
             console.log('⚠️ Pattern changed while loading, discarding texture for:', loadingForPattern);
             texture.dispose();
@@ -172,11 +172,11 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
           texture.offset.set(0, 0);
 
           texture.needsUpdate = true;
-          
+
           textureRef.current = texture;
           setImageTexture(texture);
           setIsLoadingTexture(false);
-          console.log('✅ Pattern image texture loaded:', currentPattern.pattern_name, 
+          console.log('✅ Pattern image texture loaded:', currentPattern.pattern_name,
             'Repeat:', texture.repeat.x.toFixed(2), 'x', texture.repeat.y.toFixed(2));
         },
         (progress) => {
@@ -205,28 +205,28 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
 
   function getGarmentRepeatMultiplier(garmentType) {
     const multipliers = {
-      
+
       'coat-men': { x: 1.5, y: 1.8 },
       'coat-men-plain': { x: 1.5, y: 1.8 },
       'coat-women': { x: 1.4, y: 1.7 },
       'coat-women-plain': { x: 1.4, y: 1.7 },
       'coat-teal': { x: 1.5, y: 1.8 },
-      
+
       'suit-1': { x: 1.5, y: 2.0 },
       'suit-2': { x: 1.5, y: 2.0 },
-      
+
       'barong': { x: 1.2, y: 1.5 },
-      
+
       'pants': { x: 1.0, y: 1.5 },
-      
+
       'default': { x: 1.0, y: 1.0 }
     };
-    
+
     return multipliers[garmentType] || multipliers['default'];
   }
 
   const map = useMemo(() => {
-    
+
     if (currentPattern?.pattern_type === 'image' && imageTexture) {
       console.log('🎨 Using image texture for pattern:', currentPattern.pattern_name, 'on garment:', garment);
       return imageTexture;
@@ -234,54 +234,54 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
 
     if (isLoadingTexture && currentPattern?.pattern_type === 'image') {
       console.log('⏳ Loading image texture, showing solid color temporarily');
-      
+
       return makeProceduralPattern('none', baseColor, accent, 1, 1);
     }
 
     const proceduralType = currentPattern?.procedural_type || pattern;
 
     const repeatMultiplier = getGarmentRepeatMultiplier(garment);
-    const baseRepeat = 2; 
-    
-    console.log('🎨 Using procedural pattern:', proceduralType, 'on garment:', garment, 
+    const baseRepeat = 2;
+
+    console.log('🎨 Using procedural pattern:', proceduralType, 'on garment:', garment,
       'Repeat:', (baseRepeat * repeatMultiplier.x).toFixed(2), 'x', (baseRepeat * repeatMultiplier.y).toFixed(2));
 
     return makeProceduralPattern(
-      proceduralType, 
-      baseColor, 
-      accent, 
-      baseRepeat * repeatMultiplier.x, 
+      proceduralType,
+      baseColor,
+      accent,
+      baseRepeat * repeatMultiplier.x,
       baseRepeat * repeatMultiplier.y
     );
   }, [imageTexture, isLoadingTexture, currentPattern, pattern, baseColor, accent, garment]);
-  
+
   const bump = useMemo(() => makeBump(), []);
   const fabricColor = useMemo(() => {
     const color = new THREE.Color(baseColor);
-    
+
     const brightness = (0.299 * color.r + 0.587 * color.g + 0.114 * color.b);
 
     if (brightness < 0.5) {
 
       let brightenFactor;
       if (brightness < 0.2) {
-        
-        brightenFactor = 1.0 + (0.2 - brightness) * 2.0 + 0.6; 
+
+        brightenFactor = 1.0 + (0.2 - brightness) * 2.0 + 0.6;
       } else {
-        
-        brightenFactor = 1.0 + (0.5 - brightness) * 0.67; 
+
+        brightenFactor = 1.0 + (0.5 - brightness) * 0.67;
       }
 
       const maxComponent = Math.max(color.r, color.g, color.b);
       if (maxComponent > 0) {
-        
+
         const normalizedR = color.r / maxComponent;
         const normalizedG = color.g / maxComponent;
         const normalizedB = color.b / maxComponent;
 
         const targetBrightness = Math.min(0.6, brightness * brightenFactor);
         const scale = targetBrightness / (0.299 * normalizedR + 0.587 * normalizedG + 0.114 * normalizedB);
-        
+
         color.r = Math.min(1.0, normalizedR * scale);
         color.g = Math.min(1.0, normalizedG * scale);
         color.b = Math.min(1.0, normalizedB * scale);
@@ -289,9 +289,9 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
     }
     return color;
   }, [baseColor]);
-  
+
   const materialProps = useMemo(() => {
-    
+
     let rough, metal, bumpScale;
     if (fabric === 'silk') {
       rough = 0.25;
@@ -306,40 +306,40 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
       metal = 0.0;
       bumpScale = 0.06;
     } else if (fabric === 'jusi') {
-      
+
       rough = 0.3;
       metal = 0.05;
       bumpScale = 0.03;
     } else if (fabric === 'Piña' || fabric === 'pina') {
-      
+
       rough = 0.25;
       metal = 0.08;
       bumpScale = 0.02;
     } else {
-      
+
       rough = 0.9;
       metal = 0.0;
       bumpScale = 0.07;
     }
-    
+
     const transparent = garment === 'barong';
     const opacity = garment === 'barong' ? Math.max(0.15, Math.min(0.85, style.transparency || 0.35)) : 1;
 
     const brightness = (0.299 * fabricColor.r + 0.587 * fabricColor.g + 0.114 * fabricColor.b);
-    
+
     const adjustedSheen = brightness < 0.3 ? 0.2 : brightness < 0.5 ? 0.4 : 1.0;
-    
-    return { 
-      roughness: rough, 
-      metalness: metal, 
-      map, 
-      color: fabricColor, 
-      transparent, 
-      opacity, 
-      sheen: adjustedSheen, 
-      sheenColor: fabricColor, 
-      bumpMap: bump, 
-      bumpScale 
+
+    return {
+      roughness: rough,
+      metalness: metal,
+      map,
+      color: fabricColor,
+      transparent,
+      opacity,
+      sheen: adjustedSheen,
+      sheenColor: fabricColor,
+      bumpMap: bump,
+      bumpScale
     };
   }, [fabric, fabricColor, map, garment, style, bump]);
 
@@ -380,7 +380,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
     console.log('🔄 Model loading status...');
     console.log('Current garment type:', garment);
     console.log('Is mobile:', isMobileDevice);
-    
+
     if (blackBlazer?.scene) {
       setModelsLoaded(true);
       console.log('✅ Models loaded successfully');
@@ -406,8 +406,8 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
 
     if (garment.startsWith('custom-')) {
       const modelId = garment.replace('custom-', '');
-      const match = customModels.find(model => 
-        model.is_active && 
+      const match = customModels.find(model =>
+        model.is_active &&
         model.model_type === 'garment' &&
         String(model.model_id) === modelId
       );
@@ -417,14 +417,14 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
       }
     }
 
-    const match = customModels.find(model => 
-      model.is_active && 
+    const match = customModels.find(model =>
+      model.is_active &&
       model.model_type === 'garment' &&
       model.garment_category &&
       model.garment_category === garment &&
-      !builtInGarments.includes(garment) 
+      !builtInGarments.includes(garment)
     );
-    
+
     if (match) {
       console.log('Found custom model by category:', match.model_name);
       return match;
@@ -440,7 +440,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
   if (matchingCustomModel) {
     use3DModel = true;
     isCustomModel = true;
-    
+
   } else {
 
   if (garment === 'coat-men') {
@@ -476,25 +476,25 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
     let baseScale;
     switch (size) {
       case 'small':
-        baseScale = 1.4; 
+        baseScale = 1.4;
         break;
       case 'large':
-        baseScale = 1.6; 
+        baseScale = 1.6;
         break;
       case 'medium':
       default:
-        baseScale = 1.5; 
+        baseScale = 1.5;
         break;
     }
 
     switch (fit) {
       case 'loose':
-        return baseScale * 1.05; 
+        return baseScale * 1.05;
       case 'fitted':
-        return baseScale * 0.95; 
+        return baseScale * 0.95;
       case 'regular':
       default:
-        return baseScale; 
+        return baseScale;
     }
   }, [size, fit]);
 
@@ -502,20 +502,20 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
     if (use3DModel && modelScene) {
       console.log('🔄 Applying material to model, pattern:', pattern, 'hasImageTexture:', !!imageTexture);
 
-      modelScene.rotation.y = -Math.PI / 2; 
+      modelScene.rotation.y = -Math.PI / 2;
 
       modelScene.traverse((child) => {
         if (child.isMesh) {
-          
+
           if (child.material && child.material.dispose) {
             child.material.dispose();
           }
-          
+
           const newMaterial = new THREE.MeshPhysicalMaterial({
             ...materialProps,
             color: fabricColor.clone(),
             sheenColor: fabricColor.clone(),
-            map: map, 
+            map: map,
             needsUpdate: true
           });
           newMaterial.needsUpdate = true;
@@ -529,7 +529,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
 
   const pantsModel = useMemo(() => {
     if (garment !== 'pants') return null;
-    
+
     if (pantsType === 'casual-men') {
       return pantsCasualMen.scene;
     } else if (pantsType === 'formal-men') {
@@ -537,7 +537,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
     } else if (pantsType === 'formal-women') {
       return pantsFormalWomen.scene;
     }
-    
+
     return pantsCasualMen.scene;
   }, [garment, pantsType, pantsCasualMen.scene, pantsFormalMen.scene, pantsFormalWomen.scene]);
 
@@ -547,20 +547,20 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
     if (pantsModelScene) {
       console.log('🔄 Applying material to pants model, pattern:', pattern, 'hasImageTexture:', !!imageTexture);
 
-      pantsModelScene.rotation.y = -Math.PI / 2; 
+      pantsModelScene.rotation.y = -Math.PI / 2;
 
       pantsModelScene.traverse((child) => {
         if (child.isMesh) {
-          
+
           if (child.material && child.material.dispose) {
             child.material.dispose();
           }
-          
+
           const newMaterial = new THREE.MeshPhysicalMaterial({
             ...materialProps,
             color: fabricColor.clone(),
             sheenColor: fabricColor.clone(),
-            map: map, 
+            map: map,
             needsUpdate: true
           });
           newMaterial.needsUpdate = true;
@@ -578,14 +578,14 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
   const torsoH = garment.startsWith('coat') ? 3.0 * waistS : 2.4 * waistS;
 
   const customModelToRender = useMemo(() => {
-    
+
     const builtInGarments = [
       'coat-men', 'coat-men-plain', 'coat-women', 'coat-women-plain', 'coat-teal',
       'suit-1', 'suit-2',
       'barong',
       'pants'
     ];
-    
+
     console.log('=== CHECKING FOR CUSTOM MODEL ===');
     console.log('Current garment:', garment);
     console.log('Available custom models:', customModels);
@@ -597,9 +597,9 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
 
     if (garment.startsWith('custom-')) {
       const modelId = garment.replace('custom-', '');
-      const match = customModels.find(m => 
-        m.is_active && 
-        m.model_type === 'garment' && 
+      const match = customModels.find(m =>
+        m.is_active &&
+        m.model_type === 'garment' &&
         String(m.model_id) === modelId
       );
       if (match) {
@@ -612,14 +612,14 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
       console.log('✓ Found custom model by category:', matchingCustomModel.model_name);
       return matchingCustomModel;
     }
-    
+
     console.log('✗ No custom model match found - will use built-in model');
     return null;
   }, [garment, customModels, matchingCustomModel]);
 
   if (garment === 'pants') {
     if (!pantsModelScene) {
-      
+
       return (
         <mesh position={[0, 0.5, 0]}>
           <boxGeometry args={[1, 1.5, 0.5]} />
@@ -641,12 +641,12 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
   }
 
   if (customModelToRender && customModelToRender.file_url) {
-    
+
     let modelUrl = customModelToRender.file_url;
     if (!modelUrl.startsWith('http')) {
       modelUrl = `${API_BASE_URL}${modelUrl.startsWith('/') ? '' : '/'}${modelUrl}`;
     }
-    
+
     console.log('=== RENDERING CUSTOM MODEL ===');
     console.log('Model name:', customModelToRender.model_name);
     console.log('Model URL:', modelUrl);
@@ -662,7 +662,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
             <meshStandardMaterial color="#cccccc" />
           </mesh>
         }>
-          <CustomModelLoader 
+          <CustomModelLoader
             modelUrl={modelUrl}
             materialProps={materialProps}
             fabricColor={fabricColor}
@@ -683,7 +683,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
   }
 
   if (garment.startsWith('coat') || garment.startsWith('suit') || garment === 'barong' || garment === 'pants') {
-    
+
     if (!modelScene) return null;
     return (
       <group position={[0, 0, 0]} scale={sizeScale}>
@@ -698,7 +698,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
   }
 
   if (garment === 'barong') {
-    
+
     if (!modelScene) return null;
     return (
       <group position={[0, 0, 0]} scale={sizeScale}>
@@ -713,15 +713,15 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
   }
 
   if (garment.startsWith('suit') || (garment.startsWith('custom-') && matchingCustomModel && matchingCustomModel.garment_category && matchingCustomModel.garment_category.startsWith('suit'))) {
-    
+
     if (matchingCustomModel && matchingCustomModel.file_url) {
-      const modelUrl = matchingCustomModel.file_url.startsWith('http') 
-        ? matchingCustomModel.file_url 
+      const modelUrl = matchingCustomModel.file_url.startsWith('http')
+        ? matchingCustomModel.file_url
         : `${API_BASE_URL}${matchingCustomModel.file_url}`;
-      
+
       return (
         <group position={[0, 0, 0]} scale={sizeScale}>
-          <CustomModelLoader 
+          <CustomModelLoader
             modelUrl={modelUrl}
             materialProps={materialProps}
             fabricColor={fabricColor}
@@ -737,7 +737,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
         </group>
       );
     }
-    
+
     if (!modelScene) return null;
     return (
       <group position={[0, 0, 0]} scale={sizeScale}>
@@ -752,15 +752,15 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
   }
 
   if (garment.startsWith('custom-') && matchingCustomModel && matchingCustomModel.file_url) {
-    const modelUrl = matchingCustomModel.file_url.startsWith('http') 
-      ? matchingCustomModel.file_url 
+    const modelUrl = matchingCustomModel.file_url.startsWith('http')
+      ? matchingCustomModel.file_url
       : `${API_BASE_URL}${matchingCustomModel.file_url}`;
 
     const customModelScale = sizeScale * 3;
-    
+
     return (
       <group position={[0, 0.8, 2]} scale={customModelScale}>
-        <CustomModelLoader 
+        <CustomModelLoader
           modelUrl={modelUrl}
           materialProps={materialProps}
           fabricColor={fabricColor}

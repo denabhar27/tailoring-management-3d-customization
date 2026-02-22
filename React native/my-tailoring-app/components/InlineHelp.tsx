@@ -49,7 +49,7 @@ export const InlineHelp: React.FC<InlineHelpProps> = ({
           backgroundColor: "#E8F5E9",
           textColor: "#2E7D32",
         };
-      default: 
+      default:
         return {
           icon: "information-circle" as const,
           iconColor: "#1976D2",
@@ -116,10 +116,10 @@ export const FormFieldHelp: React.FC<FormFieldHelpProps> = ({
         style={styles.helpTrigger}
         onPress={() => setIsExpanded(!isExpanded)}
       >
-        <Ionicons 
-          name={isExpanded ? "information-circle" : "information-circle-outline"} 
-          size={16} 
-          color="#666" 
+        <Ionicons
+          name={isExpanded ? "information-circle" : "information-circle-outline"}
+          size={16}
+          color="#666"
         />
         <Text style={styles.helpTriggerText}>
           {isExpanded ? "Hide help" : "Show help"}
@@ -149,10 +149,10 @@ export const TooltipHelp: React.FC<TooltipHelpProps> = ({ label, helpText }) => 
         onPress={() => setShowTooltip(!showTooltip)}
         style={styles.tooltipButton}
       >
-        <Ionicons 
-          name="help-circle-outline" 
-          size={18} 
-          color="#666" 
+        <Ionicons
+          name="help-circle-outline"
+          size={18}
+          color="#666"
         />
       </TouchableOpacity>
       {showTooltip && (
@@ -197,7 +197,7 @@ export const ValidationHelp: React.FC<ValidationHelpProps> = ({ requirements }) 
 };
 
 const styles = StyleSheet.create({
-  
+
   container: {
     flexDirection: "row",
     alignItems: "flex-start",

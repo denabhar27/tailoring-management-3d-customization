@@ -112,7 +112,7 @@ const Billing = () => {
 
     bills = bills.filter(bill => {
 
-      const matchesSearch = searchTerm === "" || 
+      const matchesSearch = searchTerm === "" ||
 
         bill.uniqueNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
 
@@ -306,9 +306,9 @@ const Billing = () => {
 
     }
 
-    const downPayment = bill.pricingFactors?.downpayment || 
+    const downPayment = bill.pricingFactors?.downpayment ||
 
-                       bill.pricingFactors?.down_payment || 
+                       bill.pricingFactors?.down_payment ||
 
                        bill.pricingFactors?.downPayment ||
 
@@ -336,19 +336,19 @@ const Billing = () => {
 
     const colors = {
 
-      'Customization': '#9c27b0', 
+      'Customization': '#9c27b0',
 
-      'Dry Cleaning': '#2196f3',   
+      'Dry Cleaning': '#2196f3',
 
-      'Repair': '#ff9800',        
+      'Repair': '#ff9800',
 
-      'Rental': '#4caf50',        
+      'Rental': '#4caf50',
 
-      'Alteration': '#f44336',    
+      'Alteration': '#f44336',
 
-      'Consultation': '#795548',  
+      'Consultation': '#795548',
 
-      'Other': '#607d8b'          
+      'Other': '#607d8b'
 
     };
 
@@ -604,9 +604,9 @@ const Billing = () => {
 
                           <div className="action-buttons">
 
-                            <button 
+                            <button
 
-                              className="icon-btn next-status" 
+                              className="icon-btn next-status"
 
                               onClick={async (e) => {
 
@@ -614,7 +614,7 @@ const Billing = () => {
 
                                 await updatePaymentStatus(bill.id, nextStatus);
 
-                              }} 
+                              }}
 
                               title={`Manually move to ${nextStatus} (Note: Payment status auto-updates when service status changes in management pages)`}
 
@@ -653,9 +653,9 @@ const Billing = () => {
       </div>
       {showDetailModal && selectedBill && (
 
-        <div 
+        <div
 
-          className="modal-overlay active" 
+          className="modal-overlay active"
 
           onClick={(e) => {
 
@@ -847,13 +847,13 @@ const Billing = () => {
             </div>
 
             <div className="modal-footer">
-              <button 
-                className="close-btn" 
+              <button
+                className="close-btn"
                 onClick={() => setShowDetailModal(false)}
               >
                 Close
               </button>
-              <button 
+              <button
                 className="btn-save-list"
                 onClick={async () => {
                   const nextStatus = getNextPaymentStatus(selectedBill);
@@ -862,7 +862,7 @@ const Billing = () => {
                 }}
                 style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '14px' }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http:
                   <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
                 Mark as {getNextPaymentStatus(selectedBill)}

@@ -10,7 +10,7 @@ const ImageCarousel = ({ images, itemName, getRentalImageUrl }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const validImages = images.filter(img => img && img.url);
-  
+
   if (validImages.length === 0) {
     return (
       <div style={{
@@ -30,7 +30,7 @@ const ImageCarousel = ({ images, itemName, getRentalImageUrl }) => {
 
   if (validImages.length === 1) {
     return (
-      <img 
+      <img
         src={getRentalImageUrl(validImages[0].url)}
         alt={itemName}
         className="detail-image"
@@ -44,14 +44,14 @@ const ImageCarousel = ({ images, itemName, getRentalImageUrl }) => {
 
   return (
     <div style={{ width: '100%' }}>
-      <div style={{ 
-        position: 'relative', 
+      <div style={{
+        position: 'relative',
         backgroundColor: '#f9f9f9',
         borderRadius: '8px',
         overflow: 'hidden'
       }}>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
-          <img 
+          <img
             src={getRentalImageUrl(validImages[currentIndex].url)}
             alt={`${itemName} - ${validImages[currentIndex].label}`}
             style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain' }}
@@ -108,7 +108,7 @@ const PostRent = () => {
   const [filter, setFilter] = useState('');
   const [imagePreview, setImagePreview] = useState('');
   const [imageFile, setImageFile] = useState(null);
-  
+
   const [frontImagePreview, setFrontImagePreview] = useState('');
   const [frontImageFile, setFrontImageFile] = useState(null);
   const [backImagePreview, setBackImagePreview] = useState('');
@@ -132,14 +132,14 @@ const PostRent = () => {
     damage_notes: '',
     status: 'available',
     measurements: {
-      
+
       chest: { inch: '', cm: '' },
       shoulders: { inch: '', cm: '' },
       sleeveLength: { inch: '', cm: '' },
       neck: { inch: '', cm: '' },
       waist: { inch: '', cm: '' },
       length: { inch: '', cm: '' },
-      
+
       hips: { inch: '', cm: '' },
       inseam: { inch: '', cm: '' },
       thigh: { inch: '', cm: '' },
@@ -156,14 +156,14 @@ const PostRent = () => {
       setIsLoading(true);
       setError('');
       const result = await getAllRentals();
-      console.log('Rental items API response:', result); 
+      console.log('Rental items API response:', result);
       if (result.items && Array.isArray(result.items) && result.items.length > 0) {
         setItems(result.items);
-        console.log('Loaded rental items:', result.items.length); 
+        console.log('Loaded rental items:', result.items.length);
       } else if (result && Array.isArray(result) && result.length > 0) {
-        
+
         setItems(result);
-        console.log('Loaded rental items (array):', result.length); 
+        console.log('Loaded rental items (array):', result.length);
       } else {
         console.log('No rental items found in database. Admin should add items via "Add Post +" button.');
         setItems([]);
@@ -182,7 +182,7 @@ const PostRent = () => {
     if (id != null) {
       const item = items.find(i => i.item_id === id);
       if (item) {
-        
+
         let measurements = {
           chest: { inch: '', cm: '' },
           shoulders: { inch: '', cm: '' },
@@ -199,17 +199,17 @@ const PostRent = () => {
           try {
             const parsed = typeof item.size === 'string' ? JSON.parse(item.size) : item.size;
             if (parsed && typeof parsed === 'object') {
-              
+
               Object.keys(measurements).forEach(key => {
                 if (parsed[key]) {
                   if (typeof parsed[key] === 'object' && (parsed[key].inch !== undefined || parsed[key].cm !== undefined)) {
-                    
+
                     measurements[key] = {
                       inch: parsed[key].inch || '',
                       cm: parsed[key].cm || ''
                     };
                   } else if (typeof parsed[key] === 'string' || typeof parsed[key] === 'number') {
-                    
+
                     const inchValue = String(parsed[key]);
                     const cmValue = inchValue ? (parseFloat(inchValue) * 2.54).toFixed(2) : '';
                     measurements[key] = {
@@ -221,7 +221,7 @@ const PostRent = () => {
               });
             }
           } catch (e) {
-            
+
           }
         }
 
@@ -242,7 +242,7 @@ const PostRent = () => {
           measurements: measurements
         });
         setImagePreview(item.image_url ? getRentalImageUrl(item.image_url) : '');
-        
+
         setFrontImagePreview(item.front_image ? getRentalImageUrl(item.front_image) : '');
         setBackImagePreview(item.back_image ? getRentalImageUrl(item.back_image) : '');
         setSideImagePreview(item.side_image ? getRentalImageUrl(item.side_image) : '');
@@ -278,7 +278,7 @@ const PostRent = () => {
       });
       setImagePreview('');
       setImageFile(null);
-      
+
       setFrontImagePreview('');
       setFrontImageFile(null);
       setBackImagePreview('');
@@ -295,7 +295,7 @@ const PostRent = () => {
     setEditingId(null);
     setImagePreview('');
     setImageFile(null);
-    
+
     setFrontImagePreview('');
     setFrontImageFile(null);
     setBackImagePreview('');
@@ -308,7 +308,7 @@ const PostRent = () => {
   const handleImageChange = (e, imageType = 'front') => {
     const file = e.target.files?.[0];
     if (file) {
-      
+
       if (!file.type.startsWith('image/')) {
         setError('Please select an image file');
         return;
@@ -369,7 +369,7 @@ const PostRent = () => {
   const handleMeasurementChange = (field, unit, value) => {
     const currentMeasurement = formData.measurements[field] || { inch: '', cm: '' };
     let updatedMeasurement = { ...currentMeasurement };
-    
+
     if (unit === 'inch') {
       updatedMeasurement.inch = value;
       updatedMeasurement.cm = inchToCm(value);
@@ -377,7 +377,7 @@ const PostRent = () => {
       updatedMeasurement.cm = value;
       updatedMeasurement.inch = cmToInch(value);
     }
-    
+
     setFormData({
       ...formData,
       measurements: {
@@ -428,17 +428,17 @@ const PostRent = () => {
       if (sideImageFile) imageFiles.side_image = sideImageFile;
 
       const hasNewImages = Object.keys(imageFiles).length > 0;
-      
+
       if (editingId) {
-        
+
         result = await updateRental(editingId, dataToSave, hasNewImages ? imageFiles : null);
       } else {
-        
+
         result = await createRental(dataToSave, hasNewImages ? imageFiles : null);
       }
 
       if (result.success !== false) {
-        
+
         await loadRentalItems();
         closeModal();
         await alert(editingId ? 'Item updated successfully!' : 'Item posted successfully!', 'Success', 'success');
@@ -481,8 +481,8 @@ const PostRent = () => {
     setSelectedItem(null);
   };
 
-  const filteredItems = filter 
-    ? items.filter(i => (i.status || 'available') === filter) 
+  const filteredItems = filter
+    ? items.filter(i => (i.status || 'available') === filter)
     : items;
 
   return (
@@ -497,12 +497,12 @@ const PostRent = () => {
         </div>
 
         {error && (
-          <div className="error-message" style={{ 
-            backgroundColor: '#f8d7da', 
-            color: '#721c24', 
-            padding: '10px', 
-            borderRadius: '5px', 
-            marginBottom: '20px' 
+          <div className="error-message" style={{
+            backgroundColor: '#f8d7da',
+            color: '#721c24',
+            padding: '10px',
+            borderRadius: '5px',
+            marginBottom: '20px'
           }}>
             {error}
           </div>
@@ -522,17 +522,17 @@ const PostRent = () => {
             <p className="empty-message">Loading rental items...</p>
           ) : filteredItems.length === 0 ? (
             <p className="empty-message">
-              {items.length === 0 
-                ? 'No rental items found in database. Click "Add Post +" to add your first rental item!' 
+              {items.length === 0
+                ? 'No rental items found in database. Click "Add Post +" to add your first rental item!'
                 : `No items found with status "${filter || 'all'}". ${items.length} total item(s) in database.`}
             </p>
           ) : (
             filteredItems.map(item => (
               <div key={item.item_id} className="compact-item-card" onClick={() => openDetailModal(item)}>
-                <img 
-                  src={item.front_image ? getRentalImageUrl(item.front_image) : (item.image_url ? getRentalImageUrl(item.image_url) : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=')} 
-                  alt={item.item_name} 
-                  className="compact-item-image" 
+                <img
+                  src={item.front_image ? getRentalImageUrl(item.front_image) : (item.image_url ? getRentalImageUrl(item.image_url) : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=')}
+                  alt={item.item_name}
+                  className="compact-item-image"
                 />
                 <div className="compact-item-info">
                   <h3>{item.item_name}</h3>
@@ -571,12 +571,12 @@ const PostRent = () => {
 
             <div className="dialog-body">
               {error && (
-                <div className="error-message" style={{ 
-                  backgroundColor: '#f8d7da', 
-                  color: '#721c24', 
-                  padding: '10px', 
-                  borderRadius: '5px', 
-                  marginBottom: '15px' 
+                <div className="error-message" style={{
+                  backgroundColor: '#f8d7da',
+                  color: '#721c24',
+                  padding: '10px',
+                  borderRadius: '5px',
+                  marginBottom: '15px'
                 }}>
                   {error}
                 </div>
@@ -586,11 +586,11 @@ const PostRent = () => {
                   📸 Upload Images (Front, Back, Side)
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
-                  <div 
-                    className="upload-area" 
+                  <div
+                    className="upload-area"
                     onClick={() => document.getElementById('frontImageInput')?.click()}
-                    style={{ 
-                      minHeight: '150px', 
+                    style={{
+                      minHeight: '150px',
                       border: '2px dashed #007bff',
                       borderRadius: '10px',
                       cursor: 'pointer',
@@ -618,11 +618,11 @@ const PostRent = () => {
                     <input type="file" id="frontImageInput" accept="image/*" className="hidden-input" onChange={(e) => handleImageChange(e, 'front')} style={{ display: 'none' }} />
                     <span style={{ fontSize: '11px', color: '#007bff', marginTop: '5px', fontWeight: '600' }}>Front View</span>
                   </div>
-                  <div 
-                    className="upload-area" 
+                  <div
+                    className="upload-area"
                     onClick={() => document.getElementById('backImageInput')?.click()}
-                    style={{ 
-                      minHeight: '150px', 
+                    style={{
+                      minHeight: '150px',
                       border: '2px dashed #28a745',
                       borderRadius: '10px',
                       cursor: 'pointer',
@@ -650,11 +650,11 @@ const PostRent = () => {
                     <input type="file" id="backImageInput" accept="image/*" className="hidden-input" onChange={(e) => handleImageChange(e, 'back')} style={{ display: 'none' }} />
                     <span style={{ fontSize: '11px', color: '#28a745', marginTop: '5px', fontWeight: '600' }}>Back View</span>
                   </div>
-                  <div 
-                    className="upload-area" 
+                  <div
+                    className="upload-area"
                     onClick={() => document.getElementById('sideImageInput')?.click()}
-                    style={{ 
-                      minHeight: '150px', 
+                    style={{
+                      minHeight: '150px',
                       border: '2px dashed #fd7e14',
                       borderRadius: '10px',
                       cursor: 'pointer',
@@ -679,577 +679,4 @@ const PostRent = () => {
                         <p style={{ margin: '5px 0 0 0', fontSize: '12px', color: '#666' }}><strong>Side</strong></p>
                       </div>
                     )}
-                    <input type="file" id="sideImageInput" accept="image/*" className="hidden-input" onChange={(e) => handleImageChange(e, 'side')} style={{ display: 'none' }} />
-                    <span style={{ fontSize: '11px', color: '#fd7e14', marginTop: '5px', fontWeight: '600' }}>Side View</span>
-                  </div>
-                </div>
-                <small style={{ display: 'block', textAlign: 'center', color: '#888', marginTop: '10px' }}>
-                  Upload up to 3 images (JPG, PNG) - Max 5MB each
-                </small>
-              </div>
-
-              <div className="form-grid">
-                <div className="input-group">
-                  <label>Item Name *</label>
-                  <input 
-                    type="text" 
-                    value={formData.item_name} 
-                    onChange={(e) => setFormData({ ...formData, item_name: e.target.value })} 
-                    placeholder="e.g., Brown Business Suit"
-                  />
-                </div>
-                <div className="input-group">
-                  <label>Category</label>
-                  <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
-                    <option value="suit">Suit</option>
-                    <option value="tuxedo">Tuxedo</option>
-                    <option value="formal_wear">Formal Wear</option>
-                    <option value="business">Business</option>
-                    <option value="casual">Casual</option>
-                    <option value="pants">Pants</option>
-                    <option value="trousers">Trousers</option>
-                  </select>
-                </div>
-              </div>
-              {isTopCategory(formData.category) && (
-                <div className="measurements-section" style={{ marginBottom: '20px' }}>
-                  <h4 style={{ marginBottom: '15px', color: '#333', fontSize: '1.1rem', fontWeight: '600' }}>Top Measurements</h4>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f8f9fa' }}>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#333' }}>Measurement</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#333' }}>Inches</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#333' }}>Centimeters</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Chest</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.chest?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('chest', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.chest?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('chest', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Shoulders</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.shoulders?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('shoulders', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.shoulders?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('shoulders', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Sleeve Length</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.sleeveLength?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('sleeveLength', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.sleeveLength?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('sleeveLength', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Neck</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.neck?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('neck', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.neck?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('neck', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Waist</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.waist?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('waist', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.waist?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('waist', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', color: '#000' }}><strong style={{ color: '#000' }}>Length</strong></td>
-                        <td style={{ padding: '12px' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.length?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('length', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.length?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('length', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {isBottomCategory(formData.category) && (
-                <div className="measurements-section" style={{ marginBottom: '20px' }}>
-                  <h4 style={{ marginBottom: '15px', color: '#333', fontSize: '1.1rem', fontWeight: '600' }}>Bottom Measurements</h4>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f8f9fa' }}>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#333' }}>Measurement</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#333' }}>Inches</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#333' }}>Centimeters</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Waist</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.waist?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('waist', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.waist?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('waist', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Hips</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.hips?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('hips', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.hips?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('hips', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Inseam</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.inseam?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('inseam', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.inseam?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('inseam', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Length</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.length?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('length', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.length?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('length', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Thigh</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.thigh?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('thigh', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.thigh?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('thigh', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', color: '#000' }}><strong style={{ color: '#000' }}>Outseam</strong></td>
-                        <td style={{ padding: '12px' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.outseam?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('outseam', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.outseam?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('outseam', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              <div className="form-grid">
-                <div className="input-group">
-                  <label>Price *</label>
-                  <input 
-                    type="text" 
-                    value={formData.price} 
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })} 
-                    placeholder="e.g., 500.00"
-                  />
-                </div>
-                <div className="input-group">
-                  <label>Total Available</label>
-                  <input 
-                    type="number" 
-                    value={formData.total_available} 
-                    onChange={(e) => setFormData({ ...formData, total_available: e.target.value })} 
-                    min="1"
-                  />
-                </div>
-              </div>
-
-              <div className="form-grid">
-                <div className="input-group">
-                  <label>Brand</label>
-                  <input 
-                    type="text" 
-                    value={formData.brand} 
-                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })} 
-                    placeholder="e.g., Armani"
-                  />
-                </div>
-              </div>
-
-              <div className="form-grid">
-                <div className="input-group">
-                  <label>Color</label>
-                  <input 
-                    type="text" 
-                    value={formData.color} 
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })} 
-                    placeholder="e.g., Brown"
-                  />
-                </div>
-                <div className="input-group">
-                  <label>Material</label>
-                  <input 
-                    type="text" 
-                    value={formData.material} 
-                    onChange={(e) => setFormData({ ...formData, material: e.target.value })} 
-                    placeholder="e.g., Wool"
-                  />
-                </div>
-              </div>
-
-              <div className="input-group">
-                <label>Status</label>
-                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
-                  <option value="available">Available</option>
-                  <option value="rented">Rented</option>
-                  <option value="maintenance">Maintenance</option>
-                </select>
-              </div>
-
-              {formData.status === 'maintenance' && (
-                <div className="input-group" style={{ backgroundColor: '#fff3cd', padding: '15px', borderRadius: '8px', border: '1px solid #ffc107' }}>
-                  <label style={{ color: '#856404', fontWeight: '600' }}>⚠️ Damage/Maintenance Notes</label>
-                  <textarea 
-                    rows={3} 
-                    value={formData.damage_notes} 
-                    onChange={(e) => setFormData({ ...formData, damage_notes: e.target.value })} 
-                    placeholder="Describe the damage or reason for maintenance..."
-                    style={{ marginTop: '8px' }}
-                  />
-                </div>
-              )}
-
-              <div className="input-group">
-                <label>Description</label>
-                <textarea 
-                  rows={3} 
-                  value={formData.description} 
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
-                  placeholder="Describe the rental item..."
-                />
-              </div>
-
-              <div className="input-group">
-                <label>Care Instructions</label>
-                <textarea 
-                  rows={2} 
-                  value={formData.care_instructions} 
-                  onChange={(e) => setFormData({ ...formData, care_instructions: e.target.value })} 
-                  placeholder="Special care instructions..."
-                />
-              </div>
-            </div>
-
-            <div className="dialog-footer">
-              <button className="submit-btn" onClick={saveItem} disabled={isLoading}>
-                {isLoading ? (editingId ? 'Updating...' : 'Posting...') : (editingId ? 'Update Item' : 'Post Item')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {isDetailModalOpen && selectedItem && (
-        <div className="overlay" onClick={closeDetailModal}>
-          <div className="detail-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="detail-modal-header">
-              <h3>{selectedItem.item_name}</h3>
-              <button className="close-button" onClick={closeDetailModal}>×</button>
-            </div> 
-            
-            <div className="detail-modal-body">
-              <div className="detail-image-section">
-                <ImageCarousel 
-                  images={[
-                    { url: selectedItem.front_image, label: 'Front' },
-                    { url: selectedItem.back_image, label: 'Back' },
-                    { url: selectedItem.side_image, label: 'Side' },
-                    { url: selectedItem.image_url, label: 'Main' }
-                  ].filter(img => img.url)}
-                  itemName={selectedItem.item_name}
-                  getRentalImageUrl={getRentalImageUrl}
-                />
-              </div>
-              
-              <div className="detail-info-section">
-                <div className="detail-status">
-                  <span className={`status-badge ${selectedItem.status?.toLowerCase()}`}>
-                    {selectedItem.status || 'available'}
-                  </span>
-                </div>
-                
-                <div className="detail-pricing">
-                  <h4>Pricing</h4>
-                  <div className="price-grid" style={{ gridTemplateColumns: '1fr' }}>
-                    <div className="price-item">
-                      <label>Price:</label>
-                      <span className="price-value">₱{parseFloat(selectedItem.price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {(selectedItem.damage_notes || selectedItem.damaged_by) && (
-                  <div className="detail-damage" style={{
-                    marginBottom: '20px',
-                    padding: '15px',
-                    backgroundColor: selectedItem.status === 'maintenance' ? '#fff3cd' : '#e3f2fd',
-                    borderRadius: '8px',
-                    border: `1px solid ${selectedItem.status === 'maintenance' ? '#ffc107' : '#2196f3'}`,
-                    borderLeft: `4px solid ${selectedItem.status === 'maintenance' ? '#ffc107' : '#2196f3'}`
-                  }}>
-                    <h4 style={{ margin: '0 0 10px 0', color: selectedItem.status === 'maintenance' ? '#856404' : '#1565c0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {selectedItem.status === 'maintenance' ? '⚠️' : '📝'} Damage/Maintenance Notes
-                    </h4>
-                    {selectedItem.damage_notes && (
-                      <p style={{ margin: 0, color: selectedItem.status === 'maintenance' ? '#856404' : '#1565c0', lineHeight: '1.5' }}>
-                        {(() => {
-                          try {
-                            
-                            const parsed = JSON.parse(selectedItem.damage_notes);
-                            if (typeof parsed === 'object' && parsed !== null) {
-                              
-                              return Object.values(parsed).join('; ');
-                            } else {
-                              
-                              return selectedItem.damage_notes;
-                            }
-                          } catch (e) {
-                            
-                            return selectedItem.damage_notes;
-                          }
-                        })()}
-                      </p>
-                    )}
-                    {selectedItem.damaged_by && (
-                      <div style={{ 
-                        marginTop: selectedItem.damage_notes ? '12px' : '0',
-                        padding: '10px 12px',
-                        backgroundColor: '#ffebee',
-                        borderRadius: '6px',
-                        border: '1px solid #ef9a9a'
-                      }}>
-                        <p style={{ 
-                          margin: 0, 
-                          color: '#c62828', 
-                          fontWeight: '600',
-                          fontSize: '0.95em',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px'
-                        }}>
-                          👤 Damaged by: <span style={{ fontWeight: '700' }}>{selectedItem.damaged_by}</span>
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {selectedItem.description && (
-                  <div className="detail-description">
-                    <h4>Description</h4>
-                    <p>{selectedItem.description}</p>
-                  </div>
-                )}
-                
-                {selectedItem.care_instructions && (
-                  <div className="detail-care">
-                    <h4>Care Instructions</h4>
-                    <p>{selectedItem.care_instructions}</p>
-                  </div>
-                )}
-                
-                <div className="detail-actions">
-                  <button className="detail-edit-btn" onClick={() => { closeDetailModal(); openModal(selectedItem.item_id); }}>
-                    Edit Item
-                  </button>
-                  <button className="detail-delete-btn" onClick={() => { closeDetailModal(); deleteItem(selectedItem.item_id); }}>
-                    Delete Item
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default PostRent;
+                    <input type="file" id="sideImageInput" accept="image

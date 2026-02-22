@@ -14,7 +14,7 @@ import {
 import './AnalyticsDashboard.css';
 
 const AnalyticsDashboard = () => {
-  
+
   const [serviceData, setServiceData] = useState([]);
   const [topServices, setTopServices] = useState([]);
 
@@ -30,15 +30,13 @@ const AnalyticsDashboard = () => {
     top: false
   });
 
-  
   const [exportLoading, setExportLoading] = useState(false);
   const [exportSuccess, setExportSuccess] = useState(null);
 
-  
   const handleExportAll = async () => {
     setExportLoading(true);
     setExportSuccess(null);
-    
+
     try {
       await exportFullAnalytics({
         summary: {
@@ -83,7 +81,7 @@ const AnalyticsDashboard = () => {
   const setQuickDateRange = (preset) => {
     const today = new Date();
     let start, end;
-    
+
     switch (preset) {
       case 'today':
         start = end = format(today, 'yyyy-MM-dd');
@@ -107,7 +105,7 @@ const AnalyticsDashboard = () => {
       default:
         return;
     }
-    
+
     setDateRange({ startDate: start, endDate: end });
   };
 
@@ -116,8 +114,8 @@ const AnalyticsDashboard = () => {
   };
 
   const toggleServiceFilter = (service) => {
-    setSelectedServices(prev => 
-      prev.includes(service) 
+    setSelectedServices(prev =>
+      prev.includes(service)
         ? prev.filter(s => s !== service)
         : [...prev, service]
     );
@@ -141,7 +139,7 @@ const AnalyticsDashboard = () => {
           <h2>Revenue Analytics</h2>
           <p>Comprehensive insights into your business performance</p>
         </div>
-        <button 
+        <button
           className={`export-all-btn ${exportLoading ? 'loading' : ''}`}
           onClick={handleExportAll}
           disabled={exportLoading || loading || (serviceData.length === 0 && topServices.length === 0)}

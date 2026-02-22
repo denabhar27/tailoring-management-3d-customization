@@ -25,7 +25,7 @@ const Inventory = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        
+
         const itemsResponse = await getCompletedItems();
         if (itemsResponse.success) {
           setAllItems(itemsResponse.items);
@@ -46,21 +46,21 @@ const Inventory = () => {
   }, []);
 
   const filteredItems = allItems.filter(item => {
-    const matchesSearch = 
+    const matchesSearch =
       item.uniqueNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.customerName.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesService = serviceFilter ? (item.serviceTypeDisplay || item.serviceType) === serviceFilter : true;
-    
+
     return matchesSearch && matchesService;
   });
 
   const handleServiceFilterChange = async (e) => {
     const serviceType = e.target.value;
     setServiceFilter(serviceType);
-    
+
     if (serviceType === '') {
-      
+
       setLoading(true);
       const response = await getCompletedItems();
       if (response.success) {
@@ -68,7 +68,7 @@ const Inventory = () => {
       }
       setLoading(false);
     } else {
-      
+
       setLoading(true);
       const response = await getItemsByServiceType(serviceType);
       if (response.success) {
@@ -84,7 +84,7 @@ const Inventory = () => {
   };
 
   const getServiceImageUrl = (item) => {
-    
+
     if (item.completedItemImage && item.completedItemImage !== 'no-image') {
       if (item.completedItemImage.startsWith('http')) {
         return item.completedItemImage;
@@ -101,7 +101,7 @@ const Inventory = () => {
         return `${API_BASE_URL}${imageUrl}`;
       }
     }
-    
+
     return null;
   };
 
@@ -131,13 +131,13 @@ const Inventory = () => {
 
   const getServiceTypeColor = (serviceType) => {
     const colors = {
-      'Customization': '#9c27b0', 
-      'Dry Cleaning': '#2196f3',   
-      'Repair': '#ff9800',        
-      'Rental': '#4caf50',        
-      'Alteration': '#f44336',    
-      'Consultation': '#795548',  
-      'Other': '#607d8b'          
+      'Customization': '#9c27b0',
+      'Dry Cleaning': '#2196f3',
+      'Repair': '#ff9800',
+      'Rental': '#4caf50',
+      'Alteration': '#f44336',
+      'Consultation': '#795548',
+      'Other': '#607d8b'
     };
     return colors[serviceType] || '#666';
   };
@@ -146,7 +146,7 @@ const Inventory = () => {
     <div className="inventory-management">
       <Sidebar />
       <AdminHeader />
-      
+
       <div className="content">
         <div className="dashboard-title">
           <div>
@@ -214,7 +214,7 @@ const Inventory = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          
+
           <select value={serviceFilter} onChange={handleServiceFilterChange}>
             <option value="">All Services</option>
             <option value="Customization">Customization</option>
@@ -250,8 +250,8 @@ const Inventory = () => {
                   </tr>
                 ) : (
                   filteredItems.map(item => (
-                    <tr 
-                      key={item.id} 
+                    <tr
+                      key={item.id}
                       onClick={() => handleRowClick(item)}
                       style={{ cursor: 'pointer' }}
                     >
@@ -287,8 +287,8 @@ const Inventory = () => {
         </div>
       </div>
       {showDetailModal && selectedItem && (
-        <div 
-          className="modal-overlay active" 
+        <div
+          className="modal-overlay active"
           onClick={(e) => {
             if (e.target.classList.contains('modal-overlay')) setShowDetailModal(false);
           }}

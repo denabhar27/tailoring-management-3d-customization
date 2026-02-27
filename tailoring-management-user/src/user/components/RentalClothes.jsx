@@ -1010,7 +1010,6 @@ const RentalClothes = ({ openAuthModal, showAll = false }) => {
           <div style={{
             display: 'flex',
             justifyContent: 'center',
-            marginTop: '20px',
             marginBottom: '10px'
           }}>
             <span

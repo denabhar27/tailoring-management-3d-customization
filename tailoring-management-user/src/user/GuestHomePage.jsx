@@ -192,7 +192,6 @@ const App = ({ setIsLoggedIn }) => {
   };
 
   const services = [
-    { name: 'Rental', img: heroBg },
     { name: 'Customize', img: customizeBg },
     { name: 'Repair', img: repairBg },
     { name: 'Dry Cleaning', img: dryCleanBg },
@@ -262,21 +261,101 @@ const App = ({ setIsLoggedIn }) => {
         </div>
       </section>
       <RentalClothes openAuthModal={openAuthModal} />
+
       <section className="customization fade-in-up"
           id="Customize"
           style={{
-            background: "(background: linear-gradient(to bottom, #fffff5 0%, #f0e9e2 100%))"
+          background: "linear-gradient(to bottom, #fffff5 0%, #f0e9e2 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "100px 5%",
+            gap: "60px",      
+            flexWrap: "wrap", 
           }}
         >
-        <div className="custom-text fade-in-left">
-          <h2>Customization</h2>
-          <p>Got a style in mind?</p>
-          <p>Personalize it and turn your vision into reality!</p>
+        <div className="custom-text fade-in-left" style={{ maxWidth: "600px", textAlign: "left" }}>
+          <h2 style={{ 
+            fontFamily: "'Playfair Display', serif", 
+            fontSize: "3.5rem", 
+            fontWeight: 800, 
+            color: "#8B4513", 
+            marginBottom: "30px", 
+            letterSpacing: "1px",
+            textDecoration: "none",
+            borderBottom: "none"
+          }}>Customization Service</h2>
+          <p style={{ 
+            fontSize: "1.4rem", 
+            color: "#5D4037", 
+            margin: "20px 0", 
+            lineHeight: 1.6, 
+            opacity: 0.95 
+          }}>Got a style in mind?</p>
+          <p style={{ 
+            fontSize: "1.4rem", 
+            color: "#5D4037", 
+            margin: "20px 0", 
+            lineHeight: 1.6, 
+            opacity: 0.95 
+          }}>Personalize it and turn your vision into reality!</p>
         </div>
-        <div className="custom-image fade-in-right scale-in" style={{ backgroundImage: `url('/src/assets/background.jpg'), url(${customizeBg})` }}>
-          <button className="btn-customize glow-on-hover" onClick={openAuthModal}>Customize now!</button>
+
+        <div className="custom-image fade-in-right scale-in" style={{ 
+          backgroundImage: `url(${customizeBg})`, 
+          backgroundSize: "cover", 
+          backgroundPosition: "center", 
+          borderRadius: "32px", 
+          height: "500px", 
+          position: "relative",
+          width: "600px",
+        }}>
+          <div className="custom-overlay" style={{ 
+            position: "absolute", 
+            inset: 0, 
+            background: "linear-gradient(135deg, rgba(139, 69, 19, 0.4) 0%, rgba(101, 67, 33, 0.6) 100%)", 
+            borderRadius: "32px" ,
+          }}></div>
+          <div className="custom-content" style={{ 
+            position: "absolute", 
+            top: "50%", 
+            left: "50%", 
+            transform: "translate(-50%, -50%)", 
+            textAlign: "center", 
+            zIndex: 2, 
+            color: "white" 
+          }}>
+            <h3 style={{ 
+              fontFamily: "'Playfair Display', serif", 
+              fontSize: "2.5rem", 
+              fontWeight: 800, 
+              textShadow: "2px 2px 4px rgba(0,0,0,0.3)",
+              marginBottom: "20px"
+            }}>Customize your vision</h3>
+            <p style={{ 
+              fontSize: "1.3rem", 
+              opacity: 0.96, 
+              fontWeight: 400, 
+              textShadow: "1px 1px 2px rgba(0,0,0,0.3)", 
+              maxWidth: "500px",
+              marginBottom: "30px"
+            }}>Turn style ideas into reality</p>
+            <button className="custom-book glow-on-hover" onClick={openAuthModal} style={{ 
+              padding: "18px 50px", 
+              background: "white", 
+              color: "#8B4513", 
+              border: "none", 
+              borderRadius: "50px", 
+              fontSize: "1.2rem", 
+              fontWeight: 700, 
+              cursor: "pointer", 
+              boxShadow: "0 10px 30px rgba(139, 69, 19, 0.3)",
+              transition: "all 0.3s"
+            }}>Customize now!</button>
+          </div>
         </div>
       </section>
+
       <section className="repair fade-in-up" id="Repair">
         <h2 className="fade-in-up">Repair Service</h2>
         <div className="repair-bg scale-in" style={{ backgroundImage: `url(${repairBg})` }}>
@@ -288,15 +367,107 @@ const App = ({ setIsLoggedIn }) => {
           </div>
         </div>
       </section>
-      <section className="clean fade-in-up" id="DryCleaning">
-        <h2 className="fade-in-up">Dry Cleaning Service</h2>
-        <div className="clean-bg scale-in" style={{ backgroundImage: `url(${dryCleanBg})` }}>
-          <div className="clean-overlay"></div>
-          <div className="clean-content">
-            <h3 className="fade-in-up">Keep your garments fresh and spotless</h3>
-            <p className="fade-in-up">Premium care for suits, gowns, and more</p>
-            <button className="clean-book glow-on-hover" onClick={openAuthModal}>Book Dry Cleaning</button>
+      <section className="clean fade-in-up" id="DryCleaning"
+          style={{
+            background: "linear-gradient(to bottom, #fffff5 0%, #f0e9e2 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "100px 5%"
+          }}
+        >
+        <div className="clean-image fade-in-left scale-in" style={{ 
+          backgroundImage: `url(${dryCleanBg})`, 
+          backgroundSize: "cover", 
+          backgroundPosition: "center", 
+          borderRadius: "32px", 
+          height: "500px", 
+          width: "600px", 
+          position: "relative",
+          marginRight: "60px"
+        }}>
+          <div className="clean-overlay" style={{ 
+            position: "absolute", 
+            inset: 0, 
+            background: "linear-gradient(135deg, rgba(139, 69, 19, 0.4) 0%, rgba(101, 67, 33, 0.6) 100%)", 
+            borderRadius: "32px" 
+          }}></div>
+          <div className="clean-content" style={{ 
+            position: "absolute", 
+            top: "50%", 
+            left: "50%", 
+            transform: "translate(-50%, -50%)", 
+            textAlign: "center", 
+            zIndex: 2, 
+            color: "white" 
+          }}>
+            <h3 style={{ 
+              fontFamily: "'Playfair Display', serif", 
+              fontSize: "2.5rem", 
+              fontWeight: 800, 
+              textShadow: "2px 2px 4px rgba(0,0,0,0.3)",
+              marginBottom: "20px"
+            }}>Keep your garments fresh and spotless</h3>
+            <p style={{ 
+              fontSize: "1.3rem", 
+              opacity: 0.96, 
+              fontWeight: 400, 
+              textShadow: "1px 1px 2px rgba(0,0,0,0.3)", 
+              maxWidth: "500px",
+              marginBottom: "30px"
+            }}>Premium care for suits, gowns, and more</p>
+            <button className="clean-book glow-on-hover" onClick={openAuthModal} style={{ 
+              padding: "18px 50px", 
+              background: "white", 
+              color: "#8B4513", 
+              border: "none", 
+              borderRadius: "50px", 
+              fontSize: "1.2rem", 
+              fontWeight: 700, 
+              cursor: "pointer", 
+              boxShadow: "0 10px 30px rgba(139, 69, 19, 0.3)",
+              transition: "all 0.3s"
+            }}>Book Dry Cleaning</button>
           </div>
+        </div>
+        <div className="clean-text fade-in-right" style={{ maxWidth: "600px", textAlign: "right" }}>
+          <h2 style={{ 
+            fontFamily: "'Playfair Display', serif", 
+            fontSize: "3.5rem", 
+            fontWeight: 800, 
+            color: "#8B4513", 
+            marginBottom: "30px", 
+            letterSpacing: "1px",
+            textDecoration: "none",
+            position: "relative",
+            paddingRight: "20px"
+          }}>dry cleaning service</h2>
+          <style jsx>{`
+            .clean-text h2::after {
+              content: '';
+              position: absolute;
+              right: 0;
+              bottom: -10px;
+              width: 60px;
+              height: 3px;
+              background: linear-gradient(90deg, #8B4513 0%, #f0e9e2 100%);
+              border-radius: 2px;
+            }
+          `}</style>
+          <p style={{ 
+            fontSize: "1.4rem", 
+            color: "#5D4037", 
+            margin: "20px 0", 
+            lineHeight: 1.6, 
+            opacity: 0.95 
+          }}>Professional dry cleaning for all your garments</p>
+          <p style={{ 
+            fontSize: "1.4rem", 
+            color: "#5D4037", 
+            margin: "20px 0", 
+            lineHeight: 1.6, 
+            opacity: 0.95 
+          }}>Expert care for delicate fabrics and special occasions</p>
         </div>
       </section>
 
@@ -310,7 +481,10 @@ const App = ({ setIsLoggedIn }) => {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {services.map((s) => (
-                  <button key={s.name} className="auth-submit" onClick={openAuthModal}>{s.name}</button>
+                  <button key={s.name} className="auth-submit" onClick={() => {
+                    setServiceModalOpen(false);
+                    openAuthModal();
+                  }}>{s.name}</button>
                 ))}
               </div>
             </div>
@@ -486,6 +660,75 @@ const App = ({ setIsLoggedIn }) => {
     }}
   />
 )}
+
+      <footer style={{
+        backgroundColor: "#a76648ff",
+        color: "#f0e9e2",
+        padding: "15px 20px 10px",
+      }}>
+        <div style={{
+          maxWidth: "1200px",
+          margin: "0 auto",
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gap: "40px",
+          textAlign: "center",
+          marginTop: "20px"
+        }}>
+          <div>
+            <h3 style={{
+              fontSize: "1.1rem",
+              fontWeight: 700,
+              marginBottom: "12px",
+              color: "#f0e9e2"
+            }}>Our store:</h3>
+            <p style={{
+              fontSize: "0.9rem",
+              lineHeight: 1.5,
+              marginBottom: "8px",
+              color: "#d4c5b9"
+            }}>Location: Ground floor of Zamboanga A.E. Colleges, 41 Rizal Street, Zamboanga City, Philippines</p>
+            <p style={{
+              fontSize: "0.9rem",
+              lineHeight: 1.5,
+              color: "#d4c5b9"
+            }}>Monday-Saturday: 8 AM - 6 PM</p>
+          </div>
+          
+          <div>
+            <h3 style={{
+              fontSize: "1.1rem",
+              fontWeight: 700,
+              marginBottom: "15px",
+              color: "#f0e9e2"
+            }}>Customer Service</h3>
+            <p style={{
+              fontSize: "1rem",
+              lineHeight: 1.6,
+              marginBottom: "8px",
+              color: "#d4c5b9"
+            }}>Tel: 0917 7107959</p>
+            <p style={{
+              fontSize: "1rem",
+              lineHeight: 1.6,
+              color: "#d4c5b9"
+            }}>Email: Ronald@gmail.com</p>
+          </div>
+        </div>
+        
+        <div style={{
+          textAlign: "center",
+          marginTop: "30px",
+          paddingTop: "20px",
+          borderTop: "1px solid #4a3426"
+        }}>
+          <p style={{
+            fontSize: "0.9rem",
+            color: "#d4c5b9",
+            margin: 0
+          }}>Copyright 2026 by BridgeIT</p>
+        </div>
+      </footer>
 
     </>
   );

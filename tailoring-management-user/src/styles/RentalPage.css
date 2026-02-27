@@ -1,20 +1,20 @@
 .rental-page {
   min-height: 100vh;
-  padding-top: 100px; 
+  padding-top: 0; 
   overflow-x: hidden; 
-  background-color: #000;
+  background: linear-gradient(to bottom, #fffff5 0%, #f0e9e2 100%);
 }
 
 .home-button-container {
-  margin-bottom: 30px;
-  margin-top: 20px;
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 1000;
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  padding: 0 20px;
-  width: 100%;
-  position: relative;
-  z-index: 10;
+  width: auto;
+  padding-bottom: 20px;
 }
 
 .btn-home {
@@ -104,6 +104,7 @@
 
 .rental-page .rental-container {
   overflow-y: visible !important;
+  margin-top: 120px;
 }
 
 .rental-actions .date-section {
@@ -142,7 +143,6 @@
   border-radius: 8px;
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid #e9ecef;
 }
 
 .cost-breakdown h4 {
@@ -157,7 +157,6 @@
   justify-content: space-between;
   align-items: center;
   padding: 8px 0;
-  border-bottom: 1px solid #e9ecef;
   font-size: 14px;
 }
 
@@ -171,7 +170,6 @@
   align-items: center;
   padding: 12px 0;
   margin-top: 10px;
-  border-top: 2px solid #8B4513;
   font-weight: 700;
   font-size: 16px;
   color: #8B4513;
@@ -320,7 +318,6 @@
   font-weight: 600;
   margin: 0 0 15px 0;
   padding-bottom: 8px;
-  border-bottom: 2px solid #e9ecef;
   text-align: center;
   width: 100%;
 }
@@ -343,7 +340,6 @@
   padding: 10px 20px;
   background: white;
   border-radius: 6px;
-  border: 1px solid #e9ecef;
   font-size: 14px;
   text-align: center;
   width: auto;
@@ -400,7 +396,6 @@
   padding: 15px;
   background: #fff;
   border-radius: 8px;
-  border-left: 4px solid #8B4513;
 }
 
 .description-section strong,
@@ -420,7 +415,6 @@
 .rental-actions {
   margin-top: 25px;
   padding-top: 20px;
-  border-top: 1px solid #e9ecef;
 }
 
 .rental-actions label {
@@ -500,13 +494,11 @@
 .cart-message.success {
   background: #d4edda;
   color: #155724;
-  border: 1px solid #c3e6cb;
 }
 
 .cart-message.error {
   background: #f8d7da;
   color: #721c24;
-  border: 1px solid #f5c6cb;
 }
 
 @keyframes slideDown {

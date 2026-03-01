@@ -616,6 +616,8 @@
 .accessoryRow label {
     flex: 1;
     min-width: 0;
+    color: #5D4E37;
+    font-weight: 500;
 }
 
 .accessoryRow select {

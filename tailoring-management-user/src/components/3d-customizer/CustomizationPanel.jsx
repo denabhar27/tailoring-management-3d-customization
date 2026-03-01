@@ -486,7 +486,7 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
       </h3>
       {expandedSections.buttons && (
         <div className={styles.sectionContent}>
-          <div className="row">
+          <div className={styles.accessoryRow}>
             <label>Button Model
               <select value={selectedButtonModel} onChange={e => setSelectedButtonModel(e.target.value)}>
                 {availableButtonModels.map(model => (
@@ -499,7 +499,7 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                 ))}
               </select>
             </label>
-            <button onClick={addButton} className={styles.premiumButton} style={{ marginLeft: 8 }}>Add Button</button>
+            <button onClick={addButton} className={styles.compactButton}>Add Button</button>
           </div>
 
           {buttons && buttons.length > 0 && (
@@ -664,34 +664,6 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                 ⬇ Backward
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      <h3 onClick={() => toggleSection('details')} className={styles.collapsibleHeader}>
-        <span>Additional Details</span>
-        <span className={styles.toggleIcon}>{expandedSections.details ? '−' : '+'}</span>
-      </h3>
-      {expandedSections.details && (
-        <div className={styles.sectionContent}>
-          <div className="row">
-            <label>Design Image (Optional)
-              <input type="file" accept="image/*" className={styles.fileInput} onChange={e => {
-                if (e.target.files && e.target.files[0]) {
-                  setDesignImage(URL.createObjectURL(e.target.files[0]));
-                }
-              }} />
-            </label>
-            {designImage && <img src={designImage} alt="Design Preview" style={{ width: '100%', maxHeight: 150, objectFit: 'contain', marginTop: 8, borderRadius: 8, border: '1px solid rgba(139, 69, 19, 0.2)' }} />}
-            <label>Notes for Admin
-              <textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                rows={3}
-                className={styles.notesTextarea}
-                placeholder="Enter any specific instructions..."
-              />
-            </label>
           </div>
         </div>
       )}

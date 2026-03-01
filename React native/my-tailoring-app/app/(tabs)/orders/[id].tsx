@@ -153,7 +153,7 @@ export default function OrderDetails() {
 
   const canCancelOrder = () => {
     const status = order?.status?.toLowerCase();
-    return status === 'pending' || status === 'price_confirmation';
+    return status === 'pending';
   };
 
   const getStatusColor = (status: string) => {

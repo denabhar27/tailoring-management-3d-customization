@@ -753,7 +753,7 @@ const Repair = () => {
                       </td>
                       <td>
                         {item.specific_data?.garments && item.specific_data.garments.length > 0
-                          ? `${item.specific_data.garments.length} garment${item.specific_data.garments.length > 1 ? 's' : ''}`
+                          ? item.specific_data.garments.map(g => g.garmentType || 'Unknown').join(', ')
                           : (item.specific_data?.garmentType || 'N/A')}
                       </td>
                       <td><span style={{ fontSize: '0.9em', color: '#d32f2f' }}>{item.specific_data?.serviceName || 'N/A'}</span></td>

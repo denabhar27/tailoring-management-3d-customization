@@ -2086,7 +2086,7 @@ const Profile = () => {
                         >
                           💳 Transaction Log
                         </button>
-                        {item.status !== 'cancelled' && item.status !== 'completed' && item.status !== 'returned' && item.status !== 'accepted' && (
+                        {item.status === 'pending' && (
                           <button
                             className="btn-cancel"
                             onClick={() => {
@@ -2094,7 +2094,6 @@ const Profile = () => {
                               setCancelReason('');
                               setCancelModalOpen(true);
                             }}
-                            disabled={item.status === 'accepted'}
                             style={{
                               padding: '8px 16px',
                               backgroundColor: '#f44336',
@@ -2243,7 +2242,7 @@ const Profile = () => {
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                  {selectedItem.status !== 'cancelled' && selectedItem.status !== 'completed' && selectedItem.status !== 'returned' && selectedItem.status !== 'rented' && selectedItem.status !== 'accepted' && (
+                  {selectedItem.status === 'pending' && (
                     <button
                       onClick={() => {
                         setItemToCancel(selectedItem);
@@ -2251,7 +2250,6 @@ const Profile = () => {
                         setCancelModalOpen(true);
                         closeDetailsModal();
                       }}
-                      disabled={selectedItem.status === 'accepted'}
                       style={{
                         padding: '10px 20px',
                         backgroundColor: '#f44336',

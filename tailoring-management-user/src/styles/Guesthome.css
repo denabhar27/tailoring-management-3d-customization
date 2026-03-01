@@ -1304,3 +1304,134 @@ flex-shrink: 0;
   left: 100%;
 
 }
+
+/* ===== Service Selection Modal (matching mobile Book Appointment) ===== */
+
+.service-hero-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 36px 24px 28px;
+  text-align: center;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+}
+
+.service-hero-title {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #1e293b;
+  letter-spacing: -0.5px;
+  margin: 0 0 8px;
+  font-family: 'Playfair Display', serif;
+}
+
+.service-hero-subtitle {
+  font-size: 1rem;
+  color: #64748b;
+  font-weight: 500;
+  margin: 0 0 16px;
+}
+
+.service-decorative-line {
+  width: 70px;
+  height: 5px;
+  background: #F59E0B;
+  border-radius: 3px;
+  margin: 0 auto;
+}
+
+.service-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.service-card-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 20px;
+  border-radius: 20px;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  text-align: left;
+}
+
+.service-card-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+}
+
+.service-card-btn:active {
+  transform: translateY(-1px);
+}
+
+.service-card-repair {
+  background: linear-gradient(135deg, #DBEAFE, #BFDBFE);
+}
+.service-card-repair:hover {
+  background: linear-gradient(135deg, #BFDBFE, #93C5FD);
+}
+
+.service-card-customize {
+  background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+}
+.service-card-customize:hover {
+  background: linear-gradient(135deg, #FDE68A, #FBBF24);
+}
+
+.service-card-drycleaning {
+  background: linear-gradient(135deg, #FCE7F3, #FBCFE8);
+}
+.service-card-drycleaning:hover {
+  background: linear-gradient(135deg, #FBCFE8, #F9A8D4);
+}
+
+.service-card-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  color: #1e293b;
+}
+
+.service-card-text {
+  flex: 1;
+  margin-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.service-card-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: -0.3px;
+}
+
+.service-card-desc {
+  font-size: 0.85rem;
+  color: #475569;
+  font-weight: 600;
+}
+
+.service-card-chevron {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #64748b;
+}

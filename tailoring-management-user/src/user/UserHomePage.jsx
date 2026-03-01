@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import '../styles/UserHomePage.css';
 import '../styles/Guesthome.css';
 import '../styles/Transitions.css';
+import { FiScissors, FiDroplet, FiChevronRight } from 'react-icons/fi';
+import { PiTShirtBold } from 'react-icons/pi';
 import { initScrollAnimations, initHeaderScroll } from '../utils/scrollAnimations';
 import logo from "../assets/logo.png";
 import appointmentBg from "../assets/background.jpg";
@@ -506,17 +508,36 @@ const UserHomePage = ({ setIsLoggedIn }) => {
         <div className="auth-modal-overlay" onClick={() => setServiceModalOpen(false)}>
           <div className="auth-modal" onClick={(e) => e.stopPropagation()}>
             <div className="auth-container">
-              <div className="auth-header">
-                <h2>Select Service</h2>
-                <p className="auth-subtitle">Choose the service you want to book</p>
+              <div className="service-hero-card">
+                <h2 className="service-hero-title">Select Service</h2>
+                <p className="service-hero-subtitle">Choose the service you want to book</p>
+                <div className="service-decorative-line" />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {services.map((s) => (
-                  <button key={s.name} className="auth-submit" onClick={() => {
-                    setServiceModalOpen(false);
-                    addServiceToCart(s.name);
-                  }}>{s.name}</button>
-                ))}
+              <div className="service-cards-list">
+                <button className="service-card-btn service-card-repair" onClick={() => { setServiceModalOpen(false); addServiceToCart('Repair'); }}>
+                  <div className="service-card-icon"><FiScissors size={28} /></div>
+                  <div className="service-card-text">
+                    <span className="service-card-title">Repair Service</span>
+                    <span className="service-card-desc">Expert restoration &amp; stitching</span>
+                  </div>
+                  <div className="service-card-chevron"><FiChevronRight size={22} /></div>
+                </button>
+                <button className="service-card-btn service-card-customize" onClick={() => { setServiceModalOpen(false); addServiceToCart('Customize'); }}>
+                  <div className="service-card-icon"><PiTShirtBold size={28} /></div>
+                  <div className="service-card-text">
+                    <span className="service-card-title">Customize Service</span>
+                    <span className="service-card-desc">Tailor-made designs just for you</span>
+                  </div>
+                  <div className="service-card-chevron"><FiChevronRight size={22} /></div>
+                </button>
+                <button className="service-card-btn service-card-drycleaning" onClick={() => { setServiceModalOpen(false); addServiceToCart('Dry Cleaning'); }}>
+                  <div className="service-card-icon"><FiDroplet size={28} /></div>
+                  <div className="service-card-text">
+                    <span className="service-card-title">Dry Cleaning</span>
+                    <span className="service-card-desc">Premium care &amp; deep clean</span>
+                  </div>
+                  <div className="service-card-chevron"><FiChevronRight size={22} /></div>
+                </button>
               </div>
             </div>
           </div>

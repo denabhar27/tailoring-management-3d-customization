@@ -7,6 +7,23 @@ export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://tai
 console.log('Using API_BASE_URL:', API_BASE_URL);
 const REQUEST_TIMEOUT = parseInt(process.env.EXPO_PUBLIC_REQUEST_TIMEOUT || '10000', 10);
 
+// Simple auth event system (no Node.js 'events' dependency)
+type AuthListener = () => void;
+const authListeners: AuthListener[] = [];
+
+export const authEvents = {
+  on(_event: string, listener: AuthListener) {
+    authListeners.push(listener);
+  },
+  off(_event: string, listener: AuthListener) {
+    const idx = authListeners.indexOf(listener);
+    if (idx !== -1) authListeners.splice(idx, 1);
+  },
+  emit(_event: string) {
+    authListeners.forEach(fn => fn());
+  },
+};
+
 const decodeToken = (token: string) => {
   try {
     const base64Url = token.split('.')[1];
@@ -24,8 +41,43 @@ const decodeToken = (token: string) => {
   }
 };
 
+const isTokenExpired = (token: string): boolean => {
+  const decoded = decodeToken(token);
+  if (!decoded || !decoded.exp) return true;
+  // exp is in seconds, Date.now() in ms — add 60s buffer for clock skew
+  return decoded.exp * 1000 < Date.now() + 60000;
+};
+
+const clearAuthData = async () => {
+  await AsyncStorage.multiRemove(['userToken', 'userRole', 'userData']);
+};
+
+const handleAuthFailure = async () => {
+  await clearAuthData();
+  authEvents.emit('authExpired');
+};
+
+// Exported helper: returns true if token exists AND is not expired
+export const isAuthenticated = async (): Promise<boolean> => {
+  const token = await AsyncStorage.getItem('userToken');
+  if (!token) return false;
+  if (isTokenExpired(token)) {
+    await handleAuthFailure();
+    return false;
+  }
+  return true;
+};
+
 const getAuthHeaders = async () => {
   const token = await AsyncStorage.getItem('userToken');
+
+  // Proactively check for expired token before sending the request
+  if (token && isTokenExpired(token)) {
+    console.warn('Token expired locally — clearing auth and redirecting to login');
+    await handleAuthFailure();
+    throw new Error('Session expired. Please log in again.');
+  }
+
   return {
     'Content-Type': 'application/json',
     'Authorization': token ? `Bearer ${token}` : '',
@@ -55,6 +107,19 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
       clearTimeout(timeoutId);
 
       console.log('API Response Status:', response.status);
+
+      // Handle 401 — token rejected by server
+      if (response.status === 401) {
+        let errorData;
+        try {
+          const responseClone = response.clone();
+          errorData = await responseClone.json();
+          console.log('API 401 Error Data:', errorData);
+        } catch (_) {}
+        console.warn('Received 401 — clearing auth and redirecting to login');
+        await handleAuthFailure();
+        throw new Error('Session expired. Please log in again.');
+      }
 
       const responseClone = response.clone();
 

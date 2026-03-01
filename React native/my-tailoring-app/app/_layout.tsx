@@ -1,9 +1,11 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
+import { Alert } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
 import 'react-native-reanimated';
+import { authEvents } from '@/utils/apiService';
 
 declare const ErrorUtils: {
   getGlobalHandler: () => ((error: Error, isFatal?: boolean) => void) | null;
@@ -11,6 +13,23 @@ declare const ErrorUtils: {
 };
 
 export default function RootLayout() {
+  const router = useRouter();
+
+  // Listen for auth expiration events and redirect to login
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      Alert.alert(
+        'Session Expired',
+        'Your session has expired. Please log in again.',
+        [{ text: 'OK', onPress: () => router.replace('/(tabs)/login') }]
+      );
+    };
+    authEvents.on('authExpired', handleAuthExpired);
+    return () => {
+      authEvents.off('authExpired', handleAuthExpired);
+    };
+  }, [router]);
+
   useEffect(() => {
 
     SystemUI.setBackgroundColorAsync('#ffffff');

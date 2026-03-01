@@ -133,7 +133,9 @@ export default function ProfileScreen() {
       if (result.success) {
         setUnreadCount(result.count || 0);
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Silently ignore session-expired errors (redirect is handled globally)
+      if (error?.message?.includes('Session expired')) return;
       console.error('Error fetching unread count:', error);
     }
   };

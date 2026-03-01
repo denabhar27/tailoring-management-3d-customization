@@ -11,13 +11,15 @@ import {
   Platform,
   SafeAreaView,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { Text } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { rentalService } from "../../utils/rentalService";
-import { notificationService } from "../../utils/apiService";
+import { notificationService, isAuthenticated } from "../../utils/apiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { height, width } = Dimensions.get("window");
@@ -47,20 +49,31 @@ const services = [
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [rentals, setRentals] = useState<any[]>([]);
   const [loadingRentals, setLoadingRentals] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     checkAuth();
   }, []);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchRentals(), fetchUnreadCount()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const checkAuth = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
-      if (!token) {
-
+      const authenticated = await isAuthenticated();
+      if (!authenticated) {
+        // Token missing or expired — redirect handled by authEvents listener
         router.replace("/");
         return;
       }
@@ -80,7 +93,9 @@ export default function HomeScreen() {
       if (result.success) {
         setUnreadCount(result.count || 0);
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Silently ignore session-expired errors (redirect is handled globally)
+      if (error?.message?.includes('Session expired')) return;
       console.error('Error fetching unread count:', error);
     }
   };
@@ -125,6 +140,15 @@ export default function HomeScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#8B4513"]}
+            tintColor="#8B4513"
+            progressBackgroundColor="#FEF3C7"
+          />
+        }
       >
 
         <View style={styles.headerSection}>
@@ -188,7 +212,7 @@ export default function HomeScreen() {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
               <View style={styles.iconWrapper}>
-                <Ionicons name="heart" size={20} color="#F59E0B" />
+                <Ionicons name="cut" size={20} color="#F59E0B" />
               </View>
               <Text style={styles.sectionTitle}>Our Services</Text>
             </View>
@@ -232,7 +256,7 @@ export default function HomeScreen() {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
               <View style={styles.iconWrapper}>
-                <Ionicons name="shirt-outline" size={24} color="#F59E0B" />
+                <Ionicons name="pricetags" size={20} color="#F59E0B" />
               </View>
               <Text style={styles.sectionTitle}>Rentals</Text>
             </View>
@@ -269,7 +293,7 @@ export default function HomeScreen() {
                     {r.item_name}
                   </Text>
                   <View style={styles.priceRow}>
-                    <Text style={styles.rentalPrice}>₱{r.daily_rate}</Text>
+                    <Text style={styles.rentalPrice}>₱{parseFloat(r.daily_rate || 0).toLocaleString()}</Text>
                     <Text style={styles.priceLabel}>/day</Text>
                   </View>
                 </View>
@@ -281,37 +305,33 @@ export default function HomeScreen() {
       </ScrollView>
 
       {/* FIXED BOTTOM NAVIGATION — ALWAYS VISIBLE */}
-      <View style={styles.bottomNav}>
-        {/* Home - Active */}
+      <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={styles.navItemWrapActive}>
-          <Ionicons name="home" size={24} color="#78350F" />
-          <Text style={styles.navLabelActive}>Home</Text>
+          <Ionicons name="home" size={20} color="#7A5A00" />
         </View>
 
         <TouchableOpacity
           onPress={() =>
             router.push("/(tabs)/appointment/appointmentSelection")
           }
-          style={styles.navItemWrap}
         >
-          <Ionicons name="calendar-outline" size={24} color="#64748B" />
-          <Text style={styles.navLabel}>Book</Text>
+          <View style={styles.navItemWrap}>
+            <Ionicons name="calendar-outline" size={20} color="#9CA3AF" />
+          </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => router.push("/(tabs)/faq")}
-          style={styles.navItemWrap}
-        >
-          <Ionicons name="help-circle-outline" size={24} color="#64748B" />
-          <Text style={styles.navLabel}>FAQ</Text>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/faq")}>
+          <View style={styles.navItemWrap}>
+            <Ionicons name="help-circle-outline" size={20} color="#9CA3AF" />
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => router.push("/(tabs)/UserProfile/profile")}
-          style={styles.navItemWrap}
         >
-          <Ionicons name="person-outline" size={24} color="#64748B" />
-          <Text style={styles.navLabel}>Profile</Text>
+          <View style={styles.navItemWrap}>
+            <Ionicons name="person-outline" size={20} color="#9CA3AF" />
+          </View>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -359,8 +379,8 @@ const styles = StyleSheet.create({
   // Hero
   heroContainer: {
     marginHorizontal: 20,
-    marginTop: 20,
-    height: height * 0.26,
+    marginTop: 16,
+    height: height * 0.24,
     borderRadius: 24,
     overflow: "hidden",
     shadowColor: "#000",
@@ -389,7 +409,7 @@ const styles = StyleSheet.create({
   heroButtonText: { color: "#78350F", fontWeight: "700", fontSize: 15 },
 
   // Sections
-  sectionContainer: { marginTop: 36, paddingHorizontal: 20 },
+  sectionContainer: { marginTop: 28, paddingHorizontal: 20 },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -426,26 +446,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 16,
+    gap: 12,
   },
   serviceCard: {
-    width: (width - 56) / 2,
-    height: 180,
+    width: (width - 52) / 2,
+    height: 130,
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+    borderRadius: 20,
     overflow: "hidden",
-    elevation: 10,
+    elevation: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
   },
   serviceImageContainer: { flex: 1 },
   serviceImage: { width: "100%", height: "100%" },
   serviceGradient: { ...StyleSheet.absoluteFillObject },
-  serviceLabelContainer: { position: "absolute", bottom: 16, left: 16 },
+  serviceLabelContainer: { position: "absolute", bottom: 12, left: 12 },
   serviceLabel: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "700",
     color: "#ffffff",
     textShadowColor: "rgba(0,0,0,0.8)",
@@ -456,13 +476,12 @@ const styles = StyleSheet.create({
   rentalGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
   },
   rentalCard: {
-    width: (width - 40 - 32) / 2,
+    width: (width - 52) / 2,
     height: 200,
-    marginHorizontal: 8,
-    marginBottom: 16,
+    marginBottom: 12,
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
     overflow: "hidden",
@@ -501,42 +520,34 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
-    paddingVertical: 16,
-    paddingBottom: Platform.OS === "ios" ? 28 : 16,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
+    borderTopColor: "#EEE",
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
+    elevation: 10,
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: -4 },
-    elevation: 20,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: -3 },
   },
   navItemWrap: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#F3F4F6",
     alignItems: "center",
-    paddingHorizontal: 12,
-    gap: 4,
+    justifyContent: "center",
   },
   navItemWrapActive: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#FDE68A",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    backgroundColor: "#FEF3C7",
-    borderRadius: 20,
-    gap: 4,
-  },
-  navLabel: {
-    fontSize: 11,
-    color: "#64748B",
-    fontWeight: "600",
-  },
-  navLabelActive: {
-    fontSize: 11,
-    color: "#78350F",
-    fontWeight: "700",
+    justifyContent: "center",
   },
   cartBadgeContainer: {
     position: "relative",

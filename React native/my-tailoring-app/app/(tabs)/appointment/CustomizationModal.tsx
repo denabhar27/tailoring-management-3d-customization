@@ -406,7 +406,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
             activeOpacity={0.8}
           >
             <View style={styles.banner3DIcon}>
-              <MaterialCommunityIcons name="rotate-3d-variant" size={40} color="#B8860B" />
+              <MaterialCommunityIcons name="creation" size={40} color="#B8860B" />
             </View>
             <View style={styles.banner3DText}>
               <Text style={styles.banner3DTitle}>✨ Try Our 3D Customizer</Text>

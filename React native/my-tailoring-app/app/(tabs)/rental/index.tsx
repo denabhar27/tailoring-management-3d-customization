@@ -17,7 +17,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "react-native-paper";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { rentalService } from "../../../utils/rentalService";
 import { cartService } from "../../../utils/apiService";
@@ -26,13 +26,13 @@ import DateTimePickerModal from "../../../components/DateTimePickerModal";
 const { width, height } = Dimensions.get("window");
 
 const categories = [
-  { name: "All", icon: "apps" },
-  { name: "Suit", icon: "person" },
-  { name: "Coat", icon: "snow" },
-  { name: "Barong", icon: "leaf" },
-  { name: "Gown", icon: "woman" },
-  { name: "Shirt", icon: "shirt" },
-  { name: "Trousers", icon: "body" },
+  { name: "All", icon: "border-all", lib: "fa5" },
+  { name: "Suit", icon: "user-tie", lib: "fa5" },
+  { name: "Coat", icon: "tshirt", lib: "fa5" },
+  { name: "Barong", icon: "leaf", lib: "fa5" },
+  { name: "Gown", icon: "female", lib: "fa5" },
+  { name: "Shirt", icon: "tshirt", lib: "fa5" },
+  { name: "Trousers", icon: "ruler-vertical", lib: "fa5" },
 ];
 
 export default function RentalLanding() {
@@ -313,9 +313,9 @@ export default function RentalLanding() {
                   ]}
                   onPress={() => setSelectedCategory(cat.name)}
                 >
-                  <Ionicons
-                    name={cat.icon as any}
-                    size={20}
+                  <FontAwesome5
+                    name={cat.icon}
+                    size={18}
                     color={isActive ? "#FFFFFF" : "#78350F"}
                   />
                   <Text
@@ -438,7 +438,7 @@ export default function RentalLanding() {
                       {item.item_name}
                     </Text>
                     <View style={styles.priceRow}>
-                      <Text style={styles.rentalPrice}>₱{item.daily_rate}</Text>
+                      <Text style={styles.rentalPrice}>₱{parseFloat(item.daily_rate || 0).toLocaleString()}</Text>
                       <Text style={styles.priceLabel}>/day</Text>
                     </View>
                   </View>
@@ -813,13 +813,12 @@ const styles = StyleSheet.create({
   rentalGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
   },
   rentalCard: {
-    width: (width - 40 - 32) / 2,
+    width: (width - 52) / 2,
     height: 200,
-    marginHorizontal: 8,
-    marginBottom: 16,
+    marginBottom: 12,
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
     overflow: "hidden",

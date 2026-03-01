@@ -1,20 +1,20 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import RentalClothes from './components/RentalClothes';
 import '../styles/RentalPage.css';
 
 const RentalPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   
-  const isLoggedIn = () => {
-    return localStorage.getItem('token') !== null;
-  };
+  // Check if user came from guest page via navigation state
+  const isGuest = location.state?.isGuest ?? (localStorage.getItem('token') === null);
 
   const handleHomeClick = () => {
-    if (isLoggedIn()) {
-      navigate('/user-home');
-    } else {
+    if (isGuest) {
       navigate('/');
+    } else {
+      navigate('/user-home');
     }
   };
 

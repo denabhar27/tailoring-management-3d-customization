@@ -262,7 +262,7 @@ const App = ({ setIsLoggedIn }) => {
           </div>
         </div>
       </section>
-      <RentalClothes openAuthModal={openAuthModal} />
+      <RentalClothes openAuthModal={openAuthModal} isGuest={true} />
 
       <section className="customization fade-in-up"
           id="Customize"

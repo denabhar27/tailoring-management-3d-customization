@@ -7,8 +7,20 @@ import { useAlert } from '../../context/AlertContext';
 
 const RentalImageCarousel = ({ images, itemName }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [imageErrors, setImageErrors] = useState({});
 
   const validImages = images.filter(img => img && img.url);
+
+  const handleImageError = (index) => {
+    setImageErrors(prev => ({ ...prev, [index]: true }));
+  };
+
+  const getImageSrc = (img, index) => {
+    if (imageErrors[index]) {
+      return suitSample;
+    }
+    return img.url;
+  };
 
   if (validImages.length === 0) {
     return (
@@ -26,8 +38,9 @@ const RentalImageCarousel = ({ images, itemName }) => {
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', borderRadius: '10px' }}>
         <img
-          src={validImages[0].url}
+          src={getImageSrc(validImages[0], 0)}
           alt={itemName}
+          onError={() => handleImageError(0)}
           style={{ maxWidth: '100%', maxHeight: '450px', objectFit: 'contain', borderRadius: '10px' }}
         />
       </div>
@@ -51,8 +64,9 @@ const RentalImageCarousel = ({ images, itemName }) => {
         minHeight: '400px'
       }}>
         <img
-          src={validImages[currentIndex].url}
+          src={getImageSrc(validImages[currentIndex], currentIndex)}
           alt={`${itemName} - ${validImages[currentIndex].label}`}
+          onError={() => handleImageError(currentIndex)}
           style={{ maxWidth: '100%', maxHeight: '450px', objectFit: 'contain' }}
         />
         <div style={{
@@ -88,7 +102,12 @@ const RentalImageCarousel = ({ images, itemName }) => {
             border: index === currentIndex ? '2px solid #8B4513' : '2px solid #ddd',
             cursor: 'pointer', opacity: index === currentIndex ? 1 : 0.6, backgroundColor: '#fff'
           }}>
-            <img src={img.url} alt={img.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img 
+              src={getImageSrc(img, index)} 
+              alt={img.label} 
+              onError={() => handleImageError(index)}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+            />
           </button>
         ))}
       </div>
@@ -218,7 +237,7 @@ const MeasurementsDropdown = ({ measurements, item, isInModal = false, measureme
   );
 };
 
-const RentalClothes = ({ openAuthModal, showAll = false }) => {
+const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   const { alert } = useAlert();
   const [rentalItems, setRentalItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -588,7 +607,7 @@ const RentalClothes = ({ openAuthModal, showAll = false }) => {
   };
 
   const handleSeeMore = () => {
-    navigate('/rentals');
+    navigate('/rentals', { state: { isGuest } });
   };
 
   const calculateTotalCost = (duration, item) => {
@@ -978,10 +997,15 @@ const RentalClothes = ({ openAuthModal, showAll = false }) => {
                   )}
                 </div>
               )}
-              <img src={item.img} alt={item.name} style={{
-                opacity: isMultiSelectMode ? 0.9 : 1,
-                cursor: isMultiSelectMode ? 'pointer' : 'default'
-              }} />
+              <img 
+                src={item.img} 
+                alt={item.name} 
+                onError={(e) => { e.target.src = suitSample; }}
+                style={{
+                  opacity: isMultiSelectMode ? 0.9 : 1,
+                  cursor: isMultiSelectMode ? 'pointer' : 'default'
+                }} 
+              />
               <div className="rental-info">
                 <h3>{item.item_name || item.name}</h3>
                 <p className="price">{item.price}</p>

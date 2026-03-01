@@ -311,8 +311,8 @@ export default function RepairClothes() {
 
             setTimeSlots((currentSlots) => {
 
-              const currentCounts = JSON.stringify(currentSlots.map(s => ({ time: s.time_slot, available: s.available })));
-              const newCounts = JSON.stringify(result.slots.map(s => ({ time: s.time_slot, available: s.available })));
+              const currentCounts = JSON.stringify(currentSlots.map((s: any) => ({ time: s.time_slot, available: s.available })));
+              const newCounts = JSON.stringify(result.slots.map((s: any) => ({ time: s.time_slot, available: s.available })));
 
               if (currentCounts !== newCounts) {
 
@@ -726,12 +726,19 @@ export default function RepairClothes() {
                       return true;
                     });
 
-                    return uniqueSlots.map((slot) => (
+                    return uniqueSlots.map((slot) => {
+                      const statusStyles: Record<string, any> = {
+                        Available: styles.timeSlotButtonAvailable,
+                        Limited: styles.timeSlotButtonLimited,
+                        Full: styles.timeSlotButtonFull,
+                      };
+                      const statusStyle = statusStyles[slot.status.charAt(0).toUpperCase() + slot.status.slice(1)];
+                      return (
                       <TouchableOpacity
                         key={slot.slot_id || slot.time_slot}
                         style={[
                           styles.timeSlotButton,
-                          styles[`timeSlotButton${slot.status.charAt(0).toUpperCase() + slot.status.slice(1)}`],
+                          statusStyle,
                           selectedTimeSlot === slot.time_slot && styles.timeSlotButtonSelected,
                           !slot.isClickable && styles.timeSlotButtonDisabled,
                         ]}
@@ -749,7 +756,7 @@ export default function RepairClothes() {
                            slot.status === 'available' ? `${slot.available} SPOTS` : 'Unavailable'}
                         </Text>
                       </TouchableOpacity>
-                    ));
+                    )});
                   })()}
                 </View>
               ) : (

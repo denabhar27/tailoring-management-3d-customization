@@ -555,13 +555,15 @@ export default function RentalDetail() {
           <View style={styles.policyCard}>
             <Text style={styles.policyTitle}>Rental Policy</Text>
             <View style={styles.policyRow}>
-              <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-              <Text style={styles.policyText}>
-                Minimum 3 days • Maximum 30 days • Must be multiple of 3
-              </Text>
+              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+              <Text style={styles.policyText}>Minimum 3 days rental period</Text>
             </View>
             <View style={styles.policyRow}>
-              <Ionicons name="alert-circle" size={20} color="#F59E0B" />
+              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+              <Text style={styles.policyText}>Maximum 30 days rental period</Text>
+            </View>
+            <View style={styles.policyRow}>
+              <Ionicons name="alert-circle" size={16} color="#F59E0B" />
               <Text style={styles.policyText}>Late return: ₱100 per day</Text>
             </View>
           </View>

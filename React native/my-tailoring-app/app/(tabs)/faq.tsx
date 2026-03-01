@@ -39,8 +39,7 @@ const categories = [
   "Payments",
   "Technical",
   "Customization",
-  "Repair Services",
-  "Delivery"
+  "Repair Services"
 ];
 
 const SearchBar = ({

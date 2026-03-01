@@ -696,14 +696,8 @@ export default function ProfileScreen() {
                     <View key={`${item.order_id}-${item.order_item_id}`} style={styles.orderCard}>
                       <View style={styles.orderHeader}>
                         <View style={styles.orderInfo}>
-                          <Text style={styles.orderNo}>ORD-{item.order_id}</Text>
-                          <Text style={styles.serviceType}>
-                            {item.service_type === 'dry_cleaning' ? 'Dry Cleaning' : item.service_type.charAt(0).toUpperCase() + item.service_type.slice(1)}
-                            {item.specific_data?.serviceName && (
-                              <Text style={styles.serviceName}>
-                                {" - " + item.specific_data.serviceName}
-                              </Text>
-                            )}
+                          <Text style={styles.orderNo}>
+                            {item.service_type === 'dry_cleaning' ? 'Dry Cleaning' : item.service_type.charAt(0).toUpperCase() + item.service_type.slice(1)} Service
                           </Text>
                         </View>
                         <View style={styles.orderPriceContainer}>

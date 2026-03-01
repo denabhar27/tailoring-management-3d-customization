@@ -300,6 +300,13 @@ export const orderTrackingService = {
     return apiCall(`/orders/${orderItemId}/decline-price`, {
       method: 'POST',
     });
+  },
+
+  cancelOrderItem: async (orderItemId: string, reason: string) => {
+    return apiCall(`/orders/items/${orderItemId}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
   }
 };
 

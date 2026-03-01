@@ -223,10 +223,60 @@ const UserHomePage = ({ setIsLoggedIn }) => {
           <a href="#Repair">Repair</a>
           <a href="#DryCleaning">Dry Cleaning</a>
         </nav>
-        <button className="notif-button icon-button" onClick={() => setNotificationsOpen(true)} aria-label="Notifications">
+        <button className="notif-button icon-button" onClick={() => setNotificationsOpen(!notificationsOpen)} aria-label="Notifications">
           <svg width="24" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 3a6 6 0 0 1 6 6v4l2 2H4l2-2V9a6 6 0 0 1 6-6z" stroke="#8B4513" strokeWidth="2" fill="none"/><circle cx="12" cy="20" r="2" fill="#8B4513"/></svg>
           {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
         </button>
+        {/* Notification Dropdown Panel */}
+        {notificationsOpen && (
+          <div className="notification-dropdown-overlay" onClick={() => setNotificationsOpen(false)}>
+            <div className="notification-dropdown" onClick={(e) => e.stopPropagation()}>
+              <div className="notification-header">
+                <h3>Notifications</h3>
+                {unreadCount > 0 && (
+                  <button className="mark-all-read-btn" onClick={handleMarkAllAsRead}>
+                    Mark all as read
+                  </button>
+                )}
+                <button className="notification-close-btn" onClick={() => setNotificationsOpen(false)}>×</button>
+              </div>
+              <div className="notification-list">
+                {notifications.length === 0 ? (
+                  <div className="notification-empty">
+                    <p>No notifications yet</p>
+                  </div>
+                ) : (
+                  notifications.map((notif) => (
+                    <div 
+                      key={notif.notification_id}
+                      className={`notification-item ${!notif.is_read ? 'unread' : ''}`}
+                      onClick={() => handleNotificationClick(notif)}
+                    >
+                      <div className="notification-content">
+                        <p className="notification-message">
+                          {notif.message
+                            .replace(/price_confirmation/gi, 'Price Confirmation')
+                            .replace(/in_progress/gi, 'In Progress')
+                            .replace(/ready_to_pickup/gi, 'Ready to Pickup')
+                            .replace(/_/g, ' ')}
+                        </p>
+                        <span className="notification-time">
+                          {new Date(notif.created_at).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                      {!notif.is_read && <span className="notification-dot"></span>}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         <button className="cart-button icon-button" onClick={() => setCartOpen(true)} aria-label="Cart">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 6h14l-2 9H8L6 6z" stroke="#8B4513" strokeWidth="2" fill="none"/><circle cx="9" cy="20" r="2" fill="#8B4513"/><circle cx="17" cy="20" r="2" fill="#8B4513"/></svg>
           {cartItemCount > 0 && <span className="cart-badge">{cartItemCount}</span>}

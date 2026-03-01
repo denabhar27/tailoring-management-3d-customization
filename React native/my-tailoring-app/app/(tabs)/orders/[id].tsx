@@ -11,6 +11,8 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
+  Modal,
+  TextInput,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -83,6 +85,9 @@ export default function OrderDetails() {
   const insets = useSafeAreaInsets();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     fetchOrderDetails();
@@ -109,6 +114,46 @@ export default function OrderDetails() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!cancelReason.trim()) {
+      Alert.alert('Error', 'Please provide a reason for cancellation');
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      const result = await orderTrackingService.cancelOrderItem(
+        order.order_item_id.toString(),
+        cancelReason.trim()
+      );
+
+      if (result.success) {
+        Alert.alert('Success', 'Order cancelled successfully', [
+          {
+            text: 'OK',
+            onPress: () => {
+              setCancelModalVisible(false);
+              setCancelReason('');
+              router.push('/(tabs)/UserProfile/profile');
+            },
+          },
+        ]);
+      } else {
+        Alert.alert('Error', result.message || 'Failed to cancel order');
+      }
+    } catch (error: any) {
+      console.error('Cancel order error:', error);
+      Alert.alert('Error', error.message || 'Failed to cancel order');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const canCancelOrder = () => {
+    const status = order?.status?.toLowerCase();
+    return status === 'pending' || status === 'price_confirmation';
   };
 
   const getStatusColor = (status: string) => {
@@ -196,7 +241,9 @@ export default function OrderDetails() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.card}>
           <View style={styles.orderHeader}>
-            <Text style={styles.orderNo}>ORD-{order.order_id}</Text>
+            <Text style={styles.serviceType}>
+              {order.service_type === 'dry_cleaning' ? 'Dry Cleaning' : order.service_type.charAt(0).toUpperCase() + order.service_type.slice(1)} Service
+            </Text>
             <View
               style={[
                 styles.statusBadge,
@@ -210,13 +257,11 @@ export default function OrderDetails() {
           </View>
 
           <Text style={styles.date}>Placed on {formatDate(order.order_date)}</Text>
-          <Text style={styles.serviceType}>
-            {order.service_type === 'dry_cleaning' ? 'Dry Cleaning' : order.service_type.charAt(0).toUpperCase() + order.service_type.slice(1)} Service
-          </Text>
 
           <View style={styles.divider} />
 
           {/* For rental items, show 4-image carousel (front, back, side, main) */}
+          {/* For bundle, show all images from all bundle items */}
           {order.service_type === 'rental' && (() => {
             const API_BASE = API_BASE_URL.replace('/api', '');
             const buildUrl = (url: string | null | undefined) => {
@@ -224,6 +269,38 @@ export default function OrderDetails() {
               return url.startsWith('http') ? url : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
             };
 
+            // Check if it's a bundle with multiple items
+            const bundleItems = order.specific_data?.bundle_items || [];
+            const isBundle = bundleItems.length > 0;
+
+            if (isBundle) {
+              // For bundles, collect all images from all bundle items
+              const allBundleImages: { url: string; label: string }[] = [];
+              bundleItems.forEach((item: any, idx: number) => {
+                const itemName = item.item_name || `Item ${idx + 1}`;
+                const itemImages = [
+                  { url: buildUrl(item.front_image), label: `${itemName} - Front` },
+                  { url: buildUrl(item.back_image), label: `${itemName} - Back` },
+                  { url: buildUrl(item.side_image), label: `${itemName} - Side` },
+                  { url: buildUrl(item.image_url), label: `${itemName} - Main` },
+                ].filter(img => img.url) as { url: string; label: string }[];
+                allBundleImages.push(...itemImages);
+              });
+
+              if (allBundleImages.length > 0) {
+                return (
+                  <RentalImageCarousel
+                    images={allBundleImages}
+                    itemName={`Rental Bundle (${bundleItems.length} items)`}
+                    imageHeight={280}
+                    showFullscreen={true}
+                  />
+                );
+              }
+              return null;
+            }
+
+            // For single rental item
             const rentalImages = [
               { url: buildUrl(order.specific_data?.front_image), label: 'Front' },
               { url: buildUrl(order.specific_data?.back_image), label: 'Back' },
@@ -489,13 +566,15 @@ export default function OrderDetails() {
                       <Text style={styles.value}>{order.specific_data.item_name}</Text>
                     </View>
                   )}
-                  {order.specific_data.brand && (
+                  {/* Only show brand if not a bundle (Multiple) */}
+                  {order.specific_data.brand && order.specific_data.brand !== 'Multiple' && (
                     <View style={styles.detailRow}>
                       <Text style={styles.label}>Brand</Text>
                       <Text style={styles.value}>{order.specific_data.brand}</Text>
                     </View>
                   )}
-                  {order.specific_data.size && (
+                  {/* Only show size details if not a bundle (Various) */}
+                  {order.specific_data.size && order.specific_data.size !== 'Various' && (
                     <View style={styles.sizeSection}>
                       <Text style={styles.sizeSectionTitle}>Size Details</Text>
                       <View style={styles.sizeContainer}>
@@ -516,12 +595,20 @@ export default function OrderDetails() {
                   )}
                   {order.specific_data.bundle_items && order.specific_data.bundle_items.length > 0 && (
                     <View style={styles.sizeSection}>
-                      <Text style={styles.sizeSectionTitle}>Bundle Items</Text>
+                      <Text style={styles.sizeSectionTitle}>Bundle Items ({order.specific_data.bundle_items.length})</Text>
                       {order.specific_data.bundle_items.map((item: any, itemIdx: number) => (
                         <View key={itemIdx} style={styles.bundleItemContainer}>
                           <Text style={styles.bundleItemName}>
                             {item.item_name || `Item ${itemIdx + 1}`}
                           </Text>
+                          {item.brand && (
+                            <Text style={styles.bundleItemDetail}>Brand: {item.brand}</Text>
+                          )}
+                          {item.category && item.category !== 'rental' && item.category !== 'rental_bundle' && (
+                            <Text style={styles.bundleItemDetail}>
+                              Category: {item.category.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                            </Text>
+                          )}
                           <View style={styles.sizeContainer}>
                             {(() => {
                               const sizeData = formatSize(item.size);
@@ -544,7 +631,9 @@ export default function OrderDetails() {
                   {order.specific_data.category && (
                     <View style={styles.detailRow}>
                       <Text style={styles.label}>Category</Text>
-                      <Text style={styles.value}>{order.specific_data.category}</Text>
+                      <Text style={styles.value}>
+                        {order.specific_data.category.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                      </Text>
                     </View>
                   )}
                   {order.specific_data.color && (
@@ -682,10 +771,89 @@ export default function OrderDetails() {
             <Ionicons name="receipt-outline" size={20} color="#fff" />
             <Text style={styles.transactionLogButtonText}>View Transaction Log</Text>
           </TouchableOpacity>
+
+          {/* Cancel Order Button - only show for pending or price_confirmation status */}
+          {canCancelOrder() && (
+            <TouchableOpacity
+              style={styles.cancelOrderButton}
+              onPress={() => setCancelModalVisible(true)}
+            >
+              <Ionicons name="close-circle-outline" size={20} color="#fff" />
+              <Text style={styles.cancelOrderButtonText}>Cancel Order</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={{ height: 120 }} />
       </ScrollView>
+
+      {/* Cancel Order Modal */}
+      <Modal
+        visible={cancelModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setCancelModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.cancelModal}>
+            <View style={styles.cancelModalHeader}>
+              <Text style={styles.cancelModalTitle}>Cancel Order</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setCancelModalVisible(false);
+                  setCancelReason('');
+                }}
+                style={styles.cancelModalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.cancelModalSubtitle}>
+              Please provide a reason for cancelling this order:
+            </Text>
+
+            <TextInput
+              style={styles.cancelReasonInput}
+              placeholder="Enter reason for cancellation..."
+              placeholderTextColor="#9CA3AF"
+              value={cancelReason}
+              onChangeText={setCancelReason}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+
+            <View style={styles.cancelModalButtons}>
+              <TouchableOpacity
+                style={styles.cancelModalCancelButton}
+                onPress={() => {
+                  setCancelModalVisible(false);
+                  setCancelReason('');
+                }}
+              >
+                <Text style={styles.cancelModalCancelButtonText}>Go Back</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.cancelModalConfirmButton,
+                  (!cancelReason.trim() || cancelling) && styles.cancelModalConfirmButtonDisabled
+                ]}
+                onPress={handleCancelOrder}
+                disabled={!cancelReason.trim() || cancelling}
+              >
+                {cancelling ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.cancelModalConfirmButtonText}>Confirm Cancel</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <TouchableOpacity onPress={() => router.push("/home")}>
           <View style={styles.navItemWrap}>
@@ -749,10 +917,9 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 14, fontWeight: "600" },
   date: { fontSize: 14, color: "#6B7280", marginBottom: 4 },
   serviceType: {
-    fontSize: 15.5,
-    color: "#94665B",
-    fontWeight: "600",
-    marginBottom: 16,
+    fontSize: 19,
+    color: "#1F2937",
+    fontWeight: "700",
   },
   divider: { height: 1, backgroundColor: "#E5E7EB", marginVertical: 20 },
   image: {
@@ -800,6 +967,97 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  cancelOrderButton: {
+    marginTop: 12,
+    backgroundColor: "#EF4444",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+  },
+  cancelOrderButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  cancelModal: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+  },
+  cancelModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  cancelModalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  cancelModalCloseButton: {
+    padding: 4,
+  },
+  cancelModalSubtitle: {
+    fontSize: 15,
+    color: "#6B7280",
+    marginBottom: 16,
+  },
+  cancelReasonInput: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+    color: "#1F2937",
+    minHeight: 100,
+    backgroundColor: "#F9FAFB",
+  },
+  cancelModalButtons: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 20,
+  },
+  cancelModalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+  },
+  cancelModalCancelButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  cancelModalConfirmButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#EF4444",
+    alignItems: "center",
+  },
+  cancelModalConfirmButtonDisabled: {
+    backgroundColor: "#FCA5A5",
+  },
+  cancelModalConfirmButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#fff",
   },
   notFound: {
     flex: 1,
@@ -912,6 +1170,12 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#DDD",
+    textAlign: "center",
+  },
+  bundleItemDetail: {
+    fontSize: 13,
+    color: "#666",
+    marginBottom: 4,
     textAlign: "center",
   },
 

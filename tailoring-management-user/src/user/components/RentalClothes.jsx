@@ -1010,6 +1010,7 @@ const RentalClothes = ({ openAuthModal, showAll = false }) => {
           <div style={{
             display: 'flex',
             justifyContent: 'center',
+            marginTop: '20px',
             marginBottom: '10px'
           }}>
             <span
@@ -1332,6 +1333,7 @@ const RentalClothes = ({ openAuthModal, showAll = false }) => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
             background: 'white',
             padding: '20px',
+            paddingTop: '50px',
             borderRadius: '10px',
             maxWidth: '800px',
             maxHeight: '90vh',
@@ -1340,11 +1342,21 @@ const RentalClothes = ({ openAuthModal, showAll = false }) => {
           }}>
             <span className="close" onClick={closeModal} style={{
               position: 'absolute',
-              top: '10px',
-              right: '15px',
-              fontSize: '24px',
+              top: '12px',
+              right: '12px',
+              fontSize: '28px',
               cursor: 'pointer',
-              zIndex: 10
+              zIndex: 100,
+              fontWeight: 'bold',
+              color: '#333',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#f5f5f5',
+              borderRadius: '50%',
+              lineHeight: '1'
             }}>×</span>
             <div className="modal-body" style={{ maxHeight: 'calc(90vh - 40px)', overflow: 'hidden', display: 'flex', gap: '30px' }}>
               <RentalImageCarousel
@@ -1372,7 +1384,7 @@ const RentalClothes = ({ openAuthModal, showAll = false }) => {
                     <div className="detail-row">
                       <div className="detail-item">
                         <strong>Category:</strong>
-                        <span>{selectedItem.category || 'N/A'}</span>
+                        <span>{selectedItem.category ? selectedItem.category.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : 'N/A'}</span>
                       </div>
                     </div>
                     <div className="detail-row">

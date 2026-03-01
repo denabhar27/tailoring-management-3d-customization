@@ -438,8 +438,8 @@ export default function RentalLanding() {
                       {item.item_name}
                     </Text>
                     <View style={styles.priceRow}>
-                      <Text style={styles.rentalPrice}>₱{parseFloat(item.daily_rate || 0).toLocaleString()}</Text>
-                      <Text style={styles.priceLabel}>/day</Text>
+                      <Text style={styles.rentalPrice}>₱{parseFloat(item.price || 0).toLocaleString()}</Text>
+                      <Text style={styles.priceLabel}>/3 days</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -594,6 +594,8 @@ export default function RentalLanding() {
 
                   <View style={styles.costTotalRow}>
                     <Text style={styles.costTotalLabel}>Total Downpayment (Due Upon Pickup):</Text>
+                  </View>
+                  <View style={styles.costValueRow}>
                     <Text style={styles.costTotalValue}>
                       ₱{calculateBundleDownpayment().toLocaleString()}
                     </Text>
@@ -601,6 +603,8 @@ export default function RentalLanding() {
 
                   <View style={styles.costTotalRow}>
                     <Text style={styles.costTotalLabel}>Total Rental Cost (Due on Return):</Text>
+                  </View>
+                  <View style={styles.costValueRow}>
                     <Text style={styles.costTotalValue}>
                       ₱{calculateBundleTotal().toFixed(2)}
                     </Text>
@@ -610,13 +614,15 @@ export default function RentalLanding() {
               <View style={styles.policyCard}>
                 <Text style={styles.policyTitle}>Rental Policy</Text>
                 <View style={styles.policyRow}>
-                  <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                  <Text style={styles.policyText}>
-                    Minimum 3 days • Maximum 30 days • Must be multiple of 3
-                  </Text>
+                  <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                  <Text style={styles.policyText}>Minimum 3 days rental period</Text>
                 </View>
                 <View style={styles.policyRow}>
-                  <Ionicons name="alert-circle" size={20} color="#F59E0B" />
+                  <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                  <Text style={styles.policyText}>Maximum 30 days rental period</Text>
+                </View>
+                <View style={styles.policyRow}>
+                  <Ionicons name="alert-circle" size={16} color="#F59E0B" />
                   <Text style={styles.policyText}>Late return: ₱100 per day</Text>
                 </View>
               </View>
@@ -1211,16 +1217,21 @@ const styles = StyleSheet.create({
   },
   costTotalRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
+  costValueRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingBottom: 8,
   },
   costTotalLabel: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
     color: '#1F2937',
   },
   costTotalValue: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '800',
     color: '#78350F',
   },

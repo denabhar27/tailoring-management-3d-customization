@@ -199,7 +199,7 @@ export default function HomeScreen() {
           />
           <View style={styles.heroBadge}>
             <Text style={styles.heroTitle}>
-              Welcome to Jackman's Tailor Deluxe!
+              Welcome to Jackman&apos;s Tailor Deluxe!
             </Text>
             <View style={styles.heroButton}>
               <Text style={styles.heroButtonText}>Your Perfect Fit Awaits</Text>
@@ -293,8 +293,8 @@ export default function HomeScreen() {
                     {r.item_name}
                   </Text>
                   <View style={styles.priceRow}>
-                    <Text style={styles.rentalPrice}>₱{parseFloat(r.daily_rate || 0).toLocaleString()}</Text>
-                    <Text style={styles.priceLabel}>/day</Text>
+                    <Text style={styles.rentalPrice}>₱{parseFloat(r.price || 0).toLocaleString()}</Text>
+                    <Text style={styles.priceLabel}>/3 days</Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -316,7 +316,7 @@ export default function HomeScreen() {
           }
         >
           <View style={styles.navItemWrap}>
-            <Ionicons name="calendar-outline" size={20} color="#9CA3AF" />
+            <Ionicons name="cut-outline" size={20} color="#9CA3AF" />
           </View>
         </TouchableOpacity>
 

@@ -49,7 +49,7 @@ export default function RootLayout() {
       }
     });
 
-    const originalUnhandledRejection = global.onunhandledrejection;
+    const originalUnhandledRejection = global.onunhandledrejection as ((event: any) => void) | null;
     global.onunhandledrejection = (event: any) => {
       const error = event?.reason || event;
       if (error?.message?.includes('Failed to download remote update') ||

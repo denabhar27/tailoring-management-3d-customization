@@ -178,7 +178,9 @@ export default function OrderHistoryScreen() {
     >
       <View style={styles.orderHeader}>
         <View>
-          <Text style={styles.orderNo}>ORD-{item.order_id}</Text>
+          <Text style={styles.orderNo}>
+            {item.service_type === 'dry_cleaning' ? 'Dry Cleaning' : item.service_type?.charAt(0).toUpperCase() + item.service_type?.slice(1).replace('_', ' ')} Service
+          </Text>
           <Text style={styles.orderDate}>{formatDate(item.order_date)}</Text>
         </View>
         <View

@@ -612,22 +612,9 @@ export default function CartScreen() {
 
                     {item.service?.toLowerCase() === 'rental' && (
                       <>
-                        {item.isBundle ? (
+                        {!item.isBundle && item.garmentType && (
                           <Text style={styles.itemDetailText}>
-                            Bundle of {item.bundleItems?.length || 0} rental items
-                          </Text>
-                        ) : (
-                          <>
-                            {item.garmentType && (
-                              <Text style={styles.itemDetailText}>
-                                {item.quantity > 1 ? `${item.quantity}x ` : ''}{item.garmentType}
-                              </Text>
-                            )}
-                          </>
-                        )}
-                        {item.downpayment > 0 && (
-                          <Text style={styles.itemDetailText}>
-                            Downpayment: ₱{item.downpayment.toLocaleString()}
+                            {item.quantity > 1 ? `${item.quantity}x ` : ''}{item.garmentType}
                           </Text>
                         )}
                         {item.rentalStartDate && item.rentalEndDate && (
@@ -1178,19 +1165,33 @@ export default function CartScreen() {
                       key={index}
                       style={styles.bundleItemCard}
                       onPress={() => {
-                        if (fullImageUrl) {
-                          setSelectedItemDetails({
-                            ...bundleItem,
-                            image: fullImageUrl,
-                            service: 'rental',
-                            price: bundleItem.individual_cost || bundleItem.price || 0,
-                            downpayment: bundleItem.downpayment || 0,
-                            item: bundleItem.item_name || bundleItem.name || 'Rental Item',
-                            garmentType: bundleItem.item_name || bundleItem.name || '',
-                          });
-                          setShowBundleModal(false);
-                          setShowDetailsModal(true);
-                        }
+                        const API_BASE = API_BASE_URL.replace('/api', '');
+                        const getFullImageUrl = (img: string | undefined) => {
+                          if (!img || img === 'no-image') return null;
+                          return img.startsWith('http') ? img : `${API_BASE}${img}`;
+                        };
+                        
+                        setSelectedItemDetails({
+                          ...bundleItem,
+                          image: fullImageUrl,
+                          frontImage: getFullImageUrl(bundleItem.front_image),
+                          backImage: getFullImageUrl(bundleItem.back_image),
+                          sideImage: getFullImageUrl(bundleItem.side_image),
+                          service: 'rental',
+                          price: bundleItem.individual_cost || bundleItem.price || 0,
+                          downpayment: bundleItem.downpayment || 0,
+                          item: bundleItem.item_name || bundleItem.name || 'Rental Item',
+                          garmentType: bundleItem.item_name || bundleItem.name || '',
+                          rentalItemName: bundleItem.item_name || bundleItem.name || '',
+                          rentalBrand: bundleItem.brand || '',
+                          rentalCategory: bundleItem.category || '',
+                          rentalSize: bundleItem.size || '',
+                          rentalColor: bundleItem.color || '',
+                          rentalMaterial: bundleItem.material || '',
+                          rentalDescription: bundleItem.description || '',
+                        });
+                        setShowBundleModal(false);
+                        setShowDetailsModal(true);
                       }}
                     >
                       {fullImageUrl ? (

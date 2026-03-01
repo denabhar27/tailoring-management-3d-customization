@@ -17,7 +17,8 @@ const WalkInOrders = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const [customerName, setCustomerName] = useState('');
+  const [customerFirstName, setCustomerFirstName] = useState('');
+  const [customerLastName, setCustomerLastName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerSearchResults, setCustomerSearchResults] = useState([]);
@@ -195,7 +196,11 @@ const WalkInOrders = () => {
   };
 
   const selectCustomer = (customer) => {
-    setCustomerName(customer.name);
+    const nameParts = (customer.name || '').trim().split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    setCustomerFirstName(firstName);
+    setCustomerLastName(lastName);
     setCustomerEmail(customer.email || '');
     setCustomerPhone(customer.phone);
     setShowCustomerSearch(false);
@@ -287,8 +292,8 @@ const WalkInOrders = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!customerName || !customerPhone) {
-      alert('Please enter customer name and phone number');
+    if (!customerFirstName || !customerLastName || !customerPhone) {
+      alert('Please enter customer first name, last name, and phone number');
       return;
     }
 
@@ -322,7 +327,7 @@ const WalkInOrders = () => {
       if (serviceType === 'dry_cleaning') {
         const pricePerItem = garmentTypes.find(gt => gt.garment_name === garmentType)?.garment_price || 200;
         result = await createWalkInDryCleaningOrder({
-          customerName,
+          customerName: `${customerFirstName} ${customerLastName}`.trim(),
           customerEmail,
           customerPhone,
           garmentType,
@@ -338,7 +343,7 @@ const WalkInOrders = () => {
         });
       } else if (serviceType === 'repair') {
         result = await createWalkInRepairOrder({
-          customerName,
+          customerName: `${customerFirstName} ${customerLastName}`.trim(),
           customerEmail,
           customerPhone,
           garmentType: repairGarmentType,
@@ -358,7 +363,7 @@ const WalkInOrders = () => {
         };
 
         result = await createWalkInCustomizationOrder({
-          customerName,
+          customerName: `${customerFirstName} ${customerLastName}`.trim(),
           customerEmail,
           customerPhone,
           garmentType: customGarmentType,
@@ -378,7 +383,7 @@ const WalkInOrders = () => {
         }, 0);
 
         result = await createWalkInRentalOrder({
-          customerName,
+          customerName: `${customerFirstName} ${customerLastName}`.trim(),
           customerEmail,
           customerPhone,
           rentalItemIds: selectedRentalItems.map(item => item.item_id),
@@ -393,7 +398,8 @@ const WalkInOrders = () => {
       if (result.success) {
         alert('Walk-in order created successfully!', 'success');
 
-        setCustomerName('');
+        setCustomerFirstName('');
+        setCustomerLastName('');
         setCustomerEmail('');
         setCustomerPhone('');
         setGarmentType('');
@@ -451,10 +457,10 @@ const WalkInOrders = () => {
               onChange={(e) => setServiceType(e.target.value)}
               className="form-control"
             >
-              <option value="dry_cleaning">Dry Cleaning</option>
-              <option value="repair">Repair</option>
-              <option value="customization">Customization</option>
-              <option value="rental">Rental</option>
+              <option key="dry_cleaning" value="dry_cleaning">Dry Cleaning</option>
+              <option key="repair" value="repair">Repair</option>
+              <option key="customization" value="customization">Customization</option>
+              <option key="rental" value="rental">Rental</option>
             </select>
           </div>
           <div className="form-section">
@@ -487,13 +493,25 @@ const WalkInOrders = () => {
             </div>
 
             <div className="form-group">
-              <label>Full Name *</label>
+              <label>First Name *</label>
               <input
                 type="text"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+                value={customerFirstName}
+                onChange={(e) => setCustomerFirstName(e.target.value)}
                 className="form-control"
-                placeholder="Enter customer name"
+                placeholder="Enter first name"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Last Name *</label>
+              <input
+                type="text"
+                value={customerLastName}
+                onChange={(e) => setCustomerLastName(e.target.value)}
+                className="form-control"
+                placeholder="Enter last name"
                 required
               />
             </div>

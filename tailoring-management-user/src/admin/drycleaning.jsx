@@ -387,10 +387,12 @@ const DryCleaning = () => {
 
     if (item.order_type === 'walk_in') {
       try {
-        const estimatedPrice = getEstimatedPrice(item) || parseFloat(item.final_price || 0);
+        // Use actual final_price first, fall back to estimated
+        const actualPrice = parseFloat(item.final_price || 0);
+        const priceToUse = actualPrice > 0 ? actualPrice : (getEstimatedPrice(item) || 0);
         const result = await updateDryCleaningOrderItem(itemId, {
           approvalStatus: 'accepted',
-          finalPrice: estimatedPrice
+          finalPrice: priceToUse
         });
         if (result.success) {
           await loadDryCleaningOrders();
@@ -405,7 +407,9 @@ const DryCleaning = () => {
       return;
     }
 
-    const estimatedPrice = getEstimatedPrice(item) || parseFloat(item.final_price || 0);
+    // Use the actual final_price from the table first, fall back to estimated price
+    const actualPrice = parseFloat(item.final_price || 0);
+    const estimatedPrice = actualPrice > 0 ? actualPrice : (getEstimatedPrice(item) || 0);
     setPriceConfirmationItem(item);
     setPriceConfirmationPrice(estimatedPrice.toFixed(2));
     setShowPriceConfirmationModal(true);
@@ -1157,20 +1161,6 @@ const DryCleaning = () => {
                   onChange={(e) => setPriceConfirmationPrice(e.target.value)}
                   placeholder="Enter final price"
                 />
-                {(() => {
-                  const estimatedPrice = getEstimatedPrice(priceConfirmationItem);
-                  if (estimatedPrice && priceConfirmationPrice) {
-                    const priceDiff = parseFloat(priceConfirmationPrice) - estimatedPrice;
-                    if (Math.abs(priceDiff) > 0.01) {
-                      return (
-                        <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#fff3cd', borderRadius: '4px', fontSize: '0.9em' }}>
-                          <strong>⚠️ Price Changed:</strong> Estimated: ₱{estimatedPrice.toFixed(2)} → New: ₱{parseFloat(priceConfirmationPrice).toFixed(2)}
-                        </div>
-                      );
-                    }
-                  }
-                  return null;
-                })()}
               </div>
 
               <div style={{ marginTop: '15px', padding: '12px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '0.9em', color: '#1976d2' }}>

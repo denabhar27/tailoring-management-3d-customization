@@ -147,6 +147,7 @@ export default function Customizer3DScreen() {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [isShopOpen, setIsShopOpen] = useState(true);
+  const [controlsHidden, setControlsHidden] = useState(false);
 
   useEffect(() => {
     if (showConfirmModal) {
@@ -775,6 +776,22 @@ export default function Customizer3DScreen() {
     );
   }
 
+  const toggleControls = () => {
+    const newHiddenState = !controlsHidden;
+    setControlsHidden(newHiddenState);
+    
+    const hideScript = `
+      (function() {
+        const nav = document.querySelector('.nav');
+        const panel = document.querySelector('.panel');
+        if (nav) nav.style.display = '${newHiddenState ? 'none' : ''}';
+        if (panel) panel.style.display = '${newHiddenState ? 'none' : ''}';
+        true;
+      })();
+    `;
+    webViewRef.current?.injectJavaScript(hideScript);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFF8F0" />
@@ -790,6 +807,20 @@ export default function Customizer3DScreen() {
           <Ionicons name="refresh" size={22} color="#5D4037" />
         </TouchableOpacity>
       </View>
+      <TouchableOpacity 
+        style={styles.toggleControlsButton} 
+        onPress={toggleControls}
+        activeOpacity={0.7}
+      >
+        <Ionicons 
+          name={controlsHidden ? "chevron-down" : "chevron-up"} 
+          size={24} 
+          color="#5D4037" 
+        />
+        <Text style={styles.toggleControlsText}>
+          {controlsHidden ? 'Show Controls' : 'Hide Controls'}
+        </Text>
+      </TouchableOpacity>
       <WebView
         ref={webViewRef}
         source={{ uri: WEB_3D_CUSTOMIZER_URL }}
@@ -1226,6 +1257,21 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 40,
+  },
+  toggleControlsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    backgroundColor: '#FFFEF9',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8D5C4',
+  },
+  toggleControlsText: {
+    fontSize: 14,
+    color: '#5D4037',
+    marginLeft: 6,
+    fontWeight: '500',
   },
   webview: {
     flex: 1,

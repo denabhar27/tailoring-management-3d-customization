@@ -537,7 +537,7 @@ export default function RepairClothes() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-          <Ionicons name="arrow-back" size={24} color="#5D4037" />
+          <Ionicons name="close" size={28} color="#5D4037" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>🔧 Repair Request</Text>
         <View style={styles.placeholder} />
@@ -548,11 +548,6 @@ export default function RepairClothes() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Repair Request</Text>
-            <Text style={styles.cardSubtitle}>We&apos;ll make it good as new</Text>
-          </View>
           <Text style={styles.sectionTitle}>Upload Damage Photo (Recommended)</Text>
           <TouchableOpacity style={styles.imageUpload} onPress={pickImage}>
             {imagePreview ? (
@@ -814,7 +809,6 @@ export default function RepairClothes() {
               )}
             </TouchableOpacity>
           </View>
-        </View>
       </ScrollView>
       <DateTimePickerModal
         visible={showDatePicker}

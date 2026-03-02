@@ -466,28 +466,25 @@ export default function DryCleaningClothes() {
     }
   };
 
+  const handleClose = () => {
+    router.back();
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+          <Ionicons name="close" size={28} color="#5D4037" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>🧼 Dry Cleaning Service</Text>
+        <View style={styles.placeholder} />
+      </View>
+
       <ScrollView
-        style={styles.container}
-        contentContainerStyle={{ paddingBottom: height * 0.25 }}
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <Image
-            source={require("../../../assets/images/logo.png")}
-            style={styles.logo}
-          />
-          <Text style={styles.headerTitle}>Jackman Tailor Deluxe</Text>
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Dry Cleaning Service</Text>
-            <Text style={styles.cardSubtitle}>
-              We&apos;ll make it fresh and clean
-            </Text>
-          </View>
-
           <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
             {image ? (
               <Image source={{ uri: image }} style={styles.previewImage} />
@@ -722,7 +719,6 @@ export default function DryCleaningClothes() {
               <Text style={styles.submitText}>Add to Cart</Text>
             </TouchableOpacity>
           </View>
-        </View>
       </ScrollView>
 
       <View style={styles.bottomNav}>
@@ -750,27 +746,34 @@ export default function DryCleaningClothes() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f8fafc" },
-  container: { flex: 1 },
+  safeArea: { flex: 1, backgroundColor: "#FFF8F0" },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: width * 0.06,
-    paddingTop: height * 0.07,
-    paddingBottom: height * 0.03,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E8D5C4",
+    backgroundColor: "#FFFEF9",
   },
-  logo: {
-    width: width * 0.12,
-    height: width * 0.12,
-    borderRadius: 14,
+  closeButton: {
+    padding: 4,
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#1e293b",
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#5D4037",
+  },
+  placeholder: {
+    width: 36,
+  },
+  content: {
     flex: 1,
-    marginLeft: 10,
+  },
+  contentContainer: {
+    padding: 20,
+    paddingBottom: 120,
   },
   card: {
     marginHorizontal: width * 0.06,

@@ -173,6 +173,7 @@ export async function addRepairToCart(repairData) {
       specificData: {
         serviceName: repairData.serviceName,
         imageUrl: repairData.imageUrl,
+        imageUrls: repairData.imageUrls || [],
         pickupDate: repairData.pickupDate,
         uploadedAt: new Date().toISOString(),
 

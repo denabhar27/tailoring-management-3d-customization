@@ -12,6 +12,8 @@ import { useAlert } from '../context/AlertContext';
 
 import ImagePreviewModal from '../components/ImagePreviewModal';
 
+import SimpleImageCarousel from '../components/SimpleImageCarousel';
+
 import AnalyticsDashboard from '../components/analytics/AnalyticsDashboard';
 
 import { API_BASE_URL } from '../api/config';
@@ -258,6 +260,13 @@ const Billing = () => {
 
     return `${API_BASE_URL}${imageUrl}`;
 
+  };
+
+  const getServiceImageUrls = (bill) => {
+    if (!bill.specificData?.imageUrls || bill.specificData.imageUrls.length === 0) return null;
+    return bill.specificData.imageUrls.map(url => 
+      url.startsWith('http') ? url : `${API_BASE_URL}${url}`
+    );
   };
 
   const getServiceDescription = (bill) => {
@@ -763,7 +772,23 @@ const Billing = () => {
                 </div>
 
               )}
-              {getServiceImageUrl(selectedBill) && (
+              {/* Support multiple images */}
+              {getServiceImageUrls(selectedBill) ? (
+
+                <div className="detail-row">
+
+                  <strong>Service Images ({getServiceImageUrls(selectedBill).length}):</strong>
+
+                  <div style={{ marginTop: '8px' }}>
+                    <SimpleImageCarousel
+                      images={getServiceImageUrls(selectedBill).map((url, idx) => ({ url, label: `Photo ${idx + 1}/${getServiceImageUrls(selectedBill).length}` }))}
+                      itemName="Service Photo"
+                      height="300px"
+                    />
+                  </div>
+
+                </div>
+              ) : getServiceImageUrl(selectedBill) && (
 
                 <div className="detail-row">
 

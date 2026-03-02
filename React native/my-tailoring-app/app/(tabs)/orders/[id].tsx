@@ -88,6 +88,7 @@ export default function OrderDetails() {
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   useEffect(() => {
     fetchOrderDetails();
@@ -346,8 +347,84 @@ export default function OrderDetails() {
             </View>
           )}
 
-          {/* For non-customization, non-rental services, show single image */}
-          {order.service_type !== 'customization' && order.service_type !== 'customize' && order.service_type !== 'rental' && (() => {
+          {/* For dry_cleaning and repair, show images with carousel support */}
+          {(order.service_type === 'dry_cleaning' || order.service_type === 'repair') && (() => {
+            const API_BASE = API_BASE_URL.replace('/api', '');
+            const buildUrl = (url: string | null | undefined) => {
+              if (!url || url === 'no-image' || url.trim() === '') return null;
+              return url.startsWith('http') ? url : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+            };
+
+            // Check for imageUrls array first (multiple images)
+            const imageUrls: string[] = order.specific_data?.imageUrls || [];
+            const validImageUrls = imageUrls
+              .map((url: string) => buildUrl(url))
+              .filter((url: string | null): url is string => url !== null);
+
+            // Fallback to single imageUrl
+            if (validImageUrls.length === 0) {
+              let singleUrl = order.specific_data?.imageUrl ||
+                             order.specific_data?.image_url ||
+                             order.specific_data?.designImage ||
+                             order.specific_data?.item_image ||
+                             order.specific_data?.completed_item_image ||
+                             order.image_url;
+              
+              if (order.service_type === 'dry_cleaning' && !singleUrl) {
+                singleUrl = order.specific_data?.completed_item_image || order.specific_data?.item_image;
+              }
+              if (order.service_type === 'repair' && !singleUrl) {
+                singleUrl = order.specific_data?.damageImage ||
+                           order.specific_data?.repairImage ||
+                           order.specific_data?.item_image;
+              }
+              
+              const builtUrl = buildUrl(singleUrl);
+              if (builtUrl) validImageUrls.push(builtUrl);
+            }
+
+            if (validImageUrls.length === 0) return null;
+
+            return (
+              <View style={styles.imageCarouselContainer}>
+                <Image
+                  source={{ uri: validImageUrls[currentImageIndex] }}
+                  style={styles.image}
+                  resizeMode="cover"
+                />
+                {validImageUrls.length > 1 && (
+                  <>
+                    <TouchableOpacity
+                      style={[styles.carouselArrow, styles.carouselArrowLeft]}
+                      onPress={() => setCurrentImageIndex(prev => 
+                        prev === 0 ? validImageUrls.length - 1 : prev - 1
+                      )}
+                    >
+                      <Ionicons name="chevron-back" size={24} color="#fff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.carouselArrow, styles.carouselArrowRight]}
+                      onPress={() => setCurrentImageIndex(prev => 
+                        prev === validImageUrls.length - 1 ? 0 : prev + 1
+                      )}
+                    >
+                      <Ionicons name="chevron-forward" size={24} color="#fff" />
+                    </TouchableOpacity>
+                    <View style={styles.carouselIndicator}>
+                      <Text style={styles.carouselIndicatorText}>
+                        {currentImageIndex + 1} / {validImageUrls.length}
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </View>
+            );
+          })()}
+
+          {/* For non-customization, non-rental, non-dry_cleaning, non-repair services, show single image */}
+          {order.service_type !== 'customization' && order.service_type !== 'customize' && 
+           order.service_type !== 'rental' && order.service_type !== 'dry_cleaning' && 
+           order.service_type !== 'repair' && (() => {
 
             let imageUrl = order.specific_data?.imageUrl ||
                           order.specific_data?.image_url ||
@@ -356,33 +433,13 @@ export default function OrderDetails() {
                           order.specific_data?.completed_item_image ||
                           order.image_url;
 
-            if (order.service_type === 'dry_cleaning' && !imageUrl) {
-              imageUrl = order.specific_data?.completed_item_image || order.specific_data?.item_image;
-            }
-
-            if (order.service_type === 'repair' && !imageUrl) {
-              imageUrl = order.specific_data?.damageImage ||
-                        order.specific_data?.repairImage ||
-                        order.specific_data?.item_image;
-            }
-
             const hasValidImage = imageUrl && imageUrl !== 'no-image' && imageUrl.trim() !== '';
 
-            console.log('=== ORDER IMAGE DEBUG ===');
-            console.log('Service type:', order.service_type);
-            console.log('Image URL found:', imageUrl);
-            console.log('Has valid image:', hasValidImage);
-            console.log('Full specific_data:', JSON.stringify(order.specific_data, null, 2));
-            console.log('========================');
-
             if (hasValidImage) {
-
               const API_BASE = API_BASE_URL.replace('/api', '');
               const fullImageUrl = imageUrl.startsWith('http')
                 ? imageUrl
                 : `${API_BASE}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
-
-              console.log('Constructed full image URL:', fullImageUrl);
 
               return (
                 <View>
@@ -390,11 +447,6 @@ export default function OrderDetails() {
                     source={{ uri: fullImageUrl }}
                     style={styles.image}
                     resizeMode="cover"
-                    onError={(e) => {
-                      console.log('Image load error:', e.nativeEvent.error);
-                      console.log('Failed URL:', fullImageUrl);
-                    }}
-                    onLoad={() => console.log('Image loaded successfully:', fullImageUrl)}
                   />
                 </View>
               );
@@ -466,22 +518,6 @@ export default function OrderDetails() {
                       </Text>
                     </View>
                   )}
-                  {/* Display uploaded image */}
-                  {(order.specific_data.imageUrl || order.specific_data.image_url) &&
-                   (order.specific_data.imageUrl !== 'no-image' && order.specific_data.image_url !== 'no-image') && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.label}>Uploaded Image</Text>
-                      <Image
-                        source={{
-                          uri: (order.specific_data.imageUrl || order.specific_data.image_url).startsWith('http')
-                            ? (order.specific_data.imageUrl || order.specific_data.image_url)
-                            : `${API_BASE_URL.replace('/api', '')}${order.specific_data.imageUrl || order.specific_data.image_url}`
-                        }}
-                        style={styles.uploadedImage}
-                        resizeMode="cover"
-                      />
-                    </View>
-                  )}
                 </>
               )}
               {order.service_type === 'repair' && (
@@ -538,22 +574,6 @@ export default function OrderDetails() {
                       <Text style={styles.value}>
                         {formatDate(order.specific_data.pickupDate)}
                       </Text>
-                    </View>
-                  )}
-                  {/* Display uploaded image */}
-                  {(order.specific_data.imageUrl || order.specific_data.image_url) &&
-                   (order.specific_data.imageUrl !== 'no-image' && order.specific_data.image_url !== 'no-image') && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.label}>Damage Image</Text>
-                      <Image
-                        source={{
-                          uri: (order.specific_data.imageUrl || order.specific_data.image_url).startsWith('http')
-                            ? (order.specific_data.imageUrl || order.specific_data.image_url)
-                            : `${API_BASE_URL.replace('/api', '')}${order.specific_data.imageUrl || order.specific_data.image_url}`
-                        }}
-                        style={styles.uploadedImage}
-                        resizeMode="cover"
-                      />
                     </View>
                   )}
                 </>
@@ -1242,5 +1262,38 @@ const styles = StyleSheet.create({
   },
   topAngleImagesContainer: {
     marginBottom: 16,
+  },
+  imageCarouselContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  carouselArrow: {
+    position: 'absolute',
+    top: '50%',
+    transform: [{ translateY: -20 }],
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+    padding: 8,
+    zIndex: 10,
+  },
+  carouselArrowLeft: {
+    left: 10,
+  },
+  carouselArrowRight: {
+    right: 10,
+  },
+  carouselIndicator: {
+    position: 'absolute',
+    bottom: 10,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  carouselIndicatorText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

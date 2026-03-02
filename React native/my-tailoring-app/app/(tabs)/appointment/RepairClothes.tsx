@@ -50,8 +50,8 @@ interface RepairGarmentItem {
 export default function RepairClothes() {
   const router = useRouter();
 
-  const [image, setImage] = useState<string | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const [garments, setGarments] = useState<RepairGarmentItem[]>([
     { id: 1, garmentType: '', damageLevel: '', notes: '' }
@@ -197,14 +197,33 @@ export default function RepairClothes() {
       quality: 1,
     });
     if (!result.canceled) {
-      setImage(result.assets[0].uri);
-      setImagePreview(result.assets[0].uri);
+      setImages([...images, result.assets[0].uri]);
+      setCurrentImageIndex(images.length);
     }
   };
 
-  const removeImage = () => {
-    setImage(null);
-    setImagePreview(null);
+  const removeCurrentImage = () => {
+    if (images.length > 0) {
+      const newImages = images.filter((_, i) => i !== currentImageIndex);
+      setImages(newImages);
+      if (currentImageIndex >= newImages.length && newImages.length > 0) {
+        setCurrentImageIndex(newImages.length - 1);
+      } else if (newImages.length === 0) {
+        setCurrentImageIndex(0);
+      }
+    }
+  };
+
+  const goToPreviousImage = () => {
+    if (currentImageIndex > 0) {
+      setCurrentImageIndex(currentImageIndex - 1);
+    }
+  };
+
+  const goToNextImage = () => {
+    if (currentImageIndex < images.length - 1) {
+      setCurrentImageIndex(currentImageIndex + 1);
+    }
   };
 
   const handleDateConfirm = async (selectedDate: Date) => {
@@ -340,15 +359,15 @@ export default function RepairClothes() {
     return () => clearInterval(refreshInterval);
   }, [appointmentDate]);
 
-  const uploadImageIfNeeded = async () => {
-    if (!image) return null;
+  const uploadImageIfNeeded = async (imageUri: string) => {
+    if (!imageUri) return null;
 
     try {
       const formData = new FormData();
       formData.append('repairImage', {
-        uri: image,
+        uri: imageUri,
         type: 'image/jpeg',
-        name: 'repair-image.jpg',
+        name: `repair-image-${Date.now()}.jpg`,
       } as any);
 
       const response = await uploadRepairImage(formData);
@@ -440,13 +459,18 @@ export default function RepairClothes() {
         return;
       }
 
-      let imageUrl = '';
-      if (image) {
-        try {
-          imageUrl = await uploadImageIfNeeded() || 'no-image';
-        } catch (uploadError) {
-          console.error('Image upload failed:', uploadError);
-          Alert.alert('Warning', 'Image upload failed. Continuing without image.');
+      let imageUrls: string[] = [];
+      if (images.length > 0) {
+        for (const img of images) {
+          try {
+            const url = await uploadImageIfNeeded(img);
+            if (url) imageUrls.push(url);
+          } catch (uploadError) {
+            console.error('Image upload failed:', uploadError);
+          }
+        }
+        if (imageUrls.length === 0 && images.length > 0) {
+          Alert.alert('Warning', 'Image uploads failed. Continuing without images.');
         }
       }
 
@@ -476,7 +500,8 @@ export default function RepairClothes() {
         finalPrice: estimatedPrice.toString(),
         pickupDate: pickupDateTime,
         appointmentTime: selectedTimeSlot,
-        imageUrl: imageUrl || 'no-image',
+        imageUrl: imageUrls.length > 0 ? imageUrls[0] : 'no-image',
+        imageUrls: imageUrls.length > 0 ? imageUrls : [],
         garments: garmentsData,
         isMultipleGarments: garments.length > 1
       };
@@ -498,8 +523,8 @@ export default function RepairClothes() {
               text: "Add More",
               onPress: () => {
                 setGarments([{ id: 1, garmentType: '', damageLevel: '', notes: '' }]);
-                setImage(null);
-                setImagePreview(null);
+                setImages([]);
+                setCurrentImageIndex(0);
                 setAppointmentDate(null);
                 setSelectedTimeSlot("");
                 setTimeSlots([]);
@@ -549,22 +574,52 @@ export default function RepairClothes() {
         showsVerticalScrollIndicator={false}
       >
           <Text style={styles.sectionTitle}>Upload Damage Photo (Recommended)</Text>
-          <TouchableOpacity style={styles.imageUpload} onPress={pickImage}>
-            {imagePreview ? (
-              <View style={styles.imagePreviewContainer}>
-                <Image source={{ uri: imagePreview }} style={styles.previewImage} />
-                <TouchableOpacity style={styles.removeImageButton} onPress={removeImage}>
-                  <Ionicons name="close-circle" size={24} color="#fff" />
-                </TouchableOpacity>
+          {/* Image Upload Section */}
+          <View style={styles.imageSection}>
+            {images.length > 0 ? (
+              <View style={styles.imageCarousel}>
+                <View style={styles.imageContainer}>
+                  <Image source={{ uri: images[currentImageIndex] }} style={styles.previewImage} />
+                  {images.length > 1 && (
+                    <>
+                      <TouchableOpacity 
+                        style={[styles.imageNavButton, styles.imageNavLeft, currentImageIndex === 0 && styles.imageNavDisabled]} 
+                        onPress={goToPreviousImage}
+                        disabled={currentImageIndex === 0}
+                      >
+                        <Ionicons name="chevron-back" size={24} color={currentImageIndex === 0 ? "#ccc" : "#5D4037"} />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.imageNavButton, styles.imageNavRight, currentImageIndex === images.length - 1 && styles.imageNavDisabled]} 
+                        onPress={goToNextImage}
+                        disabled={currentImageIndex === images.length - 1}
+                      >
+                        <Ionicons name="chevron-forward" size={24} color={currentImageIndex === images.length - 1 ? "#ccc" : "#5D4037"} />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                  <TouchableOpacity style={styles.removeImageBtn} onPress={removeCurrentImage}>
+                    <Ionicons name="close-circle" size={28} color="#ef5350" />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.imageCounter}>{currentImageIndex + 1} / {images.length}</Text>
               </View>
             ) : (
-              <View style={styles.uploadPlaceholder}>
-                <Ionicons name="camera-outline" size={40} color="#8D6E63" />
-                <Text style={styles.uploadText}>Tap to upload photo of damage</Text>
-                <Text style={styles.uploadSubtext}>Clear image helps us serve you better</Text>
-              </View>
+              <TouchableOpacity style={styles.imageUpload} onPress={pickImage}>
+                <View style={styles.uploadPlaceholder}>
+                  <Ionicons name="camera-outline" size={40} color="#8D6E63" />
+                  <Text style={styles.uploadText}>Tap to upload photo of damage</Text>
+                  <Text style={styles.uploadSubtext}>Clear image helps us serve you better</Text>
+                </View>
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+            {images.length > 0 && (
+              <TouchableOpacity style={styles.addImageButton} onPress={pickImage}>
+                <Ionicons name="add-circle-outline" size={20} color="#5D4037" />
+                <Text style={styles.addImageText}>Add Another Photo</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {garments.map((garment, index) => (
             <View key={garment.id}>
@@ -893,6 +948,74 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginTop: -4,
   },
+  imageSection: {
+    marginBottom: 20,
+  },
+  imageCarousel: {
+    alignItems: "center",
+  },
+  imageContainer: {
+    width: "100%",
+    height: 150,
+    borderRadius: 12,
+    overflow: "hidden",
+    position: "relative",
+  },
+  imageNavButton: {
+    position: "absolute",
+    top: "50%",
+    marginTop: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  imageNavLeft: {
+    left: 10,
+  },
+  imageNavRight: {
+    right: 10,
+  },
+  imageNavDisabled: {
+    opacity: 0.5,
+  },
+  removeImageBtn: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderRadius: 14,
+  },
+  imageCounter: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#5D4037",
+    fontWeight: "600",
+  },
+  addImageButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E8D5C4",
+    backgroundColor: "#FFFEF9",
+  },
+  addImageText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#5D4037",
+    fontWeight: "600",
+  },
   imageUpload: {
     height: 150,
     borderRadius: 12,
@@ -900,7 +1023,7 @@ const styles = StyleSheet.create({
     borderColor: '#E8D5C4',
     borderStyle: 'dashed',
     overflow: 'hidden',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   uploadPlaceholder: {
     flex: 1,

@@ -6,7 +6,7 @@ import '../../styles/DryCleaningFormModal.css';
 import '../../styles/SharedModal.css';
 
 const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
-
+  
   const [garmentTypes, setGarmentTypes] = useState({});
   const [garmentTypesList, setGarmentTypesList] = useState([]);
   const [loadingGarments, setLoadingGarments] = useState(false);
@@ -25,8 +25,9 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const [availableTimeSlots, setAvailableTimeSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [isShopOpen, setIsShopOpen] = useState(true);
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState('');
+  const [imageFiles, setImageFiles] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
@@ -75,7 +76,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   useEffect(() => {
     if (isOpen) {
       loadDryCleaningServices();
-
+      
       setFormData({
         serviceName: '',
         notes: '',
@@ -85,6 +86,9 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       setGarments([
         { id: 1, garmentType: '', customGarmentType: '', brand: '', quantity: 1 }
       ]);
+      setImageFiles([]);
+      setImagePreviews([]);
+      setCurrentImageIndex(0);
       setAvailableTimeSlots([]);
       setErrors({});
     }
@@ -96,11 +100,11 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
       const refreshInterval = setInterval(() => {
         if (formData.date) {
-
+          
           getAllSlotsWithAvailability('dry_cleaning', formData.date)
             .then((result) => {
               if (result.success && result.slots) {
-
+                
                 const currentSlots = JSON.stringify(allTimeSlots.map(s => ({ time: s.time_slot, available: s.available })));
                 const newSlots = JSON.stringify(result.slots.map(s => ({ time: s.time_slot, available: s.available })));
                 if (currentSlots !== newSlots) {
@@ -127,7 +131,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               console.error('[POLLING] Error refreshing slots:', error);
             });
         }
-      }, 5000);
+      }, 5000); 
 
       return () => clearInterval(refreshInterval);
     } else {
@@ -140,7 +144,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const loadDryCleaningServices = async () => {
     try {
-
+      
       const { getDryCleaningServices } = await import('../../api/DryCleaningApi');
       const result = await getDryCleaningServices();
       if (result.success && result.data) {
@@ -153,14 +157,14 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const loadAvailableSlots = async (date) => {
     if (!date) return;
-
+    
     setLoadingSlots(true);
     setMessage('');
-
+    
     try {
-
+      
       const result = await getAllSlotsWithAvailability('dry_cleaning', date);
-
+      
       if (result.success) {
         if (!result.isShopOpen) {
           setIsShopOpen(false);
@@ -169,7 +173,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           setMessage('The shop is closed on this date. Please select another date.');
           return;
         }
-
+        
         setIsShopOpen(true);
         setAllTimeSlots(result.slots || []);
 
@@ -198,11 +202,11 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const getMinDate = () => {
     const today = new Date();
     const dayOfWeek = today.getDay();
-
+    
     if (dayOfWeek === 0) {
       today.setDate(today.getDate() + 1);
     }
-
+    
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
@@ -223,7 +227,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         }
       } catch (error) {
         console.error('Error checking date availability:', error);
-
+        
         const date = new Date(selectedDate);
         const dayOfWeek = date.getDay();
         if (dayOfWeek === 0) {
@@ -234,10 +238,10 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         }
       }
     }
-
+    
     setFormData(prev => ({ ...prev, date: selectedDate, time: '' }));
     setMessage('');
-
+    
     if (errors.date) {
       setErrors(prev => ({ ...prev, date: '' }));
     }
@@ -264,9 +268,9 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
     garments.forEach(garment => {
       if (!garment.garmentType) return;
-
+      
       const quantity = parseInt(garment.quantity) || 1;
-
+      
       if (garment.garmentType === 'others') {
         const estimatedPricePerItem = 350;
         totalPrice += estimatedPricePerItem * quantity;
@@ -282,6 +286,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     setIsEstimatedPrice(hasEstimatedItem);
   };
 
+  // Garment management functions
   const addGarment = () => {
     const newId = Math.max(...garments.map(g => g.id)) + 1;
     setGarments([...garments, { id: newId, garmentType: '', customGarmentType: '', brand: '', quantity: 1 }]);
@@ -294,10 +299,10 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   const updateGarment = (id, field, value) => {
-    setGarments(garments.map(g =>
+    setGarments(garments.map(g => 
       g.id === id ? { ...g, [field]: value } : g
     ));
-
+    // Clear error for this field
     if (errors[`garment_${id}_${field}`]) {
       setErrors(prev => ({ ...prev, [`garment_${id}_${field}`]: '' }));
     }
@@ -309,7 +314,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       ...prev,
       [name]: value
     }));
-
+    
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -317,22 +322,47 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
-    setImageFile(file);
-
     if (file) {
+      setImageFiles([...imageFiles, file]);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result);
+        setImagePreviews([...imagePreviews, reader.result]);
+        setCurrentImageIndex(imagePreviews.length);
       };
       reader.readAsDataURL(file);
-    } else {
-      setImagePreview('');
+      // Reset file input
+      e.target.value = '';
+    }
+  };
+
+  const removeCurrentImage = () => {
+    const newFiles = imageFiles.filter((_, i) => i !== currentImageIndex);
+    const newPreviews = imagePreviews.filter((_, i) => i !== currentImageIndex);
+    setImageFiles(newFiles);
+    setImagePreviews(newPreviews);
+    if (currentImageIndex >= newFiles.length && newFiles.length > 0) {
+      setCurrentImageIndex(newFiles.length - 1);
+    } else if (newFiles.length === 0) {
+      setCurrentImageIndex(0);
+    }
+  };
+
+  const goToPreviousImage = () => {
+    if (currentImageIndex > 0) {
+      setCurrentImageIndex(currentImageIndex - 1);
+    }
+  };
+
+  const goToNextImage = () => {
+    if (currentImageIndex < imagePreviews.length - 1) {
+      setCurrentImageIndex(currentImageIndex + 1);
     }
   };
 
   const validateForm = () => {
     const newErrors = {};
 
+    // Validate each garment
     garments.forEach((garment, index) => {
       if (!garment.garmentType) {
         newErrors[`garment_${garment.id}_garmentType`] = 'Please select a garment type';
@@ -367,7 +397,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     setMessage('');
 
     try {
-
+      
       let slotResult = null;
       try {
         slotResult = await bookSlot('dry_cleaning', formData.date, formData.time);
@@ -387,42 +417,48 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         return;
       }
 
-      let imageUrl = '';
+      let imageUrls = [];
 
-      if (imageFile) {
-        console.log('Uploading image file:', imageFile);
-        console.log('File details:', {
-          name: imageFile.name,
-          size: imageFile.size,
-          type: imageFile.type
-        });
+      if (imageFiles.length > 0) {
+        for (const file of imageFiles) {
+          console.log('Uploading image file:', file);
+          console.log('File details:', {
+            name: file.name,
+            size: file.size,
+            type: file.type
+          });
 
-        const uploadResult = await uploadDryCleaningImage(imageFile);
-        console.log('Upload result:', uploadResult);
+          const uploadResult = await uploadDryCleaningImage(file);
+          console.log('Upload result:', uploadResult);
 
-        if (uploadResult.success) {
-          imageUrl = uploadResult.data.url || uploadResult.data.filename || '';
-          console.log('Image uploaded successfully, URL:', imageUrl);
-        } else {
-          console.warn('Image upload failed, continuing without image:', uploadResult.message);
-          setMessage(`⚠️ Image upload failed: ${uploadResult.message}. Continuing without image.`);
+          if (uploadResult.success) {
+            const url = uploadResult.data.url || uploadResult.data.filename || '';
+            imageUrls.push(url);
+            console.log('Image uploaded successfully, URL:', url);
+          } else {
+            console.warn('Image upload failed:', uploadResult.message);
+          }
+        }
+        if (imageUrls.length === 0 && imageFiles.length > 0) {
+          setMessage(`⚠️ Image uploads failed. Continuing without images.`);
         }
       } else {
-        console.log('No image file provided');
+        console.log('No image files provided');
       }
 
-      const defaultService = services && services.length > 0
+      const defaultService = services && services.length > 0 
         ? (services.find(service => service.service_name === 'Basic Dry Cleaning') || services[0])
         : null;
 
       const pickupDateTime = `${formData.date}T${formData.time}`;
 
+      // Build garments array for submission
       const garmentsData = garments.map(garment => {
-        const actualGarmentType = garment.garmentType === 'others'
-          ? garment.customGarmentType.trim()
+        const actualGarmentType = garment.garmentType === 'others' 
+          ? garment.customGarmentType.trim() 
           : garment.garmentType;
 
-        let pricePerItem = 350;
+        let pricePerItem = 350; 
         if (garment.garmentType !== 'others') {
           const selectedGarment = garmentTypesList.find(g => g.garment_name.toLowerCase() === garment.garmentType);
           pricePerItem = selectedGarment ? parseFloat(selectedGarment.garment_price) : (garmentTypes[garment.garmentType] || 200);
@@ -440,12 +476,13 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       const dryCleaningData = {
         serviceId: defaultService?.service_id || 1,
         serviceName: 'Basic Dry Cleaning',
-        basePrice: '0',
+        basePrice: '0', 
         finalPrice: estimatedPrice.toString(),
         quantity: garments.reduce((sum, g) => sum + parseInt(g.quantity), 0),
         notes: formData.notes,
         pickupDate: pickupDateTime,
-        imageUrl: imageUrl || 'no-image',
+        imageUrl: imageUrls.length > 0 ? imageUrls[0] : 'no-image',
+        imageUrls: imageUrls.length > 0 ? imageUrls : [],
         isEstimatedPrice: isEstimatedPrice,
         garments: garmentsData,
         isMultipleGarments: garments.length > 1
@@ -461,9 +498,9 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       console.log('Result message:', result?.message);
 
       if (result && result.success) {
-
+        
         const priceLabel = isEstimatedPrice ? 'Estimated price' : 'Final price';
-        setMessage(`✅ Dry cleaning service added to cart! ${priceLabel}: ₱${estimatedPrice}${imageUrl ? ' (Image uploaded)' : ''}`);
+        setMessage(`✅ Dry cleaning service added to cart! ${priceLabel}: ₱${estimatedPrice}${imageUrls.length > 0 ? ` (${imageUrls.length} image${imageUrls.length > 1 ? 's' : ''} uploaded)` : ''}`);
         setTimeout(() => {
           onClose();
           if (onCartUpdate) onCartUpdate();
@@ -484,7 +521,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   const handleClose = () => {
-
+    
     setFormData({
       serviceName: '',
       notes: '',
@@ -494,8 +531,9 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     setGarments([
       { id: 1, garmentType: '', customGarmentType: '', brand: '', quantity: 1 }
     ]);
-    setImageFile(null);
-    setImagePreview('');
+    setImageFiles([]);
+    setImagePreviews([]);
+    setCurrentImageIndex(0);
     setEstimatedPrice(0);
     setIsEstimatedPrice(false);
     setMessage('');
@@ -522,14 +560,14 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
             {garments.map((garment, index) => (
               <div key={garment.id} className="garment-inputs-group">
                 {index > 0 && <hr className="garment-divider" />}
-
+                
                 <div className="garment-row-header">
                   {garments.length > 1 && (
                     <span className="garment-label">Garment #{index + 1}</span>
                   )}
                   {garments.length > 1 && (
-                    <button
-                      type="button"
+                    <button 
+                      type="button" 
                       className="remove-garment-link"
                       onClick={() => removeGarment(garment.id)}
                     >
@@ -608,9 +646,9 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 </div>
               </div>
             ))}
-
-            <button
-              type="button"
+            
+            <button 
+              type="button" 
               className="add-garment-link"
               onClick={addGarment}
             >
@@ -667,7 +705,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                     <span>Full</span>
                   </div>
                 </div>
-
+                
                 {loadingSlots ? (
                   <div className="time-slots-loading">
                     <div className="loading-spinner"></div>
@@ -681,7 +719,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 ) : allTimeSlots.length > 0 ? (
                   <div className="time-slots-grid">
                     {(() => {
-
+                      
                       const seenTimes = new Set();
                       const uniqueSlots = allTimeSlots.filter(slot => {
                         if (seenTimes.has(slot.time_slot)) {
@@ -690,7 +728,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                         seenTimes.add(slot.time_slot);
                         return true;
                       });
-
+                      
                       return uniqueSlots.map(slot => (
                         <button
                           key={slot.slot_id || slot.time_slot}
@@ -709,8 +747,8 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                         >
                           <span className="slot-time">{slot.display_time}</span>
                           <span className="slot-status">
-                            {slot.status === 'full' ? 'Fully Booked' :
-                             slot.status === 'limited' ? `${slot.available} left` :
+                            {slot.status === 'full' ? 'Fully Booked' : 
+                             slot.status === 'limited' ? `${slot.available} left` : 
                              slot.status === 'available' ? `${slot.available} spots` : 'Unavailable'}
                           </span>
                         </button>
@@ -729,7 +767,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                   value={formData.time}
                   required
                 />
-
+                
                 {formData.time && (
                   <div className="selected-slot-info">
                     <i className="fas fa-check"></i> Selected: <strong>{allTimeSlots.find(s => s.time_slot === formData.time)?.display_time}</strong>
@@ -752,29 +790,72 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                   className="file-input-shared"
                 />
                 <label htmlFor="image" className="upload-button-shared">
-                  <i className="fas fa-camera"></i> Choose Photo
+                  <i className="fas fa-camera"></i> Add Photo{imagePreviews.length > 0 ? ` (${imagePreviews.length})` : ''}
                 </label>
               </div>
-              {imagePreview && (
-                <div className="image-preview-shared">
-                  <img src={imagePreview} alt="Clothing preview" />
+              {imagePreviews.length > 0 && (
+                <div className="image-preview-shared" style={{ position: 'relative' }}>
+                  <img src={imagePreviews[currentImageIndex]} alt="Clothing preview" />
+                  {imagePreviews.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={goToPreviousImage}
+                        style={{
+                          position: 'absolute',
+                          left: '10px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'rgba(0,0,0,0.5)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '32px',
+                          height: '32px',
+                          cursor: 'pointer',
+                          fontSize: '18px'
+                        }}
+                      >
+                        ‹
+                      </button>
+                      <button
+                        type="button"
+                        onClick={goToNextImage}
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'rgba(0,0,0,0.5)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '32px',
+                          height: '32px',
+                          cursor: 'pointer',
+                          fontSize: '18px'
+                        }}
+                      >
+                        ›
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
                     className="remove-image-btn-shared"
-                    onClick={() => {
-                      setImageFile(null);
-                      setImagePreview('');
-                      document.getElementById('image').value = '';
-                    }}
+                    onClick={removeCurrentImage}
                   >
                     ✕ Remove
                   </button>
-                </div>
-              )}
-
-              {imageFile && !imagePreview && (
-                <div className="help-text-shared" style={{ marginTop: '8px' }}>
-                  <i className="fas fa-paperclip"></i> {imageFile.name}
+                  <div style={{ 
+                    textAlign: 'center', 
+                    marginTop: '8px', 
+                    fontSize: '14px', 
+                    color: '#5D4037',
+                    fontWeight: '600'
+                  }}>
+                    {currentImageIndex + 1} / {imagePreviews.length}
+                  </div>
                 </div>
               )}
               <span className="help-text-shared">Photos help us provide better service and accurate pricing</span>
@@ -785,11 +866,11 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 <div className="price-breakdown">
                   {garments.filter(g => g.garmentType).map((garment, index) => {
                     const selectedGarment = garmentTypesList.find(g => g.garment_name.toLowerCase() === garment.garmentType);
-                    const pricePerItem = garment.garmentType === 'others'
-                      ? 350
+                    const pricePerItem = garment.garmentType === 'others' 
+                      ? 350 
                       : (selectedGarment ? parseFloat(selectedGarment.garment_price) : (garmentTypes[garment.garmentType] || 200));
-                    const garmentName = garment.garmentType === 'others'
-                      ? (garment.customGarmentType || 'Custom')
+                    const garmentName = garment.garmentType === 'others' 
+                      ? (garment.customGarmentType || 'Custom') 
                       : garment.garmentType.charAt(0).toUpperCase() + garment.garmentType.slice(1);
                     return (
                       <p key={garment.id}>

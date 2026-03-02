@@ -19,8 +19,9 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const [availableTimeSlots, setAvailableTimeSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [isShopOpen, setIsShopOpen] = useState(true);
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState('');
+  const [imageFiles, setImageFiles] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
@@ -145,8 +146,9 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       setAllTimeSlots([]);
       setAvailableTimeSlots([]);
       setIsShopOpen(true);
-      setImageFile(null);
-      setImagePreview('');
+      setImageFiles([]);
+      setImagePreviews([]);
+      setCurrentImageIndex(0);
       setEstimatedPrice(0);
       setMessage('');
       setErrors({});
@@ -301,18 +303,42 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    setImageFile(file);
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
 
-    if (file) {
+    files.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result);
+        setImageFiles(prev => [...prev, file]);
+        setImagePreviews(prev => [...prev, reader.result]);
+        setCurrentImageIndex(prev => prev === 0 && imagePreviews.length === 0 ? 0 : imagePreviews.length);
       };
       reader.readAsDataURL(file);
-    } else {
-      setImagePreview('');
-    }
+    });
+    
+    // Reset input so same file can be selected again
+    e.target.value = '';
+  };
+
+  const removeCurrentImage = () => {
+    if (imagePreviews.length === 0) return;
+    
+    setImageFiles(prev => prev.filter((_, i) => i !== currentImageIndex));
+    setImagePreviews(prev => prev.filter((_, i) => i !== currentImageIndex));
+    setCurrentImageIndex(prev => {
+      if (prev >= imagePreviews.length - 1) {
+        return Math.max(0, imagePreviews.length - 2);
+      }
+      return prev;
+    });
+  };
+
+  const goToPreviousImage = () => {
+    setCurrentImageIndex(prev => (prev > 0 ? prev - 1 : imagePreviews.length - 1));
+  };
+
+  const goToNextImage = () => {
+    setCurrentImageIndex(prev => (prev < imagePreviews.length - 1 ? prev + 1 : 0));
   };
 
   const validateForm = () => {
@@ -372,28 +398,21 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         return;
       }
 
-      let imageUrl = '';
-
-      if (imageFile) {
-        console.log('Uploading image file:', imageFile);
-        console.log('File details:', {
-          name: imageFile.name,
-          size: imageFile.size,
-          type: imageFile.type
-        });
-
-        const uploadResult = await uploadRepairImage(imageFile);
+      // Upload all images
+      const imageUrls = [];
+      
+      for (const file of imageFiles) {
+        console.log('Uploading image file:', file.name);
+        const uploadResult = await uploadRepairImage(file);
         console.log('Upload result:', uploadResult);
 
         if (uploadResult.success) {
-          imageUrl = uploadResult.data.url || uploadResult.data.filename || '';
-          console.log('Image uploaded successfully, URL:', imageUrl);
+          const url = uploadResult.data.url || uploadResult.data.filename || '';
+          if (url) imageUrls.push(url);
+          console.log('Image uploaded successfully, URL:', url);
         } else {
-          console.warn('Image upload failed, continuing without image:', uploadResult.message);
-          setMessage(`⚠️ Image upload failed: ${uploadResult.message}. Continuing without image.`);
+          console.warn('Image upload failed:', uploadResult.message);
         }
-      } else {
-        console.log('No image file provided');
       }
 
       const pickupDateTime = `${formData.date}T${formData.time}`;
@@ -416,7 +435,8 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         basePrice: estimatedPrice.toString(),
         estimatedPrice: estimatedPrice.toString(),
         pickupDate: pickupDateTime,
-        imageUrl: imageUrl || 'no-image',
+        imageUrl: imageUrls.length > 0 ? imageUrls[0] : 'no-image',
+        imageUrls: imageUrls.length > 0 ? imageUrls : [],
         garments: garmentsData,
         isMultipleGarments: garments.length > 1
       };
@@ -429,7 +449,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
       if (result.success) {
 
-        setMessage(`✅ Repair service added to cart! Estimated price: ₱${estimatedPrice}${imageUrl ? ' (Image uploaded)' : ''}`);
+        setMessage(`✅ Repair service added to cart! Estimated price: ₱${estimatedPrice}${imageUrls.length > 0 ? ` (${imageUrls.length} image${imageUrls.length > 1 ? 's' : ''} uploaded)` : ''}`);
         setTimeout(() => {
           onClose();
           if (onCartUpdate) onCartUpdate();
@@ -473,8 +493,9 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     setGarments([
       { id: 1, damageLevel: '', garmentType: '', notes: '' }
     ]);
-    setImageFile(null);
-    setImagePreview('');
+    setImageFiles([]);
+    setImagePreviews([]);
+    setCurrentImageIndex(0);
     setMessage('');
     setEstimatedPrice(0);
     setErrors({});
@@ -586,7 +607,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           </button>
 
           <div className="form-group-shared">
-            <label htmlFor="image" className="form-label-shared"><i className="fas fa-camera"></i> Upload Damage Photo (Recommended)</label>
+            <label htmlFor="image" className="form-label-shared"><i className="fas fa-camera"></i> Upload Damage Photos (Recommended)</label>
             <div className="image-upload-wrapper-shared">
               <input
                 type="file"
@@ -595,33 +616,82 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 accept="image/*"
                 onChange={handleImageChange}
                 className="file-input-shared"
+                multiple
               />
               <label htmlFor="image" className="upload-button-shared">
-                <i className="fas fa-camera"></i> Choose Photo
+                <i className="fas fa-camera"></i> Add Photo{imagePreviews.length > 0 ? ` (${imagePreviews.length})` : ''}
               </label>
             </div>
-            {imagePreview && (
-              <div className="image-preview-shared">
-                <img src={imagePreview} alt="Damage preview" />
+            {imagePreviews.length > 0 && (
+              <div className="image-preview-shared" style={{ position: 'relative' }}>
+                <img src={imagePreviews[currentImageIndex]} alt={`Damage preview ${currentImageIndex + 1}`} />
+                {imagePreviews.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={goToPreviousImage}
+                      style={{
+                        position: 'absolute',
+                        left: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'rgba(0,0,0,0.5)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        cursor: 'pointer',
+                        fontSize: '18px'
+                      }}
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      onClick={goToNextImage}
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'rgba(0,0,0,0.5)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        cursor: 'pointer',
+                        fontSize: '18px'
+                      }}
+                    >
+                      ›
+                    </button>
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '10px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      background: 'rgba(0,0,0,0.5)',
+                      color: 'white',
+                      padding: '4px 12px',
+                      borderRadius: '12px',
+                      fontSize: '12px'
+                    }}>
+                      {currentImageIndex + 1} / {imagePreviews.length}
+                    </div>
+                  </>
+                )}
                 <button
                   type="button"
                   className="remove-image-btn-shared"
-                  onClick={() => {
-                    setImageFile(null);
-                    setImagePreview('');
-                    document.getElementById('image').value = '';
-                  }}
+                  onClick={removeCurrentImage}
                 >
                   ✕ Remove
                 </button>
               </div>
             )}
 
-            {imageFile && !imagePreview && (
-              <div className="help-text-shared" style={{ marginTop: '8px' }}>
-                <i className="fas fa-paperclip"></i> {imageFile.name}
-              </div>
-            )}
             <span className="help-text-shared">Photos help us provide accurate pricing and better service</span>
           </div>
           <div className="form-group-shared">

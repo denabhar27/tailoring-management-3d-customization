@@ -8,6 +8,9 @@ import { getUserRole } from '../api/AuthApi';
 import { getAllDCGarmentTypesAdmin, createDCGarmentType, updateDCGarmentType, deleteDCGarmentType } from '../api/DryCleaningGarmentTypeApi';
 import { recordPayment } from '../api/PaymentApi';
 import { deleteOrderItem } from '../api/OrderApi';
+import ImagePreviewModal from '../components/ImagePreviewModal';
+import SimpleImageCarousel from '../components/SimpleImageCarousel';
+import { API_BASE_URL } from '../api/config';
 
 const isAuthenticated = () => {
   return !!localStorage.getItem('token');
@@ -43,6 +46,10 @@ const DryCleaning = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
 
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState('');
+  const [previewImageAlt, setPreviewImageAlt] = useState('');
+
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const [garmentTypes, setGarmentTypes] = useState([]);
@@ -59,6 +66,18 @@ const DryCleaning = () => {
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  };
+
+  const openImagePreview = (url, altText) => {
+    setPreviewImageUrl(url);
+    setPreviewImageAlt(altText || 'Image');
+    setImagePreviewOpen(true);
+  };
+
+  const closeImagePreview = () => {
+    setImagePreviewOpen(false);
+    setPreviewImageUrl('');
+    setPreviewImageAlt('');
   };
 
   const openConfirmModal = (message, action, buttonText = 'Confirm', buttonStyle = 'blue') => {
@@ -919,6 +938,36 @@ const DryCleaning = () => {
               )}
               <div className="detail-row"><strong>Service:</strong> {selectedOrder.specific_data?.serviceName || 'N/A'}</div>
 
+              {/* Support multiple images */}
+              {selectedOrder.specific_data?.imageUrls && selectedOrder.specific_data.imageUrls.length > 0 ? (
+                <div className="detail-row">
+                  <strong>Clothing Images ({selectedOrder.specific_data.imageUrls.length}):</strong><br />
+                  <div style={{ marginTop: '8px' }}>
+                    <SimpleImageCarousel
+                      images={selectedOrder.specific_data.imageUrls.map((url, idx) => ({ url: `${API_BASE_URL}${url}`, label: `Photo ${idx + 1}/${selectedOrder.specific_data.imageUrls.length}` }))}
+                      itemName="Clothing Photo"
+                      height="280px"
+                    />
+                  </div>
+                </div>
+              ) : selectedOrder.specific_data?.imageUrl && selectedOrder.specific_data.imageUrl !== 'no-image' && (
+                <div className="detail-row">
+                  <strong>Clothing Image:</strong><br />
+                  <div
+                    className="clickable-image"
+                    style={{ cursor: 'pointer', display: 'inline-block', marginTop: '8px' }}
+                    onClick={() => openImagePreview(`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`, 'Clothing Image')}
+                  >
+                    <img
+                      src={`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`}
+                      alt="Clothing"
+                      style={{ maxWidth: '200px', maxHeight: '200px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    />
+                    <small className="click-hint" style={{ display: 'block', fontSize: '11px', color: '#888', marginTop: '4px' }}>Click to expand</small>
+                  </div>
+                </div>
+              )}
+
               <div className="form-group" style={{ marginTop: '20px' }}>
                 <label>Final Price (₱)</label>
                 <input
@@ -1087,6 +1136,37 @@ const DryCleaning = () => {
                 </>
               )}
               <div className="detail-row"><strong>Service:</strong> {selectedOrder.specific_data?.serviceName || 'N/A'}</div>
+
+              {/* Support multiple images */}
+              {selectedOrder.specific_data?.imageUrls && selectedOrder.specific_data.imageUrls.length > 0 ? (
+                <div className="detail-row">
+                  <strong>Clothing Images ({selectedOrder.specific_data.imageUrls.length}):</strong><br />
+                  <div style={{ marginTop: '8px' }}>
+                    <SimpleImageCarousel
+                      images={selectedOrder.specific_data.imageUrls.map((url, idx) => ({ url: `${API_BASE_URL}${url}`, label: `Photo ${idx + 1}/${selectedOrder.specific_data.imageUrls.length}` }))}
+                      itemName="Clothing Photo"
+                      height="300px"
+                    />
+                  </div>
+                </div>
+              ) : selectedOrder.specific_data?.imageUrl && selectedOrder.specific_data.imageUrl !== 'no-image' && (
+                <div className="detail-row">
+                  <strong>Clothing Image:</strong><br />
+                  <div
+                    className="clickable-image"
+                    style={{ cursor: 'pointer', display: 'inline-block', marginTop: '8px' }}
+                    onClick={() => openImagePreview(`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`, 'Clothing Image')}
+                  >
+                    <img
+                      src={`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`}
+                      alt="Clothing"
+                      style={{ maxWidth: '300px', maxHeight: '300px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    />
+                    <small className="click-hint" style={{ display: 'block', fontSize: '11px', color: '#888', marginTop: '4px' }}>Click to expand</small>
+                  </div>
+                </div>
+              )}
+
               <div className="detail-row"><strong>Date Received:</strong> {new Date(selectedOrder.order_date).toLocaleDateString()}</div>
               <div className="detail-row"><strong>Price:</strong> ₱{parseFloat(selectedOrder.final_price || 0).toLocaleString()}</div>
               <div className="detail-row"><strong>Status:</strong>
@@ -1389,6 +1469,13 @@ const DryCleaning = () => {
           </div>
         </div>
       )}
+
+      <ImagePreviewModal
+        isOpen={imagePreviewOpen}
+        onClose={closeImagePreview}
+        imageUrl={previewImageUrl}
+        altText={previewImageAlt}
+      />
     </div>
   );
 };

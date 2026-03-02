@@ -107,6 +107,7 @@ export default function CartScreen() {
   const [orderNotes, setOrderNotes] = useState('');
   const [showBundleModal, setShowBundleModal] = useState(false);
   const [bundleItems, setBundleItems] = useState<any[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   useEffect(() => {
     fetchCartItems();
@@ -217,6 +218,13 @@ export default function CartScreen() {
             damageDescription: item.specific_data?.garments?.[0]?.notes || item.specific_data?.damageDescription || '',
             specialInstructions: item.specific_data?.specialInstructions || '',
             image: processedImage,
+            imageUrls: (() => {
+              const urls = item.specific_data?.imageUrls;
+              if (!urls || urls.length === 0) return [];
+              return urls.map((url: string) => 
+                url.startsWith('http') ? url : `${API_BASE}${url}`
+              );
+            })(),
             appointmentDate: formattedDate,
 
             clothingBrand: item.specific_data?.garments?.[0]?.brand || item.specific_data?.clothingBrand || item.specific_data?.brand || '',
@@ -421,6 +429,7 @@ export default function CartScreen() {
   const showItemDetails = (item: any) => {
     console.log('Showing item details:', item);
     console.log('Image URL:', item.image);
+    setCurrentImageIndex(0);
     setSelectedItemDetails(item);
     setShowDetailsModal(true);
   };
@@ -782,6 +791,44 @@ export default function CartScreen() {
                         ))}
                       </View>
                     </View>
+                  ) : selectedItemDetails.service?.toLowerCase() !== 'rental' && selectedItemDetails.imageUrls && selectedItemDetails.imageUrls.length > 0 ? (
+                    <>
+                      <View style={{ position: 'relative' }}>
+                        <Image
+                          source={{ uri: selectedItemDetails.imageUrls[currentImageIndex] }}
+                          style={styles.detailsImage}
+                          onError={(error) => {
+                            console.log('Image load error:', error);
+                          }}
+                        />
+                        {selectedItemDetails.imageUrls.length > 1 && (
+                          <>
+                            <TouchableOpacity
+                              style={{ position: 'absolute', left: 10, top: '50%', transform: [{ translateY: -16 }], backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 16, width: 32, height: 32, justifyContent: 'center', alignItems: 'center' }}
+                              onPress={() => setCurrentImageIndex(prev => prev > 0 ? prev - 1 : selectedItemDetails.imageUrls.length - 1)}
+                            >
+                              <Ionicons name="chevron-back" size={20} color="white" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={{ position: 'absolute', right: 10, top: '50%', transform: [{ translateY: -16 }], backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 16, width: 32, height: 32, justifyContent: 'center', alignItems: 'center' }}
+                              onPress={() => setCurrentImageIndex(prev => prev < selectedItemDetails.imageUrls.length - 1 ? prev + 1 : 0)}
+                            >
+                              <Ionicons name="chevron-forward" size={20} color="white" />
+                            </TouchableOpacity>
+                            <View style={{ position: 'absolute', bottom: 10, left: '50%', transform: [{ translateX: -25 }], backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 }}>
+                              <Text style={{ color: 'white', fontSize: 12 }}>{currentImageIndex + 1} / {selectedItemDetails.imageUrls.length}</Text>
+                            </View>
+                          </>
+                        )}
+                      </View>
+                      <View style={styles.detailsSection}>
+                        <Text style={styles.detailsImageLabel}>
+                          {selectedItemDetails.service?.toLowerCase() === 'repair' ? `${selectedItemDetails.imageUrls.length} damage photo${selectedItemDetails.imageUrls.length > 1 ? 's' : ''} uploaded` :
+                           selectedItemDetails.service?.toLowerCase() === 'dry_cleaning' ? `${selectedItemDetails.imageUrls.length} clothing photo${selectedItemDetails.imageUrls.length > 1 ? 's' : ''} uploaded` :
+                           `${selectedItemDetails.imageUrls.length} photo${selectedItemDetails.imageUrls.length > 1 ? 's' : ''} uploaded`}
+                        </Text>
+                      </View>
+                    </>
                   ) : selectedItemDetails.service?.toLowerCase() !== 'rental' && selectedItemDetails.image && selectedItemDetails.image !== 'no-image' && selectedItemDetails.image.trim() !== '' && !selectedItemDetails.image.includes('no-image') ? (
                     <>
                       <Image

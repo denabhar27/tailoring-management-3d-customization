@@ -68,7 +68,8 @@ export default function DryCleaningClothes() {
   console.log('🧹🧹🧹 DRYCLEANING COMPONENT RENDERING 🧹🧹🧹');
 
   const router = useRouter();
-  const [image, setImage] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const [garments, setGarments] = useState<GarmentItem[]>([
     { id: 1, garmentType: '', brand: '', quantity: '1' }
@@ -186,7 +187,32 @@ export default function DryCleaningClothes() {
       quality: 1,
     });
     if (!result.canceled) {
-      setImage(result.assets[0].uri);
+      setImages([...images, result.assets[0].uri]);
+      setCurrentImageIndex(images.length);
+    }
+  };
+
+  const removeCurrentImage = () => {
+    if (images.length > 0) {
+      const newImages = images.filter((_, i) => i !== currentImageIndex);
+      setImages(newImages);
+      if (currentImageIndex >= newImages.length && newImages.length > 0) {
+        setCurrentImageIndex(newImages.length - 1);
+      } else if (newImages.length === 0) {
+        setCurrentImageIndex(0);
+      }
+    }
+  };
+
+  const goToPreviousImage = () => {
+    if (currentImageIndex > 0) {
+      setCurrentImageIndex(currentImageIndex - 1);
+    }
+  };
+
+  const goToNextImage = () => {
+    if (currentImageIndex < images.length - 1) {
+      setCurrentImageIndex(currentImageIndex + 1);
     }
   };
 
@@ -369,36 +395,41 @@ export default function DryCleaningClothes() {
       }
       console.log('Slot booked successfully:', slotResult);
 
-      let imageUrl = '';
-      if (image) {
-        try {
-          const formData = new FormData();
-          formData.append('dryCleaningImage', {
-            uri: image,
-            type: 'image/jpeg',
-            name: 'dryclean-image.jpg',
-          } as any);
+      let imageUrls: string[] = [];
+      if (images.length > 0) {
+        for (const img of images) {
+          try {
+            const formData = new FormData();
+            formData.append('dryCleaningImage', {
+              uri: img,
+              type: 'image/jpeg',
+              name: `dryclean-image-${Date.now()}.jpg`,
+            } as any);
 
-          const uploadToken = await AsyncStorage.getItem('userToken');
-          const uploadResponse = await fetch(`${API_BASE_URL}/dry-cleaning/upload-image`, {
-            method: 'POST',
-            headers: {
-              'Authorization': uploadToken ? `Bearer ${uploadToken}` : '',
-            },
-            body: formData,
-          });
+            const uploadToken = await AsyncStorage.getItem('userToken');
+            const uploadResponse = await fetch(`${API_BASE_URL}/dry-cleaning/upload-image`, {
+              method: 'POST',
+              headers: {
+                'Authorization': uploadToken ? `Bearer ${uploadToken}` : '',
+              },
+              body: formData,
+            });
 
-          const uploadResult = await uploadResponse.json();
+            const uploadResult = await uploadResponse.json();
 
-          if (uploadResult.success) {
-            imageUrl = uploadResult.data.url || uploadResult.data.filename || '';
-            console.log('Image uploaded successfully, URL:', imageUrl);
-          } else {
-            console.warn('Image upload failed, continuing without image:', uploadResult.message);
+            if (uploadResult.success) {
+              const url = uploadResult.data.url || uploadResult.data.filename || '';
+              imageUrls.push(url);
+              console.log('Image uploaded successfully, URL:', url);
+            } else {
+              console.warn('Image upload failed:', uploadResult.message);
+            }
+          } catch (uploadError) {
+            console.error('Image upload failed:', uploadError);
           }
-        } catch (uploadError) {
-          console.error('Image upload failed:', uploadError);
-          Alert.alert('Warning', 'Image upload failed. Continuing without image.');
+        }
+        if (imageUrls.length === 0 && images.length > 0) {
+          Alert.alert('Warning', 'Image uploads failed. Continuing without images.');
         }
       }
 
@@ -423,7 +454,8 @@ export default function DryCleaningClothes() {
           garments: garmentsData,
           isMultipleGarments: garments.length > 1,
           notes: specialInstructions,
-          imageUrl: imageUrl || 'no-image',
+          imageUrl: imageUrls.length > 0 ? imageUrls[0] : 'no-image',
+          imageUrls: imageUrls.length > 0 ? imageUrls : [],
           pickupDate: pickupDateTime,
           appointmentTime: selectedTimeSlot
         }
@@ -447,7 +479,8 @@ export default function DryCleaningClothes() {
             onPress: () => {
               setGarments([{ id: 1, garmentType: '', brand: '', quantity: '1' }]);
               setSpecialInstructions("");
-              setImage(null);
+              setImages([]);
+              setCurrentImageIndex(0);
               setPickupDate(null);
               setSelectedTimeSlot("");
               setTimeSlots([]);
@@ -485,23 +518,58 @@ export default function DryCleaningClothes() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-          <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
-            {image ? (
-              <Image source={{ uri: image }} style={styles.previewImage} />
-            ) : (
-              <View style={styles.uploadContent}>
-                <View style={styles.uploadIconCircle}>
-                  <Ionicons name="camera-outline" size={36} color="#8D6E63" />
+          {/* Image Upload Section */}
+          <View style={styles.imageSection}>
+            {images.length > 0 ? (
+              <View style={styles.imageCarousel}>
+                <View style={styles.imageContainer}>
+                  <Image source={{ uri: images[currentImageIndex] }} style={styles.previewImage} />
+                  {images.length > 1 && (
+                    <>
+                      <TouchableOpacity 
+                        style={[styles.imageNavButton, styles.imageNavLeft, currentImageIndex === 0 && styles.imageNavDisabled]} 
+                        onPress={goToPreviousImage}
+                        disabled={currentImageIndex === 0}
+                      >
+                        <Ionicons name="chevron-back" size={24} color={currentImageIndex === 0 ? "#ccc" : "#5D4037"} />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.imageNavButton, styles.imageNavRight, currentImageIndex === images.length - 1 && styles.imageNavDisabled]} 
+                        onPress={goToNextImage}
+                        disabled={currentImageIndex === images.length - 1}
+                      >
+                        <Ionicons name="chevron-forward" size={24} color={currentImageIndex === images.length - 1 ? "#ccc" : "#5D4037"} />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                  <TouchableOpacity style={styles.removeImageButton} onPress={removeCurrentImage}>
+                    <Ionicons name="close-circle" size={28} color="#ef5350" />
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.uploadText}>
-                  Tap to upload photo of garment
-                </Text>
-                <Text style={styles.uploadSubtext}>
-                  Clear image helps us serve you better
-                </Text>
+                <Text style={styles.imageCounter}>{currentImageIndex + 1} / {images.length}</Text>
               </View>
+            ) : (
+              <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
+                <View style={styles.uploadContent}>
+                  <View style={styles.uploadIconCircle}>
+                    <Ionicons name="camera-outline" size={36} color="#8D6E63" />
+                  </View>
+                  <Text style={styles.uploadText}>
+                    Tap to upload photo of garment
+                  </Text>
+                  <Text style={styles.uploadSubtext}>
+                    Clear image helps us serve you better
+                  </Text>
+                </View>
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+            {images.length > 0 && (
+              <TouchableOpacity style={styles.addImageButton} onPress={pickImage}>
+                <Ionicons name="add-circle-outline" size={20} color="#5D4037" />
+                <Text style={styles.addImageText}>Add Another Photo</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {/* Garments - Simple repeated inputs */}
           {garments.map((garment, index) => (
@@ -817,7 +885,75 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFEF9",
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 16,
+  },
+  imageSection: {
     marginBottom: 32,
+  },
+  imageCarousel: {
+    alignItems: "center",
+  },
+  imageContainer: {
+    width: "100%",
+    height: 200,
+    borderRadius: 24,
+    overflow: "hidden",
+    position: "relative",
+  },
+  imageNavButton: {
+    position: "absolute",
+    top: "50%",
+    marginTop: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  imageNavLeft: {
+    left: 10,
+  },
+  imageNavRight: {
+    right: 10,
+  },
+  imageNavDisabled: {
+    opacity: 0.5,
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderRadius: 14,
+  },
+  imageCounter: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#5D4037",
+    fontWeight: "600",
+  },
+  addImageButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E8D5C4",
+    backgroundColor: "#FFFEF9",
+  },
+  addImageText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#5D4037",
+    fontWeight: "600",
   },
   previewImage: { width: "100%", height: "100%", borderRadius: 22 },
   uploadContent: { alignItems: "center", paddingHorizontal: 32 },

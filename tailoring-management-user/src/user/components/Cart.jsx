@@ -637,7 +637,17 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                             </>
                           )}
                           <p>Drop off preferred date: {formatDateTo12Hour(item.specific_data.pickupDate) || 'N/A'}</p>
-                          {item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
+                          {/* Support multiple images */}
+                          {item.specific_data.imageUrls && item.specific_data.imageUrls.length > 0 ? (
+                            <div className="cart-item-image">
+                              <SimpleImageCarousel
+                                images={item.specific_data.imageUrls.map((url, idx) => ({ url: `${API_BASE_URL}${url}`, label: `Photo ${idx + 1}/${item.specific_data.imageUrls.length}` }))}
+                                itemName="Damage Photo"
+                                height="280px"
+                              />
+                              <small>{item.specific_data.imageUrls.length} damage photo{item.specific_data.imageUrls.length > 1 ? 's' : ''} uploaded</small>
+                            </div>
+                          ) : item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
                             <div className="cart-item-image">
                               <img
                                 src={`${API_BASE_URL}${item.specific_data.imageUrl}`}
@@ -681,7 +691,17 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                             </>
                           )}
                           <p>Drop off date: {formatDateTo12Hour(item.specific_data.pickupDate) || 'N/A'}</p>
-                          {item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
+                          {/* Support multiple images */}
+                          {item.specific_data.imageUrls && item.specific_data.imageUrls.length > 0 ? (
+                            <div className="cart-item-image">
+                              <SimpleImageCarousel
+                                images={item.specific_data.imageUrls.map((url, idx) => ({ url: `${API_BASE_URL}${url}`, label: `Photo ${idx + 1}/${item.specific_data.imageUrls.length}` }))}
+                                itemName="Clothing Photo"
+                                height="280px"
+                              />
+                              <small>{item.specific_data.imageUrls.length} clothing photo{item.specific_data.imageUrls.length > 1 ? 's' : ''} uploaded</small>
+                            </div>
+                          ) : item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
                             <div className="cart-item-image">
                               <img
                                 src={`${API_BASE_URL}${item.specific_data.imageUrl}`}

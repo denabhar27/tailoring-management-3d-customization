@@ -4,6 +4,7 @@ import AdminHeader from './AdminHeader';
 import Sidebar from './Sidebar';
 import { getAllRepairOrders, getRepairOrdersByStatus, updateRepairOrderItem } from '../api/RepairOrderApi';
 import ImagePreviewModal from '../components/ImagePreviewModal';
+import SimpleImageCarousel from '../components/SimpleImageCarousel';
 import { useAlert } from '../context/AlertContext';
 import { getAllRepairGarmentTypesAdmin, createRepairGarmentType, updateRepairGarmentType, deleteRepairGarmentType } from '../api/RepairGarmentTypeApi';
 import { recordPayment } from '../api/PaymentApi';
@@ -872,7 +873,19 @@ const Repair = () => {
               <div className="detail-row"><strong>Garment:</strong> {selectedOrder.specific_data?.garmentType || 'N/A'}</div>
               <div className="detail-row"><strong>Service:</strong> {selectedOrder.specific_data?.serviceName || 'N/A'}</div>
 
-              {selectedOrder.specific_data?.imageUrl && (
+              {/* Support multiple images */}
+              {selectedOrder.specific_data?.imageUrls && selectedOrder.specific_data.imageUrls.length > 0 ? (
+                <div className="detail-row">
+                  <strong>Damage Images ({selectedOrder.specific_data.imageUrls.length}):</strong><br />
+                  <div style={{ marginTop: '8px' }}>
+                    <SimpleImageCarousel
+                      images={selectedOrder.specific_data.imageUrls.map((url, idx) => ({ url: `${API_BASE_URL}${url}`, label: `Photo ${idx + 1}/${selectedOrder.specific_data.imageUrls.length}` }))}
+                      itemName="Damage Photo"
+                      height="280px"
+                    />
+                  </div>
+                </div>
+              ) : selectedOrder.specific_data?.imageUrl && (
                 <div className="detail-row">
                   <strong>Damage Image:</strong><br />
                   <div
@@ -1061,7 +1074,19 @@ const Repair = () => {
                 </>
               )}
 
-              {selectedOrder.specific_data?.imageUrl && (
+              {/* Support multiple images */}
+              {selectedOrder.specific_data?.imageUrls && selectedOrder.specific_data.imageUrls.length > 0 ? (
+                <div className="detail-row">
+                  <strong>Damage Images ({selectedOrder.specific_data.imageUrls.length}):</strong><br />
+                  <div style={{ marginTop: '8px' }}>
+                    <SimpleImageCarousel
+                      images={selectedOrder.specific_data.imageUrls.map((url, idx) => ({ url: `${API_BASE_URL}${url}`, label: `Photo ${idx + 1}/${selectedOrder.specific_data.imageUrls.length}` }))}
+                      itemName="Damage Photo"
+                      height="300px"
+                    />
+                  </div>
+                </div>
+              ) : selectedOrder.specific_data?.imageUrl && (
                 <div className="detail-row">
                   <strong>Damage Image:</strong><br />
                   <div

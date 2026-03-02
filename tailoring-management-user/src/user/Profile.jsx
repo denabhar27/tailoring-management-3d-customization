@@ -690,7 +690,19 @@ const Profile = () => {
         return (
           <div className="service-details repair-details">
             <h4>Repair Details</h4>
-            {specific_data.imageUrl && specific_data.imageUrl !== 'no-image' && (
+            {/* Support multiple images */}
+            {specific_data.imageUrls && specific_data.imageUrls.length > 0 ? (
+              <div className="detail-row">
+                <span className="detail-label">Damage Photos:</span>
+                <div className="detail-value">
+                  <SimpleImageCarousel
+                    images={specific_data.imageUrls.map((url, idx) => ({ url: `${API_BASE_URL}${url}`, label: `Photo ${idx + 1}/${specific_data.imageUrls.length}` }))}
+                    itemName="Damage Photo"
+                    height="280px"
+                  />
+                </div>
+              </div>
+            ) : specific_data.imageUrl && specific_data.imageUrl !== 'no-image' && (
               <div className="detail-row">
                 <span className="detail-label">Damage Photo:</span>
                 <div className="detail-value">
@@ -994,7 +1006,19 @@ const Profile = () => {
         return (
           <div className="service-details drycleaning-details">
             <h4>Dry Cleaning Details</h4>
-            {specific_data.imageUrl && specific_data.imageUrl !== 'no-image' && (
+            {/* Support multiple images */}
+            {specific_data.imageUrls && specific_data.imageUrls.length > 0 ? (
+              <div className="detail-row">
+                <span className="detail-label">Clothing Photos:</span>
+                <div className="detail-value">
+                  <SimpleImageCarousel
+                    images={specific_data.imageUrls.map((url, idx) => ({ url: `${API_BASE_URL}${url}`, label: `Photo ${idx + 1}/${specific_data.imageUrls.length}` }))}
+                    itemName="Clothing Photo"
+                    height="280px"
+                  />
+                </div>
+              </div>
+            ) : specific_data.imageUrl && specific_data.imageUrl !== 'no-image' && (
               <div className="detail-row">
                 <span className="detail-label">Clothing Photo:</span>
                 <div className="detail-value">

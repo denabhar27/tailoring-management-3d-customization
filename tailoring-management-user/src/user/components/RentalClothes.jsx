@@ -4,6 +4,7 @@ import { getAllRentals, getRentalImageUrl } from '../../api/RentalApi';
 import { addToCart } from '../../api/CartApi';
 import suitSample from "../../assets/suits.png";
 import { useAlert } from '../../context/AlertContext';
+import '../../components/SimpleImageCarousel.css';
 
 const RentalImageCarousel = ({ images, itemName }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -51,7 +52,7 @@ const RentalImageCarousel = ({ images, itemName }) => {
   const goToNext = () => setCurrentIndex(prev => (prev === validImages.length - 1 ? 0 : prev + 1));
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <div className="simple-image-carousel" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       <div style={{
         position: 'relative',
         backgroundColor: '#ffffff',
@@ -82,31 +83,30 @@ const RentalImageCarousel = ({ images, itemName }) => {
         }}>
           {validImages[currentIndex].label}
         </div>
-        <button onClick={goToPrev} style={{
-          position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)',
-          width: '36px', height: '36px', borderRadius: '50%', border: 'none',
-          backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff', cursor: 'pointer',
-          fontSize: '18px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-        }}>‹</button>
-        <button onClick={goToNext} style={{
-          position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
-          width: '36px', height: '36px', borderRadius: '50%', border: 'none',
-          backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff', cursor: 'pointer',
-          fontSize: '18px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-        }}>›</button>
+        <button 
+          onClick={goToPrev} 
+          type="button"
+          className="carousel-nav-btn carousel-nav-prev"
+        >‹</button>
+        <button 
+          onClick={goToNext} 
+          type="button"
+          className="carousel-nav-btn carousel-nav-next"
+        >›</button>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '10px' }}>
+      <div className="carousel-thumbnails">
         {validImages.map((img, index) => (
-          <button key={index} onClick={() => setCurrentIndex(index)} style={{
-            width: '55px', height: '55px', padding: 0, borderRadius: '6px', overflow: 'hidden',
-            border: index === currentIndex ? '2px solid #8B4513' : '2px solid #ddd',
-            cursor: 'pointer', opacity: index === currentIndex ? 1 : 0.6, backgroundColor: '#fff'
-          }}>
+          <button 
+            key={index} 
+            onClick={() => setCurrentIndex(index)} 
+            type="button"
+            className={`carousel-thumbnail-btn ${index === currentIndex ? 'active' : ''}`}
+          >
             <img 
               src={getImageSrc(img, index)} 
               alt={img.label} 
               onError={() => handleImageError(index)}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+              className="carousel-thumbnail-img"
             />
           </button>
         ))}

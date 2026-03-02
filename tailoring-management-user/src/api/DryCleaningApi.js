@@ -79,6 +79,7 @@ export async function addDryCleaningToCart(dryCleaningData) {
         serviceName: dryCleaningData.serviceName,
         notes: dryCleaningData.notes,
         imageUrl: dryCleaningData.imageUrl,
+        imageUrls: dryCleaningData.imageUrls || [],
         pickupDate: dryCleaningData.pickupDate,
         quantity: dryCleaningData.quantity,
         isEstimatedPrice: dryCleaningData.isEstimatedPrice || false,

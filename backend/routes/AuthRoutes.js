@@ -4,10 +4,20 @@ const authController = require('../controller/AuthController');
 const middleware = require('../middleware/AuthToken');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+
+const profilePicDir = path.join(__dirname, '..', 'uploads', 'profile-pictures');
+if (!fs.existsSync(profilePicDir)) {
+  fs.mkdirSync(profilePicDir, { recursive: true });
+}
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/profile-pictures/');
+    // Ensure dir exists at upload time too (for ephemeral filesystems like Render)
+    if (!fs.existsSync(profilePicDir)) {
+      fs.mkdirSync(profilePicDir, { recursive: true });
+    }
+    cb(null, profilePicDir);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -38,21 +48,22 @@ router.put("/profile", middleware.verifyToken, authController.updateProfile);
 router.put("/profile-picture", middleware.verifyToken, upload.single('profilePicture'), authController.updateProfilePicture);
 
 router.use((error, req, res, next) => {
+  console.error('AuthRoutes error:', error);
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ message: 'File size too large. Maximum size is 5MB.' });
+      return res.status(400).json({ success: false, message: 'File size too large. Maximum size is 5MB.' });
     }
     if (error.code === 'LIMIT_FILE_COUNT') {
-      return res.status(400).json({ message: 'Too many files uploaded.' });
+      return res.status(400).json({ success: false, message: 'Too many files uploaded.' });
     }
-    return res.status(400).json({ message: 'File upload error: ' + error.message });
+    return res.status(400).json({ success: false, message: 'File upload error: ' + error.message });
   }
   
   if (error.message === 'Only image files are allowed') {
-    return res.status(400).json({ message: 'Only image files are allowed.' });
+    return res.status(400).json({ success: false, message: 'Only image files are allowed.' });
   }
   
-  next(error);
+  return res.status(500).json({ success: false, message: error.message || 'Internal server error' });
 });
 
 router.get("/auth/google", authController.googleAuth);

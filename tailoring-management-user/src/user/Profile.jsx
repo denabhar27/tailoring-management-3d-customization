@@ -4,7 +4,7 @@ import '../styles/UserHomePage.css';
 import '../styles/Profile.css';
 import logo from "../assets/logo.png";
 import dp from "../assets/dp.png";
-import { getUser, updateProfile } from '../api/AuthApi';
+import { getUser, updateProfile, uploadProfilePicture } from '../api/AuthApi';
 import { getUserOrderTracking, getStatusBadgeClass, getStatusLabel, cancelOrderItem } from '../api/OrderTrackingApi';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import TransactionLogModal from './components/TransactionLogModal';
@@ -48,6 +48,8 @@ const Profile = () => {
     phone_number: ''
   });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [profilePicUrl, setProfilePicUrl] = useState('');
+  const [uploadingPic, setUploadingPic] = useState(false);
 
   const openImagePreview = (imageUrl, altText) => {
     setPreviewImageUrl(imageUrl);
@@ -73,6 +75,12 @@ const Profile = () => {
         email: userData.email || '',
         phone_number: userData.phone_number || ''
       });
+      if (userData.profile_picture) {
+        const picUrl = userData.profile_picture.startsWith('http')
+          ? userData.profile_picture
+          : `${API_BASE_URL}${userData.profile_picture}`;
+        setProfilePicUrl(picUrl);
+      }
     }
   }, []);
 
@@ -1456,7 +1464,18 @@ const Profile = () => {
 
         <div className="user-info-card">
           <div className="user-card-row">
-            <img src={dp} alt="User" className="user-avatar" />
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              {profilePicUrl ? (
+                <img
+                  src={profilePicUrl}
+                  alt="User"
+                  className="user-avatar"
+                  style={{ objectFit: 'cover', borderRadius: '50%' }}
+                />
+              ) : (
+                <img src={dp} alt="User" className="user-avatar" />
+              )}
+            </div>
             <div style={{ flex: 1, width: '100%' }}>
               <>
                 <div className="user-name">
@@ -2469,6 +2488,102 @@ const Profile = () => {
               }}>×</button>
             </div>
             <div className="details-modal-content">
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '20px' }}>
+                <div style={{ position: 'relative', marginBottom: '12px' }}>
+                  {profilePicUrl ? (
+                    <img
+                      src={profilePicUrl}
+                      alt="Profile"
+                      style={{
+                        width: '100px',
+                        height: '100px',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '3px solid #8B4513'
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: '100px',
+                      height: '100px',
+                      borderRadius: '50%',
+                      backgroundColor: '#F5ECE3',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '3px solid #8B4513'
+                    }}>
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="8" r="4" stroke="#8B4513" strokeWidth="2" fill="none"/>
+                        <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="#8B4513" strokeWidth="2" fill="none"/>
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <label
+                  htmlFor="profile-pic-upload"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    backgroundColor: '#F5ECE3',
+                    color: '#8B4513',
+                    borderRadius: '20px',
+                    cursor: uploadingPic ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    opacity: uploadingPic ? 0.6 : 1,
+                    transition: 'background 0.2s ease'
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke="#8B4513" strokeWidth="2" fill="none"/>
+                    <circle cx="12" cy="13" r="4" stroke="#8B4513" strokeWidth="2" fill="none"/>
+                  </svg>
+                  {uploadingPic ? 'Uploading...' : 'Change Photo'}
+                </label>
+                <input
+                  id="profile-pic-upload"
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  style={{ display: 'none' }}
+                  disabled={uploadingPic}
+                  onChange={async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    if (file.size > 5 * 1024 * 1024) {
+                      await alert('File size must be less than 5MB', 'Error', 'error');
+                      e.target.value = '';
+                      return;
+                    }
+
+                    setUploadingPic(true);
+                    try {
+                      const result = await uploadProfilePicture(file);
+                      if (result.success && result.user) {
+                        setUser(result.user);
+                        const newPicUrl = result.user.profile_picture
+                          ? (result.user.profile_picture.startsWith('http')
+                            ? result.user.profile_picture
+                            : `${API_BASE_URL}${result.user.profile_picture}`)
+                          : '';
+                        setProfilePicUrl(newPicUrl);
+                        await alert('Profile picture updated!', 'Success', 'success');
+                      } else {
+                        await alert(result.message || 'Failed to upload picture', 'Error', 'error');
+                      }
+                    } catch (error) {
+                      console.error('Error uploading profile picture:', error);
+                      await alert('Failed to upload picture. Please try again.', 'Error', 'error');
+                    } finally {
+                      setUploadingPic(false);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+              </div>
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#333' }}>
                   First Name

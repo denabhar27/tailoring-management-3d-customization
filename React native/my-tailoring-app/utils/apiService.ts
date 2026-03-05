@@ -211,13 +211,41 @@ export const authService = {
 
   updateProfilePicture: async (formData: FormData) => {
     const token = await AsyncStorage.getItem('userToken');
-    return fetch(`${API_BASE_URL}/profile-picture`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : '',
-      },
-      body: formData,
-    });
+
+    if (token && isTokenExpired(token)) {
+      await handleAuthFailure();
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/profile-picture`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: formData,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      const text = await response.text();
+      console.log('Profile picture upload response:', response.status, text.substring(0, 200));
+
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error(`Server returned non-JSON (status ${response.status}). Please try again.`);
+      }
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('Upload timed out. Please check your connection and try again.');
+      }
+      throw err;
+    }
   },
 
   forgotPassword: async (usernameOrEmail: string) => {

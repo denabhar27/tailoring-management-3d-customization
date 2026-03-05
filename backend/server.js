@@ -9,7 +9,8 @@ const app = express();
 
 const uploadDirs = [
   'uploads',
-  'uploads/customization-references'
+  'uploads/customization-references',
+  'uploads/profile-pictures'
 ];
 uploadDirs.forEach(dir => {
   if (!fs.existsSync(dir)) {

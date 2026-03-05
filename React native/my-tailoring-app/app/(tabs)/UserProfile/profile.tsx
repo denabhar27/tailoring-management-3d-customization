@@ -20,9 +20,10 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter , useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImagePicker from "expo-image-picker";
 
 import { orderStore, Order } from "../../../utils/orderStore";
-import { authService, orderTrackingService, notificationService, measurementsService } from "../../../utils/apiService";
+import { authService, orderTrackingService, notificationService, measurementsService, API_BASE_URL } from "../../../utils/apiService";
 
 const { width, height } = Dimensions.get("window");
 
@@ -59,6 +60,8 @@ export default function ProfileScreen() {
   const [measurementsExpanded, setMeasurementsExpanded] = useState(false);
   const [measurements, setMeasurements] = useState<Measurements | null>(null);
   const [loadingMeasurements, setLoadingMeasurements] = useState(false);
+  const [profilePicUri, setProfilePicUri] = useState<string | null>(null);
+  const [uploadingPic, setUploadingPic] = useState(false);
 
   useEffect(() => {
     setOrders(orderStore.getOrders());
@@ -72,6 +75,24 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     fetchUserProfile();
+    // Load stored profile picture
+    const loadProfilePic = async () => {
+      try {
+        const storedUser = await AsyncStorage.getItem('userData');
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          if (parsed.profile_picture) {
+            const picUrl = parsed.profile_picture.startsWith('http')
+              ? parsed.profile_picture
+              : `${API_BASE_URL.replace('/api', '')}${parsed.profile_picture}`;
+            setProfilePicUri(picUrl);
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    loadProfilePic();
   }, []);
 
   useEffect(() => {
@@ -153,6 +174,13 @@ export default function ProfileScreen() {
           email: userData.email || "",
           phone: userData.phone_number || "",
         });
+
+        if (userData.profile_picture) {
+          const picUrl = userData.profile_picture.startsWith('http')
+            ? userData.profile_picture
+            : `${API_BASE_URL.replace('/api', '')}${userData.profile_picture}`;
+          setProfilePicUri(picUrl);
+        }
       } else {
 
         setUser({
@@ -387,6 +415,59 @@ export default function ProfileScreen() {
     }
   };
 
+  const pickAndUploadProfilePicture = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your photo library to change your profile picture.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: Platform.OS === 'ios',
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+    const asset = result.assets[0];
+    const uri = asset.uri;
+    const fileName = uri.split('/').pop() || 'profile.jpg';
+    const match = /\.(\w+)$/.exec(fileName);
+    const fileType = match ? `image/${match[1]}` : 'image/jpeg';
+
+    setUploadingPic(true);
+    try {
+      const formData = new FormData();
+      formData.append('profilePicture', {
+        uri,
+        name: fileName,
+        type: fileType,
+      } as any);
+
+      const data = await authService.updateProfilePicture(formData);
+
+      if (data.success && data.user) {
+        await AsyncStorage.setItem('userData', JSON.stringify(data.user));
+        if (data.user.profile_picture) {
+          const picUrl = data.user.profile_picture.startsWith('http')
+            ? data.user.profile_picture
+            : `${API_BASE_URL.replace('/api', '')}${data.user.profile_picture}`;
+          setProfilePicUri(picUrl);
+        }
+        Alert.alert('Success', 'Profile picture updated!');
+      } else {
+        Alert.alert('Error', data.message || 'Failed to upload picture');
+      }
+    } catch (error: any) {
+      console.error('Error uploading profile picture:', error);
+      Alert.alert('Error', error?.message || 'Failed to upload picture. Please try again.');
+    } finally {
+      setUploadingPic(false);
+    }
+  };
+
   const openEditModal = () => {
     setEditedUser(user);
     setEditModalVisible(true);
@@ -475,10 +556,25 @@ export default function ProfileScreen() {
         <View style={styles.profileCard}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Ionicons name="person" size={50} color="#94665B" />
+              {profilePicUri ? (
+                <Image
+                  source={{ uri: profilePicUri }}
+                  style={{ width: 100, height: 100, borderRadius: 50 }}
+                />
+              ) : (
+                <Ionicons name="person" size={50} color="#94665B" />
+              )}
             </View>
-            <TouchableOpacity style={styles.editAvatarBtn}>
-              <Ionicons name="camera" size={16} color="#fff" />
+            <TouchableOpacity
+              style={styles.editAvatarBtn}
+              onPress={pickAndUploadProfilePicture}
+              disabled={uploadingPic}
+            >
+              {uploadingPic ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="camera" size={16} color="#fff" />
+              )}
             </TouchableOpacity>
           </View>
 
@@ -945,11 +1041,28 @@ export default function ProfileScreen() {
               >
                 <View style={styles.modalAvatarSection}>
                   <View style={styles.modalAvatar}>
-                    <Ionicons name="person" size={50} color="#94665B" />
+                    {profilePicUri ? (
+                      <Image
+                        source={{ uri: profilePicUri }}
+                        style={{ width: 100, height: 100, borderRadius: 50 }}
+                      />
+                    ) : (
+                      <Ionicons name="person" size={50} color="#94665B" />
+                    )}
                   </View>
-                  <TouchableOpacity style={styles.changePhotoBtn}>
-                    <Ionicons name="camera" size={18} color="#94665B" />
-                    <Text style={styles.changePhotoText}>Change Photo</Text>
+                  <TouchableOpacity
+                    style={styles.changePhotoBtn}
+                    onPress={pickAndUploadProfilePicture}
+                    disabled={uploadingPic}
+                  >
+                    {uploadingPic ? (
+                      <ActivityIndicator size="small" color="#94665B" />
+                    ) : (
+                      <Ionicons name="camera" size={18} color="#94665B" />
+                    )}
+                    <Text style={styles.changePhotoText}>
+                      {uploadingPic ? 'Uploading...' : 'Change Photo'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
                 <View style={styles.formSection}>
@@ -1127,6 +1240,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5ECE3",
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
   editAvatarBtn: {
     position: "absolute",
@@ -1588,6 +1702,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
+    overflow: "hidden",
   },
   changePhotoBtn: {
     flexDirection: "row",

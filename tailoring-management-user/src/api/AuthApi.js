@@ -119,6 +119,42 @@ export async function updateProfile(profileData) {
   }
 }
 
+export async function uploadProfilePicture(file) {
+  try {
+    const token = getToken();
+    if (!token) {
+      return {
+        success: false,
+        message: "Authentication required. Please log in again."
+      };
+    }
+
+    const formData = new FormData();
+    formData.append('profilePicture', file);
+
+    const response = await axios.put(`${BASE_URL}/profile-picture`, formData, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+
+    const data = response.data;
+
+    if (data.success && data.user) {
+      localStorage.setItem("user", JSON.stringify(data.user));
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Upload profile picture error:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Error uploading profile picture"
+    };
+  }
+}
+
 export async function forgotPassword(usernameOrEmail) {
   try {
     const response = await axios.post(`${BASE_URL}/forgot-password`, {

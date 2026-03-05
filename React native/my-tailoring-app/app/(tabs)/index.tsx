@@ -21,12 +21,15 @@ import {
 } from "@expo-google-fonts/poppins";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import SplashScreen from '@/components/SplashScreen';
 
 const { width, height } = Dimensions.get("window");
 
 export default function LandingScreen() {
   const router = useRouter();
-  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
 
   const [fontsLoaded] = useFonts({
     Poppins_300Light_Italic,
@@ -36,29 +39,45 @@ export default function LandingScreen() {
     Poppins_700Bold,
   });
 
+  // Check auth in background while splash plays
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const token = await AsyncStorage.getItem('userToken');
         if (token) {
-
-          router.replace("/home");
-        } else {
-          setCheckingAuth(false);
+          setIsLoggedIn(true);
         }
       } catch (error) {
         console.error('Error checking auth:', error);
-        setCheckingAuth(false);
+      } finally {
+        setAuthChecked(true);
       }
     };
 
     checkAuth();
   }, []);
 
-  if (!fontsLoaded || checkingAuth) {
+  // Navigate to home once splash is done AND user is logged in
+  useEffect(() => {
+    if (splashDone && authChecked && isLoggedIn) {
+      router.replace("/home");
+    }
+  }, [splashDone, authChecked, isLoggedIn]);
+
+  // Show splash until animation completes — auth & fonts load in background
+  if (!splashDone) {
     return (
-      <View style={[styles.background, { backgroundColor: '#1F2937', justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#A0522D" />
+      <View style={[styles.background, { backgroundColor: '#0B1120' }]}>
+        <SplashScreen onFinish={() => setSplashDone(true)} />
+      </View>
+    );
+  }
+
+  // If splash is done but still waiting for fonts/auth, show brief loader
+  if (!fontsLoaded || !authChecked) {
+    return (
+      <View style={[styles.background, { backgroundColor: '#0B1120', justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#D4AF37" />
       </View>
     );
   }

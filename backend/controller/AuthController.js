@@ -7,33 +7,46 @@ const axios = require('axios');
 exports.register = (req, res) => {
   const { first_name, last_name, username, email, password, phone_number } = req.body;
 
+  // Check if username exists
   User.findByUsername(username, (err, results) => {
     if (err) return res.status(500).json({ message: "Database error", error: err });
-    if (results.length > 0) return res.status(400).json({ message: "Username must be unique" });
+    if (results.length > 0) return res.status(400).json({ message: "Username already taken" });
 
-    const hashedPassword = bcrypt.hashSync(password, 10);
+    // Check if email exists
+    User.findByEmail(email, (err, emailResults) => {
+      if (err) return res.status(500).json({ message: "Database error", error: err });
+      if (emailResults.length > 0) return res.status(400).json({ message: "Email already registered" });
 
-    User.create(first_name, last_name, username, email, hashedPassword, phone_number, (err, result) => {
-      if (err) return res.status(500).json({ message: "Error creating user", error: err });
+      const hashedPassword = bcrypt.hashSync(password, 10);
 
-      const token = jwt.sign(
-        { id: result.insertId, role: 'user' },
-        process.env.JWT_SECRET || "secret",
-        { expiresIn: '24h' }
-      );
-
-      res.json({
-        message: "Registration successful",
-        token,
-        role: 'user',
-        user: {
-          id: result.insertId,
-          first_name,
-          last_name,
-          username,
-          email,
-          phone_number
+      User.create(first_name, last_name, username, email, hashedPassword, phone_number, (err, result) => {
+        if (err) {
+          console.error('[REGISTER] Error creating user:', err);
+          if (err.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ message: "Username or email already exists" });
+          }
+          return res.status(500).json({ message: "Error creating user", error: err.message });
         }
+
+        const token = jwt.sign(
+          { id: result.insertId, role: 'user' },
+          process.env.JWT_SECRET || "secret",
+          { expiresIn: '24h' }
+        );
+
+        res.json({
+          message: "Registration successful",
+          token,
+          role: 'user',
+          user: {
+            id: result.insertId,
+            first_name,
+            last_name,
+            username,
+            email,
+            phone_number
+          }
+        });
       });
     });
   });

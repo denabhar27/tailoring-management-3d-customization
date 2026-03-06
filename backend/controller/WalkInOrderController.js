@@ -498,6 +498,23 @@ exports.createCustomizationOrder = async (req, res) => {
           });
         }
 
+        // Save measurements to customer_measurements table if provided
+        if (measurements && (measurements.top || measurements.bottom)) {
+          const CustomerMeasurements = require('../model/CustomerMeasurementsModel');
+          CustomerMeasurements.upsert(customer.id, {
+            top: measurements.top || {},
+            bottom: measurements.bottom || {},
+            notes: measurements.notes || notes || '',
+            isWalkIn: true
+          }, (measErr) => {
+            if (measErr) {
+              console.error('[WALK-IN CUSTOMIZATION] Error saving measurements:', measErr);
+            } else {
+              console.log('[WALK-IN CUSTOMIZATION] Measurements saved for customer:', customer.id);
+            }
+          });
+        }
+
         res.json({
           success: true,
           message: 'Walk-in customization order created successfully',

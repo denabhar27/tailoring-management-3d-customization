@@ -65,8 +65,8 @@ const User = {
       
       SELECT 
         wc.id as customer_id,
-        wc.name as first_name,
-        '' as last_name,
+        SUBSTRING_INDEX(wc.name, ' ', 1) as first_name,
+        IF(LOCATE(' ', wc.name) > 0, SUBSTRING(wc.name, LOCATE(' ', wc.name) + 1), '') as last_name,
         wc.name as full_name,
         wc.email,
         wc.phone as phone_number,

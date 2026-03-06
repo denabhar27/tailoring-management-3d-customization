@@ -46,6 +46,11 @@ exports.getCustomerById = (req, res) => {
           console.error('Error fetching measurements:', measErr);
         }
 
+        // Split the name into first_name and last_name
+        const nameParts = (walkInCustomer.name || '').trim().split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
         res.json({
           success: true,
           message: "Walk-in customer retrieved successfully",
@@ -56,8 +61,8 @@ exports.getCustomerById = (req, res) => {
             full_name: walkInCustomer.name,
             
             user_id: null,
-            first_name: walkInCustomer.name,
-            last_name: ''
+            first_name: firstName,
+            last_name: lastName
           },
           measurements: measurements && measurements.length > 0 ? measurements[0] : null
         });
@@ -99,8 +104,44 @@ exports.getCustomerById = (req, res) => {
 
 exports.updateCustomer = (req, res) => {
   const { id } = req.params;
-  const { first_name, last_name, email, phone_number, status } = req.body;
+  const { first_name, last_name, email, phone_number, status, customer_type } = req.body;
 
+  // Handle walk-in customer update
+  if (customer_type === 'walk_in') {
+    const WalkInCustomer = require('../model/WalkInCustomerModel');
+    
+    // For walk-in customers, combine first_name and last_name into name
+    const fullName = last_name ? `${first_name} ${last_name}`.trim() : first_name;
+    
+    if (!fullName) {
+      return res.status(400).json({
+        success: false,
+        message: "Name is required for walk-in customer"
+      });
+    }
+
+    WalkInCustomer.update(id, {
+      name: fullName,
+      email: email || null,
+      phone: phone_number
+    }, (err, result) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: "Error updating walk-in customer",
+          error: err
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Walk-in customer updated successfully"
+      });
+    });
+    return;
+  }
+
+  // Handle regular user update
   if (!first_name || !last_name || !email) {
     return res.status(400).json({
       success: false,

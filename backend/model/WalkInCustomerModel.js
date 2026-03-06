@@ -97,6 +97,21 @@ const WalkInCustomer = {
     `;
     const searchPattern = `%${searchTerm}%`;
     db.query(sql, [searchPattern, searchPattern, searchPattern], callback);
+  },
+
+  update: (id, customerData, callback) => {
+    const sql = `
+      UPDATE walk_in_customers 
+      SET name = ?, email = ?, phone = ?
+      WHERE id = ?
+    `;
+    const values = [
+      customerData.name,
+      customerData.email || null,
+      customerData.phone,
+      id
+    ];
+    db.query(sql, values, callback);
   }
 };
 

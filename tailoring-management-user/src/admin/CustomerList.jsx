@@ -202,7 +202,13 @@ const CustomerList = () => {
       const isWalkIn = selectedCustomer.customer_type === 'walk_in';
       const customerId = selectedCustomer.user_id || selectedCustomer.customer_id;
 
-      const result = await updateCustomer(customerId, editForm);
+      // Include customer_type in the update request
+      const updateData = {
+        ...editForm,
+        customer_type: isWalkIn ? 'walk_in' : 'online'
+      };
+
+      const result = await updateCustomer(customerId, updateData);
 
       if (result.success) {
 
@@ -221,6 +227,7 @@ const CustomerList = () => {
           const measurementsData = {
             ...measurements,
             isWalkIn: isWalkIn,
+            customer_type: isWalkIn ? 'walk_in' : 'online',
             customer_name: customerName
           };
 

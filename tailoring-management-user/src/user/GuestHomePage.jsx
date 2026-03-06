@@ -124,14 +124,12 @@ const App = ({ setIsLoggedIn }) => {
 
         if (!signupFirstName || !signupLastName || !signupUsername || !signupEmail || !signupPassword) {
           setAuthError('Please fill in all required fields');
-          alert('Please fill in all required fields (First Name, Last Name, Username, Email, Password)');
           setIsLoading(false);
           return;
         }
 
         if (signupPassword !== signupConfirmPassword) {
           setAuthError('Passwords do not match');
-          alert('Passwords do not match\n\nPassword Requirements:\n• Must be at least 8 characters (can be letters or numbers)\n• Must contain at least one special character (!@#$%^&* etc.)');
           setIsLoading(false);
           return;
         }
@@ -139,7 +137,6 @@ const App = ({ setIsLoggedIn }) => {
         const passwordValidation = validatePassword(signupPassword);
         if (!passwordValidation.isValid) {
           setAuthError(passwordValidation.message);
-          alert(`Password Error: ${passwordValidation.message}\n\nPassword Requirements:\n• Must be at least 8 characters (can be letters or numbers)\n• Must contain at least one special character (!@#$%^&* etc.)`);
           setIsLoading(false);
           return;
         }
@@ -174,20 +171,17 @@ const App = ({ setIsLoggedIn }) => {
           } else {
             const errorMessage = result.message || 'Registration failed';
             setAuthError(errorMessage);
-            alert(`Registration Failed: ${errorMessage}`);
           }
         } catch (regError) {
           console.error('Registration error:', regError);
           const errorMessage = regError.message || 'An error occurred during registration';
           setAuthError(errorMessage);
-          alert(`Registration Error: ${errorMessage}`);
         }
       }
     } catch (error) {
       console.error('Auth error:', error);
       const errorMessage = error.response?.data?.message || error.message || 'An unexpected error occurred. Please try again.';
       setAuthError(errorMessage);
-      alert(`Error: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -598,10 +592,9 @@ const App = ({ setIsLoggedIn }) => {
               value={isLogin ? loginPassword : signupPassword}
               onChange={(e) => isLogin ? setLoginPassword(e.target.value) : setSignupPassword(e.target.value)}
             />
-            {!isLogin && (
+            {!isLogin && signupPassword && (
               <div style={{
                 fontSize: '11px',
-                color: '#666',
                 marginTop: '5px',
                 padding: '8px',
                 backgroundColor: '#f8f9fa',
@@ -609,9 +602,29 @@ const App = ({ setIsLoggedIn }) => {
                 border: '1px solid #e0e0e0'
               }}>
                 <strong>Password Requirements:</strong>
-                <ul style={{ margin: '4px 0 0 0', paddingLeft: '20px' }}>
-                  <li>Minimum 8 characters (can be letters or numbers)</li>
-                  <li>At least one special character (!@#$%^&* etc.)</li>
+                <ul style={{ margin: '4px 0 0 0', paddingLeft: '20px', listStyle: 'none' }}>
+                  <li style={{ 
+                    color: signupPassword.length >= 8 ? '#28a745' : signupPassword.length >= 6 ? '#fd7e14' : '#dc3545',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <span style={{ fontSize: '14px' }}>
+                      {signupPassword.length >= 8 ? '✓' : signupPassword.length >= 6 ? '◐' : '✗'}
+                    </span>
+                    Minimum 8 characters ({signupPassword.length}/8)
+                  </li>
+                  <li style={{ 
+                    color: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(signupPassword) ? '#28a745' : '#dc3545',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <span style={{ fontSize: '14px' }}>
+                      {/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(signupPassword) ? '✓' : '✗'}
+                    </span>
+                    At least one special character (!@#$%^&* etc.)
+                  </li>
                 </ul>
               </div>
             )}
@@ -628,6 +641,21 @@ const App = ({ setIsLoggedIn }) => {
                   value={signupConfirmPassword}
                   onChange={(e) => setSignupConfirmPassword(e.target.value)}
                 />
+                {signupConfirmPassword && (
+                  <div style={{
+                    fontSize: '11px',
+                    marginTop: '5px',
+                    color: signupPassword === signupConfirmPassword ? '#28a745' : '#dc3545',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <span style={{ fontSize: '14px' }}>
+                      {signupPassword === signupConfirmPassword ? '✓' : '✗'}
+                    </span>
+                    {signupPassword === signupConfirmPassword ? 'Passwords match' : 'Passwords do not match'}
+                  </div>
+                )}
               </div>
               <div className="input-group">
                 <input

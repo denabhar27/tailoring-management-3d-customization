@@ -2883,36 +2883,6 @@ const Customize = () => {
 
                             </button>
 
-                            {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
-
-                              <button
-
-                                className="icon-btn"
-
-                                onClick={(e) => {
-
-                                  e.stopPropagation();
-
-                                  setSelectedOrder(item);
-
-                                  setPaymentAmount('');
-
-                                  setShowPaymentModal(true);
-
-                                }}
-
-                                title="Record Payment"
-
-                                style={{ backgroundColor: '#2196F3', color: 'white' }}
-
-                              >
-
-                                💰
-
-                              </button>
-
-                            )}
-
                           </div>
 
                         ) : (
@@ -2943,7 +2913,7 @@ const Customize = () => {
 
                             )}
 
-                            {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
+                            {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && (
 
                               <button
 

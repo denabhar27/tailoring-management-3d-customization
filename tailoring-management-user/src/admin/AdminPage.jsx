@@ -291,32 +291,32 @@ function AdminPage() {
                   switch(title?.toLowerCase()) {
                     case 'total orders':
                     case 'orders':
-                      return { icon: '📦', color: '#e3f2fd', textColor: '#2196f3' };
+                      return { icon: 'fa-solid fa-box', color: '#e3f2fd', textColor: '#2196f3' };
                     case 'pending':
                     case 'pending orders':
-                      return { icon: '⏱️', color: '#fff3e0', textColor: '#ff9800' };
+                      return { icon: 'fa-solid fa-clock', color: '#fff3e0', textColor: '#ff9800' };
                     case 'in progress':
                     case 'in-progress':
-                      return { icon: '🔄', color: '#e8f5e9', textColor: '#4caf50' };
+                      return { icon: 'fa-solid fa-spinner', color: '#e8f5e9', textColor: '#4caf50' };
                     case 'completed':
                     case 'completed orders':
-                      return { icon: '✅', color: '#e8f5e9', textColor: '#4caf50' };
+                      return { icon: 'fa-solid fa-circle-check', color: '#e8f5e9', textColor: '#4caf50' };
                     case 'customers':
-                      return { icon: '👥', color: '#f3e5f5', textColor: '#9c27b0' };
+                      return { icon: 'fa-solid fa-users', color: '#f3e5f5', textColor: '#9c27b0' };
                     case 'monthly revenue':
-                      return { icon: '💰', color: '#e8f5e9', textColor: '#4caf50' };
+                      return { icon: 'fa-solid fa-peso-sign', color: '#e8f5e9', textColor: '#4caf50' };
                     case 'repair':
-                      return { icon: '🔧', color: '#ffebee', textColor: '#f44336' };
+                      return { icon: 'fa-solid fa-screwdriver-wrench', color: '#ffebee', textColor: '#f44336' };
                     case 'dry cleaning':
                     case 'dry clean':
-                      return { icon: '🧺', color: '#e3f2fd', textColor: '#2196f3' };
+                      return { icon: 'fa-solid fa-jug-detergent', color: '#e3f2fd', textColor: '#2196f3' };
                     case 'customization':
                     case 'custom':
-                      return { icon: '🎨', color: '#fff3e0', textColor: '#ff9800' };
+                      return { icon: 'fa-solid fa-palette', color: '#fff3e0', textColor: '#ff9800' };
                     case 'rental':
-                      return { icon: '👔', color: '#f3e5f5', textColor: '#9c27b0' };
+                      return { icon: 'fa-solid fa-shirt', color: '#f3e5f5', textColor: '#9c27b0' };
                     default:
-                      return { icon: '📊', color: '#f5f5f5', textColor: '#666' };
+                      return { icon: 'fa-solid fa-chart-simple', color: '#f5f5f5', textColor: '#666' };
                   }
                 };
 
@@ -326,7 +326,9 @@ function AdminPage() {
                   <div className="stat-card" key={index}>
                     <div className="stat-header">
                       <span>{stat.title}</span>
-                      <div className="stat-icon" style={{ background: color, color: textColor }}>{icon}</div>
+                      <div className="stat-icon" style={{ background: color, color: textColor }}>
+                        <i className={icon}></i>
+                      </div>
                     </div>
                     <div className="stat-number">{stat.number}</div>
                     {stat.info && <small>{stat.info}</small>}
@@ -337,7 +339,9 @@ function AdminPage() {
               <div className="stat-card">
                 <div className="stat-header">
                   <span>Total Revenue</span>
-                  <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>💰</div>
+                  <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>
+                    <i className="fa-solid fa-peso-sign"></i>
+                  </div>
                 </div>
                 <div className="stat-number" style={{ fontSize: '28px' }}>
                   ₱{(billingStats.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -348,7 +352,9 @@ function AdminPage() {
               <div className="stat-card">
                 <div className="stat-header">
                   <span>Pending</span>
-                  <div className="stat-icon" style={{ background: '#fff3e0', color: '#ff9800' }}>⏳</div>
+                  <div className="stat-icon" style={{ background: '#fff3e0', color: '#ff9800' }}>
+                    <i className="fa-solid fa-hourglass-half"></i>
+                  </div>
                 </div>
                 <div className="stat-number" style={{ fontSize: '28px' }}>
                   ₱{(billingStats.pendingRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

@@ -787,21 +787,6 @@ const Repair = () => {
                                 <line x1="6" y1="6" x2="18" y2="18"></line>
                               </svg>
                             </button>
-                            {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
-                              <button
-                                className="icon-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedOrder(item);
-                                  setPaymentAmount('');
-                                  setShowPaymentModal(true);
-                                }}
-                                title="Record Payment"
-                                style={{ backgroundColor: '#2196F3', color: 'white' }}
-                              >
-                                💰
-                              </button>
-                            )}
                           </div>
                         ) : (
                           <div className="action-buttons">
@@ -817,7 +802,7 @@ const Repair = () => {
                                 </svg>
                               </button>
                             )}
-                            {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
+                            {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && (
                               <button
                                 className="icon-btn"
                                 onClick={(e) => {

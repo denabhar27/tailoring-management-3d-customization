@@ -932,26 +932,19 @@ function Rental() {
                                 </svg>
                               </button>
                                 )}
-                                {rental.approval_status !== 'cancelled' && (
+                                {rental.approval_status !== 'cancelled' && rental.approval_status !== 'pending' && rental.approval_status !== 'pending_review' && rental.approval_status !== 'price_confirmation' && !isPending && (
                                 <button
                                     className="icon-btn"
                                     onClick={(e) => {
                                       e.stopPropagation();
-
-                                      const isWalkIn = rental.order_type === 'walk_in';
-                                      if (!isPending || isWalkIn) {
-                                        setSelectedRental(rental);
-                                        setPaymentAmount('');
-                                        setShowPaymentModal(true);
-                                      }
+                                      setSelectedRental(rental);
+                                      setPaymentAmount('');
+                                      setShowPaymentModal(true);
                                     }}
-                                    title={isPending && rental.order_type !== 'walk_in' ? "Record Payment (Disabled - Status is Pending)" : "Record Payment"}
-                                    disabled={isPending && rental.order_type !== 'walk_in'}
+                                    title="Record Payment"
                                     style={{
                                       backgroundColor: '#2196F3',
-                                      color: 'white',
-                                      opacity: (isPending && rental.order_type !== 'walk_in') ? 0.5 : 1,
-                                      cursor: (isPending && rental.order_type !== 'walk_in') ? 'not-allowed' : 'pointer'
+                                      color: 'white'
                                     }}
                                   >
                                     💰

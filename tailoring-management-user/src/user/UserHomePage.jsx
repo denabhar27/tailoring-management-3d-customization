@@ -13,6 +13,7 @@ import customizeBg from "../assets/background.jpg";
 import repairBg from "../assets/repair.png";
 import dryCleanBg from "../assets/dryclean.png";
 import { logoutUser } from '../api/AuthApi';
+import { useAlert } from '../context/AlertContext';
 import { notificationApi } from '../api/NotificationApi';
 import { getCartSummary } from '../api/CartApi';
 import RentalClothes from './components/RentalClothes';
@@ -24,6 +25,7 @@ import OrderDetailsModal from './OrderDetailsModal';
 
 const UserHomePage = ({ setIsLoggedIn }) => {
   const navigate = useNavigate();
+  const { confirm } = useAlert();
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
@@ -161,12 +163,21 @@ const UserHomePage = ({ setIsLoggedIn }) => {
     { type: 'Dry Cleaning', description: 'Impeccable clean on your suit' },
   ];
 
-  const handleLogout = () => {
-    logoutUser();
-    if (typeof setIsLoggedIn === 'function') {
-      setIsLoggedIn(false);
+  const handleLogout = async () => {
+    const confirmed = await confirm(
+      'Are you sure you want to logout?',
+      'Confirm Logout',
+      'warning',
+      { confirmText: 'Logout', cancelText: 'Cancel' }
+    );
+    
+    if (confirmed) {
+      logoutUser();
+      if (typeof setIsLoggedIn === 'function') {
+        setIsLoggedIn(false);
+      }
+      navigate('/', { replace: true });
     }
-    navigate('/', { replace: true });
   };
 
   const handleCartUpdate = () => {

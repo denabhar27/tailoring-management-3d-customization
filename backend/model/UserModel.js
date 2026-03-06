@@ -116,19 +116,19 @@ const User = {
    * Store reset code for a user
    * @param {number} userId - User ID
    * @param {string} resetCode - 6-character security code
-   * @param {Date} expiresAt - Expiration timestamp
+   * @param {number} expiryMinutes - Minutes until code expires
    * @param {function} callback - Callback function
    */
-  setResetCode: (userId, resetCode, expiresAt, callback) => {
+  setResetCode: (userId, resetCode, expiryMinutes, callback) => {
     const sql = `
       UPDATE user 
       SET reset_code = ?, 
-          reset_code_expires = ?, 
+          reset_code_expires = DATE_ADD(NOW(), INTERVAL ? MINUTE), 
           reset_attempts = 0,
           reset_last_attempt = NOW()
       WHERE user_id = ?
     `;
-    db.query(sql, [resetCode, expiresAt, userId], callback);
+    db.query(sql, [resetCode, expiryMinutes, userId], callback);
   },
 
   /**

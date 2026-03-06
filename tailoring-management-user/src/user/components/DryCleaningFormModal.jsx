@@ -555,7 +555,7 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         </div>
 
         <div className="modal-content-shared">
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             {/* Garments - Simple repeated inputs like original design */}
             {garments.map((garment, index) => (
               <div key={garment.id} className="garment-inputs-group">
@@ -679,7 +679,6 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 onChange={handleDateChange}
                 min={getMinDate()}
                 className={`form-input-shared ${errors.date ? 'error' : ''}`}
-                required
               />
               <span className="help-text-shared">Select a date when the shop is open</span>
               {errors.date && (
@@ -765,7 +764,6 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                   type="hidden"
                   name="time"
                   value={formData.time}
-                  required
                 />
                 
                 {formData.time && (

@@ -537,18 +537,6 @@ const UserHomePage = ({ setIsLoggedIn }) => {
             position: "relative",
             paddingRight: "20px"
           }}>Dry Cleaning Service</h2>
-          <style jsx>{`
-            .clean-text h2::after {
-              content: '';
-              position: absolute;
-              right: 0;
-              bottom: -10px;
-              width: 60px;
-              height: 3px;
-              background: linear-gradient(90deg, #8B4513 0%, #f0e9e2 100%);
-              border-radius: 2px;
-            }
-          `}</style>
           <p style={{ 
             fontSize: "1.4rem", 
             color: "#5D4037", 

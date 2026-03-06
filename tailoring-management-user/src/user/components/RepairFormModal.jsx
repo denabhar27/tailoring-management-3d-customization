@@ -512,7 +512,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           <button className="modal-close-shared" onClick={handleClose} aria-label="Close modal">×</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-content-shared">
+        <form onSubmit={handleSubmit} className="modal-content-shared" noValidate>
           {/* Garments - Simple repeated inputs like original design */}
           {garments.map((garment, index) => (
             <div key={garment.id} className="garment-inputs-group">
@@ -706,7 +706,6 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               onChange={handleDateChange}
               min={getMinDate()}
               className={`form-input-shared ${errors.date ? 'error' : ''}`}
-              required
             />
             <span className="help-text-shared">Select a date when the shop is open</span>
             {errors.date && (
@@ -792,7 +791,6 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 type="hidden"
                 name="time"
                 value={formData.time}
-                required
               />
 
               {formData.time && (

@@ -108,11 +108,9 @@ exports.forgotPassword = async (req, res) => {
 
       // Generate security code
       const securityCode = generateSecurityCode();
-      const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + RESET_CODE_EXPIRY_MINUTES);
 
-      // Store reset code in database
-      User.setResetCode(user.user_id, securityCode, expiresAt, async (err) => {
+      // Store reset code in database (using SQL DATE_ADD to avoid timezone issues)
+      User.setResetCode(user.user_id, securityCode, RESET_CODE_EXPIRY_MINUTES, async (err) => {
         if (err) {
           console.error('[PASSWORD RESET] Failed to store reset code:', err);
           return res.status(500).json({ 
@@ -239,16 +237,8 @@ exports.verifyResetCode = (req, res) => {
         });
       }
 
-      // Check if code is expired
-      const now = new Date();
-      const expiresAt = new Date(resetUser.reset_code_expires);
-      
-      if (now > expiresAt) {
-        return res.status(400).json({ 
-          success: false,
-          message: 'Code has expired. Please request a new code.' 
-        });
-      }
+      // Note: Expiry is already checked in SQL query (WHERE reset_code_expires > NOW())
+      // If we got here, the code is valid and not expired
 
       // Code is valid - generate a reset token for the next step
       const resetToken = Buffer.from(`${resetUser.user_id}:${cleanCode}:${Date.now()}`).toString('base64');

@@ -32,11 +32,6 @@ exports.getUserOrderTracking = (req, res) => {
         return;
       }
 
-      if (item.status === 'cancelled' || item.status === 'rejected' || item.status === 'price_declined') {
-        console.log('Skipping rejected item:', item.order_item_id, 'status:', item.status);
-        return;
-      }
-
       processedKeys.add(itemKey);
       
       try {

@@ -62,6 +62,7 @@ export default function ProfileScreen() {
   const [loadingMeasurements, setLoadingMeasurements] = useState(false);
   const [profilePicUri, setProfilePicUri] = useState<string | null>(null);
   const [uploadingPic, setUploadingPic] = useState(false);
+  const [pendingPicture, setPendingPicture] = useState<{ uri: string; name: string; type: string } | null>(null);
 
   useEffect(() => {
     setOrders(orderStore.getOrders());
@@ -415,7 +416,7 @@ export default function ProfileScreen() {
     }
   };
 
-  const pickAndUploadProfilePicture = async () => {
+  const pickProfilePicture = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission Required', 'Please allow access to your photo library to change your profile picture.');
@@ -437,13 +438,20 @@ export default function ProfileScreen() {
     const match = /\.(\w+)$/.exec(fileName);
     const fileType = match ? `image/${match[1]}` : 'image/jpeg';
 
+    // Store selected picture for preview, upload only on Save Changes
+    setPendingPicture({ uri, name: fileName, type: fileType });
+  };
+
+  const uploadPendingPicture = async (): Promise<boolean> => {
+    if (!pendingPicture) return true;
+
     setUploadingPic(true);
     try {
       const formData = new FormData();
       formData.append('profilePicture', {
-        uri,
-        name: fileName,
-        type: fileType,
+        uri: pendingPicture.uri,
+        name: pendingPicture.name,
+        type: pendingPicture.type,
       } as any);
 
       const data = await authService.updateProfilePicture(formData);
@@ -456,13 +464,16 @@ export default function ProfileScreen() {
             : `${API_BASE_URL.replace('/api', '')}${data.user.profile_picture}`;
           setProfilePicUri(picUrl);
         }
-        Alert.alert('Success', 'Profile picture updated!');
+        setPendingPicture(null);
+        return true;
       } else {
         Alert.alert('Error', data.message || 'Failed to upload picture');
+        return false;
       }
     } catch (error: any) {
       console.error('Error uploading profile picture:', error);
       Alert.alert('Error', error?.message || 'Failed to upload picture. Please try again.');
+      return false;
     } finally {
       setUploadingPic(false);
     }
@@ -476,6 +487,7 @@ export default function ProfileScreen() {
   const closeEditModal = () => {
     setEditModalVisible(false);
     setEditedUser(user);
+    setPendingPicture(null);
   };
 
   const saveProfile = async () => {
@@ -492,28 +504,51 @@ export default function ProfileScreen() {
       return;
     }
 
+    const hasProfileChanges = !(
+      editedUser.name.trim() === user.name.trim() &&
+      editedUser.email.trim() === user.email.trim() &&
+      editedUser.phone.trim() === user.phone.trim()
+    );
+    const hasPictureChange = !!pendingPicture;
+
+    // Check if any changes were made before saving
+    if (!hasProfileChanges && !hasPictureChange) {
+      setEditModalVisible(false);
+      return;
+    }
+
     try {
-
-      const nameParts = editedUser.name.trim().split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-
-      const updateData = {
-        first_name: firstName,
-        last_name: lastName,
-        email: editedUser.email,
-        phone_number: editedUser.phone
-      };
-
-      const response = await authService.updateProfile(updateData);
-
-      if (response.success) {
-        setUser(editedUser);
-        setEditModalVisible(false);
-        alert("Profile updated successfully!");
-      } else {
-        alert(response.message || "Failed to update profile");
+      // Upload pending picture if any
+      if (hasPictureChange) {
+        const picSuccess = await uploadPendingPicture();
+        if (!picSuccess) return;
       }
+
+      // Update profile info if changed
+      if (hasProfileChanges) {
+        const nameParts = editedUser.name.trim().split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
+        const updateData = {
+          first_name: firstName,
+          last_name: lastName,
+          email: editedUser.email,
+          phone_number: editedUser.phone
+        };
+
+        const response = await authService.updateProfile(updateData);
+
+        if (response.success) {
+          setUser(editedUser);
+        } else {
+          alert(response.message || "Failed to update profile");
+          return;
+        }
+      }
+
+      setEditModalVisible(false);
+      alert("Profile updated successfully!");
     } catch (error) {
       console.error("Error updating profile:", error);
       alert("Failed to update profile. Please try again.");
@@ -1027,12 +1062,17 @@ export default function ProfileScreen() {
             onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.modalContent}>
+              {/* Drag handle indicator */}
+              <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 4 }}>
+                <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#D1D5DB' }} />
+              </View>
+
               <View style={styles.modalHeader}>
-                <TouchableOpacity onPress={closeEditModal}>
-                  <Ionicons name="close" size={28} color="#1F2937" />
+                <TouchableOpacity onPress={closeEditModal} style={{ padding: 4 }}>
+                  <Ionicons name="close-circle" size={28} color="#9CA3AF" />
                 </TouchableOpacity>
                 <Text style={styles.modalTitle}>Edit Profile</Text>
-                <View style={{ width: 28 }} />
+                <View style={{ width: 36 }} />
               </View>
 
               <ScrollView
@@ -1041,7 +1081,12 @@ export default function ProfileScreen() {
               >
                 <View style={styles.modalAvatarSection}>
                   <View style={styles.modalAvatar}>
-                    {profilePicUri ? (
+                    {pendingPicture ? (
+                      <Image
+                        source={{ uri: pendingPicture.uri }}
+                        style={{ width: 100, height: 100, borderRadius: 50 }}
+                      />
+                    ) : profilePicUri ? (
                       <Image
                         source={{ uri: profilePicUri }}
                         style={{ width: 100, height: 100, borderRadius: 50 }}
@@ -1049,21 +1094,34 @@ export default function ProfileScreen() {
                     ) : (
                       <Ionicons name="person" size={50} color="#94665B" />
                     )}
+                    {/* Camera overlay badge */}
+                    <TouchableOpacity
+                      onPress={pickProfilePicture}
+                      disabled={uploadingPic}
+                      style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        right: 0,
+                        backgroundColor: '#94665B',
+                        width: 32,
+                        height: 32,
+                        borderRadius: 16,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 2,
+                        borderColor: '#fff',
+                      }}
+                    >
+                      {uploadingPic ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Ionicons name="camera" size={16} color="#fff" />
+                      )}
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity
-                    style={styles.changePhotoBtn}
-                    onPress={pickAndUploadProfilePicture}
-                    disabled={uploadingPic}
-                  >
-                    {uploadingPic ? (
-                      <ActivityIndicator size="small" color="#94665B" />
-                    ) : (
-                      <Ionicons name="camera" size={18} color="#94665B" />
-                    )}
-                    <Text style={styles.changePhotoText}>
-                      {uploadingPic ? 'Uploading...' : 'Change Photo'}
-                    </Text>
-                  </TouchableOpacity>
+                  <Text style={{ color: '#6B7280', fontSize: 13, marginTop: 8 }}>
+                    {pendingPicture ? 'New photo selected' : 'Tap camera icon to change'}
+                  </Text>
                 </View>
                 <View style={styles.formSection}>
                   <Text style={styles.formSectionTitle}>
@@ -1135,12 +1193,14 @@ export default function ProfileScreen() {
                     style={styles.cancelButton}
                     onPress={closeEditModal}
                   >
+                    <Ionicons name="close-outline" size={20} color="#DC2626" />
                     <Text style={styles.cancelButtonText}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.saveButton}
                     onPress={saveProfile}
                   >
+                    <Ionicons name="checkmark-outline" size={20} color="#fff" />
                     <Text style={styles.saveButtonText}>Save Changes</Text>
                   </TouchableOpacity>
                 </View>
@@ -1776,22 +1836,30 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
+    flexDirection: "row",
+    backgroundColor: "#FEE2E2",
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
   },
   cancelButtonText: {
-    color: "#6B7280",
-    fontWeight: "600",
+    color: "#DC2626",
+    fontWeight: "700",
     fontSize: 16,
   },
   saveButton: {
     flex: 1,
+    flexDirection: "row",
     backgroundColor: "#94665B",
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
     shadowColor: "#94665B",
     shadowOpacity: 0.3,
     shadowRadius: 8,

@@ -210,7 +210,7 @@ const Inventory = () => {
         <div className="search-container">
           <input
             type="text"
-            placeholder="Search by Unique No. or Customer Name"
+            placeholder="Search by Order ID or Customer Name"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -220,8 +220,6 @@ const Inventory = () => {
             <option value="Customization">Customization</option>
             <option value="Dry Cleaning">Dry Cleaning</option>
             <option value="Repair">Repair</option>
-            <option value="Alteration">Alteration</option>
-            <option value="Consultation">Consultation</option>
           </select>
         </div>
         <div className="table-container">
@@ -233,7 +231,7 @@ const Inventory = () => {
             <table>
               <thead>
                 <tr>
-                  <th>Unique No.</th>
+                  <th>Order ID</th>
                   <th>Customer Name</th>
                   <th>Service Type</th>
                   <th>Date Completed</th>
@@ -300,7 +298,7 @@ const Inventory = () => {
             </div>
             <div className="modal-body">
               <div className="detail-row">
-                <strong>Unique No:</strong>
+                <strong>Order ID:</strong>
                 <span>{selectedItem.uniqueNo}</span>
               </div>
               <div className="detail-row">

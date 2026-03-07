@@ -119,3 +119,19 @@ export async function getUserSlots() {
   }
 }
 
+export async function getAdminTimeSlots() {
+  try {
+    const response = await axios.get(`${BASE_URL}/appointments/admin/time-slots`, {
+      headers: getAuthHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Get admin time slots error:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Error fetching time slots",
+      slots: []
+    };
+  }
+}
+

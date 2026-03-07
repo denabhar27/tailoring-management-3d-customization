@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AdminHeader from './AdminHeader';
 import Sidebar from './Sidebar';
 import '../adminStyle/rent.css';
+import '../adminStyle/dryclean.css';
 import { getAllRentalOrders, getRentalOrdersByStatus, updateRentalOrderItem, recordRentalPayment } from '../api/RentalOrderApi';
 import { updateRentalStatus, getRentalImageUrl } from '../api/RentalApi';
 import { useAlert } from '../context/AlertContext';
@@ -583,13 +584,16 @@ function Rental() {
   };
 
   return (
-    <div className="rental-page">
+    <div className="dry-cleaning-management">
       <Sidebar />
       <AdminHeader />
 
       <div className="content">
         <div className="dashboard-title">
-          <h2>Rental Management</h2>
+          <div>
+            <h2>Rental Management</h2>
+            <p>Track and manage all rental orders</p>
+          </div>
         </div>
 
         <div className="stats-grid">

@@ -507,7 +507,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
     <div className="cart-overlay">
       <div className="cart-container">
         <div className="cart-header">
-          <h2>Shopping Cart</h2>
+          <h2>Order Cart</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontSize: '14px' }}>
               <input
@@ -610,7 +610,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                       ) : item.service_type === 'dry_cleaning' && item.specific_data?.isEstimatedPrice ? (
                         <p>Estimated Price: {formatPrice(item.final_price)}</p>
                       ) : item.service_type === 'dry_cleaning' ? (
-                        <p>Final Price: {formatPrice(item.final_price)}</p>
+                        <p>Estimated Price: {formatPrice(item.final_price)}</p>
                       ) : (
                         <p>Estimated Price: {formatPrice(item.final_price)}</p>
                       )}

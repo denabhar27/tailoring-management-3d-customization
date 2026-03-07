@@ -9,10 +9,10 @@ import { getAllSlotsWithAvailability, bookSlot } from '../../api/AppointmentSlot
 
 const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const navigate = useNavigate();
+  const [garments, setGarments] = useState([
+    { id: 1, uploadedImage: null, imagePreview: '', fabricType: '', garmentType: '', designDetails: null }
+  ]);
   const [formData, setFormData] = useState({
-    uploadedImage: null,
-    fabricType: '',
-    garmentType: '',
     preferredDate: '',
     preferredTime: '',
     notes: '',
@@ -20,12 +20,10 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const [allTimeSlots, setAllTimeSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [isShopOpen, setIsShopOpen] = useState(true);
-  const [imagePreview, setImagePreview] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
-  const [estimatedPrice, setEstimatedPrice] = useState(0);
-  const [designDetails, setDesignDetails] = useState(null);
+  const [pendingGarmentAutoFill, setPendingGarmentAutoFill] = useState(false);
 
   const defaultFabricTypes = {
     'Cotton': 200,
@@ -275,21 +273,19 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   useEffect(() => {
-    if (designDetails?._pendingGarmentAutoFill && Object.keys(garmentCodeToName).length > 0) {
+    const firstGarment = garments[0];
+    if (pendingGarmentAutoFill && firstGarment?.designDetails && Object.keys(garmentCodeToName).length > 0) {
       console.log('🎯 Processing pending garment auto-fill...');
-      console.log('🎯 Design details:', designDetails);
-      console.log('🎯 Available garment code mapping:', garmentCodeToName);
+      const designDets = firstGarment.designDetails;
 
       let mappedGarment = '';
 
-      if (designDetails.garment) {
-        const garmentCode = designDetails.garment.toLowerCase();
-        console.log('🎯 Trying to match garment code:', garmentCode);
+      if (designDets.garment) {
+        const garmentCode = designDets.garment.toLowerCase();
 
         if (garmentCodeToName[garmentCode]) {
           mappedGarment = garmentCodeToName[garmentCode];
         } else {
-
           for (const [code, name] of Object.entries(garmentCodeToName)) {
             if (garmentCode.includes(code) || code.includes(garmentCode)) {
               mappedGarment = name;
@@ -299,14 +295,12 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         }
       }
 
-      if (!mappedGarment && designDetails.garmentType) {
-        const garmentTypeLower = designDetails.garmentType.toLowerCase();
-        console.log('🎯 Trying to match garment type name:', garmentTypeLower);
+      if (!mappedGarment && designDets.garmentType) {
+        const garmentTypeLower = designDets.garmentType.toLowerCase();
 
         if (garmentCodeToName[garmentTypeLower]) {
           mappedGarment = garmentCodeToName[garmentTypeLower];
         } else {
-
           for (const [code, name] of Object.entries(garmentCodeToName)) {
             const nameLower = name.toLowerCase();
             if (garmentTypeLower.includes(nameLower) || nameLower.includes(garmentTypeLower) ||
@@ -318,21 +312,13 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         }
       }
 
-      console.log('🎯 Final mapped garment:', mappedGarment || '(no match found)');
-
       if (mappedGarment) {
-        setFormData(prev => ({
-          ...prev,
-          garmentType: mappedGarment
-        }));
+        setGarments(prev => prev.map((g, i) => i === 0 ? { ...g, garmentType: mappedGarment } : g));
       }
 
-      setDesignDetails(prev => ({
-        ...prev,
-        _pendingGarmentAutoFill: false
-      }));
+      setPendingGarmentAutoFill(false);
     }
-  }, [garmentCodeToName, designDetails]);
+  }, [garmentCodeToName, pendingGarmentAutoFill]);
 
   useEffect(() => {
     if (isOpen) {
@@ -350,21 +336,18 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           }
 
           if (design.design) {
-            setDesignDetails({
-              ...design.design,
-              _pendingGarmentAutoFill: true
-            });
+            setGarments(prev => prev.map((g, i) => i === 0 ? { ...g, designDetails: design.design } : g));
+            setPendingGarmentAutoFill(true);
           }
 
           if (designImage) {
-
+            let preview = '';
             let imageData = designImage;
             if (designImage.startsWith('data:image')) {
-              setImagePreview(designImage);
+              preview = designImage;
               imageData = designImage.split(',')[1];
             } else {
-
-              setImagePreview(`data:image/png;base64,${designImage}`);
+              preview = `data:image/png;base64,${designImage}`;
             }
 
             try {
@@ -376,17 +359,13 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               const byteArray = new Uint8Array(byteNumbers);
               const blob = new Blob([byteArray], { type: 'image/png' });
               const file = new File([blob], '3d-design.png', { type: 'image/png' });
-              setFormData(prev => ({
-                ...prev,
-                uploadedImage: file
-              }));
+              setGarments(prev => prev.map((g, i) => i === 0 ? { ...g, uploadedImage: file, imagePreview: preview } : g));
             } catch (err) {
               console.error('Error converting image:', err);
             }
           }
 
           if (design.design?.fabric) {
-
             const fabricMap = {
               'wool': 'Wool',
               'cotton': 'Cotton',
@@ -395,10 +374,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
             };
             const fabricName = fabricMap[design.design.fabric.toLowerCase()] ||
                               (design.design.fabric.charAt(0).toUpperCase() + design.design.fabric.slice(1));
-            setFormData(prev => ({
-              ...prev,
-              fabricType: fabricName in fabricTypes ? fabricName : fabricName
-            }));
+            setGarments(prev => prev.map((g, i) => i === 0 ? { ...g, fabricType: fabricName } : g));
           }
 
           if (design.notes || design.design?.notes) {
@@ -416,43 +392,54 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     }
   }, [isOpen]);
 
-  const isUniformSelected = formData.garmentType === 'Uniform';
-
-  useEffect(() => {
-    if (formData.garmentType === 'Uniform') {
-
-      setEstimatedPrice(0);
-    } else if (formData.fabricType && formData.garmentType) {
-      const fabricPrice = fabricTypes[formData.fabricType] || 0;
-      const garmentPrice = garmentTypes[formData.garmentType] || 0;
-      const total = fabricPrice + garmentPrice;
-      setEstimatedPrice(total);
-    } else {
-      setEstimatedPrice(0);
+  const getGarmentPrice = (garment) => {
+    if (garment.garmentType === 'Uniform') return 0;
+    if (garment.fabricType && garment.garmentType) {
+      return (fabricTypes[garment.fabricType] || 0) + (garmentTypes[garment.garmentType] || 0);
     }
-  }, [formData.fabricType, formData.garmentType]);
+    return 0;
+  };
 
-  const handleImageUpload = (e) => {
+  const totalEstimatedPrice = garments.reduce((sum, g) => sum + getGarmentPrice(g), 0);
+  const hasUniform = garments.some(g => g.garmentType === 'Uniform');
+
+  const addGarment = () => {
+    const newId = Math.max(...garments.map(g => g.id)) + 1;
+    setGarments([...garments, { id: newId, uploadedImage: null, imagePreview: '', fabricType: '', garmentType: '', designDetails: null }]);
+  };
+
+  const removeGarment = (id) => {
+    if (garments.length > 1) {
+      setGarments(garments.filter(g => g.id !== id));
+    }
+  };
+
+  const updateGarment = (id, field, value) => {
+    setGarments(garments.map(g =>
+      g.id === id ? { ...g, [field]: value } : g
+    ));
+    if (errors[`garment_${id}_${field}`]) {
+      setErrors(prev => ({ ...prev, [`garment_${id}_${field}`]: '' }));
+    }
+  };
+
+  const handleGarmentImageUpload = (garmentId, e) => {
     const file = e.target.files[0];
     if (file) {
-
       if (!file.type.startsWith('image/')) {
-        setErrors(prev => ({ ...prev, image: 'Please upload a valid image file' }));
+        setErrors(prev => ({ ...prev, [`garment_${garmentId}_image`]: 'Please upload a valid image file' }));
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        setErrors(prev => ({ ...prev, image: 'Image size must be less than 5MB' }));
+        setErrors(prev => ({ ...prev, [`garment_${garmentId}_image`]: 'Image size must be less than 5MB' }));
         return;
       }
-
       const reader = new FileReader();
       reader.onload = (event) => {
-        setFormData(prev => ({
-          ...prev,
-          uploadedImage: file,
-        }));
-        setImagePreview(event.target.result);
-        setErrors(prev => ({ ...prev, image: '' }));
+        setGarments(prev => prev.map(g =>
+          g.id === garmentId ? { ...g, uploadedImage: file, imagePreview: event.target.result } : g
+        ));
+        setErrors(prev => ({ ...prev, [`garment_${garmentId}_image`]: '' }));
       };
       reader.readAsDataURL(file);
     }
@@ -491,15 +478,18 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.uploadedImage && !imagePreview) {
-      newErrors.image = 'Please upload a reference image';
-    }
-    if (!formData.fabricType) {
-      newErrors.fabricType = 'Please select a fabric type';
-    }
-    if (!formData.garmentType) {
-      newErrors.garmentType = 'Please select a garment type';
-    }
+    garments.forEach(garment => {
+      if (!garment.uploadedImage && !garment.imagePreview) {
+        newErrors[`garment_${garment.id}_image`] = 'Please upload a reference image';
+      }
+      if (!garment.fabricType) {
+        newErrors[`garment_${garment.id}_fabricType`] = 'Please select a fabric type';
+      }
+      if (!garment.garmentType) {
+        newErrors[`garment_${garment.id}_garmentType`] = 'Please select a garment type';
+      }
+    });
+
     if (!formData.preferredDate) {
       newErrors.preferredDate = 'Please select a preferred date';
     }
@@ -520,35 +510,41 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     setMessage('');
 
     try {
-      let imageUrl = 'no-image';
+      // Upload all garment images
+      const garmentsData = [];
+      for (const garment of garments) {
+        let imageUrl = 'no-image';
 
-      if (formData.uploadedImage) {
-        const uploadResult = await uploadCustomizationImage(formData.uploadedImage);
-        if (uploadResult.success) {
-          imageUrl = uploadResult.imageUrl;
-        } else {
-          throw new Error(uploadResult.message || 'Failed to upload image');
+        if (garment.uploadedImage) {
+          const uploadResult = await uploadCustomizationImage(garment.uploadedImage);
+          if (uploadResult.success) {
+            imageUrl = uploadResult.imageUrl;
+          } else {
+            throw new Error(uploadResult.message || 'Failed to upload image');
+          }
         }
+
+        let cleanDesignData = null;
+        if (garment.designDetails) {
+          cleanDesignData = JSON.parse(JSON.stringify(garment.designDetails));
+          if (cleanDesignData.designImage) delete cleanDesignData.designImage;
+          if (cleanDesignData.design?.designImage) delete cleanDesignData.design.designImage;
+        }
+
+        const isUniform = garment.garmentType === 'Uniform';
+        const price = isUniform ? 0 : (getGarmentPrice(garment) || 500);
+
+        garmentsData.push({
+          fabricType: garment.fabricType,
+          garmentType: garment.garmentType,
+          imageUrl: imageUrl,
+          estimatedPrice: price,
+          isUniform: isUniform,
+          designData: cleanDesignData || {},
+        });
       }
 
-      let cleanDesignData = null;
-      if (designDetails) {
-
-        cleanDesignData = JSON.parse(JSON.stringify(designDetails));
-
-        if (cleanDesignData.designImage) {
-          delete cleanDesignData.designImage;
-        }
-
-        if (cleanDesignData.design && cleanDesignData.design.designImage) {
-          delete cleanDesignData.design.designImage;
-        }
-
-      }
-
-      const isUniform = formData.garmentType === 'Uniform';
-      const priceToSubmit = isUniform ? 0 : (estimatedPrice || 500);
-
+      // Book one appointment slot for all garments
       let slotResult = null;
       try {
         slotResult = await bookSlot('customization', formData.preferredDate, formData.preferredTime);
@@ -564,20 +560,24 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         throw new Error(errorMsg);
       }
 
+      const totalPrice = garmentsData.reduce((sum, g) => sum + g.estimatedPrice, 0);
+      const hasAnyUniform = garmentsData.some(g => g.isUniform);
+
       const cartResult = await addCustomizationToCart({
-        fabricType: formData.fabricType,
-        garmentType: formData.garmentType,
+        fabricType: garmentsData[0].fabricType,
+        garmentType: garmentsData[0].garmentType,
         preferredDate: formData.preferredDate,
         preferredTime: formData.preferredTime,
         notes: formData.notes,
-        imageUrl: imageUrl,
-        estimatedPrice: priceToSubmit,
-        isUniform: isUniform,
-        designData: cleanDesignData || {},
+        imageUrl: garmentsData[0].imageUrl,
+        estimatedPrice: totalPrice,
+        isUniform: hasAnyUniform,
+        designData: garmentsData[0].designData,
+        garments: garmentsData,
+        isMultipleGarments: garments.length > 1,
       });
 
       if (cartResult.success) {
-
         setMessage('Added to cart successfully!');
 
         if (onCartUpdate) {
@@ -602,11 +602,11 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const handleOpen3DCustomizer = () => {
 
     sessionStorage.setItem('customizationFormData', JSON.stringify({
-      fabricType: formData.fabricType,
-      garmentType: formData.garmentType,
+      fabricType: garments[0]?.fabricType || '',
+      garmentType: garments[0]?.garmentType || '',
       preferredDate: formData.preferredDate,
       notes: formData.notes,
-      imagePreview: imagePreview,
+      imagePreview: garments[0]?.imagePreview || '',
     }));
 
     sessionStorage.setItem('reopenCustomizationModal', 'true');
@@ -616,20 +616,17 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   const resetForm = () => {
+    setGarments([
+      { id: 1, uploadedImage: null, imagePreview: '', fabricType: '', garmentType: '', designDetails: null }
+    ]);
     setFormData({
-      uploadedImage: null,
-      fabricType: '',
-      garmentType: '',
       preferredDate: '',
       preferredTime: '',
       notes: '',
     });
     setAllTimeSlots([]);
     setIsShopOpen(true);
-    setImagePreview('');
     setErrors({});
-    setEstimatedPrice(0);
-    setDesignDetails(null);
   };
 
   const handleClose = () => {
@@ -654,152 +651,240 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               {message}
             </div>
           )}
-          <div className="form-group-shared">
-            <label className="form-label-shared">
-              <i className="fas fa-camera"></i> Upload Reference Image
-              <span className="required-indicator">*</span>
-            </label>
-            {isUniformSelected && (
-              <div style={{
-                backgroundColor: '#fff3e0',
-                padding: '10px 15px',
-                borderRadius: '8px',
-                marginBottom: '10px',
-                border: '1px solid #ffb74d',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px'
-              }}>
-                <span style={{ fontSize: '20px' }}><i className="fas fa-tshirt"></i></span>
-                <div>
-                  <strong style={{ color: '#e65100' }}>Uniform Selected</strong>
-                  <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#666' }}>
-                    Please upload a clear picture of your uniform for accurate pricing. Final price will be determined based on uniform type and complexity.
-                  </p>
-                </div>
-              </div>
-            )}
-            <div className="image-upload-wrapper-shared">
-              <input
-                type="file"
-                id="imageUpload"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="file-input-shared"
-                disabled={loading}
-              />
-              <label htmlFor="imageUpload" className="upload-button-shared">
-                {imagePreview ? <><i className="fas fa-camera"></i> Change Image</> : <><i className="fas fa-folder-open"></i> Choose Image</>}
-              </label>
-            </div>
 
-            {imagePreview && (
-              <div className="image-preview-shared">
-                {designDetails?.angleImages ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '10px' }}>
-                    {['front', 'back', 'right', 'left'].map((angle) => (
-                      designDetails.angleImages[angle] && (
-                        <div key={angle} style={{ position: 'relative' }}>
-                          <img
-                            src={designDetails.angleImages[angle]}
-                            alt={`${angle} view`}
-                            style={{ width: '100%', height: 'auto', borderRadius: '8px', border: '2px solid #e0e0e0' }}
-                          />
-                          <div style={{
-                            position: 'absolute',
-                            bottom: '5px',
-                            left: '5px',
-                            background: 'rgba(0,0,0,0.7)',
-                            color: 'white',
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            textTransform: 'capitalize',
-                            fontWeight: 'bold'
-                          }}>
-                            {angle}
-                          </div>
-                        </div>
-                      )
-                    ))}
-                  </div>
-                ) : (
-                  <img src={imagePreview} alt="Preview" />
+          {/* Garments - Repeatable per-garment fields */}
+          {garments.map((garment, index) => (
+            <div key={garment.id} className="garment-inputs-group">
+              {index > 0 && <hr className="garment-divider" />}
+
+              <div className="garment-row-header">
+                {garments.length > 1 && (
+                  <span className="garment-label">Garment #{index + 1}</span>
                 )}
-                <button
-                  type="button"
-                  className="remove-image-btn-shared"
-                  onClick={() => {
-                    setFormData(prev => ({
-                      ...prev,
-                      uploadedImage: null,
-                    }));
-                    setImagePreview('');
-                    setDesignDetails(prev => prev ? { ...prev, angleImages: null } : null);
-                  }}
+                {garments.length > 1 && (
+                  <button
+                    type="button"
+                    className="remove-garment-link"
+                    onClick={() => removeGarment(garment.id)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+
+              <div className="form-group-shared">
+                <label className="form-label-shared">
+                  <i className="fas fa-camera"></i> Upload Reference Image
+                  <span className="required-indicator">*</span>
+                </label>
+                {garment.garmentType === 'Uniform' && (
+                  <div style={{
+                    backgroundColor: '#fff3e0',
+                    padding: '10px 15px',
+                    borderRadius: '8px',
+                    marginBottom: '10px',
+                    border: '1px solid #ffb74d',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    <span style={{ fontSize: '20px' }}><i className="fas fa-tshirt"></i></span>
+                    <div>
+                      <strong style={{ color: '#e65100' }}>Uniform Selected</strong>
+                      <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#666' }}>
+                        Please upload a clear picture of your uniform for accurate pricing. Final price will be determined based on uniform type and complexity.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <div className="image-upload-wrapper-shared">
+                  <input
+                    type="file"
+                    id={`imageUpload_${garment.id}`}
+                    accept="image/*"
+                    onChange={(e) => handleGarmentImageUpload(garment.id, e)}
+                    className="file-input-shared"
+                    disabled={loading}
+                  />
+                  <label htmlFor={`imageUpload_${garment.id}`} className="upload-button-shared">
+                    {garment.imagePreview ? <><i className="fas fa-camera"></i> Change Image</> : <><i className="fas fa-folder-open"></i> Choose Image</>}
+                  </label>
+                </div>
+
+                {garment.imagePreview && (
+                  <div className="image-preview-shared">
+                    {garment.designDetails?.angleImages ? (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '10px' }}>
+                        {['front', 'back', 'right', 'left'].map((angle) => (
+                          garment.designDetails.angleImages[angle] && (
+                            <div key={angle} style={{ position: 'relative' }}>
+                              <img
+                                src={garment.designDetails.angleImages[angle]}
+                                alt={`${angle} view`}
+                                style={{ width: '100%', height: 'auto', borderRadius: '8px', border: '2px solid #e0e0e0' }}
+                              />
+                              <div style={{
+                                position: 'absolute',
+                                bottom: '5px',
+                                left: '5px',
+                                background: 'rgba(0,0,0,0.7)',
+                                color: 'white',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                textTransform: 'capitalize',
+                                fontWeight: 'bold'
+                              }}>
+                                {angle}
+                              </div>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    ) : (
+                      <img src={garment.imagePreview} alt="Preview" />
+                    )}
+                    <button
+                      type="button"
+                      className="remove-image-btn-shared"
+                      onClick={() => {
+                        setGarments(prev => prev.map(g =>
+                          g.id === garment.id ? { ...g, uploadedImage: null, imagePreview: '', designDetails: g.designDetails ? { ...g.designDetails, angleImages: null } : null } : g
+                        ));
+                      }}
+                      disabled={loading}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+                {errors[`garment_${garment.id}_image`] && (
+                  <span className="error-message-shared">{errors[`garment_${garment.id}_image`]}</span>
+                )}
+              </div>
+
+              <div className="form-group-shared">
+                <label className="form-label-shared">
+                  <i className="fas fa-scroll"></i> Fabric Type
+                  <span className="required-indicator">*</span>
+                </label>
+                <select
+                  value={garment.fabricType}
+                  onChange={(e) => updateGarment(garment.id, 'fabricType', e.target.value)}
+                  className={`form-select-shared ${errors[`garment_${garment.id}_fabricType`] ? 'error' : ''}`}
                   disabled={loading}
                 >
-                  Remove
-                </button>
+                  <option value="">-- Select Fabric Type --</option>
+                  {Object.keys(fabricTypes).length > 0 ? (
+                    Object.keys(fabricTypes).sort().map(fabric => (
+                      <option key={fabric} value={fabric}>
+                        {fabric} - ₱{fabricTypes[fabric].toFixed(2)}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>Loading fabric types...</option>
+                  )}
+                </select>
+                {errors[`garment_${garment.id}_fabricType`] && (
+                  <span className="error-message-shared">{errors[`garment_${garment.id}_fabricType`]}</span>
+                )}
               </div>
-            )}
-            {errors.image && (
-              <span className="error-message-shared">{errors.image}</span>
-            )}
-          </div>
-          <div className="form-group-shared">
-            <label htmlFor="fabricType" className="form-label-shared">
-              <i className="fas fa-scroll"></i> Fabric Type
-              <span className="required-indicator">*</span>
-            </label>
-            <select
-              id="fabricType"
-              name="fabricType"
-              value={formData.fabricType}
-              onChange={handleInputChange}
-              className={`form-select-shared ${errors.fabricType ? 'error' : ''}`}
-              disabled={loading}
-            >
-              <option value="">-- Select Fabric Type --</option>
-              {Object.keys(fabricTypes).length > 0 ? (
-                Object.keys(fabricTypes).sort().map(fabric => (
-                  <option key={fabric} value={fabric}>
-                    {fabric} - ₱{fabricTypes[fabric].toFixed(2)}
-                  </option>
-                ))
-              ) : (
-                <option value="" disabled>Loading fabric types...</option>
+
+              <div className="form-group-shared">
+                <label className="form-label-shared">
+                  <i className="fas fa-tshirt"></i> Garment Type
+                  <span className="required-indicator">*</span>
+                </label>
+                <select
+                  value={garment.garmentType}
+                  onChange={(e) => updateGarment(garment.id, 'garmentType', e.target.value)}
+                  className={`form-select-shared ${errors[`garment_${garment.id}_garmentType`] ? 'error' : ''}`}
+                  disabled={loading}
+                >
+                  <option value="">-- Select Garment Type --</option>
+                  {Object.keys(garmentTypes).map(gt => (
+                    <option key={gt} value={gt}>
+                      {gt} - ₱{garmentTypes[gt]}
+                    </option>
+                  ))}
+                  <option value="Uniform" style={{ fontWeight: 'bold' }}>Uniform (Price varies)</option>
+                </select>
+                {errors[`garment_${garment.id}_garmentType`] && (
+                  <span className="error-message-shared">{errors[`garment_${garment.id}_garmentType`]}</span>
+                )}
+              </div>
+
+              {garment.designDetails && (
+                <div className="form-group" style={{ backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '8px', border: '1px solid #e0e0e0', marginTop: '10px' }}>
+                  <h4 style={{ margin: '0 0 15px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>
+                    <i className="fas fa-palette"></i> 3D Customization Choices
+                  </h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '14px' }}>
+                    {garment.designDetails.size && (
+                      <div>
+                        <strong>Size:</strong> {garment.designDetails.size.charAt(0).toUpperCase() + garment.designDetails.size.slice(1)}
+                      </div>
+                    )}
+                    {garment.designDetails.fit && (
+                      <div>
+                        <strong>Fit:</strong> {garment.designDetails.fit.charAt(0).toUpperCase() + garment.designDetails.fit.slice(1)}
+                      </div>
+                    )}
+                    {garment.designDetails.colors && garment.designDetails.colors.fabric && (
+                      <div>
+                        <strong>Color:</strong> {getColorName(garment.designDetails.colors.fabric)}
+                      </div>
+                    )}
+                    {garment.designDetails.pattern && garment.designDetails.pattern !== 'none' && (
+                      <div>
+                        <strong>Pattern:</strong> {garment.designDetails.pattern.charAt(0).toUpperCase() + garment.designDetails.pattern.slice(1)}
+                      </div>
+                    )}
+                    {garment.designDetails.personalization && garment.designDetails.personalization.initials && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <strong>Personalization:</strong> {garment.designDetails.personalization.initials}
+                        {garment.designDetails.personalization.font && ` (${garment.designDetails.personalization.font} font)`}
+                      </div>
+                    )}
+                    {garment.designDetails.buttons && garment.designDetails.buttons.length > 0 && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <strong>Button Type:</strong>
+                        <div style={{ marginLeft: '10px', marginTop: '5px', fontSize: '13px' }}>
+                          {garment.designDetails.buttons.map((btn, btnIdx) => (
+                            <div key={btn.id || btnIdx}>
+                              Button {btnIdx + 1}: {getButtonType(btn.modelPath)}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {garment.designDetails.accessories && garment.designDetails.accessories.length > 0 && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <strong>Accessories:</strong>
+                        <div style={{ marginLeft: '10px', marginTop: '5px', fontSize: '13px' }}>
+                          {garment.designDetails.accessories.map((acc, accIdx) => (
+                            <div key={acc.id || accIdx}>
+                              {getAccessoryName(acc.modelPath)}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
-            </select>
-            {errors.fabricType && (
-              <span className="error-message-shared">{errors.fabricType}</span>
-            )}
-          </div>
-          <div className="form-group-shared">
-            <label htmlFor="garmentType" className="form-label-shared">
-              <i className="fas fa-tshirt"></i> Garment Type
-              <span className="required-indicator">*</span>
-            </label>
-            <select
-              id="garmentType"
-              name="garmentType"
-              value={formData.garmentType}
-              onChange={handleInputChange}
-              className={`form-select-shared ${errors.garmentType ? 'error' : ''}`}
-              disabled={loading}
-            >
-              <option value="">-- Select Garment Type --</option>
-              {Object.keys(garmentTypes).map(garment => (
-                <option key={garment} value={garment}>
-                  {garment} - ₱{garmentTypes[garment]}
-                </option>
-              ))}
-              <option value="Uniform" style={{ fontWeight: 'bold' }}><i className="fas fa-tshirt"></i> Uniform (Price varies)</option>
-            </select>
-            {errors.garmentType && (
-              <span className="error-message-shared">{errors.garmentType}</span>
-            )}
-          </div>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            className="add-garment-link"
+            onClick={addGarment}
+            disabled={loading}
+          >
+            + Add Another
+          </button>
+
           <div className="form-group-shared">
             <label htmlFor="preferredDate" className="form-label-shared">
               <i className="fas fa-calendar"></i> Preferred Date for Sizing in Store
@@ -858,7 +943,6 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               ) : allTimeSlots.length > 0 ? (
                 <div className="time-slots-grid">
                   {(() => {
-
                     const seenTimes = new Set();
                     const uniqueSlots = allTimeSlots.filter(slot => {
                       if (seenTimes.has(slot.time_slot)) {
@@ -901,65 +985,6 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               )}
             </div>
           )}
-          {designDetails && (
-            <div className="form-group" style={{ backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '8px', border: '1px solid #e0e0e0', marginTop: '10px' }}>
-              <h4 style={{ margin: '0 0 15px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>
-                <i className="fas fa-palette"></i> 3D Customization Choices
-              </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '14px' }}>
-                {designDetails.size && (
-                  <div>
-                    <strong>Size:</strong> {designDetails.size.charAt(0).toUpperCase() + designDetails.size.slice(1)}
-                  </div>
-                )}
-                {designDetails.fit && (
-                  <div>
-                    <strong>Fit:</strong> {designDetails.fit.charAt(0).toUpperCase() + designDetails.fit.slice(1)}
-                  </div>
-                )}
-                {designDetails.colors && designDetails.colors.fabric && (
-                  <div>
-                    <strong>Color:</strong> {getColorName(designDetails.colors.fabric)}
-                  </div>
-                )}
-                {designDetails.pattern && designDetails.pattern !== 'none' && (
-                  <div>
-                    <strong>Pattern:</strong> {designDetails.pattern.charAt(0).toUpperCase() + designDetails.pattern.slice(1)}
-                  </div>
-                )}
-                {designDetails.personalization && designDetails.personalization.initials && (
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <strong>Personalization:</strong> {designDetails.personalization.initials}
-                    {designDetails.personalization.font && ` (${designDetails.personalization.font} font)`}
-                  </div>
-                )}
-                {designDetails.buttons && designDetails.buttons.length > 0 && (
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <strong>Button Type:</strong>
-                    <div style={{ marginLeft: '10px', marginTop: '5px', fontSize: '13px' }}>
-                      {designDetails.buttons.map((btn, index) => (
-                        <div key={btn.id || index}>
-                          Button {index + 1}: {getButtonType(btn.modelPath)}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {designDetails.accessories && designDetails.accessories.length > 0 && (
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <strong>Accessories:</strong>
-                    <div style={{ marginLeft: '10px', marginTop: '5px', fontSize: '13px' }}>
-                      {designDetails.accessories.map((acc, index) => (
-                        <div key={acc.id || index}>
-                          {getAccessoryName(acc.modelPath)}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
           <div className="form-group-shared">
             <label htmlFor="notes" className="form-label-shared">
               <i className="fas fa-pen"></i> Additional Notes
@@ -975,23 +1000,29 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               disabled={loading}
             />
           </div>
-          {isUniformSelected ? (
+
+          {hasUniform ? (
             <div className="price-estimate-shared" style={{ backgroundColor: '#fff3e0', borderColor: '#ffb74d' }}>
-              <h4 style={{ color: '#e65100' }}>💰 Price: Varies by uniform type</h4>
+              <h4 style={{ color: '#e65100' }}>💰 Price: Includes uniform items (price varies)</h4>
               <p style={{ color: '#666' }}>
                 Uniform pricing depends on the type, fabric, complexity, and quantity. Our team will provide an accurate quote after reviewing your uploaded image.
               </p>
-              <p className="help-text-shared" style={{ marginTop: '12px', fontStyle: 'italic' }}>
-                Note: Please ensure you upload a clear picture of the uniform for accurate pricing.
-              </p>
+              {totalEstimatedPrice > 0 && (
+                <p style={{ marginTop: '8px' }}>Non-uniform items estimated total: ₱{totalEstimatedPrice}</p>
+              )}
             </div>
-          ) : estimatedPrice > 0 && formData.fabricType && formData.garmentType && (
+          ) : totalEstimatedPrice > 0 && (
             <div className="price-estimate-shared">
-              <h4>Estimated Price: ₱{estimatedPrice}</h4>
-              <p>
-                Fabric: {formData.fabricType} (₱{fabricTypes[formData.fabricType]}) +
-                Garment: {formData.garmentType} (₱{garmentTypes[formData.garmentType]})
-              </p>
+              <h4>Estimated Price: ₱{totalEstimatedPrice}</h4>
+              {garments.map((garment, idx) => {
+                const price = getGarmentPrice(garment);
+                return price > 0 ? (
+                  <p key={garment.id}>
+                    {garments.length > 1 ? `Garment #${idx + 1}: ` : ''}
+                    {garment.fabricType} (₱{fabricTypes[garment.fabricType]}) + {garment.garmentType} (₱{garmentTypes[garment.garmentType]}) = ₱{price}
+                  </p>
+                ) : null;
+              })}
               <p className="help-text-shared" style={{ marginTop: '12px', fontStyle: 'italic' }}>
                 Note: Estimated price is based on the selected garment and fabric type. Final price may vary depending on sizes and other accessories.
               </p>

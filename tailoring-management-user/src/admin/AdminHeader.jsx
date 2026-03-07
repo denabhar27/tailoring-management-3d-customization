@@ -24,32 +24,32 @@ function AdminHeader() {
     };
 
     return (
-        <nav className="navbar">
-          <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <button
-              onClick={handleLogout}
-              title="Logout"
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '18px',
-                color: '#dc3545',
-                padding: '8px',
-                borderRadius: '5px',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = 'rgba(220, 53, 69, 0.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'transparent';
-              }}
-            >
-              <i className="fa-solid fa-right-from-bracket"></i>
-            </button>
+        <nav className="navbar" style={{ justifyContent: 'space-between' }}>
+          <div className="logo" style={{ display: 'flex', alignItems: 'center' }}>
             Welcome back, Admin!
           </div>
+          <button
+            onClick={handleLogout}
+            title="Logout"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '18px',
+              color: '#ffffff',
+              padding: '8px',
+              borderRadius: '5px',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+            }}
+          >
+            <i className="fa-solid fa-right-from-bracket"></i>
+          </button>
         </nav>
     );
 }

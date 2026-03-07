@@ -1,4 +1,5 @@
 const AppointmentSlot = require('../model/AppointmentSlotModel');
+const ShopSchedule = require('../model/ShopScheduleModel');
 const db = require('../config/db');
 
 const ensureTableExists = (callback) => {
@@ -210,6 +211,21 @@ exports.getAllSlotsWithAvailability = (req, res) => {
         });
       }
 
+      // Get available_times for this day of week
+      const dateParts = date.split('-');
+      let dayOfWeek;
+      if (dateParts.length === 3) {
+        const year = parseInt(dateParts[0], 10);
+        const month = parseInt(dateParts[1], 10) - 1;
+        const day = parseInt(dateParts[2], 10);
+        dayOfWeek = new Date(year, month, day).getDay();
+      } else {
+        dayOfWeek = new Date(date).getDay();
+      }
+
+      ShopSchedule.getByDay(dayOfWeek, (schedErr, daySchedule) => {
+        const dayAvailableTimes = daySchedule?.available_times || null;
+
       const slotsSql = `
         SELECT MIN(slot_id) as slot_id, time_slot, MAX(capacity) as capacity, MAX(is_active) as is_active 
         FROM time_slots 
@@ -383,16 +399,26 @@ exports.getAllSlotsWithAvailability = (req, res) => {
             };
           });
 
+          // Filter by day-specific available times if configured
+          let filteredSlots = slotsWithAvailability;
+          if (dayAvailableTimes && Array.isArray(dayAvailableTimes) && dayAvailableTimes.length > 0) {
+            filteredSlots = slotsWithAvailability.filter(slot => {
+              const slotTime = slot.time_slot.substring(0, 5); // "08:00"
+              return dayAvailableTimes.includes(slot.time_slot) || dayAvailableTimes.includes(slotTime);
+            });
+          }
+
           res.json({
             success: true,
             message: "Slots with availability retrieved successfully",
             isShopOpen: true,
             date: date,
-            slots: slotsWithAvailability
+            slots: filteredSlots
           });
         });
       });
-    });
+      }); // close ShopSchedule.getByDay
+    }); // close isValidDate
   });
 };
 

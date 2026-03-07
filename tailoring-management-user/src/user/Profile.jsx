@@ -50,6 +50,8 @@ const Profile = () => {
   const [savingProfile, setSavingProfile] = useState(false);
   const [profilePicUrl, setProfilePicUrl] = useState('');
   const [uploadingPic, setUploadingPic] = useState(false);
+  const [pendingPicFile, setPendingPicFile] = useState(null);
+  const [pendingPicPreview, setPendingPicPreview] = useState(null);
 
   const openImagePreview = (imageUrl, altText) => {
     setPreviewImageUrl(imageUrl);
@@ -90,18 +92,8 @@ const Profile = () => {
         const result = await getUserOrderTracking();
         console.log("Orders fetched:", result);
         if (result.success) {
-
-          const filteredOrders = result.data.map(order => ({
-            ...order,
-            items: order.items.filter(item =>
-              item.status !== 'cancelled' &&
-              item.status !== 'rejected' &&
-              item.status !== 'price_declined'
-            )
-          })).filter(order => order.items.length > 0);
-
-          setOrders(filteredOrders);
-          console.log("Filtered orders data:", filteredOrders);
+          setOrders(result.data);
+          console.log("Orders data:", result.data);
         } else {
           setError(result.message || 'Failed to fetch orders');
         }
@@ -1319,7 +1311,7 @@ const Profile = () => {
       return orders;
     }
     return orders.filter(order =>
-      order.items.some(item => item.status === statusFilter)
+      order.items.some(item => item.status === statusFilter || (statusFilter === 'cancelled' && (item.status === 'rejected' || item.status === 'price_declined')))
     );
   };
 
@@ -1329,7 +1321,7 @@ const Profile = () => {
     orders.forEach(order => {
       order.items.forEach(item => {
 
-        const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
+        const matchesStatus = statusFilter === 'all' || item.status === statusFilter || (statusFilter === 'cancelled' && (item.status === 'rejected' || item.status === 'price_declined'));
 
         let matchesService = false;
         if (serviceFilter === 'all') {
@@ -1378,7 +1370,7 @@ const Profile = () => {
     return allItems;
   };
 
-  const getStatusCounts = () => {
+  const getStatusCounts = (forService = serviceFilter) => {
     const counts = {
       all: 0,
       pending: 0,
@@ -1386,6 +1378,8 @@ const Profile = () => {
       price_confirmation: 0,
       in_progress: 0,
       ready_to_pickup: 0,
+      rented: 0,
+      returned: 0,
       completed: 0,
       cancelled: 0,
       price_declined: 0
@@ -1393,7 +1387,24 @@ const Profile = () => {
 
     orders.forEach(order => {
       order.items.forEach(item => {
-        if (counts[item.status] !== undefined) {
+        // Apply service filter to counts
+        let matchesService = true;
+        if (forService !== 'all') {
+          const itemServiceType = item.service_type?.toLowerCase();
+          const filterServiceType = forService.toLowerCase();
+          if (filterServiceType === 'customize') {
+            matchesService = itemServiceType === 'customization' || itemServiceType === 'customize';
+          } else if (filterServiceType === 'dry_cleaning') {
+            matchesService = itemServiceType === 'dry_cleaning' || itemServiceType === 'drycleaning' || itemServiceType === 'dry-cleaning';
+          } else {
+            matchesService = itemServiceType === filterServiceType;
+          }
+        }
+        if (!matchesService) return;
+
+        if (item.status === 'rejected' || item.status === 'price_declined') {
+          counts.cancelled++;
+        } else if (counts[item.status] !== undefined) {
           counts[item.status]++;
         }
         counts.all++;
@@ -1557,31 +1568,31 @@ const Profile = () => {
             <div className="status-filters">
               <button
                 className={`filter-btn ${serviceFilter === 'all' ? 'active' : ''}`}
-                onClick={() => setServiceFilter('all')}
+                onClick={() => { setServiceFilter('all'); setStatusFilter('all'); }}
               >
                 All ({getServiceCounts().all})
               </button>
               <button
                 className={`filter-btn ${serviceFilter === 'repair' ? 'active' : ''}`}
-                onClick={() => setServiceFilter('repair')}
+                onClick={() => { setServiceFilter('repair'); setStatusFilter('all'); }}
               >
                 Repair ({getServiceCounts().repair})
               </button>
               <button
                 className={`filter-btn ${serviceFilter === 'customize' ? 'active' : ''}`}
-                onClick={() => setServiceFilter('customize')}
+                onClick={() => { setServiceFilter('customize'); setStatusFilter('all'); }}
               >
                 Customize ({getServiceCounts().customize})
               </button>
               <button
                 className={`filter-btn ${serviceFilter === 'dry_cleaning' ? 'active' : ''}`}
-                onClick={() => setServiceFilter('dry_cleaning')}
+                onClick={() => { setServiceFilter('dry_cleaning'); setStatusFilter('all'); }}
               >
                 Dry Cleaning ({getServiceCounts().dry_cleaning})
               </button>
               <button
                 className={`filter-btn ${serviceFilter === 'rental' ? 'active' : ''}`}
-                onClick={() => setServiceFilter('rental')}
+                onClick={() => { setServiceFilter('rental'); setStatusFilter('all'); }}
               >
                 Rental ({getServiceCounts().rental})
               </button>
@@ -1596,42 +1607,85 @@ const Profile = () => {
               >
                 All ({getStatusCounts().all})
               </button>
-              <button
-                className={`filter-btn ${statusFilter === 'pending' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('pending')}
-              >
-                Pending ({getStatusCounts().pending})
-              </button>
-              <button
-                className={`filter-btn ${statusFilter === 'price_confirmation' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('price_confirmation')}
-              >
-                Price Confirmation ({getStatusCounts().price_confirmation})
-              </button>
-              <button
-                className={`filter-btn ${statusFilter === 'in_progress' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('in_progress')}
-              >
-                In Progress ({getStatusCounts().in_progress})
-              </button>
-              <button
-                className={`filter-btn ${statusFilter === 'ready_to_pickup' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('ready_to_pickup')}
-              >
-                Ready to Pickup ({getStatusCounts().ready_to_pickup})
-              </button>
-              <button
-                className={`filter-btn ${statusFilter === 'completed' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('completed')}
-              >
-                Completed ({getStatusCounts().completed})
-              </button>
-              <button
-                className={`filter-btn ${statusFilter === 'cancelled' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('cancelled')}
-              >
-                Cancelled ({getStatusCounts().cancelled})
-              </button>
+              {serviceFilter === 'rental' ? (
+                <>
+                  <button
+                    className={`filter-btn ${statusFilter === 'pending' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('pending')}
+                  >
+                    Order Placed ({getStatusCounts().pending})
+                  </button>
+                  <button
+                    className={`filter-btn ${statusFilter === 'ready_to_pickup' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('ready_to_pickup')}
+                  >
+                    Ready to Pick Up ({getStatusCounts().ready_to_pickup})
+                  </button>
+                  <button
+                    className={`filter-btn ${statusFilter === 'rented' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('rented')}
+                  >
+                    Rented ({getStatusCounts().rented})
+                  </button>
+                  <button
+                    className={`filter-btn ${statusFilter === 'returned' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('returned')}
+                  >
+                    Returned ({getStatusCounts().returned})
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className={`filter-btn ${statusFilter === 'pending' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('pending')}
+                  >
+                    Pending ({getStatusCounts().pending})
+                  </button>
+                  <button
+                    className={`filter-btn ${statusFilter === 'price_confirmation' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('price_confirmation')}
+                  >
+                    Price Confirmation ({getStatusCounts().price_confirmation})
+                  </button>
+                  <button
+                    className={`filter-btn ${statusFilter === 'in_progress' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('in_progress')}
+                  >
+                    In Progress ({getStatusCounts().in_progress})
+                  </button>
+                  <button
+                    className={`filter-btn ${statusFilter === 'ready_to_pickup' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('ready_to_pickup')}
+                  >
+                    Ready to Pickup ({getStatusCounts().ready_to_pickup})
+                  </button>
+                  <button
+                    className={`filter-btn ${statusFilter === 'rented' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('rented')}
+                  >
+                    Rented ({getStatusCounts().rented})
+                  </button>
+                  <button
+                    className={`filter-btn ${statusFilter === 'returned' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('returned')}
+                  >
+                    Returned ({getStatusCounts().returned})
+                  </button>
+                  <button
+                    className={`filter-btn ${statusFilter === 'completed' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('completed')}
+                  >
+                    Completed ({getStatusCounts().completed})
+                  </button>
+                  <button
+                    className={`filter-btn ${statusFilter === 'cancelled' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('cancelled')}
+                  >
+                    Cancelled ({getStatusCounts().cancelled})
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -2457,6 +2511,8 @@ const Profile = () => {
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setIsEditingProfile(false);
+              setPendingPicFile(null);
+              setPendingPicPreview(null);
 
               const currentUser = getUser();
               if (currentUser) {
@@ -2471,10 +2527,12 @@ const Profile = () => {
           }}
         >
           <div className="details-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-            <div className="details-modal-header">
-              <h3 className="modal-title-black">Edit Profile</h3>
+            <div className="details-modal-header" style={{ borderBottom: '2px solid #F3F4F6', paddingBottom: '16px' }}>
+              <h3 className="modal-title-black" style={{ fontSize: '20px', fontWeight: '700' }}>Edit Profile</h3>
               <button className="details-modal-close" onClick={() => {
                 setIsEditingProfile(false);
+                setPendingPicFile(null);
+                setPendingPicPreview(null);
 
                 const currentUser = getUser();
                 if (currentUser) {
@@ -2488,11 +2546,12 @@ const Profile = () => {
               }}>×</button>
             </div>
             <div className="details-modal-content">
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '20px' }}>
+              {/* Profile Picture Section */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid #F3F4F6' }}>
                 <div style={{ position: 'relative', marginBottom: '12px' }}>
-                  {profilePicUrl ? (
+                  {(pendingPicPreview || profilePicUrl) ? (
                     <img
-                      src={profilePicUrl}
+                      src={pendingPicPreview || profilePicUrl}
                       alt="Profile"
                       style={{
                         width: '100px',
@@ -2519,150 +2578,182 @@ const Profile = () => {
                       </svg>
                     </div>
                   )}
+                  {/* Camera badge overlay */}
+                  <label
+                    htmlFor="profile-pic-upload"
+                    style={{
+                      position: 'absolute',
+                      bottom: '0',
+                      right: '0',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      backgroundColor: '#8B4513',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      border: '2px solid #fff',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke="#fff" strokeWidth="2" fill="none"/>
+                      <circle cx="12" cy="13" r="4" stroke="#fff" strokeWidth="2" fill="none"/>
+                    </svg>
+                  </label>
                 </div>
-                <label
-                  htmlFor="profile-pic-upload"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '8px 16px',
-                    backgroundColor: '#F5ECE3',
-                    color: '#8B4513',
-                    borderRadius: '20px',
-                    cursor: uploadingPic ? 'not-allowed' : 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    opacity: uploadingPic ? 0.6 : 1,
-                    transition: 'background 0.2s ease'
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke="#8B4513" strokeWidth="2" fill="none"/>
-                    <circle cx="12" cy="13" r="4" stroke="#8B4513" strokeWidth="2" fill="none"/>
-                  </svg>
-                  {uploadingPic ? 'Uploading...' : 'Change Photo'}
-                </label>
+                <span style={{ color: '#6B7280', fontSize: '13px' }}>
+                  {pendingPicPreview ? 'New photo selected — click Save to apply' : 'Click camera icon to change photo'}
+                </span>
                 <input
                   id="profile-pic-upload"
                   type="file"
                   accept="image/jpeg,image/png,image/gif,image/webp"
                   style={{ display: 'none' }}
-                  disabled={uploadingPic}
-                  onChange={async (e) => {
+                  disabled={savingProfile}
+                  onChange={(e) => {
                     const file = e.target.files[0];
                     if (!file) return;
 
                     if (file.size > 5 * 1024 * 1024) {
-                      await alert('File size must be less than 5MB', 'Error', 'error');
+                      alert('File size must be less than 5MB');
                       e.target.value = '';
                       return;
                     }
 
-                    setUploadingPic(true);
-                    try {
-                      const result = await uploadProfilePicture(file);
-                      if (result.success && result.user) {
-                        setUser(result.user);
-                        const newPicUrl = result.user.profile_picture
-                          ? (result.user.profile_picture.startsWith('http')
-                            ? result.user.profile_picture
-                            : `${API_BASE_URL}${result.user.profile_picture}`)
-                          : '';
-                        setProfilePicUrl(newPicUrl);
-                        await alert('Profile picture updated!', 'Success', 'success');
-                      } else {
-                        await alert(result.message || 'Failed to upload picture', 'Error', 'error');
-                      }
-                    } catch (error) {
-                      console.error('Error uploading profile picture:', error);
-                      await alert('Failed to upload picture. Please try again.', 'Error', 'error');
-                    } finally {
-                      setUploadingPic(false);
-                      e.target.value = '';
-                    }
+                    // Just preview, don't upload yet
+                    setPendingPicFile(file);
+                    const previewUrl = URL.createObjectURL(file);
+                    setPendingPicPreview(previewUrl);
+                    e.target.value = '';
                   }}
                 />
               </div>
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#333' }}>
-                  First Name
-                </label>
-                <input
-                  type="text"
-                  value={profileData.first_name}
-                  onChange={(e) => setProfileData({ ...profileData, first_name: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    color: '#000'
-                  }}
-                />
+
+              {/* Personal Information */}
+              <div style={{ marginBottom: '8px' }}>
+                <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937', marginBottom: '16px' }}>Personal Information</h4>
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#374151', fontSize: '14px' }}>
+                    First Name <span style={{ color: '#dc3545' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={profileData.first_name}
+                    onChange={(e) => setProfileData({ ...profileData, first_name: e.target.value })}
+                    placeholder="Enter your first name"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      color: '#1F2937',
+                      backgroundColor: '#F9FAFB',
+                      outline: 'none',
+                      transition: 'border-color 0.2s ease'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#8B4513'}
+                    onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+                  />
+                </div>
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#374151', fontSize: '14px' }}>
+                    Last Name <span style={{ color: '#dc3545' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={profileData.last_name}
+                    onChange={(e) => setProfileData({ ...profileData, last_name: e.target.value })}
+                    placeholder="Enter your last name"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      color: '#1F2937',
+                      backgroundColor: '#F9FAFB',
+                      outline: 'none',
+                      transition: 'border-color 0.2s ease'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#8B4513'}
+                    onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+                  />
+                </div>
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#374151', fontSize: '14px' }}>
+                    Email <span style={{ color: '#dc3545' }}>*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={profileData.email}
+                    onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                    placeholder="Enter your email"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      color: '#1F2937',
+                      backgroundColor: '#F9FAFB',
+                      outline: 'none',
+                      transition: 'border-color 0.2s ease'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#8B4513'}
+                    onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+                    required
+                  />
+                </div>
               </div>
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#333' }}>
-                  Last Name
-                </label>
-                <input
-                  type="text"
-                  value={profileData.last_name}
-                  onChange={(e) => setProfileData({ ...profileData, last_name: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    color: '#000'
-                  }}
-                />
-              </div>
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#333' }}>
-                  Email <span style={{ color: '#dc3545' }}>*</span>
-                </label>
-                <input
-                  type="email"
-                  value={profileData.email}
-                  onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    color: '#000'
-                  }}
-                  required
-                />
-              </div>
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#333' }}>
-                  Contact Number
-                </label>
-                <input
-                  type="tel"
-                  value={profileData.phone_number}
-                  onChange={(e) => setProfileData({ ...profileData, phone_number: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    color: '#000'
-                  }}
-                  placeholder="e.g., +63 912 345 6789"
-                />
+
+              {/* Contact Information */}
+              <div>
+                <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937', marginBottom: '16px' }}>Contact Information</h4>
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#374151', fontSize: '14px' }}>
+                    Contact Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={profileData.phone_number}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '');
+                      setProfileData({ ...profileData, phone_number: digits });
+                    }}
+                    maxLength={11}
+                    placeholder="e.g., 09123456789"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      border: `1px solid ${profileData.phone_number && profileData.phone_number.replace(/\D/g, '').length !== 11 ? '#f44336' : '#E5E7EB'}`,
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      color: '#1F2937',
+                      backgroundColor: '#F9FAFB',
+                      outline: 'none',
+                      transition: 'border-color 0.2s ease'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#8B4513'}
+                    onBlur={(e) => e.target.style.borderColor = profileData.phone_number && profileData.phone_number.replace(/\D/g, '').length !== 11 ? '#f44336' : '#E5E7EB'}
+                  />
+                  {profileData.phone_number && profileData.phone_number.replace(/\D/g, '').length !== 11 && (
+                    <span style={{ color: '#f44336', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                      Contact number must be exactly 11 digits ({profileData.phone_number.replace(/\D/g, '').length}/11)
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="details-modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <div className="details-modal-footer" style={{ display: 'flex', flexDirection: 'row', gap: '10px', padding: '16px 24px', borderTop: '2px solid #F3F4F6' }}>
               <button
+                className="btn-secondary"
                 onClick={() => {
                   setIsEditingProfile(false);
+                  setPendingPicFile(null);
+                  setPendingPicPreview(null);
 
                   const currentUser = getUser();
                   if (currentUser) {
@@ -2676,19 +2767,10 @@ const Profile = () => {
                 }}
                 disabled={savingProfile}
                 style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#f44336',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: savingProfile ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500',
+                  flex: 1,
                   opacity: savingProfile ? 0.6 : 1,
-                  transition: 'background 0.3s ease'
+                  cursor: savingProfile ? 'not-allowed' : 'pointer'
                 }}
-                onMouseEnter={(e) => !savingProfile && (e.target.style.backgroundColor = '#da190b')}
-                onMouseLeave={(e) => !savingProfile && (e.target.style.backgroundColor = '#f44336')}
               >
                 Cancel
               </button>
@@ -2699,27 +2781,68 @@ const Profile = () => {
                     return;
                   }
 
+                  if (profileData.phone_number && profileData.phone_number.replace(/\D/g, '').length !== 11) {
+                    await alert('Contact number must be exactly 11 digits', 'Validation Error', 'error');
+                    return;
+                  }
+
+                  const currentUser = getUser();
+                  const hasProfileChanges = currentUser && (
+                    profileData.first_name !== (currentUser.first_name || '') ||
+                    profileData.last_name !== (currentUser.last_name || '') ||
+                    profileData.email !== (currentUser.email || '') ||
+                    profileData.phone_number !== (currentUser.phone_number || '')
+                  );
+                  const hasPictureChange = !!pendingPicFile;
+
+                  if (!hasProfileChanges && !hasPictureChange) {
+                    setIsEditingProfile(false);
+                    return;
+                  }
+
                   setSavingProfile(true);
                   try {
-                    const result = await updateProfile({
-                      first_name: profileData.first_name,
-                      last_name: profileData.last_name,
-                      email: profileData.email,
-                      phone_number: profileData.phone_number || null
-                    });
-
-                    if (result.success) {
-
-                      if (result.user) {
-                        setUser(result.user);
-
-                        localStorage.setItem("user", JSON.stringify(result.user));
+                    // Upload pending picture if any
+                    if (hasPictureChange) {
+                      const picResult = await uploadProfilePicture(pendingPicFile);
+                      if (picResult.success && picResult.user) {
+                        setUser(picResult.user);
+                        const newPicUrl = picResult.user.profile_picture
+                          ? (picResult.user.profile_picture.startsWith('http')
+                            ? picResult.user.profile_picture
+                            : `${API_BASE_URL}${picResult.user.profile_picture}`)
+                          : '';
+                        setProfilePicUrl(newPicUrl);
+                      } else {
+                        await alert(picResult.message || 'Failed to upload picture', 'Error', 'error');
+                        return;
                       }
-                      await alert('Profile updated successfully!', 'Success', 'success');
-                      setIsEditingProfile(false);
-                    } else {
-                      await alert(result.message || 'Failed to update profile', 'Error', 'error');
                     }
+
+                    // Update profile info if changed
+                    if (hasProfileChanges) {
+                      const result = await updateProfile({
+                        first_name: profileData.first_name,
+                        last_name: profileData.last_name,
+                        email: profileData.email,
+                        phone_number: profileData.phone_number || null
+                      });
+
+                      if (result.success) {
+                        if (result.user) {
+                          setUser(result.user);
+                          localStorage.setItem("user", JSON.stringify(result.user));
+                        }
+                      } else {
+                        await alert(result.message || 'Failed to update profile', 'Error', 'error');
+                        return;
+                      }
+                    }
+
+                    setPendingPicFile(null);
+                    setPendingPicPreview(null);
+                    await alert('Profile updated successfully!', 'Success', 'success');
+                    setIsEditingProfile(false);
                   } catch (error) {
                     console.error('Error updating profile:', error);
                     await alert('Failed to update profile. Please try again.', 'Error', 'error');
@@ -2729,7 +2852,8 @@ const Profile = () => {
                 }}
                 disabled={savingProfile}
                 style={{
-                  padding: '10px 20px',
+                  flex: 1,
+                  padding: '8px 16px',
                   backgroundColor: '#8B4513',
                   color: 'white',
                   border: 'none',
@@ -2825,15 +2949,8 @@ const Profile = () => {
 
                     const ordersResult = await getUserOrderTracking();
                     if (ordersResult.success) {
-                      const filteredOrders = ordersResult.data.map(order => ({
-                        ...order,
-                        items: order.items.filter(item =>
-                          item.status !== 'cancelled' &&
-                          item.status !== 'rejected' &&
-                          item.status !== 'price_declined'
-                        )
-                      })).filter(order => order.items.length > 0);
-                      setOrders(filteredOrders);
+                      setOrders(ordersResult.data);
+                      setStatusFilter('cancelled');
                     }
                   } else {
                     await alert(result.message || 'Failed to cancel service', 'Error', 'error');

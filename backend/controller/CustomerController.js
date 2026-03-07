@@ -59,7 +59,7 @@ exports.getCustomerById = (req, res) => {
             customer_type: 'walk_in',
             customer_id: walkInCustomer.id,
             full_name: walkInCustomer.name,
-            
+            phone_number: walkInCustomer.phone || '',
             user_id: null,
             first_name: firstName,
             last_name: lastName

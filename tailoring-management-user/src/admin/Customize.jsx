@@ -5715,19 +5715,17 @@ const Customize = () => {
 
                           </div>
 
-                          <div className="fabric-item-actions" style={{ display: 'flex', gap: '8px' }}>
+                          <div className="fabric-item-actions">
 
                             <button
 
-                              className="fabric-action-btn edit"
+                              className="fabric-edit-btn"
 
                               onClick={() => openEditPattern(pattern)}
 
-                              title="Edit pattern"
-
                             >
 
-                              ✏️
+                              Edit
 
                             </button>
 
@@ -5735,15 +5733,13 @@ const Customize = () => {
 
                               <button
 
-                                className="fabric-action-btn delete"
+                                className="fabric-delete-btn"
 
                                 onClick={() => handleDeletePattern(pattern.pattern_id, pattern.pattern_code)}
 
-                                title="Delete pattern"
-
                               >
 
-                                🗑️
+                                Delete
 
                               </button>
 

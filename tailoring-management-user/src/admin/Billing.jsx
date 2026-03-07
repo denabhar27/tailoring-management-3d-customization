@@ -456,7 +456,7 @@ const Billing = () => {
 
             type="text"
 
-            placeholder="Search by Unique No. or Customer Name"
+            placeholder="Search by Order ID or Customer Name"
 
             value={searchTerm}
 
@@ -515,7 +515,7 @@ const Billing = () => {
 
                 <tr>
 
-                  <th>Unique No.</th>
+                  <th>Order ID</th>
 
                   <th>Customer Name</th>
 
@@ -613,6 +613,7 @@ const Billing = () => {
 
                           <div className="action-buttons">
 
+                            {bill.status !== 'Paid' && bill.status !== 'Fully Paid' && (
                             <button
 
                               className="icon-btn next-status"
@@ -638,6 +639,7 @@ const Billing = () => {
                               </svg>
 
                             </button>
+                            )}
 
                           </div>
 
@@ -688,7 +690,7 @@ const Billing = () => {
 
               <div className="detail-row">
 
-                <strong>Unique No:</strong>
+                <strong>Order ID:</strong>
 
                 <span>{selectedBill.uniqueNo}</span>
 
@@ -878,6 +880,7 @@ const Billing = () => {
               >
                 Close
               </button>
+              {selectedBill.status !== 'Paid' && selectedBill.status !== 'Fully Paid' && (
               <button
                 className="btn-save-list"
                 onClick={async () => {
@@ -892,6 +895,7 @@ const Billing = () => {
                 </svg>
                 Mark as {getNextPaymentStatus(selectedBill)}
               </button>
+              )}
             </div>
 
           </div>

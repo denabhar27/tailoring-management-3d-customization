@@ -248,6 +248,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   const [endDate, setEndDate] = useState('');
   const [totalCost, setTotalCost] = useState(0);
   const [cartMessage, setCartMessage] = useState('');
+  const [dateError, setDateError] = useState('');
   const [addingToCart, setAddingToCart] = useState(false);
   const [measurementUnit, setMeasurementUnit] = useState('inch');
   const navigate = useNavigate();
@@ -683,7 +684,26 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
     setIsDateModalOpen(false);
   };
 
-  const handleStartDateChange = (date) => {
+  const handleStartDateChange = async (date) => {
+    setDateError('');
+    if (date) {
+      try {
+        const { checkDateOpen } = await import('../../api/ShopScheduleApi');
+        const result = await checkDateOpen(date);
+        if (!result.success || !result.is_open) {
+          setDateError('The shop is closed on this date. Please select another date.');
+          setStartDate('');
+          return;
+        }
+      } catch (error) {
+        const dayOfWeek = new Date(date).getDay();
+        if (dayOfWeek === 0) {
+          setDateError('The shop is closed on Sundays. Please select another date.');
+          setStartDate('');
+          return;
+        }
+      }
+    }
     setStartDate(date);
   };
 
@@ -1195,12 +1215,17 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                       width: '100%',
                       padding: '12px',
                       borderRadius: '8px',
-                      border: '1px solid #ddd',
+                      border: dateError ? '1px solid #f44336' : '1px solid #ddd',
                       fontSize: '14px',
                       color: '#000',
                       backgroundColor: '#fff'
                     }}
                   />
+                  {dateError && (
+                    <span style={{ color: '#f44336', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                      {dateError}
+                    </span>
+                  )}
                 </div>
                 <div className="date-input-group" style={{ flex: 1, minWidth: '200px' }}>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#000' }}>Rental Duration *</label>
@@ -1473,7 +1498,15 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                         value={startDate}
                         onChange={(e) => handleStartDateChange(e.target.value)}
                         min={new Date().toISOString().split('T')[0]}
+                        style={{
+                          border: dateError ? '1px solid #f44336' : undefined
+                        }}
                       />
+                      {dateError && (
+                        <span style={{ color: '#f44336', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                          {dateError}
+                        </span>
+                      )}
                     </div>
                     <div className="date-input-group">
                       <label>Rental Duration *</label>

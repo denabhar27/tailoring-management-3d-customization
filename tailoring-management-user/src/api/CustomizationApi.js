@@ -148,7 +148,7 @@ export async function addCustomizationToCart(customizationData) {
     const cartItem = {
       serviceType: 'customization',
       serviceId: null,
-      quantity: 1,
+      quantity: customizationData.garments ? customizationData.garments.length : 1,
       basePrice: price,
       finalPrice: price,
       pricingFactors: {
@@ -169,6 +169,8 @@ export async function addCustomizationToCart(customizationData) {
         imageUrl: customizationData.imageUrl || 'no-image',
         isUniform: isUniform,
         designData: customizationData.designData || {},
+        garments: customizationData.garments || [],
+        isMultipleGarments: customizationData.isMultipleGarments || false,
         uploadedAt: new Date().toISOString()
       }
     };

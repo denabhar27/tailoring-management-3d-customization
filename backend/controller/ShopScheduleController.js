@@ -13,7 +13,8 @@ exports.getShopSchedule = (req, res) => {
     const formattedSchedule = schedule.map(item => ({
       day_of_week: item.day_of_week,
       day_name: getDayName(item.day_of_week),
-      is_open: item.is_open === 1
+      is_open: item.is_open === 1,
+      available_times: item.available_times || null
     }));
 
     res.json({
@@ -43,7 +44,8 @@ exports.getShopScheduleAdmin = (req, res) => {
     const formattedSchedule = schedule.map(item => ({
       day_of_week: item.day_of_week,
       day_name: getDayName(item.day_of_week),
-      is_open: item.is_open === 1
+      is_open: item.is_open === 1,
+      available_times: item.available_times || null
     }));
 
     res.json({
@@ -72,7 +74,8 @@ exports.updateShopSchedule = (req, res) => {
 
   const validSchedule = schedule.map(item => ({
     day_of_week: parseInt(item.day_of_week),
-    is_open: item.is_open ? 1 : 0
+    is_open: item.is_open ? 1 : 0,
+    available_times: item.available_times || null
   }));
 
   for (let i = 0; i <= 6; i++) {

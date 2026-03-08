@@ -395,7 +395,7 @@ try {
 try {
   const alterPaymentStatusSQL = `
     ALTER TABLE order_items 
-    MODIFY COLUMN payment_status ENUM('unpaid', 'paid', 'cancelled', 'fully_paid', 'down-payment', 'partial_payment') DEFAULT 'unpaid'
+    MODIFY COLUMN payment_status ENUM('unpaid', 'paid', 'cancelled', 'fully_paid', 'down-payment', 'partial_payment', 'pending', 'partial') DEFAULT 'unpaid'
   `;
   db.query(alterPaymentStatusSQL, (err) => {
     if (err) {

@@ -490,10 +490,6 @@ const Billing = () => {
 
             <option value="Rental">Rental</option>
 
-            <option value="Alteration">Alteration</option>
-
-            <option value="Consultation">Consultation</option>
-
           </select>
 
         </div>

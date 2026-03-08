@@ -217,8 +217,9 @@ const WalkInOrders = () => {
   const calculateRentalPrice = () => {
     if (selectedRentalItems.length === 0 || !rentalDuration) return 0;
     return selectedRentalItems.reduce((total, item) => {
-      const basePrice = parseFloat(item.price || 0);
-      return total + (basePrice * parseInt(rentalDuration));
+      const basePrice = parseFloat(item.price || 0); // Price is per 3 days
+      const durationMultiplier = Math.ceil(parseInt(rentalDuration) / 3); // Calculate how many 3-day periods
+      return total + (basePrice * durationMultiplier);
     }, 0);
   };
 

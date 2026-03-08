@@ -175,8 +175,9 @@ exports.createRentalOrder = async (req, res) => {
         const bundleItems = [];
 
         rentalItems.forEach((rentalItem) => {
-          const basePrice = parseFloat(rentalItem.price || 0);
-          const itemPrice = basePrice * parseInt(rentalDuration);
+          const basePrice = parseFloat(rentalItem.price || 0); // Price is per 3 days
+          const durationMultiplier = Math.ceil(parseInt(rentalDuration) / 3); // Calculate how many 3-day periods
+          const itemPrice = basePrice * durationMultiplier;
           const itemDownpayment = parseFloat(rentalItem.downpayment || 0);
           
           totalPrice += itemPrice;

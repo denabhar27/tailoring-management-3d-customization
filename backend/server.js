@@ -391,6 +391,59 @@ try {
   console.error('[SERVER] Error initializing rental monitoring service:', err.message);
 }
 
+// Auto-migrate payment_status ENUM to include all required values
+try {
+  const alterPaymentStatusSQL = `
+    ALTER TABLE order_items 
+    MODIFY COLUMN payment_status ENUM('unpaid', 'paid', 'cancelled', 'fully_paid', 'down-payment', 'partial_payment') DEFAULT 'unpaid'
+  `;
+  db.query(alterPaymentStatusSQL, (err) => {
+    if (err) {
+      // Ignore if column doesn't exist or already has correct type
+      if (!err.message.includes("Unknown column") && !err.message.includes("doesn't exist")) {
+        console.log('[SERVER] payment_status ENUM migration note:', err.message);
+      }
+    } else {
+      console.log('[SERVER] ✅ payment_status ENUM updated successfully');
+    }
+  });
+} catch (err) {
+  console.error('[SERVER] Error updating payment_status ENUM:', err.message);
+}
+
+// Auto-migrate approval_status ENUM to include 'rented' and other rental statuses
+try {
+  const alterApprovalStatusSQL = `
+    ALTER TABLE order_items 
+    MODIFY COLUMN approval_status ENUM(
+      'auto_confirmed',
+      'pending_review', 
+      'pending',
+      'accepted',
+      'price_confirmation', 
+      'confirmed', 
+      'cancelled', 
+      'ready_for_pickup', 
+      'completed', 
+      'price_declined',
+      'rented',
+      'picked_up',
+      'returned'
+    ) DEFAULT 'pending_review'
+  `;
+  db.query(alterApprovalStatusSQL, (err) => {
+    if (err) {
+      if (!err.message.includes("Unknown column") && !err.message.includes("doesn't exist")) {
+        console.log('[SERVER] approval_status ENUM migration note:', err.message);
+      }
+    } else {
+      console.log('[SERVER] ✅ approval_status ENUM updated successfully');
+    }
+  });
+} catch (err) {
+  console.error('[SERVER] Error updating approval_status ENUM:', err.message);
+}
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

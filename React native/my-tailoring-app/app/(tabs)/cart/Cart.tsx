@@ -94,6 +94,109 @@ const formatSize = (size: any): { label: string; value: string }[] | null => {
   }
 };
 
+// Helper function to convert hex color to readable name
+const getColorName = (hex: string | undefined): string => {
+  if (!hex) return 'Not specified';
+
+  // If it's already a color name (not a hex), return it capitalized
+  if (typeof hex === 'string' && !hex.startsWith('#') && !hex.match(/^[0-9a-fA-F]{3,6}$/)) {
+    return hex.charAt(0).toUpperCase() + hex.slice(1);
+  }
+
+  let normalizedHex = String(hex).toLowerCase().trim();
+  if (!normalizedHex.startsWith('#')) {
+    normalizedHex = `#${normalizedHex}`;
+  }
+
+  const colorMap: { [key: string]: string } = {
+    '#1a1a1a': 'Classic Black',
+    '#1e3a5f': 'Navy Blue',
+    '#6b1e3d': 'Burgundy',
+    '#2d5a3d': 'Forest Green',
+    '#4a4a4a': 'Charcoal Gray',
+    '#c9a66b': 'Camel Tan',
+    '#f5e6d3': 'Cream White',
+    '#5d4037': 'Chocolate Brown',
+    '#2a4d8f': 'Royal Blue',
+    '#722f37': 'Wine Red',
+    '#ffffff': 'White',
+    '#000000': 'Black',
+    '#ff0000': 'Red',
+    '#00ff00': 'Green',
+    '#0000ff': 'Blue',
+    '#ffff00': 'Yellow',
+    '#ff00ff': 'Magenta',
+    '#00ffff': 'Cyan',
+    '#808080': 'Gray',
+    '#800000': 'Maroon',
+    '#008000': 'Dark Green',
+    '#000080': 'Navy',
+    '#800080': 'Purple',
+    '#ffa500': 'Orange',
+    '#a52a2a': 'Brown',
+    '#ffc0cb': 'Pink',
+    '#ffd700': 'Gold',
+    '#c0c0c0': 'Silver',
+  };
+
+  if (colorMap[normalizedHex]) {
+    return colorMap[normalizedHex];
+  }
+
+  // Try to determine color family from RGB values
+  try {
+    const r = parseInt(normalizedHex.slice(1, 3), 16);
+    const g = parseInt(normalizedHex.slice(3, 5), 16);
+    const b = parseInt(normalizedHex.slice(5, 7), 16);
+
+    if (r > 200 && g > 200 && b > 200) return 'Light';
+    if (r < 50 && g < 50 && b < 50) return 'Dark';
+    if (r > g && r > b) return 'Reddish';
+    if (g > r && g > b) return 'Greenish';
+    if (b > r && b > g) return 'Bluish';
+    if (r === g && g === b) return 'Gray';
+  } catch (e) {
+    // Fall through
+  }
+
+  return normalizedHex; // Return the hex if no match found
+};
+
+// Helper function to get button type name from model path
+const getButtonType = (modelPath: string | undefined): string => {
+  if (!modelPath) return 'Standard Button';
+  const path = modelPath.toLowerCase();
+  if (path.includes('orange')) return 'Orange Button';
+  if (path.includes('white')) return 'White Button';
+  if (path.includes('black')) return 'Black Button';
+  if (path.includes('brown')) return 'Brown Button';
+  if (path.includes('gold')) return 'Gold Button';
+  if (path.includes('silver')) return 'Silver Button';
+  // Extract button name from path
+  const match = path.match(/\/([^\/]+)\.glb$/);
+  if (match) {
+    return match[1].replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
+  return 'Custom Button';
+};
+
+// Helper function to get accessory name from model path
+const getAccessoryName = (modelPath: string | undefined): string => {
+  if (!modelPath) return 'Accessory';
+  const path = modelPath.toLowerCase();
+  if (path.includes('pendant')) return 'Pendant';
+  if (path.includes('brooch')) return 'Brooch';
+  if (path.includes('flower') || path.includes('rose')) return 'Flower';
+  if (path.includes('pin')) return 'Pin';
+  if (path.includes('chain')) return 'Chain';
+  // Extract accessory name from path
+  const match = path.match(/\/([^\/]+)\.glb$/);
+  if (match) {
+    return match[1].replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).replace(/3d model/i, '').trim();
+  }
+  return 'Accessory';
+};
+
 export default function CartScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -1063,10 +1166,30 @@ export default function CartScreen() {
                           <Text style={styles.detailsValue}>
                             {selectedItemDetails.designData.size && `Size: ${selectedItemDetails.designData.size.charAt(0).toUpperCase() + selectedItemDetails.designData.size.slice(1)}\n`}
                             {selectedItemDetails.designData.fit && `Fit: ${selectedItemDetails.designData.fit.charAt(0).toUpperCase() + selectedItemDetails.designData.fit.slice(1)}\n`}
-                            {selectedItemDetails.designData.colors?.fabric && `Color: ${selectedItemDetails.designData.colors.fabric}\n`}
+                            {selectedItemDetails.designData.colors?.fabric && `Color: ${getColorName(selectedItemDetails.designData.colors.fabric)}\n`}
                             {selectedItemDetails.designData.pattern && selectedItemDetails.designData.pattern !== 'none' && `Pattern: ${selectedItemDetails.designData.pattern.charAt(0).toUpperCase() + selectedItemDetails.designData.pattern.slice(1)}\n`}
                             {selectedItemDetails.designData.personalization?.initials && `Personalization: ${selectedItemDetails.designData.personalization.initials}\n`}
                           </Text>
+                          {selectedItemDetails.designData.buttons && selectedItemDetails.designData.buttons.length > 0 && (
+                            <View style={styles.customizationSubSection}>
+                              <Text style={styles.customizationSubLabel}>Button Types:</Text>
+                              {selectedItemDetails.designData.buttons.map((btn: any, index: number) => (
+                                <Text key={btn.id || index} style={styles.customizationSubValue}>
+                                  Button {index + 1}: {getButtonType(btn.modelPath)}
+                                </Text>
+                              ))}
+                            </View>
+                          )}
+                          {selectedItemDetails.designData.accessories && selectedItemDetails.designData.accessories.length > 0 && (
+                            <View style={styles.customizationSubSection}>
+                              <Text style={styles.customizationSubLabel}>Accessories:</Text>
+                              {selectedItemDetails.designData.accessories.map((acc: any, index: number) => (
+                                <Text key={acc.id || index} style={styles.customizationSubValue}>
+                                  {getAccessoryName(acc.modelPath)}
+                                </Text>
+                              ))}
+                            </View>
+                          )}
                         </View>
                       )}
                     </>
@@ -1720,6 +1843,26 @@ const styles = StyleSheet.create({
   },
   detailsValue: { fontSize: 17, color: "#1F2937", fontWeight: "500" },
   detailsPriceValue: { fontSize: 24, fontWeight: "800", color: "#94665B" },
+
+  // Customization sub-section styles for buttons and accessories
+  customizationSubSection: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  customizationSubLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#374151",
+    marginBottom: 4,
+  },
+  customizationSubValue: {
+    fontSize: 14,
+    color: "#4B5563",
+    marginLeft: 12,
+    marginTop: 2,
+  },
 
   // Size measurement styles (matching web styling)
   sizeContainer: {

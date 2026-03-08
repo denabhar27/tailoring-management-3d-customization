@@ -1,6 +1,7 @@
 -- Add payment_status column to order_items table
+-- With all possible status values for different service types
 ALTER TABLE order_items 
-ADD COLUMN payment_status ENUM('unpaid', 'paid', 'cancelled') DEFAULT 'unpaid' AFTER approval_status;
+ADD COLUMN payment_status ENUM('unpaid', 'paid', 'cancelled', 'fully_paid', 'down-payment', 'partial_payment') DEFAULT 'unpaid' AFTER approval_status;
 
 -- Update existing records based on current status
 -- Mark completed orders as paid

@@ -17,23 +17,13 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "react-native-paper";
 import { useRouter } from "expo-router";
-import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { rentalService } from "../../../utils/rentalService";
 import { cartService } from "../../../utils/apiService";
 import DateTimePickerModal from "../../../components/DateTimePickerModal";
 
 const { width, height } = Dimensions.get("window");
-
-const categories = [
-  { name: "All", icon: "border-all", lib: "fa5" },
-  { name: "Suit", icon: "user-tie", lib: "fa5" },
-  { name: "Coat", icon: "tshirt", lib: "fa5" },
-  { name: "Barong", icon: "leaf", lib: "fa5" },
-  { name: "Gown", icon: "female", lib: "fa5" },
-  { name: "Shirt", icon: "tshirt", lib: "fa5" },
-  { name: "Trousers", icon: "ruler-vertical", lib: "fa5" },
-];
 
 export default function RentalLanding() {
   const insets = useSafeAreaInsets();
@@ -42,7 +32,6 @@ export default function RentalLanding() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState("All");
 
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
@@ -100,14 +89,6 @@ export default function RentalLanding() {
 
     return require("../../../assets/images/rent.jpg");
   };
-
-  const filteredRentals =
-    selectedCategory === "All"
-      ? rentals
-      : rentals.filter((item) => {
-          const category = item.category || item.item_category || "Other";
-          return category === selectedCategory;
-        });
 
   const toggleItemSelection = (item: any) => {
     if (isMultiSelectMode) {
@@ -296,55 +277,15 @@ export default function RentalLanding() {
             </View>
           </View>
         </View>
-        <View style={styles.categorySection}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryScroll}
-          >
-            {categories.map((cat) => {
-              const isActive = selectedCategory === cat.name;
-              return (
-                <TouchableOpacity
-                  key={cat.name}
-                  style={[
-                    styles.categoryChip,
-                    isActive && styles.categoryChipActive,
-                  ]}
-                  onPress={() => setSelectedCategory(cat.name)}
-                >
-                  <FontAwesome5
-                    name={cat.icon}
-                    size={18}
-                    color={isActive ? "#FFFFFF" : "#78350F"}
-                  />
-                  <Text
-                    style={[
-                      styles.categoryText,
-                      isActive && styles.categoryTextActive,
-                    ]}
-                  >
-                    {cat.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
               <View style={styles.iconWrapper}>
                 <Ionicons name="shirt-outline" size={24} color="#F59E0B" />
               </View>
-              <Text style={styles.sectionTitle}>
-                {selectedCategory === "All"
-                  ? "All Rentals"
-                  : `${selectedCategory} Collection`}
-              </Text>
+              <Text style={styles.sectionTitle}>All Rentals</Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Text style={styles.itemCount}>{filteredRentals.length} items</Text>
               <TouchableOpacity
                 onPress={() => {
                   if (isMultiSelectMode) {
@@ -386,15 +327,15 @@ export default function RentalLanding() {
               <Text style={styles.retryButtonText}>Retry</Text>
             </TouchableOpacity>
           </View>
-        ) : filteredRentals.length === 0 ? (
+        ) : rentals.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="shirt-outline" size={60} color="#D1D5DB" />
-            <Text style={styles.emptyText}>No rentals in this category</Text>
+            <Text style={styles.emptyText}>No rentals available</Text>
           </View>
         ) : (
 
           <View style={styles.rentalGrid}>
-            {filteredRentals.map((item) => {
+            {rentals.map((item) => {
               const selected = isItemSelected(item);
               return (
                 <TouchableOpacity
@@ -820,6 +761,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+    paddingBottom: 30,
   },
   rentalCard: {
     width: (width - 52) / 2,

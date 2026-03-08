@@ -28,11 +28,17 @@ const ShopSchedule = {
     
     db.query(sql, [dayOfWeek], (err, results) => {
       if (err) return callback(err, null);
-      if (!results[0]) return callback(null, null);
+      if (!results[0]) {
+        console.log(`[SHOP SCHEDULE] No record found for day ${dayOfWeek}`);
+        return callback(null, null);
+      }
       const row = results[0];
+      console.log(`[SHOP SCHEDULE] Raw data for day ${dayOfWeek}:`, JSON.stringify(row));
+      const parsedTimes = row.available_times ? JSON.parse(row.available_times) : null;
+      console.log(`[SHOP SCHEDULE] Parsed available_times for day ${dayOfWeek}:`, parsedTimes);
       callback(null, {
         ...row,
-        available_times: row.available_times ? JSON.parse(row.available_times) : null
+        available_times: parsedTimes
       });
     });
   },
@@ -99,6 +105,9 @@ const ShopSchedule = {
     
     scheduleData.forEach((item) => {
       const timesJson = item.available_times ? JSON.stringify(item.available_times) : null;
+      
+      console.log(`[SHOP SCHEDULE] Saving day ${item.day_of_week}: is_open=${item.is_open}, available_times=${timesJson}`);
+      
       const updateSql = `
         INSERT INTO shop_schedule (day_of_week, is_open, available_times) 
         VALUES (?, ?, ?)

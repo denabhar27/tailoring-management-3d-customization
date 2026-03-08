@@ -78,6 +78,9 @@ exports.updateShopSchedule = (req, res) => {
     available_times: item.available_times || null
   }));
 
+  // Debug logging
+  console.log('[SHOP SCHEDULE] Saving schedule:', JSON.stringify(validSchedule, null, 2));
+
   for (let i = 0; i <= 6; i++) {
     if (!validSchedule.find(s => s.day_of_week === i)) {
       validSchedule.push({ day_of_week: i, is_open: 0 });

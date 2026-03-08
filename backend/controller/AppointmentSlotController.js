@@ -225,6 +225,11 @@ exports.getAllSlotsWithAvailability = (req, res) => {
 
       ShopSchedule.getByDay(dayOfWeek, (schedErr, daySchedule) => {
         const dayAvailableTimes = daySchedule?.available_times || null;
+        
+        // Debug logging
+        console.log('[SLOT AVAILABILITY] Day of week:', dayOfWeek, '(0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat)');
+        console.log('[SLOT AVAILABILITY] Day schedule:', daySchedule);
+        console.log('[SLOT AVAILABILITY] Available times for day:', dayAvailableTimes);
 
       const slotsSql = `
         SELECT MIN(slot_id) as slot_id, time_slot, MAX(capacity) as capacity, MAX(is_active) as is_active 
@@ -402,10 +407,28 @@ exports.getAllSlotsWithAvailability = (req, res) => {
           // Filter by day-specific available times if configured
           let filteredSlots = slotsWithAvailability;
           if (dayAvailableTimes && Array.isArray(dayAvailableTimes) && dayAvailableTimes.length > 0) {
-            filteredSlots = slotsWithAvailability.filter(slot => {
-              const slotTime = slot.time_slot.substring(0, 5); // "08:00"
-              return dayAvailableTimes.includes(slot.time_slot) || dayAvailableTimes.includes(slotTime);
+            console.log('[SLOT AVAILABILITY] Filtering by available times:', dayAvailableTimes);
+            console.log('[SLOT AVAILABILITY] Slots before filter:', slotsWithAvailability.map(s => s.time_slot));
+            
+            // Normalize available times to both formats for comparison
+            const normalizedAvailableTimes = new Set();
+            dayAvailableTimes.forEach(t => {
+              const timeStr = String(t).trim();
+              normalizedAvailableTimes.add(timeStr); // Full format: "08:00:00"
+              normalizedAvailableTimes.add(timeStr.substring(0, 5)); // Short format: "08:00"
             });
+            console.log('[SLOT AVAILABILITY] Normalized available times set:', [...normalizedAvailableTimes]);
+            
+            filteredSlots = slotsWithAvailability.filter(slot => {
+              const slotTimeFull = String(slot.time_slot).trim(); // "08:00:00"
+              const slotTimeShort = slotTimeFull.substring(0, 5); // "08:00"
+              const match = normalizedAvailableTimes.has(slotTimeFull) || normalizedAvailableTimes.has(slotTimeShort);
+              console.log(`[SLOT AVAILABILITY] Checking slot ${slotTimeFull} (short: ${slotTimeShort}) - match: ${match}`);
+              return match;
+            });
+            console.log('[SLOT AVAILABILITY] Slots after filter:', filteredSlots.map(s => s.time_slot));
+          } else {
+            console.log('[SLOT AVAILABILITY] No day-specific times configured, returning all slots');
           }
 
           res.json({

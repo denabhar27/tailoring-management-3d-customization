@@ -777,12 +777,10 @@ export default function RepairClothes() {
                     });
 
                     return uniqueSlots.map((slot) => {
-                      const statusStyles: Record<string, any> = {
-                        Available: styles.timeSlotButtonAvailable,
-                        Limited: styles.timeSlotButtonLimited,
-                        Full: styles.timeSlotButtonFull,
-                      };
-                      const statusStyle = statusStyles[slot.status.charAt(0).toUpperCase() + slot.status.slice(1)];
+                      let statusStyle = styles.timeSlotButtonAvailable;
+                      if (slot.status === 'limited') statusStyle = styles.timeSlotButtonLimited;
+                      if (slot.status === 'full') statusStyle = styles.timeSlotButtonFull;
+                      if (slot.status === 'inactive') statusStyle = styles.timeSlotButtonInactive;
                       return (
                       <TouchableOpacity
                         key={slot.slot_id || slot.time_slot}

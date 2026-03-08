@@ -602,7 +602,7 @@ export default function ProfileScreen() {
             </View>
             <TouchableOpacity
               style={styles.editAvatarBtn}
-              onPress={pickAndUploadProfilePicture}
+              onPress={pickProfilePicture}
               disabled={uploadingPic}
             >
               {uploadingPic ? (

@@ -1062,6 +1062,7 @@ export default function Customizer3DScreen() {
                             slot.status === 'available' && styles.timeSlotButtonAvailable,
                             slot.status === 'limited' && styles.timeSlotButtonLimited,
                             slot.status === 'full' && styles.timeSlotButtonFull,
+                            slot.status === 'inactive' && styles.timeSlotButtonInactive,
                             selectedTimeSlot === slot.time_slot && styles.timeSlotButtonSelected,
                             !slot.isClickable && styles.timeSlotButtonDisabled,
                           ]}
@@ -1774,6 +1775,11 @@ const styles = StyleSheet.create({
   timeSlotButtonSelected: {
     backgroundColor: '#22c55e',
     borderColor: '#15803d',
+  },
+  timeSlotButtonInactive: {
+    backgroundColor: '#f5f5f5',
+    borderColor: '#d4d4d4',
+    opacity: 0.6,
   },
   timeSlotButtonDisabled: {
     opacity: 0.6,

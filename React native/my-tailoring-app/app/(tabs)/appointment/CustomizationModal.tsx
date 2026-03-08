@@ -656,6 +656,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
                       slot.status === 'available' && styles.timeSlotButtonAvailable,
                       slot.status === 'limited' && styles.timeSlotButtonLimited,
                       slot.status === 'full' && styles.timeSlotButtonFull,
+                      slot.status === 'inactive' && styles.timeSlotButtonInactive,
                       selectedTimeSlot === slot.time_slot && styles.timeSlotButtonSelected,
                       !slot.isClickable && styles.timeSlotButtonDisabled,
                     ]}

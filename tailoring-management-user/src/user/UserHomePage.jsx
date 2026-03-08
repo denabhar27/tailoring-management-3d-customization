@@ -697,7 +697,7 @@ const UserHomePage = ({ setIsLoggedIn }) => {
             }}>
               {/* Placeholder QR Code - replace src with actual QR when available */}
               <img 
-                src="https://api.qrserver.com/v1/create-qr-code/?size=70x70&data=https://example.com/app" 
+                src="https://expo.dev/accounts/tocka27/projects/my-tailoring-app/builds/d8d5b650-6b41-462b-ae77-ff3eee27d2c1" 
                 alt="Download App QR Code"
                 style={{ width: '70px', height: '70px' }}
               />

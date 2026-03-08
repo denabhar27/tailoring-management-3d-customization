@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import AdminHeader from './AdminHeader';
 import '../adminStyle/admin.css';
 import '../styles/SharedModal.css';
 import { getShopScheduleAdmin, updateShopSchedule } from '../api/ShopScheduleApi';
 import { getAdminTimeSlots } from '../api/AppointmentSlotApi';
+import { getUserRole } from '../api/AuthApi';
 import { useAlert } from '../context/AlertContext';
 
 const ShopSchedule = () => {
   const { alert } = useAlert();
+  const navigate = useNavigate();
   const [schedule, setSchedule] = useState([]);
   const [timeSlots, setTimeSlots] = useState([]);
   const [expandedDay, setExpandedDay] = useState(null);
@@ -26,6 +29,11 @@ const ShopSchedule = () => {
   ];
 
   useEffect(() => {
+    const role = getUserRole();
+    if (role !== 'admin') {
+      navigate('/', { replace: true });
+      return;
+    }
     fetchData();
   }, []);
 
@@ -58,6 +66,11 @@ const ShopSchedule = () => {
       }
     } catch (error) {
       console.error('Error fetching shop schedule:', error);
+      if (error?.response?.status === 403) {
+        await alert('Admin access required. Please log in as admin.', 'Access Denied', 'error');
+        navigate('/', { replace: true });
+        return;
+      }
       await alert('Failed to load shop schedule', 'Error', 'error');
     } finally {
       setLoading(false);

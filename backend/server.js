@@ -245,6 +245,7 @@ try {
         schedule_id INT AUTO_INCREMENT PRIMARY KEY,
         day_of_week TINYINT NOT NULL UNIQUE COMMENT '0 = Sunday, 1 = Monday, ..., 6 = Saturday',
         is_open TINYINT(1) DEFAULT 1 COMMENT '1 = Open, 0 = Closed',
+        available_times TEXT NULL COMMENT 'JSON array of available time slots for this day',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         
@@ -258,6 +259,16 @@ try {
         console.error('[SERVER] Error creating shop_schedule table:', err.message);
       } else {
         console.log('[SERVER] ✅ shop_schedule table ready');
+
+        // Migration: add available_times column if missing (for existing databases)
+        const addColumnSQL = `ALTER TABLE shop_schedule ADD COLUMN available_times TEXT NULL COMMENT 'JSON array of available time slots for this day'`;
+        db.query(addColumnSQL, (alterErr) => {
+          if (alterErr && !alterErr.message.includes('Duplicate column')) {
+            console.warn('[SERVER] Note on available_times column:', alterErr.message);
+          } else if (!alterErr) {
+            console.log('[SERVER] ✅ Added available_times column to shop_schedule');
+          }
+        });
         
         const checkDataSQL = `SELECT COUNT(*) as count FROM shop_schedule`;
         db.query(checkDataSQL, (err, results) => {

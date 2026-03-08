@@ -400,7 +400,14 @@ export const appointmentSlotService = {
     const timeoutId = setTimeout(() => controller.abort(), timeout || REQUEST_TIMEOUT);
 
     try {
-      const headers = await getAuthHeaders();
+      // This is a public endpoint - don't require auth (avoids expired token blocking time slot display)
+      const token = await AsyncStorage.getItem('userToken');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token && !isTokenExpired(token)) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const response = await fetch(`${API_BASE_URL}/appointments/slots-with-availability?serviceType=${serviceType}&date=${date}`, {
         headers,
         signal: controller.signal,

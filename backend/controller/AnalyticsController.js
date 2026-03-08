@@ -388,6 +388,12 @@ exports.getTopServices = async (req, res) => {
 
     const revenueExpr = getRevenueExpression();
 
+    // Use consistent payment condition - include all orders with any payment
+    const paidCondition = `(
+      oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
+      OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
+    )`;
+
     const topServices = await query(`
       SELECT 
         CASE 
@@ -402,7 +408,7 @@ exports.getTopServices = async (req, res) => {
         COALESCE(AVG(${revenueExpr}), 0) AS avg_order_value
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
-      WHERE (oi.payment_status = 'paid' OR (LOWER(oi.service_type) = 'rental' AND oi.payment_status NOT IN ('unpaid', 'pending', 'cancelled')))
+      WHERE ${paidCondition}
         ${dateCondition}
         ${serviceTypeCondition}
       GROUP BY 

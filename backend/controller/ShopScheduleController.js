@@ -72,11 +72,32 @@ exports.updateShopSchedule = (req, res) => {
     });
   }
 
-  const validSchedule = schedule.map(item => ({
-    day_of_week: parseInt(item.day_of_week),
-    is_open: item.is_open ? 1 : 0,
-    available_times: item.available_times || null
-  }));
+  // Helper to normalize times to HH:MM:SS format
+  const normalizeTime = (t) => {
+    const timeStr = String(t).trim();
+    // If it's HH:MM format, add :00
+    if (timeStr.match(/^\d{2}:\d{2}$/)) {
+      return timeStr + ':00';
+    }
+    // If it's HH:MM:SS format, keep as is
+    if (timeStr.match(/^\d{2}:\d{2}:\d{2}$/)) {
+      return timeStr;
+    }
+    return timeStr;
+  };
+
+  const validSchedule = schedule.map(item => {
+    // Normalize available_times array - convert all to HH:MM:SS and remove duplicates
+    let normalizedTimes = null;
+    if (item.available_times && Array.isArray(item.available_times) && item.available_times.length > 0) {
+      normalizedTimes = [...new Set(item.available_times.map(normalizeTime))];
+    }
+    return {
+      day_of_week: parseInt(item.day_of_week),
+      is_open: item.is_open ? 1 : 0,
+      available_times: normalizedTimes
+    };
+  });
 
   // Debug logging
   console.log('[SHOP SCHEDULE] Saving schedule:', JSON.stringify(validSchedule, null, 2));

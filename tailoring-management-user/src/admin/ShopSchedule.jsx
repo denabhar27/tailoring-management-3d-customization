@@ -55,12 +55,31 @@ const ShopSchedule = () => {
           scheduleMap[item.day_of_week] = item;
         });
 
-        const fullSchedule = daysOfWeek.map(day => ({
-          day_of_week: day.value,
-          day_name: day.name,
-          is_open: scheduleMap[day.value]?.is_open || false,
-          available_times: scheduleMap[day.value]?.available_times || []
-        }));
+        // Helper to normalize times to HH:MM:SS format
+        const normalizeTime = (t) => {
+          const timeStr = String(t).trim();
+          // If it's HH:MM format, add :00
+          if (timeStr.match(/^\d{2}:\d{2}$/)) {
+            return timeStr + ':00';
+          }
+          // If it's HH:MM:SS format, keep as is
+          if (timeStr.match(/^\d{2}:\d{2}:\d{2}$/)) {
+            return timeStr;
+          }
+          return timeStr;
+        };
+
+        const fullSchedule = daysOfWeek.map(day => {
+          const existingTimes = scheduleMap[day.value]?.available_times || [];
+          // Normalize all times to HH:MM:SS format and remove duplicates
+          const normalizedTimes = [...new Set(existingTimes.map(normalizeTime))];
+          return {
+            day_of_week: day.value,
+            day_name: day.name,
+            is_open: scheduleMap[day.value]?.is_open || false,
+            available_times: normalizedTimes
+          };
+        });
 
         setSchedule(fullSchedule);
       }
@@ -99,14 +118,17 @@ const ShopSchedule = () => {
 
   const toggleTimeSlot = (dayOfWeek, timeSlot) => {
     const normalizedTime = timeSlot.substring(0, 5) + ':00';
+    const shortTime = timeSlot.substring(0, 5); // HH:MM format
     setSchedule(prev => prev.map(day => {
       if (day.day_of_week !== dayOfWeek) return day;
       const currentTimes = day.available_times || [];
-      const hasTime = currentTimes.includes(normalizedTime);
+      // Check for both formats (HH:MM and HH:MM:SS)
+      const hasTime = currentTimes.some(t => t === normalizedTime || t === shortTime);
       return {
         ...day,
+        // Remove both formats and add the normalized one, or just remove if toggling off
         available_times: hasTime
-          ? currentTimes.filter(t => t !== normalizedTime)
+          ? currentTimes.filter(t => t !== normalizedTime && t !== shortTime)
           : [...currentTimes, normalizedTime]
       };
     }));
@@ -335,7 +357,9 @@ const ShopSchedule = () => {
                         {timeSlots.filter(s => s.is_active).map(slot => {
                           const timeStr = typeof slot.time_slot === 'string' ? slot.time_slot : slot.time_slot.toString();
                           const normalizedTime = timeStr.substring(0, 5) + ':00';
-                          const isSelected = (day.available_times || []).includes(normalizedTime);
+                          const shortTime = timeStr.substring(0, 5);
+                          // Check for both formats (HH:MM and HH:MM:SS)
+                          const isSelected = (day.available_times || []).some(t => t === normalizedTime || t === shortTime);
                           
                           return (
                             <button

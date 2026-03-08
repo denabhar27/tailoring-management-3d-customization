@@ -4358,9 +4358,9 @@ const Customize = () => {
                 </div>
 
               </div>
-              <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#fff3e0', borderRadius: '8px', border: '1px solid #ffcc80' }}>
+              <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#FFF8F0', borderRadius: '12px', border: '1px solid #E8C9A0', width: '100%', textAlign: 'left' }}>
 
-                <label style={{ display: 'block', marginBottom: '10px', color: '#000', fontWeight: '600', fontSize: '16px' }}>Notes</label>
+                <label style={{ display: 'block', marginBottom: '10px', color: '#333', fontWeight: '700', fontSize: '16px' }}>Notes</label>
 
                 <textarea
 
@@ -4370,9 +4370,9 @@ const Customize = () => {
 
                   placeholder="Add any additional notes about measurements..."
 
-                  rows={3}
+                  rows={4}
 
-                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                  style={{ width: '100%', padding: '12px 14px', border: '1px solid #E8C9A0', borderRadius: '8px', fontSize: '14px', lineHeight: '1.5', minHeight: '80px', backgroundColor: '#fff' }}
 
                 />
 

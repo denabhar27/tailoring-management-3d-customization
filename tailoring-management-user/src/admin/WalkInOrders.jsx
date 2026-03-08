@@ -333,8 +333,6 @@ const WalkInOrders = () => {
           garmentType,
           quantity: parseInt(quantity),
           specialInstructions,
-          preferredPickupDate,
-          preferredPickupTime,
           pricingFactors: {
             pricePerItem: pricePerItem.toString(),
             quantity: quantity.toString()
@@ -349,8 +347,6 @@ const WalkInOrders = () => {
           garmentType: repairGarmentType,
           damageLevel,
           description: repairDescription,
-          preferredDate: repairPreferredDate,
-          preferredTime: repairPreferredTime,
           estimatedPrice: estimatedRepairPrice || '0',
           notes
         });
@@ -370,8 +366,6 @@ const WalkInOrders = () => {
           fabricType,
           patternType,
           measurements: structuredMeasurements,
-          preferredDate: customPreferredDate,
-          preferredTime: customPreferredTime,
           estimatedPrice: estimatedCustomPrice || '0',
           notes,
           referenceImage: referenceImage
@@ -571,29 +565,6 @@ const WalkInOrders = () => {
                 />
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Preferred Pickup Date</label>
-                  <input
-                    type="date"
-                    value={preferredPickupDate}
-                    onChange={(e) => setPreferredPickupDate(e.target.value)}
-                    className="form-control"
-                    min={new Date().toISOString().split('T')[0]}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Preferred Pickup Time</label>
-                  <input
-                    type="time"
-                    value={preferredPickupTime}
-                    onChange={(e) => setPreferredPickupTime(e.target.value)}
-                    className="form-control"
-                  />
-                </div>
-              </div>
-
               <div className="price-display">
                 <strong>Total Price: ₱{calculateDryCleaningPrice().toFixed(2)}</strong>
               </div>
@@ -646,29 +617,6 @@ const WalkInOrders = () => {
                   placeholder="Describe the damage and repair needed..."
                   required
                 />
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Preferred Date</label>
-                  <input
-                    type="date"
-                    value={repairPreferredDate}
-                    onChange={(e) => setRepairPreferredDate(e.target.value)}
-                    className="form-control"
-                    min={new Date().toISOString().split('T')[0]}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Preferred Time</label>
-                  <input
-                    type="time"
-                    value={repairPreferredTime}
-                    onChange={(e) => setRepairPreferredTime(e.target.value)}
-                    className="form-control"
-                  />
-                </div>
               </div>
 
               <div className="form-group">
@@ -979,29 +927,6 @@ const WalkInOrders = () => {
                 </div>
               </div>
 
-              <div className="form-row" style={{ marginTop: '20px' }}>
-                <div className="form-group">
-                  <label>Preferred Date</label>
-                  <input
-                    type="date"
-                    value={customPreferredDate}
-                    onChange={(e) => setCustomPreferredDate(e.target.value)}
-                    className="form-control"
-                    min={new Date().toISOString().split('T')[0]}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Preferred Time</label>
-                  <input
-                    type="time"
-                    value={customPreferredTime}
-                    onChange={(e) => setCustomPreferredTime(e.target.value)}
-                    className="form-control"
-                  />
-                </div>
-              </div>
-
               <div className="form-group">
                 <label>Final Price</label>
                 <input
@@ -1124,7 +1049,7 @@ const WalkInOrders = () => {
                             </button>
                           </div>
                           {item.brand && <p><strong>Brand:</strong> {item.brand}</p>}
-                          {item.category && <p><strong>Category:</strong> {item.category}</p>}
+                          {item.category && <p><strong>Category:</strong> {item.category.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</p>}
                           {measurements && measurements.length > 0 && (
                             <div className="measurements-display">
                               <strong>Measurements:</strong>

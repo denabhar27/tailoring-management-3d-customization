@@ -2412,8 +2412,8 @@ const Profile = () => {
                       <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
                         <thead>
                           <tr style={{ backgroundColor: '#f5e6d3' }}>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#000' }}>Measurement</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#000' }}>Value (Inches / CM)</th>
+                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Measurement</th>
+                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Value (Inches / CM)</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2448,8 +2448,8 @@ const Profile = () => {
                       <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
                         <thead>
                           <tr style={{ backgroundColor: '#f5e6d3' }}>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#000' }}>Measurement</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#000' }}>Value (Inches / CM)</th>
+                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Measurement</th>
+                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Value (Inches / CM)</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2478,9 +2478,9 @@ const Profile = () => {
                     </div>
                   )}
                   {measurements.notes && (
-                    <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
-                      <strong style={{ display: 'block', marginBottom: '8px', color: '#333' }}>Notes:</strong>
-                      <p style={{ margin: 0, color: '#666' }}>{measurements.notes}</p>
+                    <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#FFF8F0', borderRadius: '12px', border: '1px solid #E8C9A0', width: '100%', textAlign: 'left' }}>
+                      <strong style={{ display: 'block', marginBottom: '10px', color: '#333', fontSize: '16px' }}>Notes</strong>
+                      <div style={{ backgroundColor: '#fff', border: '1px solid #E8C9A0', borderRadius: '8px', padding: '12px 14px', color: '#333', fontSize: '14px', lineHeight: '1.5', minHeight: '80px' }}>{measurements.notes}</div>
                     </div>
                   )}
 

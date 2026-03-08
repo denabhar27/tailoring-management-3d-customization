@@ -722,7 +722,7 @@ function Rental() {
                             `${rental.first_name || ''} ${rental.last_name || ''}`.trim() || 'N/A'
                           )}
                         </td>
-                        <td>{rental.specific_data?.item_name || 'N/A'}</td>
+                        <td style={{ color: '#8B4513', fontWeight: '600' }}>{rental.specific_data?.item_name || 'N/A'}</td>
                         <td>
                           {rental.rental_start_date && rental.rental_end_date ? (
                             <>

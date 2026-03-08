@@ -397,26 +397,18 @@ exports.getBillingStats = (req, res) => {
         END
       ) as unpaid_count,
       SUM(
-        CASE 
-          WHEN oi.payment_status IN ('paid', 'fully_paid') THEN 
-            CASE 
-              WHEN LOWER(oi.service_type) = 'rental' THEN COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), oi.final_price)
-              ELSE oi.final_price
-            END
-          WHEN LOWER(oi.service_type) = 'rental' 
-            AND COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0 THEN
-            COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0)
-          ELSE 0
-        END
+        COALESCE(
+          CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
+          CASE 
+            WHEN oi.payment_status IN ('paid', 'fully_paid') THEN oi.final_price
+            ELSE 0
+          END
+        )
       ) as total_revenue,
       SUM(
         CASE 
-          WHEN oi.payment_status IN ('unpaid', 'pending', 'down-payment', 'partial_payment', '') OR oi.payment_status IS NULL THEN 
-            CASE 
-              WHEN LOWER(oi.service_type) = 'rental' THEN 
-                oi.final_price - COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0)
-              ELSE oi.final_price
-            END
+          WHEN oi.payment_status NOT IN ('paid', 'fully_paid') OR oi.payment_status IS NULL THEN 
+            oi.final_price - COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0)
           ELSE 0
         END
       ) as pending_revenue

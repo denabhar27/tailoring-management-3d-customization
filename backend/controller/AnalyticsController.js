@@ -9,15 +9,16 @@ function query(sql, params = []) {
   });
 }
 
+// Revenue = actual amount paid (from pricing_factors.amount_paid)
+// This includes partial payments for all services
 const getRevenueExpression = () => `
-  CASE 
-    WHEN LOWER(oi.service_type) = 'rental' THEN 
-      COALESCE(
-        CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
-        0
-      )
-    ELSE oi.final_price
-  END
+  COALESCE(
+    CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
+    CASE 
+      WHEN oi.payment_status IN ('paid', 'fully_paid') THEN oi.final_price
+      ELSE 0
+    END
+  )
 `;
 
 exports.getRevenueOverview = async (req, res) => {
@@ -28,7 +29,11 @@ exports.getRevenueOverview = async (req, res) => {
     });
   }
 
-  const paidCondition = "(oi.payment_status = 'paid' OR (LOWER(oi.service_type) = 'rental' AND oi.payment_status NOT IN ('unpaid', 'pending', 'cancelled')))";
+  // Include all orders that have any payment (partial or full)
+  const paidCondition = `(
+    oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
+    OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
+  )`;
   const revenueExpr = getRevenueExpression();
 
   try {
@@ -218,7 +223,10 @@ exports.getRevenueTrend = async (req, res) => {
         COUNT(*) AS order_count
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
-      WHERE (oi.payment_status = 'paid' OR (LOWER(oi.service_type) = 'rental' AND oi.payment_status NOT IN ('unpaid', 'pending', 'cancelled')))
+      WHERE (
+        oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
+        OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
+      )
         ${dateCondition}
         ${serviceCondition}
       GROUP BY period, period_group
@@ -260,11 +268,17 @@ exports.getRevenueByService = async (req, res) => {
       dateCondition = `AND DATE(o.order_date) BETWEEN '${startDate}' AND '${endDate}'`;
     }
 
-    let paymentCondition = "AND (oi.payment_status = 'paid' OR (LOWER(oi.service_type) = 'rental' AND oi.payment_status NOT IN ('unpaid', 'pending', 'cancelled')))";
+    // Include all orders with any payment (partial or full)
+    let paymentCondition = `AND (
+      oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
+      OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
+    )`;
     if (paymentStatus && paymentStatus !== 'all') {
-      
       if (paymentStatus === 'paid') {
-        paymentCondition = "AND (oi.payment_status = 'paid' OR (LOWER(oi.service_type) = 'rental' AND oi.payment_status NOT IN ('unpaid', 'pending', 'cancelled')))";
+        paymentCondition = `AND (
+          oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
+          OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
+        )`;
       } else {
         paymentCondition = `AND oi.payment_status = '${paymentStatus}'`;
       }

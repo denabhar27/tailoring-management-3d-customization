@@ -308,37 +308,43 @@ const Billing = () => {
   };
 
   const getRentalPriceDisplay = (bill) => {
+    const fullPrice = parseFloat(bill.price || 0);
+    const amountPaid = parseFloat(bill.pricingFactors?.amount_paid || 0);
+    const remainingBalance = fullPrice - amountPaid;
+    const serviceType = (bill.serviceType || '').toLowerCase();
 
-    if ((bill.serviceType || '').toLowerCase() !== 'rental') {
-
-      return `₱${parseFloat(bill.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
+    // For rental, show downpayment info
+    if (serviceType === 'rental') {
+      const downPayment = amountPaid || parseFloat(bill.pricingFactors?.downpayment ||
+                         bill.pricingFactors?.down_payment ||
+                         bill.pricingFactors?.downPayment ||
+                         bill.specificData?.downpayment || 0);
+      
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <span style={{ fontSize: '14px' }}>Paid: ₱{parseFloat(downPayment).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span style={{ fontSize: '14px' }}>Full Price: ₱{fullPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          {remainingBalance > 0 && (
+            <span style={{ fontSize: '12px', color: '#f44336' }}>Balance: ₱{remainingBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          )}
+        </div>
+      );
     }
 
-    const downPayment = bill.pricingFactors?.downpayment ||
+    // For other services (dry cleaning, repair, customization)
+    if (amountPaid > 0 && amountPaid < fullPrice) {
+      // Partial payment
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <span style={{ fontSize: '14px' }}>Paid: ₱{amountPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span style={{ fontSize: '14px' }}>Full Price: ₱{fullPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span style={{ fontSize: '12px', color: '#f44336' }}>Balance: ₱{remainingBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        </div>
+      );
+    }
 
-                       bill.pricingFactors?.down_payment ||
-
-                       bill.pricingFactors?.downPayment ||
-
-                       bill.specificData?.downpayment ||
-
-                       0;
-
-    const fullPrice = bill.price || 0;
-
-    return (
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-
-        <span style={{ fontSize: '14px' }}>Down Payment: ₱{parseFloat(downPayment).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-
-        <span style={{ fontSize: '14px' }}>Full Price: ₱{parseFloat(fullPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-
-      </div>
-
-    );
-
+    // Fully paid or unpaid - show single price
+    return `₱${fullPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const getServiceTypeColor = (serviceType) => {

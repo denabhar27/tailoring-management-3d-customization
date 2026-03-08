@@ -315,8 +315,16 @@ exports.makePayment = (req, res) => {
           });
         }
 
-        const updateSql = `UPDATE order_items SET payment_status = ? WHERE item_id = ?`;
-        db.query(updateSql, [newPaymentStatus, orderItemId], (updateErr, updateResult) => {
+        const updateSql = `
+          UPDATE order_items 
+          SET payment_status = ?,
+              pricing_factors = JSON_SET(
+                COALESCE(pricing_factors, '{}'),
+                '$.amount_paid', ?
+              )
+          WHERE item_id = ?
+        `;
+        db.query(updateSql, [newPaymentStatus, newTotalPaid.toString(), orderItemId], (updateErr, updateResult) => {
           if (updateErr) {
             return res.status(500).json({
               success: false,

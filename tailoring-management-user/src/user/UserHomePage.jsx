@@ -631,10 +631,11 @@ const UserHomePage = ({ setIsLoggedIn }) => {
           maxWidth: "1200px",
           margin: "0 auto",
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gridTemplateColumns: "repeat(3, 1fr)",
           gap: "40px",
           textAlign: "center",
-          marginTop: "20px"
+          marginTop: "20px",
+          alignItems: "start"
         }}>
           <div>
             <h3 style={{
@@ -674,6 +675,38 @@ const UserHomePage = ({ setIsLoggedIn }) => {
               lineHeight: 1.6,
               color: "#d4c5b9"
             }}>Email: Ronald@gmail.com</p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <h3 style={{
+              fontSize: "1.1rem",
+              fontWeight: 700,
+              marginBottom: "12px",
+              color: "#f0e9e2"
+            }}>Download the App</h3>
+            <div style={{
+              width: '80px',
+              height: '80px',
+              backgroundColor: '#fff',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '5px',
+              marginBottom: '8px'
+            }}>
+              {/* Placeholder QR Code - replace src with actual QR when available */}
+              <img 
+                src="https://api.qrserver.com/v1/create-qr-code/?size=70x70&data=https://example.com/app" 
+                alt="Download App QR Code"
+                style={{ width: '70px', height: '70px' }}
+              />
+            </div>
+            <p style={{
+              fontSize: "0.8rem",
+              color: "#d4c5b9",
+              margin: 0
+            }}>Scan to download</p>
           </div>
         </div>
         

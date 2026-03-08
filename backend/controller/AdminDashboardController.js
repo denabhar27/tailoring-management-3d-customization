@@ -122,10 +122,18 @@ exports.getDashboardOverview = async (req, res) => {
     });
 
     const todayRevenueQuery = query(
-      `SELECT COALESCE(SUM(oi.final_price), 0) AS total
+      `SELECT COALESCE(SUM(
+        COALESCE(
+          CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
+          CASE WHEN oi.payment_status IN ('paid', 'fully_paid') THEN oi.final_price ELSE 0 END
+        )
+      ), 0) AS total
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.order_id
-       WHERE oi.payment_status = 'paid'
+       WHERE (
+         oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
+         OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
+       )
          AND DATE(o.order_date) = CURDATE()`
     ).catch(err => {
       console.error('Error in todayRevenueQuery:', err);
@@ -133,10 +141,18 @@ exports.getDashboardOverview = async (req, res) => {
     });
 
     const yesterdayRevenueQuery = query(
-      `SELECT COALESCE(SUM(oi.final_price), 0) AS total
+      `SELECT COALESCE(SUM(
+        COALESCE(
+          CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
+          CASE WHEN oi.payment_status IN ('paid', 'fully_paid') THEN oi.final_price ELSE 0 END
+        )
+      ), 0) AS total
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.order_id
-       WHERE oi.payment_status = 'paid'
+       WHERE (
+         oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
+         OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
+       )
          AND DATE(o.order_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
     ).catch(err => {
       console.error('Error in yesterdayRevenueQuery:', err);
@@ -144,10 +160,18 @@ exports.getDashboardOverview = async (req, res) => {
     });
 
     const currentMonthRevenueQuery = query(
-      `SELECT COALESCE(SUM(oi.final_price), 0) AS total
+      `SELECT COALESCE(SUM(
+        COALESCE(
+          CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
+          CASE WHEN oi.payment_status IN ('paid', 'fully_paid') THEN oi.final_price ELSE 0 END
+        )
+      ), 0) AS total
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.order_id
-       WHERE oi.payment_status = 'paid'
+       WHERE (
+         oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
+         OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
+       )
          AND YEAR(o.order_date) = YEAR(CURDATE())
          AND MONTH(o.order_date) = MONTH(CURDATE())`
     ).catch(err => {
@@ -156,10 +180,18 @@ exports.getDashboardOverview = async (req, res) => {
     });
 
     const previousMonthRevenueQuery = query(
-      `SELECT COALESCE(SUM(oi.final_price), 0) AS total
+      `SELECT COALESCE(SUM(
+        COALESCE(
+          CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
+          CASE WHEN oi.payment_status IN ('paid', 'fully_paid') THEN oi.final_price ELSE 0 END
+        )
+      ), 0) AS total
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.order_id
-       WHERE oi.payment_status = 'paid'
+       WHERE (
+         oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
+         OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
+       )
          AND YEAR(o.order_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
          AND MONTH(o.order_date) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))`
     ).catch(err => {

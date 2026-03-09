@@ -72,6 +72,10 @@ function Sidebar() {
           <i className="fas fa-cut nav-icon"></i>
           Repair
         </NavLink>
+        <NavLink to="/orders-inventory" className={({ isActive }) => isActive ? 'active' : ''}>
+          <i className="fas fa-clipboard-list nav-icon"></i>
+          Orders & Inventory
+        </NavLink>
         <NavLink to="/billing" className={({ isActive }) => isActive ? 'active' : ''}>
           <i className="fas fa-file-invoice-dollar nav-icon"></i>
           Billing

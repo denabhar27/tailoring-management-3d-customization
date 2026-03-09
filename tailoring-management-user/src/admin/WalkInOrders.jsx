@@ -435,7 +435,7 @@ const WalkInOrders = () => {
   };
 
   return (
-    <div className="admin-page">
+    <div className="admin-page walk-in-orders-page">
       <Sidebar />
       <AdminHeader />
 
@@ -444,196 +444,220 @@ const WalkInOrders = () => {
           <h2>New Walk-In Order</h2>
         </div>
 
-        <div className="form-container" style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <div className="form-group">
-            <label>Service Type *</label>
-            <select
-              value={serviceType}
-              onChange={(e) => setServiceType(e.target.value)}
-              className="form-control"
-            >
-              <option key="dry_cleaning" value="dry_cleaning">Dry Cleaning</option>
-              <option key="repair" value="repair">Repair</option>
-              <option key="customization" value="customization">Customization</option>
-              <option key="rental" value="rental">Rental</option>
-            </select>
-          </div>
-          <div className="form-section">
-            <h3>Customer Information</h3>
+        <div className="form-container walk-in-form-container">
+          {/* Side-by-side layout for Customer Info and Service Selection */}
+          <div className="walk-in-form-grid">
+            {/* Left Column: Customer Information */}
+            <div className="customer-info-section">
+              <div className="form-section">
+                <h3>Customer Information</h3>
 
-            <div className="form-group">
-              <label>Phone Number *</label>
-              <input
-                type="tel"
-                value={customerPhone}
-                onChange={(e) => handlePhoneChange(e.target.value)}
-                className="form-control"
-                placeholder="Enter phone number"
-                required
-              />
-              {showCustomerSearch && customerSearchResults.length > 0 && (
-                <div className="customer-search-results">
-                  {customerSearchResults.map(customer => (
-                    <div
-                      key={customer.id}
-                      className="customer-search-item"
-                      onClick={() => selectCustomer(customer)}
-                    >
-                      <strong>{customer.name}</strong> - {customer.phone}
-                      {customer.email && <span> ({customer.email})</span>}
+                <div className="form-group">
+                  <label>Phone Number *</label>
+                  <input
+                    type="tel"
+                    value={customerPhone}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    className="form-control"
+                    placeholder="Enter phone number"
+                    required
+                  />
+                  {showCustomerSearch && customerSearchResults.length > 0 && (
+                    <div className="customer-search-results">
+                      {customerSearchResults.map(customer => (
+                        <div
+                          key={customer.id}
+                          className="customer-search-item"
+                          onClick={() => selectCustomer(customer)}
+                        >
+                          <strong>{customer.name}</strong> - {customer.phone}
+                          {customer.email && <span> ({customer.email})</span>}
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
+
+                <div className="form-row-compact">
+                  <div className="form-group">
+                    <label>First Name *</label>
+                    <input
+                      type="text"
+                      value={customerFirstName}
+                      onChange={(e) => setCustomerFirstName(e.target.value)}
+                      className="form-control"
+                      placeholder="First name"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Last Name *</label>
+                    <input
+                      type="text"
+                      value={customerLastName}
+                      onChange={(e) => setCustomerLastName(e.target.value)}
+                      className="form-control"
+                      placeholder="Last name"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    className="form-control"
+                    placeholder="Enter email (optional)"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="form-group">
-              <label>First Name *</label>
-              <input
-                type="text"
-                value={customerFirstName}
-                onChange={(e) => setCustomerFirstName(e.target.value)}
-                className="form-control"
-                placeholder="Enter first name"
-                required
-              />
-            </div>
+            {/* Right Column: Service Selection + Service Details */}
+            <div className="service-details-section">
+              <div className="form-section">
+                <h3>Service Selection & Details</h3>
+                <div className="form-group">
+                  <label>Service Type *</label>
+                  <select
+                    value={serviceType}
+                    onChange={(e) => setServiceType(e.target.value)}
+                    className="form-control"
+                  >
+                    <option key="dry_cleaning" value="dry_cleaning">Dry Cleaning</option>
+                    <option key="repair" value="repair">Repair</option>
+                    <option key="customization" value="customization">Customization</option>
+                    <option key="rental" value="rental">Rental</option>
+                  </select>
+                </div>
 
-            <div className="form-group">
-              <label>Last Name *</label>
-              <input
-                type="text"
-                value={customerLastName}
-                onChange={(e) => setCustomerLastName(e.target.value)}
-                className="form-control"
-                placeholder="Enter last name"
-                required
-              />
-            </div>
+                {/* Service-specific fields */}
+                {serviceType === 'dry_cleaning' && (
+                  <div className="service-specific-fields">
+                    <div className="form-group">
+                      <label>Garment Type *</label>
+                      <select
+                        value={garmentType}
+                        onChange={(e) => setGarmentType(e.target.value)}
+                        className="form-control"
+                        required
+                      >
+                        <option value="">Select garment type</option>
+                        {garmentTypes.map(gt => (
+                          <option key={gt.garment_type_id} value={gt.garment_name}>
+                            {gt.garment_name} - ₱{gt.garment_price}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-            <div className="form-group">
-              <label>Email</label>
-              <input
-                type="email"
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-                className="form-control"
-                placeholder="Enter email (optional)"
-              />
+                    <div className="form-group">
+                      <label>Quantity *</label>
+                      <input
+                        type="number"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        className="form-control"
+                        min="1"
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Special Instructions</label>
+                      <textarea
+                        value={specialInstructions}
+                        onChange={(e) => setSpecialInstructions(e.target.value)}
+                        className="form-control"
+                        rows="2"
+                        placeholder="Any special instructions..."
+                      />
+                    </div>
+
+                    <div className="price-display">
+                      <strong>Total Price: ₱{calculateDryCleaningPrice().toFixed(2)}</strong>
+                    </div>
+                  </div>
+                )}
+
+                {serviceType === 'repair' && (
+                  <div className="service-specific-fields">
+                    <div className="form-group">
+                      <label>Garment Type *</label>
+                      <select
+                        value={repairGarmentType}
+                        onChange={(e) => setRepairGarmentType(e.target.value)}
+                        className="form-control"
+                        required
+                      >
+                        <option value="">Select garment type</option>
+                        {repairGarmentTypes.map(gt => (
+                          <option key={gt.garment_type_id} value={gt.garment_name}>
+                            {gt.garment_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Damage Level *</label>
+                      <select
+                        value={damageLevel}
+                        onChange={(e) => setDamageLevel(e.target.value)}
+                        className="form-control"
+                        required
+                      >
+                        <option value="">Select damage level</option>
+                        <option key="minor" value="minor">Minor</option>
+                        <option key="moderate" value="moderate">Moderate</option>
+                        <option key="severe" value="severe">Severe</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Description *</label>
+                      <textarea
+                        value={repairDescription}
+                        onChange={(e) => setRepairDescription(e.target.value)}
+                        className="form-control"
+                        rows="3"
+                        placeholder="Describe the damage and repair needed..."
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Final Price</label>
+                      <input
+                        type="number"
+                        value={estimatedRepairPrice}
+                        onChange={(e) => setEstimatedRepairPrice(e.target.value)}
+                        className="form-control"
+                        min="0"
+                        step="0.01"
+                        placeholder="Enter final price (optional)"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="form-group" style={{ marginTop: serviceType === 'customization' || serviceType === 'rental' ? '0' : '15px' }}>
+                  <label>Order Notes</label>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="form-control"
+                    rows="2"
+                    placeholder="Any additional notes..."
+                  />
+                </div>
+              </div>
             </div>
           </div>
-          {serviceType === 'dry_cleaning' && (
-            <div className="form-section">
-              <h3>Dry Cleaning Details</h3>
-
-              <div className="form-group">
-                <label>Garment Type *</label>
-                <select
-                  value={garmentType}
-                  onChange={(e) => setGarmentType(e.target.value)}
-                  className="form-control"
-                  required
-                >
-                  <option value="">Select garment type</option>
-                  {garmentTypes.map(gt => (
-                    <option key={gt.garment_type_id} value={gt.garment_name}>
-                      {gt.garment_name} - ₱{gt.garment_price}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Quantity *</label>
-                <input
-                  type="number"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className="form-control"
-                  min="1"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Special Instructions</label>
-                <textarea
-                  value={specialInstructions}
-                  onChange={(e) => setSpecialInstructions(e.target.value)}
-                  className="form-control"
-                  rows="3"
-                  placeholder="Any special instructions..."
-                />
-              </div>
-
-              <div className="price-display">
-                <strong>Total Price: ₱{calculateDryCleaningPrice().toFixed(2)}</strong>
-              </div>
-            </div>
-          )}
-
-          {serviceType === 'repair' && (
-            <div className="form-section">
-              <h3>Repair Details</h3>
-
-              <div className="form-group">
-                <label>Garment Type *</label>
-                <select
-                  value={repairGarmentType}
-                  onChange={(e) => setRepairGarmentType(e.target.value)}
-                  className="form-control"
-                  required
-                >
-                  <option value="">Select garment type</option>
-                  {repairGarmentTypes.map(gt => (
-                    <option key={gt.garment_type_id} value={gt.garment_name}>
-                      {gt.garment_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Damage Level *</label>
-                <select
-                  value={damageLevel}
-                  onChange={(e) => setDamageLevel(e.target.value)}
-                  className="form-control"
-                  required
-                >
-                  <option value="">Select damage level</option>
-                  <option key="minor" value="minor">Minor</option>
-                  <option key="moderate" value="moderate">Moderate</option>
-                  <option key="severe" value="severe">Severe</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Description *</label>
-                <textarea
-                  value={repairDescription}
-                  onChange={(e) => setRepairDescription(e.target.value)}
-                  className="form-control"
-                  rows="4"
-                  placeholder="Describe the damage and repair needed..."
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Final Price</label>
-                <input
-                  type="number"
-                  value={estimatedRepairPrice}
-                  onChange={(e) => setEstimatedRepairPrice(e.target.value)}
-                  className="form-control"
-                  min="0"
-                  step="0.01"
-                  placeholder="Enter final price (optional)"
-                />
-              </div>
-            </div>
-          )}
 
           {serviceType === 'customization' && (
             <div className="form-section">
@@ -1111,16 +1135,8 @@ const WalkInOrders = () => {
               </div>
             </div>
           )}
-          <div className="form-group">
-            <label>Order Notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="form-control"
-              rows="3"
-              placeholder="Any additional notes..."
-            />
-          </div>
+
+          {/* Form Actions */}
           <div className="form-actions">
             <button
               type="submit"
@@ -1135,6 +1151,42 @@ const WalkInOrders = () => {
       </div>
 
       <style>{`
+        .walk-in-orders-page .content {
+          max-width: 1200px;
+        }
+        .walk-in-form-container {
+          max-width: 100% !important;
+        }
+        .walk-in-form-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 25px;
+          margin-bottom: 25px;
+        }
+        @media (max-width: 900px) {
+          .walk-in-form-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+        .customer-info-section,
+        .service-details-section {
+          background: #fff;
+          border-radius: 8px;
+        }
+        .customer-info-section .form-section,
+        .service-details-section .form-section {
+          margin-bottom: 0;
+          padding-bottom: 0;
+          border-bottom: none;
+        }
+        .form-row-compact {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+        .form-row-compact .form-group {
+          margin-bottom: 15px;
+        }
         .form-container {
           background: white;
           padding: 30px;

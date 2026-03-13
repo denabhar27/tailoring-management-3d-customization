@@ -9,6 +9,8 @@ import { useAlert } from '../context/AlertContext';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
 import { API_BASE_URL } from '../api/config';
+import { getUserRole } from '../api/AuthApi';
+import { useNavigate } from 'react-router-dom';
 
 // ImageCarousel component for rental items
 const ImageCarousel = ({ images, itemName, getRentalImageUrl }) => {
@@ -103,6 +105,7 @@ const ImageCarousel = ({ images, itemName, getRentalImageUrl }) => {
 };
 
 const OrdersInventory = () => {
+  const navigate = useNavigate();
   const { alert, confirm } = useAlert();
   
   // Combined data states
@@ -171,10 +174,16 @@ const OrdersInventory = () => {
 
   // Fetch all data on component mount
   useEffect(() => {
+    const role = getUserRole();
+    if (role !== 'admin') {
+      navigate('/customize', { replace: true });
+      return undefined;
+    }
+
     fetchAllData();
     const refreshInterval = setInterval(fetchAllData, 30000); // Refresh every 30 seconds
     return () => clearInterval(refreshInterval);
-  }, []);
+  }, [navigate]);
 
   // Combine billing and inventory data when they change
   useEffect(() => {

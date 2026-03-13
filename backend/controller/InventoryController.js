@@ -2,7 +2,7 @@ const db = require('../config/db');
 
 exports.getCompletedItems = (req, res) => {
   
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -190,7 +190,7 @@ exports.getCompletedItems = (req, res) => {
 exports.getItemsByServiceType = (req, res) => {
   const { serviceType } = req.params;
 
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -374,7 +374,7 @@ exports.getItemsByServiceType = (req, res) => {
 
 exports.getInventoryStats = (req, res) => {
   
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."

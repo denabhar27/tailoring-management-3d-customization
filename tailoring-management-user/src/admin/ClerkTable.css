@@ -1,0 +1,101 @@
+.clerk-table-wrapper {
+  margin-top: 32px;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.05);
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+
+.clerk-table-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  background: linear-gradient(135deg, #fffaf4, #fff);
+}
+
+.clerk-table-header h3 {
+  margin: 0 0 6px 0;
+  font-size: 1.25rem;
+  color: #2d2a26;
+}
+
+.clerk-subtitle {
+  margin: 0;
+  color: #6b625a;
+  font-size: 0.95rem;
+}
+
+.clerk-table-scroll {
+  overflow-x: auto;
+}
+
+.clerk-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 780px;
+}
+
+.clerk-table th,
+.clerk-table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  font-size: 0.95rem;
+}
+
+.clerk-table th {
+  background: #faf7f2;
+  color: #5d4e37;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.clerk-table tbody tr:hover {
+  background: #fff9f2;
+}
+
+.clerk-empty {
+  text-align: center;
+  color: #888;
+  font-style: italic;
+}
+
+.clerk-status {
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.clerk-status.active {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.clerk-status.inactive {
+  background: #fbeaea;
+  color: #c0392b;
+}
+
+.clerk-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #8b4513;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+}
+
+.btn-link.danger {
+  color: #c0392b;
+}

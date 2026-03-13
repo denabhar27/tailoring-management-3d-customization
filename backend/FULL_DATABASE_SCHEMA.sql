@@ -1,11 +1,4 @@
--- ================================================================
--- COMPLETE DATABASE SCHEMA FOR PET_MANAGEMENT
--- Run this script in phpMyAdmin to recreate all tables
--- IMPORTANT: Delete all .ibd files in C:\xampp\mysql\data\pet_management\ 
---            before running this script (stop MySQL first!)
--- ================================================================
 
--- Drop all tables in correct order (child tables first due to foreign keys)
 SET FOREIGN_KEY_CHECKS = 0;
 
 DROP TABLE IF EXISTS transaction_logs;
@@ -36,6 +29,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 CREATE TABLE user (
   user_id INT AUTO_INCREMENT PRIMARY KEY,
   first_name VARCHAR(100) NOT NULL,
+  middle_name VARCHAR(100) NULL,
   last_name VARCHAR(100) NOT NULL,
   username VARCHAR(100) UNIQUE NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
@@ -43,7 +37,7 @@ CREATE TABLE user (
   phone_number VARCHAR(20),
   profile_picture VARCHAR(255),
   google_id VARCHAR(255),
-  role ENUM('user', 'admin') DEFAULT 'user',
+  role ENUM('user', 'admin', 'clerk') DEFAULT 'user',
   status ENUM('active', 'inactive', 'suspended') DEFAULT 'active',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -83,17 +77,13 @@ CREATE TABLE orders (
   status ENUM('pending', 'processing', 'completed', 'cancelled') DEFAULT 'pending',
   order_date DATETIME DEFAULT CURRENT_TIMESTAMP,
   notes TEXT,
-  is_walkin TINYINT(1) DEFAULT 0 COMMENT 'Is this a walk-in customer order',
-  walkin_customer_name VARCHAR(255) NULL COMMENT 'Walk-in customer name (when is_walkin = 1)',
-  walkin_customer_phone VARCHAR(20) NULL COMMENT 'Walk-in customer phone (when is_walkin = 1)',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   
   FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE,
   INDEX idx_user_id (user_id),
   INDEX idx_status (status),
-  INDEX idx_order_date (order_date),
-  INDEX idx_is_walkin (is_walkin)
+  INDEX idx_order_date (order_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ================================================================

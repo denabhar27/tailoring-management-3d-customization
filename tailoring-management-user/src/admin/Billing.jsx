@@ -17,8 +17,12 @@ import SimpleImageCarousel from '../components/SimpleImageCarousel';
 import AnalyticsDashboard from '../components/analytics/AnalyticsDashboard';
 
 import { API_BASE_URL } from '../api/config';
+import { getUserRole } from '../api/AuthApi';
+import { useNavigate } from 'react-router-dom';
 
 const Billing = () => {
+
+  const navigate = useNavigate();
 
   const { alert } = useAlert();
 
@@ -53,6 +57,12 @@ const Billing = () => {
   const [imagePreview, setImagePreview] = useState({ isOpen: false, imageUrl: '', altText: '' });
 
   useEffect(() => {
+
+    const role = getUserRole();
+    if (role !== 'admin') {
+      navigate('/customize', { replace: true });
+      return;
+    }
 
     const fetchData = async () => {
 

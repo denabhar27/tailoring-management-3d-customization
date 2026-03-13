@@ -314,9 +314,9 @@ const Customize = () => {
 
     const role = getUserRole();
 
-    if (role !== 'admin') {
+    if (role !== 'admin' && role !== 'clerk') {
 
-      setError('Admin access required');
+      setError('Access restricted');
 
       navigate('/');
 
@@ -484,7 +484,9 @@ const Customize = () => {
 
   useEffect(() => {
 
-    if (isAuthenticated() && getUserRole() === 'admin') {
+    const role = getUserRole();
+
+    if (isAuthenticated() && (role === 'admin' || role === 'clerk')) {
 
       loadCustomizationOrders();
 

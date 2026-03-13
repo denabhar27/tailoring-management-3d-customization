@@ -1,9 +1,9 @@
 const db = require('../config/db');
 
 const User = {
-  create: (first_name, last_name, username, email, password, phone_number, callback) => {
-    const sql = "INSERT INTO user (first_name, last_name, username, email, password, phone_number) VALUES (?, ?, ?, ?, ?, ?)";
-    db.query(sql, [first_name, last_name, username, email, password, phone_number], callback);
+  create: (first_name, middle_name, last_name, username, email, password, phone_number, role = 'user', callback) => {
+    const sql = "INSERT INTO user (first_name, middle_name, last_name, username, email, password, phone_number, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+    db.query(sql, [first_name, middle_name, last_name, username, email, password, phone_number, role], callback);
   },
   
   findByUsername: (username, callback) =>{
@@ -17,7 +17,7 @@ const User = {
   },
 
   findById: (user_id, callback) => {
-    const sql = "SELECT user_id, first_name, last_name, username, email, phone_number, profile_picture FROM user WHERE user_id = ?";
+    const sql = "SELECT user_id, first_name, middle_name, last_name, username, email, phone_number, profile_picture, role, status, created_at, updated_at FROM user WHERE user_id = ?";
     db.query(sql, [user_id], callback);
   },
   
@@ -25,8 +25,8 @@ const User = {
     
     const username = email.split('@')[0] + '_' + Date.now().toString().slice(-6);
    
-    const sql = "INSERT INTO user (first_name, last_name, username, email, password, phone_number, google_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
-    db.query(sql, [first_name, last_name, username, email, null, null, google_id], callback);
+    const sql = "INSERT INTO user (first_name, middle_name, last_name, username, email, password, phone_number, google_id, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    db.query(sql, [first_name, null, last_name, username, email, null, null, google_id, 'user'], callback);
   },
 
   updateProfilePicture: (user_id, profile_picture_path, callback) => {
@@ -34,13 +34,13 @@ const User = {
     db.query(sql, [profile_picture_path, user_id], callback);
   },
 
-  update: (user_id, first_name, last_name, email, phone_number, profile_picture, callback) => {
+  update: (user_id, first_name, middle_name, last_name, email, phone_number, profile_picture, callback) => {
     if (profile_picture) {
-      const sql = "UPDATE user SET first_name = ?, last_name = ?, email = ?, phone_number = ?, profile_picture = ? WHERE user_id = ?";
-      db.query(sql, [first_name, last_name, email, phone_number, profile_picture, user_id], callback);
+      const sql = "UPDATE user SET first_name = ?, middle_name = ?, last_name = ?, email = ?, phone_number = ?, profile_picture = ? WHERE user_id = ?";
+      db.query(sql, [first_name, middle_name, last_name, email, phone_number, profile_picture, user_id], callback);
     } else {
-      const sql = "UPDATE user SET first_name = ?, last_name = ?, email = ?, phone_number = ? WHERE user_id = ?";
-      db.query(sql, [first_name, last_name, email, phone_number, user_id], callback);
+      const sql = "UPDATE user SET first_name = ?, middle_name = ?, last_name = ?, email = ?, phone_number = ? WHERE user_id = ?";
+      db.query(sql, [first_name, middle_name, last_name, email, phone_number, user_id], callback);
     }
   },
 
@@ -216,6 +216,65 @@ const User = {
       WHERE username = ? OR email = ?
     `;
     db.query(sql, [usernameOrEmail, usernameOrEmail], callback);
+  },
+
+  // Clerk role helpers
+  createClerk: (data, callback) => {
+    const {
+      first_name,
+      middle_name = null,
+      last_name,
+      username,
+      email,
+      password,
+      phone_number
+    } = data;
+
+    const sql = `
+      INSERT INTO user (first_name, middle_name, last_name, username, email, password, phone_number, role, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'clerk', 'active')
+    `;
+    db.query(sql, [first_name, middle_name, last_name, username, email, password, phone_number], callback);
+  },
+
+  listClerks: (callback) => {
+    const sql = `
+      SELECT user_id, first_name, middle_name, last_name, email, phone_number, status, created_at, updated_at
+      FROM user
+      WHERE role = 'clerk'
+      ORDER BY created_at DESC
+    `;
+    db.query(sql, callback);
+  },
+
+  updateClerk: (userId, data, callback) => {
+    const { first_name, middle_name = null, last_name, email, phone_number, status = 'active', username, passwordHash } = data;
+
+    const fields = [first_name, middle_name, last_name, email, phone_number, status];
+    let sql = `
+      UPDATE user
+      SET first_name = ?, middle_name = ?, last_name = ?, email = ?, phone_number = ?, status = ?
+    `;
+
+    if (username) {
+      sql += ', username = ?';
+      fields.push(username);
+    }
+
+    if (passwordHash) {
+      sql += ', password = ?';
+      fields.push(passwordHash);
+    }
+
+    sql += ' WHERE user_id = ? AND role = "clerk"';
+    fields.push(userId);
+
+    db.query(sql, fields, callback);
+  },
+
+  deactivateClerk: (userId, callback) => {
+    const sql = `UPDATE user SET status = 'inactive' WHERE user_id = ? AND role = 'clerk'`;
+    db.query(sql, [userId], callback);
   }
 
 };

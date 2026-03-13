@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const axios = require('axios');
 
 exports.register = (req, res) => {
-  const { first_name, last_name, username, email, password, phone_number } = req.body;
+  const { first_name, middle_name = null, last_name, username, email, password, phone_number } = req.body;
 
   // Check if username exists
   User.findByUsername(username, (err, results) => {
@@ -19,7 +19,7 @@ exports.register = (req, res) => {
 
       const hashedPassword = bcrypt.hashSync(password, 10);
 
-      User.create(first_name, last_name, username, email, hashedPassword, phone_number, (err, result) => {
+      User.create(first_name, middle_name, last_name, username, email, hashedPassword, phone_number, 'user', (err, result) => {
         if (err) {
           console.error('[REGISTER] Error creating user:', err);
           if (err.code === 'ER_DUP_ENTRY') {
@@ -28,8 +28,9 @@ exports.register = (req, res) => {
           return res.status(500).json({ message: "Error creating user", error: err.message });
         }
 
+        const role = 'user';
         const token = jwt.sign(
-          { id: result.insertId, role: 'user' },
+          { id: result.insertId, role },
           process.env.JWT_SECRET || "secret",
           { expiresIn: '24h' }
         );
@@ -37,10 +38,11 @@ exports.register = (req, res) => {
         res.json({
           message: "Registration successful",
           token,
-          role: 'user',
+          role,
           user: {
             id: result.insertId,
             first_name,
+            middle_name,
             last_name,
             username,
             email,
@@ -53,65 +55,76 @@ exports.register = (req, res) => {
 };
 
 exports.login = async (req, res) => {
-  const {username, password} = req.body;
+  const { username, password } = req.body;
 
-  User.findByUsername(username, (err, userResults) => {
-    if (err) return res.status(500).json({message: "Database error"});
-    
-    if (userResults.length > 0) {
-    
-      const user = userResults[0];
+  // Check admin first to avoid matching an admin username that also exists in the user table
+  Admin.findByUsername(username, (adminErr, adminResults) => {
+    if (adminErr) return res.status(500).json({ message: "Database error" });
 
-      if (!user.password) {
-        return res.status(401).json({message: "This account was created with Google. Please use Google sign-in."});
-      }
-      
-      const isMatch = bcrypt.compareSync(password, user.password);
-      if (!isMatch) return res.status(401).json({message: "Invalid credentials"});
-      
-    const token = jwt.sign(
-  { id: user.user_id, role: 'user', first_name: user.first_name, last_name: user.last_name, email: user.email, phone_number: user.phone_number },
-  process.env.JWT_SECRET || "secret",
-  { expiresIn: '24h' }
-);
-      return res.json({
-  token, 
-  role: 'user', 
-  message: "Login successful",
-  user: {
-    id: user.user_id,
-    first_name: user.first_name,
-    last_name: user.last_name,
-    email: user.email,
-    phone_number: user.phone_number,
-    profile_picture: user.profile_picture
-  }
-});
-    }
-
-    Admin.findByUsername(username, (err, adminResults) => {
-      if (err) return res.status(500).json({message: "Database error"});
-      if (adminResults.length === 0) return res.status(404).json({message: "Invalid credentials"});
-      
+    if (adminResults.length > 0) {
       const admin = adminResults[0];
       const isMatch = bcrypt.compareSync(password, admin.password);
-      if (!isMatch) return res.status(401).json({message: "Invalid credentials"});
+      if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
-   const adminId = admin.admin_id || admin.id;
-   const token = jwt.sign(
-  { id: adminId, role: 'admin', username: admin.username },
-  process.env.JWT_SECRET || "secret",
-  { expiresIn: '24h' }
-);
+      const adminId = admin.admin_id || admin.id;
+      const token = jwt.sign(
+        { id: adminId, role: 'admin', username: admin.username },
+        process.env.JWT_SECRET || "secret",
+        { expiresIn: '24h' }
+      );
+
       return res.json({
-  token, 
-  role: 'admin', 
-  message: "Admin login successful",
-  admin: {
-    id: adminId,
-    username: admin.username
-  }
-});
+        token,
+        role: 'admin',
+        message: "Admin login successful",
+        admin: {
+          id: adminId,
+          username: admin.username
+        }
+      });
+    }
+
+    // Fallback to regular user login
+    User.findByUsername(username, (userErr, userResults) => {
+      if (userErr) return res.status(500).json({ message: "Database error" });
+      if (userResults.length === 0) return res.status(404).json({ message: "Invalid credentials" });
+
+      const user = userResults[0];
+
+      if (user.status === 'inactive' || user.status === 'suspended') {
+        return res.status(403).json({ message: "Account is inactive. Please contact an admin." });
+      }
+
+      if (!user.password) {
+        return res.status(401).json({ message: "This account was created with Google. Please use Google sign-in." });
+      }
+
+      const isMatch = bcrypt.compareSync(password, user.password);
+      if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+
+      const userRole = user.role || 'user';
+      const token = jwt.sign(
+        { id: user.user_id, role: userRole, first_name: user.first_name, last_name: user.last_name, email: user.email, phone_number: user.phone_number },
+        process.env.JWT_SECRET || "secret",
+        { expiresIn: '24h' }
+      );
+
+      return res.json({
+        token,
+        role: userRole,
+        message: "Login successful",
+        user: {
+          id: user.user_id,
+          first_name: user.first_name,
+          middle_name: user.middle_name,
+          last_name: user.last_name,
+          email: user.email,
+          phone_number: user.phone_number,
+          profile_picture: user.profile_picture,
+          role: userRole,
+          status: user.status
+        }
+      });
     });
   });
 };
@@ -331,11 +344,14 @@ exports.updateProfilePicture = (req, res) => {
       const userData = {
         id: updatedUser.user_id,
         first_name: updatedUser.first_name,
+        middle_name: updatedUser.middle_name,
         last_name: updatedUser.last_name,
         email: updatedUser.email,
         phone_number: updatedUser.phone_number,
         username: updatedUser.username,
-        profile_picture: updatedUser.profile_picture || null
+        profile_picture: updatedUser.profile_picture || null,
+        role: updatedUser.role,
+        status: updatedUser.status
       };
       
       res.status(200).json({
@@ -349,7 +365,7 @@ exports.updateProfilePicture = (req, res) => {
 
 exports.updateProfile = (req, res) => {
   const user_id = req.user.id;
-  const { first_name, last_name, email, phone_number, profile_picture } = req.body;
+  const { first_name, middle_name = null, last_name, email, phone_number, profile_picture } = req.body;
 
   if (!first_name || !last_name || !email) {
     return res.status(400).json({ message: "First name, last name, and email are required" });
@@ -365,7 +381,7 @@ exports.updateProfile = (req, res) => {
       return res.status(400).json({ message: "Email is already taken by another user" });
     }
 
-    User.update(user_id, first_name, last_name, email, phone_number || null, profile_picture || null, (err, result) => {
+    User.update(user_id, first_name, middle_name, last_name, email, phone_number || null, profile_picture || null, (err, result) => {
       if (err) {
         console.error("Profile update error:", err);
         return res.status(500).json({ message: "Error updating profile", error: err });
@@ -380,11 +396,14 @@ exports.updateProfile = (req, res) => {
         const userData = {
           id: updatedUser.user_id,
           first_name: updatedUser.first_name,
+          middle_name: updatedUser.middle_name,
           last_name: updatedUser.last_name,
           email: updatedUser.email,
           phone_number: updatedUser.phone_number,
           username: updatedUser.username,
-          profile_picture: updatedUser.profile_picture || null
+          profile_picture: updatedUser.profile_picture || null,
+          role: updatedUser.role,
+          status: updatedUser.status
         };
         
         res.status(200).json({

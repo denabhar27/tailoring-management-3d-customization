@@ -123,6 +123,7 @@ const appointmentSlotRoutes = require('./routes/AppointmentSlotRoutes');
 const transactionLogRoutes = require('./routes/TransactionLogRoutes');
 const fabricTypeRoutes = require('./routes/FabricTypeRoutes');
 const garmentTypeRoutes = require('./routes/GarmentTypeRoutes');
+const clerkRoutes = require('./routes/ClerkRoutes');
 
 app.use('/api', authRoutes);
 app.use('/api/rentals', rentalRoutes);
@@ -142,6 +143,7 @@ app.use('/api/appointments', appointmentSlotRoutes);
 app.use('/api/transaction-logs', transactionLogRoutes);
 app.use('/api/fabric-types', fabricTypeRoutes);
 app.use('/api/garment-types', garmentTypeRoutes);
+app.use('/api/admin/clerks', clerkRoutes);
 const repairGarmentTypeRoutes = require('./routes/RepairGarmentTypeRoutes');
 app.use('/api/repair-garment-types', repairGarmentTypeRoutes);
 const dcGarmentTypeRoutes = require('./routes/DryCleaningGarmentTypeRoutes');

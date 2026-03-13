@@ -111,7 +111,7 @@ const App = ({ setIsLoggedIn }) => {
           setIsAuthModalOpen(false);
 
           const userRole = localStorage.getItem('role');
-          if (userRole === 'admin') {
+          if (userRole === 'admin' || userRole === 'clerk') {
             navigate('/admin', { replace: true });
           } else {
             navigate('/user-home', { replace: true });

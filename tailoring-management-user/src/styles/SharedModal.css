@@ -959,3 +959,51 @@
   outline: 3px solid #8B4513;
   outline-offset: 2px;
 }
+
+/* Clerk modal helpers */
+.error-text-shared {
+  color: #c0392b;
+  font-size: 0.85rem;
+  margin-top: 6px;
+}
+
+.modal-actions-shared {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.btn-primary-shared,
+.btn-secondary-shared {
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-primary-shared {
+  background: linear-gradient(90deg, #8B4513, #A0522D);
+  color: #fff;
+}
+
+.btn-primary-shared:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn-primary-shared:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(139, 69, 19, 0.25);
+}
+
+.btn-secondary-shared {
+  background: rgba(139, 69, 19, 0.08);
+  color: #5D4E37;
+}
+
+.btn-secondary-shared:hover {
+  background: rgba(139, 69, 19, 0.15);
+}

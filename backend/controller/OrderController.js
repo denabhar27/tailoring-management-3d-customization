@@ -291,7 +291,7 @@ exports.updateItemApprovalStatus = (req, res) => {
     });
   }
 
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -320,28 +320,30 @@ exports.updateItemApprovalStatus = (req, res) => {
 
       const ActionLog = require('../model/ActionLogModel');
       
-      const adminUserId = req.user?.id || item.user_id || null;
+      const actorUserId = req.user?.id || item.user_id || null;
+      const actorRole = req.user?.role === 'clerk' ? 'clerk' : 'admin';
+      const actorLabel = req.user?.username || actorRole;
       
-      if (!adminUserId) {
+      if (!actorUserId) {
         console.error('Cannot log action: user_id is missing. req.user:', req.user, 'item.user_id:', item.user_id);
       }
 
-      if (adminUserId) {
+      if (actorUserId) {
         ActionLog.create({
           order_item_id: itemId,
-          user_id: adminUserId,
+          user_id: actorUserId,
           action_type: 'status_update',
-          action_by: 'admin',
+          action_by: actorRole,
           previous_status: previousStatus,
           new_status: status,
           reason: null,
-          notes: `Admin updated order item status from ${previousStatus} to ${status}`
+          notes: `${actorLabel} updated order item status from ${previousStatus} to ${status}`
         }, (logErr, logResult) => {
           if (logErr) {
             console.error('Error logging order item status update:', logErr);
             console.error('Log data:', {
               order_item_id: itemId,
-              user_id: adminUserId,
+              user_id: actorUserId,
               action_type: 'status_update',
               previous_status: previousStatus,
               new_status: status
@@ -391,7 +393,7 @@ exports.getOrdersByStatus = (req, res) => {
 
 exports.getPendingApprovalItems = (req, res) => {
   
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -423,7 +425,7 @@ exports.getPendingApprovalItems = (req, res) => {
 
 exports.getRepairOrders = (req, res) => {
   
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -463,7 +465,7 @@ exports.getRepairOrdersByStatus = (req, res) => {
     });
   }
 
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -497,7 +499,7 @@ exports.updateRepairOrderItem = (req, res) => {
   const itemId = req.params.id;
   const { finalPrice, approvalStatus, adminNotes } = req.body;
 
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -571,6 +573,8 @@ exports.updateRepairOrderItem = (req, res) => {
       const ActionLog = require('../model/ActionLogModel');
       
       const userId = req.user?.id || item.user_id || null;
+      const actorRole = req.user?.role === 'clerk' ? 'clerk' : 'admin';
+      const actorLabel = req.user?.username || actorRole;
       
       if (!userId) {
         console.error('Cannot log action: user_id is missing. req.user:', req.user, 'item.user_id:', item.user_id);
@@ -609,13 +613,13 @@ exports.updateRepairOrderItem = (req, res) => {
           order_item_id: itemId,
           user_id: userId,
           action_type: 'status_update',
-          action_by: 'admin',
+          action_by: actorRole,
           previous_status: previousStatus,
           new_status: newStatus,
           reason: null,
           notes: actionNotes.length > 0 
-            ? `Repair: ${actionNotes.join(' | ')}`
-            : `Repair: Updated`
+            ? `Repair: ${actionNotes.join(' | ')} (by ${actorLabel})`
+            : `Repair: Updated (by ${actorLabel})`
         }, (logErr, logResult) => {
           if (logErr) {
             console.error('Error logging repair order action:', logErr);
@@ -836,7 +840,7 @@ exports.updateRepairOrderItem = (req, res) => {
 
 exports.getDryCleaningOrders = (req, res) => {
   
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -876,7 +880,7 @@ exports.getDryCleaningOrdersByStatus = (req, res) => {
     });
   }
 
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -910,7 +914,7 @@ exports.updateDryCleaningOrderItem = (req, res) => {
   const itemId = req.params.id;
   const { finalPrice, approvalStatus, adminNotes } = req.body;
 
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -978,6 +982,8 @@ exports.updateDryCleaningOrderItem = (req, res) => {
       const ActionLog = require('../model/ActionLogModel');
       
       const userId = req.user?.id || item.user_id || null;
+      const actorRole = req.user?.role === 'clerk' ? 'clerk' : 'admin';
+      const actorLabel = req.user?.username || actorRole;
       
       if (!userId) {
         console.error('Cannot log action: user_id is missing. req.user:', req.user, 'item.user_id:', item.user_id);
@@ -1016,13 +1022,13 @@ exports.updateDryCleaningOrderItem = (req, res) => {
           order_item_id: itemId,
           user_id: userId,
           action_type: 'status_update',
-          action_by: 'admin',
+          action_by: actorRole,
           previous_status: previousStatus,
           new_status: newStatus,
           reason: null,
           notes: actionNotes.length > 0 
-            ? `Dry Cleaning: ${actionNotes.join(' | ')}`
-            : `Dry Cleaning: Updated`
+            ? `Dry Cleaning: ${actionNotes.join(' | ')} (by ${actorLabel})`
+            : `Dry Cleaning: Updated (by ${actorLabel})`
         }, (logErr, logResult) => {
           if (logErr) {
             console.error('Error logging dry cleaning order action:', logErr);
@@ -1242,7 +1248,7 @@ exports.updateDryCleaningOrderItem = (req, res) => {
 
 exports.getRentalOrders = (req, res) => {
   
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -1282,7 +1288,7 @@ exports.getRentalOrdersByStatus = (req, res) => {
     });
   }
 
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -1318,7 +1324,7 @@ exports.updateRentalOrderItem = (req, res) => {
 
   console.log("Controller - Updating rental order item:", itemId, req.body);
 
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -1438,6 +1444,8 @@ exports.updateRentalOrderItem = (req, res) => {
       const ActionLog = require('../model/ActionLogModel');
       
       const userId = req.user?.id || item.user_id || null;
+      const actorRole = req.user?.role === 'clerk' ? 'clerk' : 'admin';
+      const actorLabel = req.user?.username || actorRole;
       
       if (!userId) {
         console.error('Cannot log action: user_id is missing. req.user:', req.user, 'item.user_id:', item.user_id);
@@ -1478,13 +1486,13 @@ exports.updateRentalOrderItem = (req, res) => {
           order_item_id: itemId,
           user_id: userId,
           action_type: 'status_update',
-          action_by: 'admin',
+          action_by: actorRole,
           previous_status: previousStatus,
           new_status: newStatus,
           reason: null,
           notes: actionNotes.length > 0 
-            ? `Rental: ${actionNotes.join(' | ')}`
-            : `Rental: Updated`
+            ? `Rental: ${actionNotes.join(' | ')} (by ${actorLabel})`
+            : `Rental: Updated (by ${actorLabel})`
         }, (logErr, logResult) => {
           if (logErr) {
             console.error('Error logging rental order action:', logErr);
@@ -1758,7 +1766,7 @@ exports.recordRentalPayment = (req, res) => {
   const itemId = req.params.id;
   const { paymentAmount } = req.body;
 
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -1850,15 +1858,17 @@ exports.recordRentalPayment = (req, res) => {
 
       const ActionLog = require('../model/ActionLogModel');
       const previousPaymentStatus = item.payment_status || 'unpaid';
+      const actorId = req.user?.id || item.user_id;
+      const actorRole = req.user?.role === 'clerk' ? 'clerk' : 'admin';
       ActionLog.create({
         order_item_id: itemId,
-        user_id: item.user_id,
+        user_id: actorId,
         action_type: 'payment',
-        action_by: 'admin',
+        action_by: actorRole,
         previous_status: previousPaymentStatus,
         new_status: newPaymentStatus,
         reason: null,
-        notes: `Admin recorded payment of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)}. Customer: ${customerName}`
+        notes: `${actorRole === 'clerk' ? 'Clerk' : 'Admin'} recorded payment of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)}. Customer: ${customerName}`
       }, (actionLogErr) => {
         if (actionLogErr) {
           console.error('Error creating payment action log:', actionLogErr);
@@ -1879,8 +1889,8 @@ exports.recordRentalPayment = (req, res) => {
         previous_payment_status: previousPaymentStatus,
         new_payment_status: newPaymentStatus,
         payment_method: 'cash', 
-        notes: `Admin recorded ${transactionType.replace('_', ' ')} of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}`,
-        created_by: 'admin'
+        notes: `${actorRole === 'clerk' ? 'Clerk' : 'Admin'} recorded ${transactionType.replace('_', ' ')} of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}`,
+        created_by: actorRole
       }, (transLogErr, transLogResult) => {
         if (transLogErr) {
           console.error('[TRANSACTION LOG] Error creating transaction log:', transLogErr);

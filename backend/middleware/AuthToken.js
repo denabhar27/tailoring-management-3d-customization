@@ -28,8 +28,22 @@ exports.verifyToken = (req, res, next) => {
   });
 };
 exports.requireAdmin = (req, res, next) => {
-  if (req.user && req.user.role === 'admin') {
+  // Allow both admin and clerk to pass admin-protected routes
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'clerk')) {
     return next();
   }
   return res.status(403).json({ message: 'Admin access required' });
+};
+
+// Generic role guard; pass an array of allowed roles
+exports.requireRole = (roles = []) => (req, res, next) => {
+  if (!req.user || !req.user.role) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+
+  if (roles.includes(req.user.role)) {
+    return next();
+  }
+
+  return res.status(403).json({ message: 'Access denied for this role' });
 };

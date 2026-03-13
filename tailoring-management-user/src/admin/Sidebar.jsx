@@ -2,17 +2,23 @@ import React, { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom';
 import "../adminStyle/appointments.css"
 import logo from '../assets/logo.png';
+import { getUserRole } from '../api/AuthApi';
 
 function Sidebar() {
   const location = useLocation();
   const isRentalActive = location.pathname === '/rental' || location.pathname === '/Post';
   const [rentalSubmenuOpen, setRentalSubmenuOpen] = useState(isRentalActive);
+  const [role, setRole] = useState(getUserRole() || 'admin');
 
   useEffect(() => {
     if (isRentalActive) {
       setRentalSubmenuOpen(true);
     }
   }, [isRentalActive]);
+
+  useEffect(() => {
+    setRole(getUserRole() || 'admin');
+  }, []);
 
   return (
     <aside className='sidebar'>
@@ -28,10 +34,12 @@ function Sidebar() {
 </div>
 
       <nav>
-        <NavLink to="/admin" className={({ isActive }) => isActive ? 'active' : ''}>
-          <i className="fas fa-home nav-icon"></i>
-          Dashboard
-        </NavLink>
+        {role === 'admin' && (
+          <NavLink to="/admin" className={({ isActive }) => isActive ? 'active' : ''}>
+            <i className="fas fa-home nav-icon"></i>
+            Dashboard
+          </NavLink>
+        )}
         <NavLink to="/customize" className={({ isActive }) => isActive ? 'active' : ''}>
           <i className="fas fa-tshirt nav-icon"></i>
           Customization
@@ -72,14 +80,18 @@ function Sidebar() {
           <i className="fas fa-cut nav-icon"></i>
           Repair
         </NavLink>
-        <NavLink to="/orders-inventory" className={({ isActive }) => isActive ? 'active' : ''}>
-          <i className="fas fa-clipboard-list nav-icon"></i>
-          Orders & Inventory
-        </NavLink>
-        <NavLink to="/billing" className={({ isActive }) => isActive ? 'active' : ''}>
-          <i className="fas fa-file-invoice-dollar nav-icon"></i>
-          Billing
-        </NavLink>
+        {role === 'admin' && (
+          <NavLink to="/orders-inventory" className={({ isActive }) => isActive ? 'active' : ''}>
+            <i className="fas fa-clipboard-list nav-icon"></i>
+            Orders & Inventory
+          </NavLink>
+        )}
+        {role === 'admin' && (
+          <NavLink to="/billing" className={({ isActive }) => isActive ? 'active' : ''}>
+            <i className="fas fa-file-invoice-dollar nav-icon"></i>
+            Billing
+          </NavLink>
+        )}
         <NavLink to="/inventory" className={({ isActive }) => isActive ? 'active' : ''}>
           <i className="fas fa-boxes nav-icon"></i>
           Inventory
@@ -88,10 +100,12 @@ function Sidebar() {
           <i className="fas fa-users nav-icon"></i>
           Customer List
         </NavLink>
-        <NavLink to="/shop-schedule" className={({ isActive }) => isActive ? 'active' : ''}>
-          <i className="fas fa-store nav-icon"></i>
-          Shop Schedule
-        </NavLink>
+        {role === 'admin' && (
+          <NavLink to="/shop-schedule" className={({ isActive }) => isActive ? 'active' : ''}>
+            <i className="fas fa-store nav-icon"></i>
+            Shop Schedule
+          </NavLink>
+        )}
         <NavLink to="/walk-in-orders" className={({ isActive }) => isActive ? 'active' : ''}>
           <i className="fas fa-walking nav-icon"></i>
           Walk-In Orders

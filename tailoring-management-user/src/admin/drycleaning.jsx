@@ -101,8 +101,8 @@ const DryCleaning = () => {
       return;
     }
     const role = getUserRole();
-    if (role !== 'admin') {
-      setError('Admin access required');
+    if (role !== 'admin' && role !== 'clerk') {
+      setError('Access restricted');
       navigate('/');
       return;
     }
@@ -292,7 +292,8 @@ const DryCleaning = () => {
   };
 
   useEffect(() => {
-    if (isAuthenticated() && getUserRole() === 'admin') {
+    const role = getUserRole();
+    if (isAuthenticated() && (role === 'admin' || role === 'clerk')) {
       loadDryCleaningOrders();
     }
   }, []);

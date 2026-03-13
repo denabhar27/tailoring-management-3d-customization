@@ -3,7 +3,7 @@ const db = require('../config/db');
 
 exports.getAllBillingRecords = (req, res) => {
   
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -162,7 +162,7 @@ exports.getAllBillingRecords = (req, res) => {
 exports.getBillingRecordsByStatus = (req, res) => {
   const { status } = req.params;
 
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -310,7 +310,7 @@ exports.updateBillingRecordStatus = (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."
@@ -362,7 +362,7 @@ exports.updateBillingRecordStatus = (req, res) => {
 
 exports.getBillingStats = (req, res) => {
   
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
       message: "Access denied. Admin only."

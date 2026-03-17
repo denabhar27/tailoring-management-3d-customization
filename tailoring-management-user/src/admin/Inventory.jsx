@@ -2,22 +2,74 @@ import React, { useState, useEffect } from 'react';
 import '../adminStyle/inventory.css';
 import AdminHeader from './AdminHeader';
 import Sidebar from './Sidebar';
-import { getCompletedItems, getItemsByServiceType, getInventoryStats } from '../api/InventoryApi';
+import { getAvailableRentals, getRentalImageUrl } from '../api/RentalApi';
 import ImagePreviewModal from '../components/ImagePreviewModal';
-import { API_BASE_URL } from '../api/config';
+
+const SIZE_LABELS = {
+  small: 'Small (S)',
+  medium: 'Medium (M)',
+  large: 'Large (L)',
+  extra_large: 'Extra Large (XL)'
+};
+
+const parseSizeOptions = (rawSize) => {
+  if (!rawSize) return {};
+
+  try {
+    const parsed = typeof rawSize === 'string' ? JSON.parse(rawSize) : rawSize;
+
+    // v2 format: size_entries
+    if (parsed?.format === 'rental_size_v2' && Array.isArray(parsed.size_entries)) {
+      const result = {};
+      parsed.size_entries.forEach(entry => {
+        const key = entry.sizeKey !== 'custom' ? entry.sizeKey : (entry.customLabel || 'custom');
+        const quantity = parseInt(entry.quantity, 10);
+        result[key] = { inch: '', cm: '', quantity: Number.isNaN(quantity) ? 0 : Math.max(0, quantity) };
+      });
+      return result;
+    }
+
+    const source = parsed?.size_options || parsed?.sizeOptions || {};
+
+    if (!source || typeof source !== 'object') return {};
+
+    const normalized = {};
+    Object.keys(SIZE_LABELS).forEach((key) => {
+      const option = source[key];
+      if (!option || typeof option !== 'object') return;
+
+      const quantity = parseInt(option.quantity, 10);
+      normalized[key] = {
+        inch: option.inch || '',
+        cm: option.cm || '',
+        quantity: Number.isNaN(quantity) ? 0 : Math.max(0, quantity)
+      };
+    });
+
+    return normalized;
+  } catch (e) {
+    return {};
+  }
+};
+
+const getAvailableSizesText = (sizeOptions) => {
+  const keys = Object.keys(sizeOptions || {}).filter((key) => (sizeOptions[key]?.quantity || 0) > 0);
+  if (keys.length === 0) return 'No sizes configured';
+  return keys.map((key) => SIZE_LABELS[key] || key).join(', ');
+};
 
 const Inventory = () => {
   const [allItems, setAllItems] = useState([]);
   const [inventoryStats, setInventoryStats] = useState({
     total: 0,
-    customization: 0,
-    dryCleaning: 0,
+    available: 0,
+    rented: 0,
     repair: 0,
     totalValue: 0
   });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [serviceFilter, setServiceFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [imagePreview, setImagePreview] = useState({ isOpen: false, imageUrl: '', altText: '' });
@@ -25,16 +77,35 @@ const Inventory = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const rentalResponse = await getAvailableRentals();
+        const rentals = rentalResponse?.items || [];
 
-        const itemsResponse = await getCompletedItems();
-        if (itemsResponse.success) {
-          setAllItems(itemsResponse.items);
-        }
+        const mapped = rentals.map((item) => {
+          const sizeOptions = parseSizeOptions(item.size);
+          const totalBySizes = Object.values(sizeOptions).reduce((sum, option) => sum + (option.quantity || 0), 0);
+          const availableQty = totalBySizes > 0 ? totalBySizes : (parseInt(item.total_available, 10) || 0);
 
-        const statsResponse = await getInventoryStats();
-        if (statsResponse.success) {
-          setInventoryStats(statsResponse.stats);
-        }
+          return {
+            ...item,
+            id: item.item_id,
+            sizeOptions,
+            availableQty,
+            image: item.front_image ? getRentalImageUrl(item.front_image) : getRentalImageUrl(item.image_url),
+            displayCategory: item.category ? item.category.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ') : 'N/A'
+          };
+        });
+
+        setAllItems(mapped);
+
+        const stats = {
+          total: mapped.length,
+          available: mapped.filter((item) => (item.status || 'available') === 'available').length,
+          rented: mapped.filter((item) => (item.status || '').toLowerCase() === 'rented').length,
+          repair: mapped.filter((item) => (item.status || '').toLowerCase() === 'maintenance').length,
+          totalValue: mapped.reduce((sum, item) => sum + ((parseFloat(item.price) || 0) * (item.availableQty || 0)), 0)
+        };
+
+        setInventoryStats(stats);
       } catch (error) {
         console.error('Error fetching inventory data:', error);
       } finally {
@@ -45,80 +116,18 @@ const Inventory = () => {
     fetchData();
   }, []);
 
-  const filteredItems = allItems.filter(item => {
-    const matchesSearch =
-      item.uniqueNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.customerName.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesService = serviceFilter ? (item.serviceTypeDisplay || item.serviceType) === serviceFilter : true;
-
-    return matchesSearch && matchesService;
+  const filteredItems = allItems.filter((item) => {
+    const haystack = `${item.item_name || ''} ${item.brand || ''} ${item.displayCategory || ''}`.toLowerCase();
+    const matchesSearch = haystack.includes(searchTerm.toLowerCase());
+    const matchesCategory = categoryFilter ? item.category === categoryFilter : true;
+    return matchesSearch && matchesCategory;
   });
 
-  const handleServiceFilterChange = async (e) => {
-    const serviceType = e.target.value;
-    setServiceFilter(serviceType);
-
-    if (serviceType === '') {
-
-      setLoading(true);
-      const response = await getCompletedItems();
-      if (response.success) {
-        setAllItems(response.items);
-      }
-      setLoading(false);
-    } else {
-
-      setLoading(true);
-      const response = await getItemsByServiceType(serviceType);
-      if (response.success) {
-        setAllItems(response.items);
-      }
-      setLoading(false);
-    }
-  };
+  const uniqueCategories = [...new Set(allItems.map((item) => item.category).filter(Boolean))];
 
   const handleRowClick = (item) => {
     setSelectedItem(item);
     setShowDetailModal(true);
-  };
-
-  const getServiceImageUrl = (item) => {
-
-    if (item.completedItemImage && item.completedItemImage !== 'no-image') {
-      if (item.completedItemImage.startsWith('http')) {
-        return item.completedItemImage;
-      }
-      return `${API_BASE_URL}${item.completedItemImage}`;
-    }
-
-    if (item.specificData) {
-      const imageUrl = item.specificData.imageUrl || item.specificData.completed_image || item.specificData.completedImage;
-      if (imageUrl && imageUrl !== 'no-image') {
-        if (imageUrl.startsWith('http')) {
-          return imageUrl;
-        }
-        return `${API_BASE_URL}${imageUrl}`;
-      }
-    }
-
-    return null;
-  };
-
-  const getServiceDescription = (item) => {
-    if (!item.specificData) return null;
-    const data = item.specificData;
-    const serviceType = (item.serviceType || '').toLowerCase();
-
-    if (serviceType === 'dry_cleaning' || serviceType === 'dry-cleaning' || serviceType === 'drycleaning') {
-      return `${data.garmentType || 'Garment'} - Brand: ${data.brand || 'N/A'} - Quantity: ${data.quantity || 1}`;
-    } else if (serviceType === 'repair') {
-      return `${data.serviceName || 'Repair'} - ${data.damageDescription || 'No description'}`;
-    } else if (serviceType === 'customization' || serviceType === 'customize') {
-      return `${data.garmentType || 'Custom'} - ${data.fabricType || 'N/A'} fabric`;
-    }
-
-    return data.description || data.notes || 'Service details';
   };
 
   const openImagePreview = (imageUrl, altText) => {
@@ -127,19 +136,6 @@ const Inventory = () => {
 
   const closeImagePreview = () => {
     setImagePreview({ isOpen: false, imageUrl: '', altText: '' });
-  };
-
-  const getServiceTypeColor = (serviceType) => {
-    const colors = {
-      'Customization': '#9c27b0',
-      'Dry Cleaning': '#2196f3',
-      'Repair': '#ff9800',
-      'Rental': '#4caf50',
-      'Alteration': '#f44336',
-      'Consultation': '#795548',
-      'Other': '#607d8b'
-    };
-    return colors[serviceType] || '#666';
   };
 
   return (
@@ -151,7 +147,7 @@ const Inventory = () => {
         <div className="dashboard-title">
           <div>
             <h2>Inventory Management</h2>
-            <p>Track completed service items</p>
+            <p>Track available rental clothes</p>
           </div>
         </div>
         <div className="stats-grid">
@@ -167,27 +163,27 @@ const Inventory = () => {
 
           <div className="stat-card">
             <div className="stat-header">
-              <span>Customization</span>
-              <div className="stat-icon" style={{ background: '#fff3e0', color: '#ff9800' }}>
-                <i className="fas fa-tshirt"></i>
+              <span>Available Items</span>
+              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#2e7d32' }}>
+                <i className="fas fa-check-circle"></i>
               </div>
             </div>
-            <div className="stat-number">{inventoryStats.customization}</div>
+            <div className="stat-number">{inventoryStats.available}</div>
           </div>
 
           <div className="stat-card">
             <div className="stat-header">
-              <span>Dry Cleaning</span>
-              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>
-                <i className="fas fa-tint"></i>
+              <span>Rented Items</span>
+              <div className="stat-icon" style={{ background: '#fff3e0', color: '#ef6c00' }}>
+                <i className="fas fa-user-clock"></i>
               </div>
             </div>
-            <div className="stat-number">{inventoryStats.dryCleaning}</div>
+            <div className="stat-number">{inventoryStats.rented}</div>
           </div>
 
           <div className="stat-card">
             <div className="stat-header">
-              <span>Repair</span>
+              <span>Maintenance</span>
               <div className="stat-icon" style={{ background: '#ffebee', color: '#f44336' }}>
                 <i className="fas fa-cut"></i>
               </div>
@@ -210,16 +206,18 @@ const Inventory = () => {
         <div className="search-container">
           <input
             type="text"
-            placeholder="Search by Order ID or Customer Name"
+            placeholder="Search by item name, brand, or category"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
 
-          <select value={serviceFilter} onChange={handleServiceFilterChange}>
-            <option value="">All Services</option>
-            <option value="Customization">Customization</option>
-            <option value="Dry Cleaning">Dry Cleaning</option>
-            <option value="Repair">Repair</option>
+          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+            <option value="">All Categories</option>
+            {uniqueCategories.map((category) => (
+              <option key={category} value={category}>
+                {category.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')}
+              </option>
+            ))}
           </select>
         </div>
         <div className="table-container">
@@ -231,10 +229,11 @@ const Inventory = () => {
             <table>
               <thead>
                 <tr>
-                  <th>Order ID</th>
-                  <th>Customer Name</th>
-                  <th>Service Type</th>
-                  <th>Date Completed</th>
+                  <th>Item Name</th>
+                  <th>Category</th>
+                  <th>Brand</th>
+                  <th>Available Sizes</th>
+                  <th>Quantity</th>
                   <th>Price</th>
                   <th>Status</th>
                 </tr>
@@ -242,25 +241,22 @@ const Inventory = () => {
               <tbody>
                 {filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
-                      No inventory items found
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>
+                      No rental inventory items found
                     </td>
                   </tr>
                 ) : (
-                  filteredItems.map(item => (
+                  filteredItems.map((item) => (
                     <tr
                       key={item.id}
                       onClick={() => handleRowClick(item)}
                       style={{ cursor: 'pointer' }}
                     >
-                      <td><strong>{item.uniqueNo}</strong></td>
-                      <td>{item.customerName}</td>
-                      <td>
-                        <span className="service-type-badge" data-service-type={(item.serviceType || '').toLowerCase()}>
-                          {item.serviceTypeDisplay || item.serviceType}
-                        </span>
-                      </td>
-                      <td>{item.date}</td>
+                      <td><strong>{item.item_name}</strong></td>
+                      <td>{item.displayCategory}</td>
+                      <td>{item.brand || 'N/A'}</td>
+                      <td>{getAvailableSizesText(item.sizeOptions)}</td>
+                      <td>{item.availableQty}</td>
                       <td style={{ fontWeight: '600', color: '#2e7d32' }}>
                         ₱{parseFloat(item.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
@@ -293,43 +289,13 @@ const Inventory = () => {
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="modal-header">
-              <h2>Completed Item Details</h2>
+              <h2>Rental Inventory Details</h2>
               <span className="close-modal" onClick={() => setShowDetailModal(false)}>×</span>
             </div>
             <div className="modal-body">
               <div className="detail-row">
-                <strong>Order ID:</strong>
-                <span>{selectedItem.uniqueNo}</span>
-              </div>
-              <div className="detail-row">
-                <strong>Order ID:</strong>
-                <span>#{selectedItem.orderId}</span>
-              </div>
-              <div className="detail-row">
-                <strong>Customer Name:</strong>
-                <span>{selectedItem.customerName}</span>
-              </div>
-              {selectedItem.customerEmail && (
-                <div className="detail-row">
-                  <strong>Email:</strong>
-                  <span>{selectedItem.customerEmail}</span>
-                </div>
-              )}
-              {selectedItem.customerPhone && (
-                <div className="detail-row">
-                  <strong>Phone:</strong>
-                  <span>{selectedItem.customerPhone}</span>
-                </div>
-              )}
-              <div className="detail-row">
-                <strong>Service Type:</strong>
-                <span className="service-type-badge" data-service-type={(selectedItem.serviceType || '').toLowerCase()}>
-                  {selectedItem.serviceTypeDisplay || selectedItem.serviceType}
-                </span>
-              </div>
-              <div className="detail-row">
-                <strong>Date Completed:</strong>
-                <span>{selectedItem.date}</span>
+                <strong>Item:</strong>
+                <span>{selectedItem.item_name}</span>
               </div>
               <div className="detail-row">
                 <strong>Price:</strong>
@@ -350,81 +316,52 @@ const Inventory = () => {
                   {selectedItem.status}
                 </span>
               </div>
-              {getServiceDescription(selectedItem) && (
+              <div className="detail-row">
+                <strong>Category:</strong>
+                <span>{selectedItem.displayCategory}</span>
+              </div>
+              <div className="detail-row">
+                <strong>Brand:</strong>
+                <span>{selectedItem.brand || 'N/A'}</span>
+              </div>
+              <div className="detail-row">
+                <strong>Material:</strong>
+                <span>{selectedItem.material || 'N/A'}</span>
+              </div>
+              <div className="detail-row">
+                <strong>Total Quantity:</strong>
+                <span>{selectedItem.availableQty}</span>
+              </div>
+              {selectedItem.description && (
                 <div className="detail-row">
                   <strong>Description:</strong>
-                  <span>{getServiceDescription(selectedItem)}</span>
+                  <span>{selectedItem.description}</span>
                 </div>
               )}
-              {selectedItem.specificData && (
-                <>
-                  {selectedItem.serviceType?.toLowerCase() === 'dry_cleaning' || selectedItem.serviceType?.toLowerCase() === 'dry-cleaning' || selectedItem.serviceType?.toLowerCase() === 'drycleaning' ? (
-                    <>
-                      {selectedItem.specificData.garmentType && (
-                        <div className="detail-row">
-                          <strong>Garment Type:</strong>
-                          <span>{selectedItem.specificData.garmentType}</span>
+
+              {Object.keys(selectedItem.sizeOptions || {}).length > 0 && (
+                <div className="detail-row" style={{ display: 'block' }}>
+                  <strong>Size Availability:</strong>
+                  <div style={{ marginTop: '8px' }}>
+                    {Object.entries(selectedItem.sizeOptions)
+                      .filter(([, option]) => (option.quantity || 0) > 0)
+                      .map(([key, option]) => (
+                        <div key={key} style={{ padding: '6px 0', borderBottom: '1px solid #eee' }}>
+                          <strong>{SIZE_LABELS[key] || key}</strong> - Qty: {option.quantity}
+                          {(option.cm || option.inch) ? ` (${option.cm || '-'} cm / ${option.inch || '-'} in)` : ''}
                         </div>
-                      )}
-                      {selectedItem.specificData.brand && (
-                        <div className="detail-row">
-                          <strong>Brand:</strong>
-                          <span>{selectedItem.specificData.brand}</span>
-                        </div>
-                      )}
-                      {selectedItem.specificData.quantity && (
-                        <div className="detail-row">
-                          <strong>Quantity:</strong>
-                          <span>{selectedItem.specificData.quantity}</span>
-                        </div>
-                      )}
-                    </>
-                  ) : selectedItem.serviceType?.toLowerCase() === 'repair' ? (
-                    <>
-                      {selectedItem.specificData.serviceName && (
-                        <div className="detail-row">
-                          <strong>Service Name:</strong>
-                          <span>{selectedItem.specificData.serviceName}</span>
-                        </div>
-                      )}
-                      {selectedItem.specificData.damageLevel && (
-                        <div className="detail-row">
-                          <strong>Damage Level:</strong>
-                          <span>{selectedItem.specificData.damageLevel}</span>
-                        </div>
-                      )}
-                      {selectedItem.specificData.damageDescription && (
-                        <div className="detail-row">
-                          <strong>Damage Description:</strong>
-                          <span>{selectedItem.specificData.damageDescription}</span>
-                        </div>
-                      )}
-                    </>
-                  ) : selectedItem.serviceType?.toLowerCase() === 'customization' || selectedItem.serviceType?.toLowerCase() === 'customize' ? (
-                    <>
-                      {selectedItem.specificData.garmentType && (
-                        <div className="detail-row">
-                          <strong>Garment Type:</strong>
-                          <span>{selectedItem.specificData.garmentType}</span>
-                        </div>
-                      )}
-                      {selectedItem.specificData.fabricType && (
-                        <div className="detail-row">
-                          <strong>Fabric Type:</strong>
-                          <span>{selectedItem.specificData.fabricType}</span>
-                        </div>
-                      )}
-                    </>
-                  ) : null}
-                </>
+                      ))}
+                  </div>
+                </div>
               )}
-              {getServiceImageUrl(selectedItem) && (
+
+              {selectedItem.image && (
                 <div className="detail-row">
-                  <strong>Completed Item Image:</strong>
+                  <strong>Item Image:</strong>
                   <div style={{ marginTop: '8px' }}>
                     <img
-                      src={getServiceImageUrl(selectedItem)}
-                      alt="Completed Item"
+                      src={selectedItem.image}
+                      alt="Rental Item"
                       style={{
                         maxWidth: '100%',
                         maxHeight: '400px',
@@ -432,7 +369,7 @@ const Inventory = () => {
                         borderRadius: '4px',
                         cursor: 'pointer'
                       }}
-                      onClick={() => openImagePreview(getServiceImageUrl(selectedItem), `${selectedItem.serviceTypeDisplay || selectedItem.serviceType} - Completed Item`)}
+                      onClick={() => openImagePreview(selectedItem.image, `${selectedItem.item_name} - Rental Item`)}
                       onError={(e) => {
                         e.target.style.display = 'none';
                       }}
@@ -441,12 +378,6 @@ const Inventory = () => {
                       Click to enlarge
                     </small>
                   </div>
-                </div>
-              )}
-              {selectedItem.pricingFactors?.adminNotes && (
-                <div className="detail-row">
-                  <strong>Admin Notes:</strong>
-                  <span>{selectedItem.pricingFactors.adminNotes}</span>
                 </div>
               )}
             </div>

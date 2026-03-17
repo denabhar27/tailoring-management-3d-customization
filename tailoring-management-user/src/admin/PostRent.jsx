@@ -6,6 +6,166 @@ import Sidebar from './Sidebar';
 import { getAllRentals, createRental, updateRental, deleteRental, getRentalImageUrl } from '../api/RentalApi';
 import { useAlert } from '../context/AlertContext';
 
+const SIZE_OPTION_KEYS = ['small', 'medium', 'large', 'extra_large'];
+
+const SIZE_LABELS = {
+  small: 'Small (S)',
+  medium: 'Medium (M)',
+  large: 'Large (L)',
+  extra_large: 'Extra Large (XL)'
+};
+
+const EMPTY_MEASUREMENTS = () => ({
+  chest: { inch: '', cm: '' },
+  shoulders: { inch: '', cm: '' },
+  sleeveLength: { inch: '', cm: '' },
+  neck: { inch: '', cm: '' },
+  waist: { inch: '', cm: '' },
+  length: { inch: '', cm: '' },
+  hips: { inch: '', cm: '' },
+  inseam: { inch: '', cm: '' },
+  thigh: { inch: '', cm: '' },
+  outseam: { inch: '', cm: '' }
+});
+
+const createDefaultSizeEntry = (sizeKey, extraId = '') => ({
+  id: `${sizeKey || 'custom'}_${Date.now()}${extraId}`,
+  sizeKey: sizeKey || 'custom',
+  customLabel: '',
+  quantity: '',
+  price: '',
+  activeTab: 'top',
+  isOpen: false,
+  measurements: EMPTY_MEASUREMENTS()
+});
+
+const parseSizeEntriesFromPayload = (rawSize) => {
+  const defaults = SIZE_OPTION_KEYS.map((k, i) => createDefaultSizeEntry(k, String(i)));
+  if (!rawSize) return defaults;
+  try {
+    const parsed = typeof rawSize === 'string' ? JSON.parse(rawSize) : rawSize;
+    if (parsed?.size_entries && Array.isArray(parsed.size_entries) && parsed.size_entries.length > 0) {
+      return parsed.size_entries.map((entry, idx) => {
+        const measurements = EMPTY_MEASUREMENTS();
+        const m = entry.measurements || {};
+        Object.keys(measurements).forEach(key => {
+          if (m[key]) measurements[key] = { inch: m[key].inch ?? '', cm: m[key].cm ?? '' };
+        });
+        return {
+          id: `entry_${idx}_${Date.now()}`,
+          sizeKey: entry.sizeKey || 'custom',
+          customLabel: entry.customLabel || '',
+          quantity: entry.quantity !== undefined ? String(entry.quantity) : '',
+          price: entry.price !== undefined ? String(entry.price) : '',
+          activeTab: 'top',
+          isOpen: false,
+          measurements
+        };
+      });
+    }
+    // Old v1 format
+    const sizeOpts = parsed?.size_options || parsed?.sizeOptions || {};
+    const mp = parsed?.measurement_profile || parsed?.measurementProfile || {};
+    const getMeasVal = (src, key) => {
+      const val = src?.[key];
+      if (!val) return { inch: '', cm: '' };
+      if (typeof val === 'object' && (val.inch !== undefined || val.cm !== undefined))
+        return { inch: val.inch ?? '', cm: val.cm ?? '' };
+      return { inch: String(val), cm: '' };
+    };
+    return SIZE_OPTION_KEYS.map((key, idx) => {
+      const opt = sizeOpts[key] || {};
+      const measurements = EMPTY_MEASUREMENTS();
+      Object.keys(measurements).forEach(k => { measurements[k] = getMeasVal(mp, k); });
+      return {
+        id: `${key}_${Date.now() + idx}`,
+        sizeKey: key,
+        customLabel: '',
+        quantity: opt.quantity !== undefined ? String(opt.quantity) : '',
+        price: opt.price !== undefined ? String(opt.price) : '',
+        activeTab: 'top',
+        isOpen: false,
+        measurements
+      };
+    });
+  } catch (e) {
+    return defaults;
+  }
+};
+
+const getTotalFromEntries = (entries) =>
+  (entries || []).reduce((sum, entry) => {
+    const qty = parseInt(entry.quantity, 10);
+    return sum + (isNaN(qty) || qty < 0 ? 0 : qty);
+  }, 0);
+
+const TOP_MEASUREMENT_FIELDS = [
+  { key: 'chest', label: 'Chest' },
+  { key: 'shoulders', label: 'Shoulders' },
+  { key: 'sleeveLength', label: 'Sleeve Length' },
+  { key: 'neck', label: 'Neck' },
+  { key: 'waist', label: 'Waist' },
+  { key: 'length', label: 'Length' }
+];
+
+const BOTTOM_MEASUREMENT_FIELDS = [
+  { key: 'waist', label: 'Waist' },
+  { key: 'hips', label: 'Hips' },
+  { key: 'inseam', label: 'Inseam' },
+  { key: 'length', label: 'Length' },
+  { key: 'thigh', label: 'Thigh' },
+  { key: 'outseam', label: 'Outseam' }
+];
+
+const createDefaultSizeOptions = () => ({
+  small: { inch: '', cm: '', quantity: '' },
+  medium: { inch: '', cm: '', quantity: '' },
+  large: { inch: '', cm: '', quantity: '' },
+  extra_large: { inch: '', cm: '', quantity: '' }
+});
+
+const parseSizeOptionsFromSizePayload = (rawSize) => {
+  const defaults = createDefaultSizeOptions();
+
+  if (!rawSize) {
+    return defaults;
+  }
+
+  try {
+    const parsed = typeof rawSize === 'string' ? JSON.parse(rawSize) : rawSize;
+    const source = parsed?.size_options || parsed?.sizeOptions || parsed;
+
+    if (!source || typeof source !== 'object') {
+      return defaults;
+    }
+
+    const normalized = { ...defaults };
+    SIZE_OPTION_KEYS.forEach((key) => {
+      const option = source[key];
+      if (!option || typeof option !== 'object') {
+        return;
+      }
+
+      normalized[key] = {
+        inch: option.inch ?? '',
+        cm: option.cm ?? '',
+        quantity: option.quantity ?? ''
+      };
+    });
+
+    return normalized;
+  } catch (e) {
+    return defaults;
+  }
+};
+
+const getTotalAvailableFromSizeOptions = (sizeOptions) => {
+  return SIZE_OPTION_KEYS.reduce((total, key) => {
+    const qty = parseInt(sizeOptions?.[key]?.quantity, 10);
+    return total + (Number.isNaN(qty) || qty < 0 ? 0 : qty);
+  }, 0);
+};
+
 const ImageCarousel = ({ images, itemName, getRentalImageUrl }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -115,6 +275,7 @@ const PostRent = () => {
   const [backImageFile, setBackImageFile] = useState(null);
   const [sideImagePreview, setSideImagePreview] = useState('');
   const [sideImageFile, setSideImageFile] = useState(null);
+  const [isSizeSectionOpen, setIsSizeSectionOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -127,24 +288,11 @@ const PostRent = () => {
     price: '',
     downpayment: '',
     total_available: '1',
+    size_entries: SIZE_OPTION_KEYS.map((k, i) => createDefaultSizeEntry(k, String(i))),
     material: '',
     care_instructions: '',
     damage_notes: '',
     status: 'available',
-    measurements: {
-      
-      chest: { inch: '', cm: '' },
-      shoulders: { inch: '', cm: '' },
-      sleeveLength: { inch: '', cm: '' },
-      neck: { inch: '', cm: '' },
-      waist: { inch: '', cm: '' },
-      length: { inch: '', cm: '' },
-      
-      hips: { inch: '', cm: '' },
-      inseam: { inch: '', cm: '' },
-      thigh: { inch: '', cm: '' },
-      outseam: { inch: '', cm: '' }
-    }
   });
 
   useEffect(() => {
@@ -182,49 +330,6 @@ const PostRent = () => {
     if (id != null) {
       const item = items.find(i => i.item_id === id);
       if (item) {
-        
-        let measurements = {
-          chest: { inch: '', cm: '' },
-          shoulders: { inch: '', cm: '' },
-          sleeveLength: { inch: '', cm: '' },
-          neck: { inch: '', cm: '' },
-          waist: { inch: '', cm: '' },
-          length: { inch: '', cm: '' },
-          hips: { inch: '', cm: '' },
-          inseam: { inch: '', cm: '' },
-          thigh: { inch: '', cm: '' },
-          outseam: { inch: '', cm: '' }
-        };
-        if (item.size) {
-          try {
-            const parsed = typeof item.size === 'string' ? JSON.parse(item.size) : item.size;
-            if (parsed && typeof parsed === 'object') {
-              
-              Object.keys(measurements).forEach(key => {
-                if (parsed[key]) {
-                  if (typeof parsed[key] === 'object' && (parsed[key].inch !== undefined || parsed[key].cm !== undefined)) {
-                    
-                    measurements[key] = {
-                      inch: parsed[key].inch || '',
-                      cm: parsed[key].cm || ''
-                    };
-                  } else if (typeof parsed[key] === 'string' || typeof parsed[key] === 'number') {
-                    
-                    const inchValue = String(parsed[key]);
-                    const cmValue = inchValue ? (parseFloat(inchValue) * 2.54).toFixed(2) : '';
-                    measurements[key] = {
-                      inch: inchValue,
-                      cm: cmValue
-                    };
-                  }
-                }
-              });
-            }
-          } catch (e) {
-            
-          }
-        }
-
         setFormData({
           item_name: item.item_name || '',
           description: item.description || '',
@@ -235,14 +340,13 @@ const PostRent = () => {
           price: item.price || '',
           downpayment: item.downpayment || '',
           total_available: item.total_available?.toString() || '1',
+          size_entries: parseSizeEntriesFromPayload(item.size),
           material: item.material || '',
           care_instructions: item.care_instructions || '',
           damage_notes: item.damage_notes || '',
           status: item.status || 'available',
-          measurements: measurements
         });
         setImagePreview(item.image_url ? getRentalImageUrl(item.image_url) : '');
-        
         setFrontImagePreview(item.front_image ? getRentalImageUrl(item.front_image) : '');
         setBackImagePreview(item.back_image ? getRentalImageUrl(item.back_image) : '');
         setSideImagePreview(item.side_image ? getRentalImageUrl(item.side_image) : '');
@@ -259,22 +363,11 @@ const PostRent = () => {
         price: '',
         downpayment: '',
         total_available: '1',
+        size_entries: SIZE_OPTION_KEYS.map((k, i) => createDefaultSizeEntry(k, String(i))),
         material: '',
         care_instructions: '',
         damage_notes: '',
         status: 'available',
-        measurements: {
-          chest: { inch: '', cm: '' },
-          shoulders: { inch: '', cm: '' },
-          sleeveLength: { inch: '', cm: '' },
-          neck: { inch: '', cm: '' },
-          waist: { inch: '', cm: '' },
-          length: { inch: '', cm: '' },
-          hips: { inch: '', cm: '' },
-          inseam: { inch: '', cm: '' },
-          thigh: { inch: '', cm: '' },
-          outseam: { inch: '', cm: '' }
-        }
       });
       setImagePreview('');
       setImageFile(null);
@@ -344,14 +437,6 @@ const PostRent = () => {
     }
   };
 
-  const isTopCategory = (category) => {
-    return ['suit', 'tuxedo', 'formal_wear', 'business'].includes(category);
-  };
-
-  const isBottomCategory = (category) => {
-    return ['casual', 'pants', 'trousers'].includes(category);
-  };
-
   const inchToCm = (inch) => {
     if (!inch || inch === '') return '';
     const num = parseFloat(inch);
@@ -366,24 +451,42 @@ const PostRent = () => {
     return (num / 2.54).toFixed(2);
   };
 
-  const handleMeasurementChange = (field, unit, value) => {
-    const currentMeasurement = formData.measurements[field] || { inch: '', cm: '' };
-    let updatedMeasurement = { ...currentMeasurement };
-    
-    if (unit === 'inch') {
-      updatedMeasurement.inch = value;
-      updatedMeasurement.cm = inchToCm(value);
-    } else if (unit === 'cm') {
-      updatedMeasurement.cm = value;
-      updatedMeasurement.inch = cmToInch(value);
-    }
-    
-    setFormData({
-      ...formData,
-      measurements: {
-        ...formData.measurements,
-        [field]: updatedMeasurement
-      }
+  const handleEntryChange = (entryId, field, value) => {
+    setFormData(prev => {
+      const nextEntries = prev.size_entries.map(entry =>
+        entry.id === entryId ? { ...entry, [field]: value } : entry
+      );
+      return {
+        ...prev,
+        size_entries: nextEntries,
+        ...(field === 'quantity' ? { total_available: String(getTotalFromEntries(nextEntries)) } : {})
+      };
+    });
+  };
+
+  const handleEntryMeasurementChange = (entryId, measKey, unit, value) => {
+    setFormData(prev => ({
+      ...prev,
+      size_entries: prev.size_entries.map(entry => {
+        if (entry.id !== entryId) return entry;
+        const current = entry.measurements[measKey] || { inch: '', cm: '' };
+        const updated = unit === 'inch'
+          ? { inch: value, cm: inchToCm(value) }
+          : { cm: value, inch: cmToInch(value) };
+        return { ...entry, measurements: { ...entry.measurements, [measKey]: { ...current, ...updated } } };
+      })
+    }));
+  };
+
+  const addEntry = () => {
+    const newEntry = { ...createDefaultSizeEntry('custom', `_${Date.now()}`), isOpen: true };
+    setFormData(prev => ({ ...prev, size_entries: [...prev.size_entries, newEntry] }));
+  };
+
+  const removeEntry = (entryId) => {
+    setFormData(prev => {
+      const updated = prev.size_entries.filter(e => e.id !== entryId);
+      return { ...prev, size_entries: updated, total_available: String(getTotalFromEntries(updated)) };
     });
   };
 
@@ -391,32 +494,46 @@ const PostRent = () => {
     setError('');
     setIsLoading(true);
 
-    if (!formData.item_name || !formData.price) {
-      setError('Item name and price are required');
+    if (!formData.item_name) {
+      setError('Item name is required');
       setIsLoading(false);
       return;
     }
 
-    const measurementsToSave = {};
-    if (isTopCategory(formData.category)) {
-      measurementsToSave.chest = formData.measurements.chest || { inch: '', cm: '' };
-      measurementsToSave.shoulders = formData.measurements.shoulders || { inch: '', cm: '' };
-      measurementsToSave.sleeveLength = formData.measurements.sleeveLength || { inch: '', cm: '' };
-      measurementsToSave.neck = formData.measurements.neck || { inch: '', cm: '' };
-      measurementsToSave.waist = formData.measurements.waist || { inch: '', cm: '' };
-      measurementsToSave.length = formData.measurements.length || { inch: '', cm: '' };
-    } else if (isBottomCategory(formData.category)) {
-      measurementsToSave.waist = formData.measurements.waist || { inch: '', cm: '' };
-      measurementsToSave.hips = formData.measurements.hips || { inch: '', cm: '' };
-      measurementsToSave.inseam = formData.measurements.inseam || { inch: '', cm: '' };
-      measurementsToSave.length = formData.measurements.length || { inch: '', cm: '' };
-      measurementsToSave.thigh = formData.measurements.thigh || { inch: '', cm: '' };
-      measurementsToSave.outseam = formData.measurements.outseam || { inch: '', cm: '' };
+    const sizeEntries = formData.size_entries || [];
+    const normalizedEntries = sizeEntries.map(entry => ({
+      sizeKey: entry.sizeKey,
+      customLabel: entry.customLabel || '',
+      quantity: Math.max(0, parseInt(entry.quantity, 10) || 0),
+      price: parseFloat(entry.price) || 0,
+      measurements: entry.measurements || {}
+    }));
+
+    // Build size_options for backward compatibility
+    const normalizedSizeOptions = {};
+    sizeEntries.forEach(entry => {
+      const key = entry.sizeKey !== 'custom' ? entry.sizeKey : null;
+      if (key) normalizedSizeOptions[key] = { quantity: Math.max(0, parseInt(entry.quantity, 10) || 0) };
+    });
+
+    const totalAvailable = getTotalFromEntries(sizeEntries);
+    const firstEntryPrice = normalizedEntries.find(e => e.price > 0)?.price ?? 0;
+
+    if (totalAvailable <= 0) {
+      setError('Total available must be greater than 0');
+      setIsLoading(false);
+      return;
     }
 
     const dataToSave = {
       ...formData,
-      size: JSON.stringify(measurementsToSave)
+      price: firstEntryPrice,
+      total_available: totalAvailable,
+      size: JSON.stringify({
+        format: 'rental_size_v2',
+        size_options: normalizedSizeOptions,
+        size_entries: normalizedEntries
+      })
     };
 
     try {
@@ -566,7 +683,7 @@ const PostRent = () => {
           <div className="dialog" onClick={(e) => e.stopPropagation()}>
             <div className="dialog-header">
               <h3>{editingId ? 'Edit Item' : 'Add New Item'}</h3>
-              <button className="close-button" onClick={closeModal}>├ù</button>
+              <button className="close-button" onClick={closeModal}>x</button>
             </div>
 
             <div className="dialog-body">
@@ -711,347 +828,166 @@ const PostRent = () => {
                   </select>
                 </div>
               </div>
-              {isTopCategory(formData.category) && (
-                <div className="measurements-section" style={{ marginBottom: '20px' }}>
-                  <h4 style={{ marginBottom: '15px', color: '#333', fontSize: '1.1rem', fontWeight: '600' }}>Top Measurements</h4>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f8f9fa' }}>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Measurement</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Inches</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Centimeters</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Chest</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.chest?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('chest', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.chest?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('chest', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Shoulders</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.shoulders?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('shoulders', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.shoulders?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('shoulders', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Sleeve Length</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.sleeveLength?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('sleeveLength', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.sleeveLength?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('sleeveLength', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Neck</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.neck?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('neck', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.neck?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('neck', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Waist</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.waist?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('waist', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.waist?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('waist', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', color: '#000' }}><strong style={{ color: '#000' }}>Length</strong></td>
-                        <td style={{ padding: '12px' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.length?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('length', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.length?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('length', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+              {/* Combined collapsible Sizes & Measurements section */}
+              <div style={{ marginBottom: '20px', border: '1px solid #e0e0e0', borderRadius: '10px', overflow: 'hidden' }}>
+                <div
+                  onClick={() => setIsSizeSectionOpen(!isSizeSectionOpen)}
+                  style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '14px 16px', backgroundColor: '#f8f9fa', cursor: 'pointer',
+                    borderBottom: isSizeSectionOpen ? '1px solid #e0e0e0' : 'none', userSelect: 'none'
+                  }}
+                >
+                  <h4 style={{ margin: 0, color: '#333', fontWeight: '600', fontSize: '1rem' }}>
+                    Sizes &amp; Measurements
+                  </h4>
+                  <span style={{
+                    fontSize: '11px', color: '#666', display: 'inline-block',
+                    transform: isSizeSectionOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s'
+                  }}>▼</span>
                 </div>
-              )}
 
-              {isBottomCategory(formData.category) && (
-                <div className="measurements-section" style={{ marginBottom: '20px' }}>
-                  <h4 style={{ marginBottom: '15px', color: '#333', fontSize: '1.1rem', fontWeight: '600' }}>Bottom Measurements</h4>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f8f9fa' }}>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Measurement</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Inches</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Centimeters</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Waist</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.waist?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('waist', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.waist?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('waist', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Hips</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.hips?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('hips', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.hips?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('hips', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Inseam</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.inseam?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('inseam', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.inseam?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('inseam', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Length</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.length?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('length', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.length?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('length', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}><strong style={{ color: '#000' }}>Thigh</strong></td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.thigh?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('thigh', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.thigh?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('thigh', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '12px', color: '#000' }}><strong style={{ color: '#000' }}>Outseam</strong></td>
-                        <td style={{ padding: '12px' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.outseam?.inch || ''} 
-                            onChange={(e) => handleMeasurementChange('outseam', 'inch', e.target.value)} 
-                            placeholder="Inches"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px' }}>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={formData.measurements.outseam?.cm || ''} 
-                            onChange={(e) => handleMeasurementChange('outseam', 'cm', e.target.value)} 
-                            placeholder="Centimeters"
-                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000' }}
-                          />
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                {isSizeSectionOpen && (
+                  <div style={{ padding: '16px' }}>
+                    <p style={{ fontSize: '12px', color: '#666', marginTop: 0, marginBottom: '14px' }}>
+                      Set quantity per size. Expand a size row to add its garment measurements.
+                    </p>
 
-              <div className="form-grid">
-                <div className="input-group">
-                  <label>Price *</label>
-                  <input 
-                    type="text" 
-                    value={formData.price} 
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })} 
-                    placeholder="e.g., 500.00"
-                  />
-                </div>
-                <div className="input-group">
-                  <label>Total Available</label>
-                  <input 
-                    type="number" 
-                    value={formData.total_available} 
-                    onChange={(e) => setFormData({ ...formData, total_available: e.target.value })} 
-                    min="1"
-                  />
-                </div>
-              </div>
+                    {formData.size_entries.map((entry, idx) => (
+                      <div key={entry.id} style={{ marginBottom: '10px', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
+                        {/* Row header */}
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px',
+                          backgroundColor: entry.isOpen ? '#f0f7ff' : (idx % 2 === 0 ? '#fff' : '#fafafa')
+                        }}>
+                          {entry.sizeKey !== 'custom' ? (
+                            <span style={{ minWidth: '130px', fontWeight: '600', color: '#333', fontSize: '13px' }}>
+                              {SIZE_LABELS[entry.sizeKey] || entry.sizeKey}
+                            </span>
+                          ) : (
+                            <input
+                              type="text"
+                              value={entry.customLabel}
+                              onChange={(e) => handleEntryChange(entry.id, 'customLabel', e.target.value)}
+                              placeholder="Size name (e.g., XL)"
+                              style={{ width: '130px', padding: '6px 8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px', color: '#000' }}
+                            />
+                          )}
+                          <label style={{ fontSize: '12px', color: '#555', whiteSpace: 'nowrap' }}>Qty:</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={entry.quantity}
+                            onChange={(e) => handleEntryChange(entry.id, 'quantity', e.target.value)}
+                            placeholder="0"
+                            style={{ width: '70px', padding: '6px 8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000', fontSize: '13px' }}
+                          />
+                          <label style={{ fontSize: '12px', color: '#555', whiteSpace: 'nowrap' }}>Price:</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={entry.price}
+                            onChange={(e) => handleEntryChange(entry.id, 'price', e.target.value)}
+                            placeholder="0.00"
+                            style={{ width: '90px', padding: '6px 8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000', fontSize: '13px' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleEntryChange(entry.id, 'isOpen', !entry.isOpen)}
+                            style={{
+                              marginLeft: 'auto', padding: '5px 14px', fontSize: '12px', whiteSpace: 'nowrap',
+                              border: `1px solid ${entry.isOpen ? '#0d6efd' : '#aaa'}`, borderRadius: '14px',
+                              backgroundColor: entry.isOpen ? '#0d6efd' : '#fff',
+                              color: entry.isOpen ? '#fff' : '#555', cursor: 'pointer'
+                            }}
+                          >
+                            {entry.isOpen ? '▲ Hide Measurements' : '▼ Measurements'}
+                          </button>
+                          {formData.size_entries.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeEntry(entry.id)}
+                              style={{ padding: '5px 10px', fontSize: '12px', border: '1px solid #dc3545', borderRadius: '4px', backgroundColor: '#fff', color: '#dc3545', cursor: 'pointer' }}
+                            >✕</button>
+                          )}
+                        </div>
 
-              <div className="form-grid">
-                <div className="input-group">
-                  <label>Brand</label>
-                  <input 
-                    type="text" 
-                    value={formData.brand} 
-                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })} 
-                    placeholder="e.g., Armani"
-                  />
-                </div>
+                        {/* Expandable measurement sub-section */}
+                        {entry.isOpen && (
+                          <div style={{ padding: '14px', borderTop: '1px solid #e0e0e0', backgroundColor: '#fafcff' }}>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleEntryChange(entry.id, 'activeTab', 'top')}
+                                style={{
+                                  padding: '6px 14px', borderRadius: '16px', fontSize: '12px', cursor: 'pointer', fontWeight: '600',
+                                  border: entry.activeTab === 'top' ? '1px solid #0d6efd' : '1px solid #d9d9d9',
+                                  backgroundColor: entry.activeTab === 'top' ? '#e7f1ff' : '#fff',
+                                  color: entry.activeTab === 'top' ? '#0d6efd' : '#555'
+                                }}
+                              >Top</button>
+                              <button
+                                type="button"
+                                onClick={() => handleEntryChange(entry.id, 'activeTab', 'bottom')}
+                                style={{
+                                  padding: '6px 14px', borderRadius: '16px', fontSize: '12px', cursor: 'pointer', fontWeight: '600',
+                                  border: entry.activeTab === 'bottom' ? '1px solid #198754' : '1px solid #d9d9d9',
+                                  backgroundColor: entry.activeTab === 'bottom' ? '#e8f8ef' : '#fff',
+                                  color: entry.activeTab === 'bottom' ? '#198754' : '#555'
+                                }}
+                              >Bottom</button>
+                            </div>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '6px', overflow: 'hidden' }}>
+                              <thead>
+                                <tr style={{ backgroundColor: '#f8f9fa' }}>
+                                  <th style={{ padding: '9px 12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#333', fontSize: '12px' }}>Measurement</th>
+                                  <th style={{ padding: '9px 12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#333', fontSize: '12px' }}>Inches</th>
+                                  <th style={{ padding: '9px 12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#333', fontSize: '12px' }}>Centimeters</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(entry.activeTab === 'top' ? TOP_MEASUREMENT_FIELDS : BOTTOM_MEASUREMENT_FIELDS).map((mf, mIdx) => (
+                                  <tr key={mf.key} style={{ backgroundColor: mIdx % 2 === 0 ? '#fff' : '#f9f9f9' }}>
+                                    <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0', color: '#333', fontWeight: '600', fontSize: '12px' }}>{mf.label}</td>
+                                    <td style={{ padding: '6px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                      <input
+                                        type="number" step="0.1"
+                                        value={entry.measurements[mf.key]?.inch || ''}
+                                        onChange={(e) => handleEntryMeasurementChange(entry.id, mf.key, 'inch', e.target.value)}
+                                        placeholder="in"
+                                        style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', color: '#000', fontSize: '12px' }}
+                                      />
+                                    </td>
+                                    <td style={{ padding: '6px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                      <input
+                                        type="number" step="0.1"
+                                        value={entry.measurements[mf.key]?.cm || ''}
+                                        onChange={(e) => handleEntryMeasurementChange(entry.id, mf.key, 'cm', e.target.value)}
+                                        placeholder="cm"
+                                        style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', color: '#000', fontSize: '12px' }}
+                                      />
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    <button
+                      type="button"
+                      onClick={addEntry}
+                      style={{
+                        marginTop: '8px', padding: '8px 18px', fontSize: '13px', width: '100%',
+                        border: '2px dashed #0d6efd', borderRadius: '8px',
+                        backgroundColor: '#f0f7ff', color: '#0d6efd', cursor: 'pointer', fontWeight: '600'
+                      }}
+                    >+ Add Another Size</button>
+                  </div>
+                )}
               </div>
 
               <div className="form-grid">
@@ -1131,7 +1067,7 @@ const PostRent = () => {
           <div className="detail-modal" onClick={(e) => e.stopPropagation()}>
             <div className="detail-modal-header">
               <h3>{selectedItem.item_name}</h3>
-              <button className="close-button" onClick={closeDetailModal}>├ù</button>
+              <button className="close-button" onClick={closeDetailModal}>x</button>
             </div> 
             
             <div className="detail-modal-body">

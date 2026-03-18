@@ -12,6 +12,7 @@ body {
   color: #333;
 }
 
+/* ===== HEADER ===== */
 .header-container {
   position: fixed;
   top: 0;
@@ -113,6 +114,7 @@ body {
   font-family: 'Playfair Display', serif;
 }
 
+/* ===== HERO SECTION ===== */
 .hero-section {
   margin-top: 5rem;
   height: 350px;
@@ -148,6 +150,7 @@ body {
   text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.5);
 }
 
+/* ===== CATEGORY SECTION ===== */
 .category-section {
   padding: 2rem 1rem;
   background: white;
@@ -208,6 +211,7 @@ body {
   font-weight: 500;
 }
 
+/* ===== RENTAL SECTION ===== */
 .rental-section {
   padding: 2rem 1rem;
   background-color: #fffcf9;
@@ -351,6 +355,7 @@ body {
   right: 0;
 }
 
+/* ===== PAGINATION ===== */
 .pagination {
   display: flex;
   justify-content: center;
@@ -374,6 +379,7 @@ body {
   border-radius: 4px;
 }
 
+/* ===== MODAL ===== */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -468,6 +474,7 @@ body {
   box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.1);
 }
 
+/* ===== BUTTONS ===== */
 .btn-primary {
   background: linear-gradient(to right, #8B4513, #b86b3c);
   color: white;
@@ -522,6 +529,7 @@ body {
   background: #c9302c;
 }
 
+/* ===== FOOTER ===== */
 .footer {
   background-color: #2a2a2a;
   color: white;
@@ -531,6 +539,7 @@ body {
   font-size: 0.9rem;
 }
 
+/* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
   .header-nav {
     display: none;
@@ -589,19 +598,22 @@ body {
   .rental-card-image {
     height: 160px;
   }
-}
+}/* styles/rental_user.css */
 
+/* Override hero section background to match the light clothes rack image */
 section.mt-24.h-96 {
   background: url('https://as1.ftcdn.net/jpg/02/72/80/50/1000_F_272805043_dQuXR9kta9Cyn6Lk88xFLxxCpslZpNuJ.jpg') no-repeat center center !important;
   background-size: cover !important;
 }
 
+/* Remove dark overlay and make it slightly light if needed */
 div.absolute.inset-0.bg-black.bg-opacity-40 {
   background-color: transparent !important;
 }
 
+/* Change text color to dark for better visibility on light background */
 div.text-center.text-white {
-  color: #111827 !important; 
+  color: #111827 !important; /* gray-900 */
 }
 
 div.text-center.text-white h1 {
@@ -609,36 +621,41 @@ div.text-center.text-white h1 {
 }
 
 div.text-center.text-white p {
-  color: #374151 !important; 
+  color: #374151 !important; /* gray-700 */
   opacity: 1 !important;
 }
 
+/* Add the missing small text "Just Rent It. Return It." using ::after */
 div.text-center.text-white::after {
   content: "Just Rent It. Return It.";
   display: block;
   margin-top: 1rem;
   font-size: 1.25rem;
-  color: #6b7280; 
+  color: #6b7280; /* gray-500 */
   opacity: 0.9;
 }
 
+/* Make category icons black and grayscale for silhouette-like appearance */
 div.w-16.h-16.bg-gray-100 {
   color: #000000 !important;
   filter: grayscale(1);
 }
 
+/* Ensure hover effects match */
 div.w-16.h-16.bg-gray-100:hover {
-  background-color: #92400e !important; 
+  background-color: #92400e !important; /* amber-900 */
   color: #ffffff !important;
   filter: none;
 }
 
+/* Remove light amber background from rental section to match white in pic */
 section.bg-amber-50 {
   background-color: #ffffff !important;
 }
 
+/* Adjust any other minor styles if needed */
 header.fixed.top-0 {
- 
+  
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
 }
 

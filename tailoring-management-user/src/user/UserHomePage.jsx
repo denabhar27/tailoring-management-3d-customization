@@ -707,7 +707,7 @@ const UserHomePage = ({ setIsLoggedIn }) => {
               color: "#d4c5b9",
               margin: 0
             }}>Scan to download</p>
-          </div>
+         </div>
         </div>
         
         <div style={{

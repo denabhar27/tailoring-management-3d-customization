@@ -10,10 +10,10 @@ const OrderDetails = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-
+ 
     const fetchOrder = async () => {
       try {
-
+  
         console.log('Fetching order details for order_item_id:', orderItemId);
         setOrder({ id: orderItemId, status: 'Loading...' });
       } catch (err) {
@@ -37,6 +37,7 @@ const OrderDetails = () => {
       <div style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '16px', marginTop: '16px' }}>
         <p><strong>Order Item ID:</strong> {orderItemId}</p>
         <p><strong>Status:</strong> {order?.status || 'Unknown'}</p>
+      
       </div>
     </div>
   );

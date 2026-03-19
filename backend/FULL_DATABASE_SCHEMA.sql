@@ -364,7 +364,7 @@ CREATE TABLE rental_inventory (
   item_name VARCHAR(255) NOT NULL,
   description TEXT,
   brand VARCHAR(100),
-  size VARCHAR(255),
+  size LONGTEXT,
   color VARCHAR(100),
   category VARCHAR(100),
   price DECIMAL(10,2) NOT NULL DEFAULT 0.00,

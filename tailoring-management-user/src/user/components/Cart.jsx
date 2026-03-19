@@ -1098,16 +1098,26 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                     <p style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#333' }}>
                       {bundleItem.item_name || 'Rental Item'}
                     </p>
-                    {bundleItem.brand && bundleItem.brand !== 'Unknown' && (
+                    {(bundleItem.brand || bundleItem.specific_data?.brand) && (bundleItem.brand || bundleItem.specific_data?.brand) !== 'Unknown' && (
                       <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#666' }}>
-                        {bundleItem.brand}
+                        {bundleItem.brand || bundleItem.specific_data?.brand}
                       </p>
                     )}
-                    {bundleItem.color && (
+                    {bundleItem.color || bundleItem.specific_data?.color ? (
                       <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#888' }}>
-                        Color: {bundleItem.color}
+                        Color: {bundleItem.color || bundleItem.specific_data?.color}
                       </p>
-                    )}
+                    ) : null}
+                    {(bundleItem.material || bundleItem.specific_data?.material) ? (
+                      <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#888' }}>
+                        Material: {bundleItem.material || bundleItem.specific_data?.material}
+                      </p>
+                    ) : null}
+                    {(bundleItem.price || bundleItem.final_price || bundleItem.specific_data?.price) ? (
+                      <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#007bff', fontWeight: '600' }}>
+                        Price: {formatPrice(bundleItem.price || bundleItem.final_price || bundleItem.specific_data?.price)}
+                      </p>
+                    ) : null}
                     <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: '#007bff' }}>
                       Click to view details →
                     </p>
@@ -1198,34 +1208,71 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                 <span style={{ fontWeight: '600', color: '#333' }}>{selectedBundleItem.item_name || 'N/A'}</span>
               </div>
 
-              {selectedBundleItem.brand && selectedBundleItem.brand !== 'Unknown' && (
+              {selectedBundleItem.category && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+                  <span style={{ fontWeight: '500', color: '#666' }}>Category</span>
+                  <span style={{ fontWeight: '600', color: '#333' }}>{selectedBundleItem.category}</span>
+                </div>
+              )}
+
+              {(selectedBundleItem.brand || selectedBundleItem.specific_data?.brand) && (selectedBundleItem.brand || selectedBundleItem.specific_data?.brand) !== 'Unknown' && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
                   <span style={{ fontWeight: '500', color: '#666' }}>Brand</span>
-                  <span style={{ fontWeight: '600', color: '#333' }}>{selectedBundleItem.brand}</span>
+                  <span style={{ fontWeight: '600', color: '#333' }}>{selectedBundleItem.brand || selectedBundleItem.specific_data?.brand}</span>
                 </div>
               )}
 
-              {selectedBundleItem.color && (
+              {(selectedBundleItem.color || selectedBundleItem.specific_data?.color) && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
                   <span style={{ fontWeight: '500', color: '#666' }}>Color</span>
-                  <span style={{ fontWeight: '600', color: '#333' }}>{selectedBundleItem.color}</span>
+                  <span style={{ fontWeight: '600', color: '#333' }}>{selectedBundleItem.color || selectedBundleItem.specific_data?.color}</span>
                 </div>
               )}
 
-              {selectedBundleItem.material && (
+              {(selectedBundleItem.material || selectedBundleItem.specific_data?.material) && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
                   <span style={{ fontWeight: '500', color: '#666' }}>Material</span>
-                  <span style={{ fontWeight: '600', color: '#333' }}>{selectedBundleItem.material}</span>
+                  <span style={{ fontWeight: '600', color: '#333' }}>{selectedBundleItem.material || selectedBundleItem.specific_data?.material}</span>
                 </div>
               )}
-              {selectedBundleItem.size && renderSizeMeasurements(selectedBundleItem.size)}
 
-              {selectedBundleItem.price && (
+              {Array.isArray(selectedBundleItem.selected_sizes) && selectedBundleItem.selected_sizes.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px', backgroundColor: '#fff8ec', borderRadius: '6px' }}>
+                  <span style={{ fontWeight: '600', color: '#5f3412' }}>Selected Sizes</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {selectedBundleItem.selected_sizes.map((s, idx) => (
+                      <span key={idx} style={{ color: '#4a2910', fontWeight: '700', display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                        <span>{s.label || s.sizeKey}</span>
+                        <span>x{s.quantity}{s.price ? ` · ₱${parseFloat(s.price).toLocaleString('en-PH')}` : ''}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(selectedBundleItem.size || selectedBundleItem.specific_data?.size || selectedBundleItem.specific_data?.measurements || selectedBundleItem.specific_data?.measurementProfile) ? (
+                renderSizeMeasurements(
+                  selectedBundleItem.size ||
+                  selectedBundleItem.specific_data?.size ||
+                  selectedBundleItem.specific_data?.measurements ||
+                  selectedBundleItem.specific_data?.measurementProfile
+                )
+              ) : null}
+
+              {(selectedBundleItem.price || selectedBundleItem.final_price || selectedBundleItem.pricing_factors?.base_price || selectedBundleItem.specific_data?.price || selectedBundleItem.specific_data?.final_price) ? (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#e8f4e8', borderRadius: '6px', marginTop: '10px' }}>
                   <span style={{ fontWeight: '500', color: '#2d5a3d' }}>Base Price (per 3 days)</span>
-                  <span style={{ fontWeight: '700', color: '#2d5a3d' }}>{formatPrice(selectedBundleItem.price)}</span>
+                  <span style={{ fontWeight: '700', color: '#2d5a3d' }}>
+                    {formatPrice(
+                      selectedBundleItem.price ||
+                      selectedBundleItem.final_price ||
+                      selectedBundleItem.pricing_factors?.base_price ||
+                      selectedBundleItem.specific_data?.price ||
+                      selectedBundleItem.specific_data?.final_price
+                    )}
+                  </span>
                 </div>
-              )}
+              ) : null}
             </div>
 
             <button

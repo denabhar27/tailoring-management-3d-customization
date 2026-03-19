@@ -520,20 +520,12 @@ const Profile = () => {
                   : (specific_data.category || 'N/A')}
               </span>
             </div>
-            <div className="detail-row">
-              <span className="detail-label">Brand:</span>
-              <span className="detail-value">
-                {isBundle && bundleItems.length > 0
-                  ? [...new Set(bundleItems.map(item => item.brand || 'N/A'))].join(', ')
-                  : (specific_data.brand || 'N/A')}
-              </span>
-            </div>
             <div className="detail-row" style={{ alignItems: 'flex-start', flexDirection: 'column' }}>
               <span className="detail-label" style={{ marginBottom: '10px', textAlign: 'center', display: 'block', width: '100%' }}>Size:</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', alignItems: 'center' }}>
                 {isBundle && bundleItems.length > 0
                   ? bundleItems.map((item, idx) => {
-                      const sizeData = formatSize(item.size);
+                      const sizeData = formatSize(item.size) || (item.selected_sizes && item.selected_sizes.length > 0 ? item.selected_sizes.map(s => ({ label: s.label || s.sizeKey, value: `x${s.quantity}` })) : null);
                       return (
                         <div key={idx} style={{
                           fontSize: '0.9rem',
@@ -575,7 +567,9 @@ const Profile = () => {
                         maxWidth: '350px'
                       }}>
                         {(() => {
-                          const sizeData = formatSize(specific_data.size);
+                          const sizeData = formatSize(specific_data.size) || (specific_data.selected_sizes && specific_data.selected_sizes.length > 0
+                            ? specific_data.selected_sizes.map(s => ({ label: s.label || s.sizeKey, value: `x${s.quantity}` }))
+                            : null);
                           if (sizeData && Array.isArray(sizeData)) {
                             return (
                               <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '6px 16px', color: '#666', justifyContent: 'center' }}>

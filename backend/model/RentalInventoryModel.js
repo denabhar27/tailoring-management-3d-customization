@@ -1,5 +1,48 @@
 const db = require('../config/db');
 
+function parseJsonSafely(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function getSizeEntriesTotal(sizeRaw) {
+  const parsed = parseJsonSafely(sizeRaw);
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  // v2 format: { format: 'rental_size_v2', size_entries: [{ quantity, sizeKey, ... }] }
+  if (parsed.format === 'rental_size_v2' && Array.isArray(parsed.size_entries)) {
+    return parsed.size_entries.reduce((sum, entry) => {
+      const q = parseInt(entry?.quantity, 10);
+      return sum + (Number.isNaN(q) ? 0 : Math.max(0, q));
+    }, 0);
+  }
+
+  // v2-ish without format
+  if (Array.isArray(parsed.size_entries)) {
+    return parsed.size_entries.reduce((sum, entry) => {
+      const q = parseInt(entry?.quantity, 10);
+      return sum + (Number.isNaN(q) ? 0 : Math.max(0, q));
+    }, 0);
+  }
+
+  // v1 format: { size_options / sizeOptions: { small: { quantity }, ... } }
+  const options = parsed.size_options || parsed.sizeOptions || parsed.size_options_v1 || parsed.sizeOptionsV1;
+  if (options && typeof options === 'object' && !Array.isArray(options)) {
+    return Object.values(options).reduce((sum, opt) => {
+      const q = parseInt(opt?.quantity, 10);
+      return sum + (Number.isNaN(q) ? 0 : Math.max(0, q));
+    }, 0);
+  }
+
+  return null;
+}
+
 const RentalInventory = {
   
   create: (itemData, callback) => {
@@ -71,35 +114,53 @@ const RentalInventory = {
       values.push(filters.offset);
     }
     
-    db.query(sql, values, callback);
+    db.query(sql, values, (err, rows) => {
+      if (err) return callback(err);
+      const filtered = (rows || []).filter((row) => {
+        const sizeTotal = getSizeEntriesTotal(row.size);
+        if (sizeTotal === null) return true; // keep legacy/unparsed items
+        return sizeTotal > 0;
+      });
+      callback(null, filtered);
+    });
   },
 
   getAvailableItemsCount: (filters = {}, callback) => {
-    let sql = "SELECT COUNT(*) as total FROM rental_inventory WHERE status = 'available' AND total_available > 0";
+    let sql = "SELECT item_id, size, total_available FROM rental_inventory WHERE status = 'available' AND total_available > 0";
     const values = [];
-    
+
     if (filters.category) {
       sql += " AND category = ?";
       values.push(filters.category);
     }
-    
+
     if (filters.min_price) {
       sql += " AND price >= ?";
       values.push(filters.min_price);
     }
-    
+
     if (filters.max_price) {
       sql += " AND price <= ?";
       values.push(filters.max_price);
     }
-    
+
     if (filters.search) {
       sql += " AND (item_name LIKE ? OR description LIKE ? OR brand LIKE ?)";
       const searchTerm = `%${filters.search}%`;
       values.push(searchTerm, searchTerm, searchTerm);
     }
-    
-    db.query(sql, values, callback);
+
+    db.query(sql, values, (err, rows) => {
+      if (err) return callback(err);
+
+      const filteredCount = (rows || []).filter((row) => {
+        const sizeTotal = getSizeEntriesTotal(row.size);
+        if (sizeTotal === null) return true;
+        return sizeTotal > 0;
+      }).length;
+
+      callback(null, [{ total: filteredCount }]);
+    });
   },
 
   findById: (item_id, callback) => {
@@ -191,13 +252,22 @@ const RentalInventory = {
   },
 
   getFeaturedItems: (limit, callback) => {
+    const fetchLimit = Math.max(1, Math.ceil(limit * 5));
     const sql = `
       SELECT * FROM rental_inventory 
       WHERE status = 'available' AND total_available > 0 
       ORDER BY created_at DESC 
       LIMIT ?
     `;
-    db.query(sql, [limit], callback);
+    db.query(sql, [fetchLimit], (err, rows) => {
+      if (err) return callback(err);
+      const filtered = (rows || []).filter((row) => {
+        const sizeTotal = getSizeEntriesTotal(row.size);
+        if (sizeTotal === null) return true;
+        return sizeTotal > 0;
+      });
+      callback(null, filtered.slice(0, limit));
+    });
   },
 
   getSimilarItems: (category, excludeId, limit, callback) => {

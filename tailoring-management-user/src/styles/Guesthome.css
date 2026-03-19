@@ -431,13 +431,13 @@ body {
 
 .rental-card {
   background: white;
-  border-radius: 20px;
+  border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(139, 69, 19, 0.12);
   transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   display: flex;
   flex-direction: column;
-  height: 430px;           
+  height: auto;
   position: relative;
 }
 
@@ -465,7 +465,7 @@ body {
 
 .rental-card img {
   width: 100%;
-  height: 220px;           
+  height: 300px;
   object-fit: cover;
   transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   position: relative;
@@ -504,50 +504,22 @@ body {
 
 .btn-view {
   margin-top: 8px;
-  padding: 10px 28px;
-  background: transparent;
-  border: 2.5px solid #8B4513;
-  color: #8B4513;
-  border-radius: 50px;
+  padding: 8px 14px;
+  min-width: 120px;
+  background: #fbf6ee;
+  border: 1px dashed #c7a67b;
+  color: #5f3a1c;
+  border-radius: 12px;
   cursor: pointer;
-  font-weight: 600;
-  font-size: 0.95rem;
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  min-width: 130px;
-  position: relative;
-  overflow: hidden;
-}
-
-.btn-view::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(139, 69, 19, 0.1);
-  transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
-  z-index: 0;
-}
-
-.btn-view:hover::before {
-  width: 300px;
-  height: 300px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .btn-view:hover {
-  background: #8B4513;
-  color: white;
-  transform: translateY(-3px) scale(1.05);
-  box-shadow: 0 10px 25px rgba(139, 69, 19, 0.3);
-  z-index: 1;
-}
-
-.btn-view span {
-  position: relative;
-  z-index: 1;
+  background: #f2e5d4;
+  border-color: #b48a5a;
+  color: #4a2d14;
 }
 
 .customization {

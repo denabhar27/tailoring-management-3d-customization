@@ -41,6 +41,9 @@ export default function RentalLanding() {
   const [bundleEndDate, setBundleEndDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);
+  const [cardSizeSelections, setCardSizeSelections] = useState<{ [itemId: string]: { [sizeKey: string]: number } }>({});
+  const [inlineMessage, setInlineMessage] = useState('');
+  const [inlineMessageItemId, setInlineMessageItemId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRentals();
@@ -93,9 +96,19 @@ export default function RentalLanding() {
   const toggleItemSelection = (item: any) => {
     if (isMultiSelectMode) {
       setSelectedItems(prev => {
-        const isSelected = prev.some(i => (i.item_id || i.id) === (item.item_id || item.id));
+        const itemId = getItemId(item);
+        const isSelected = prev.some(i => getItemId(i) === itemId);
         if (isSelected) {
-          return prev.filter(i => (i.item_id || i.id) !== (item.item_id || item.id));
+          setCardSizeSelections(p => {
+            const next = { ...p };
+            delete next[itemId];
+            return next;
+          });
+          if (inlineMessageItemId === itemId) {
+            setInlineMessage('');
+            setInlineMessageItemId(null);
+          }
+          return prev.filter(i => getItemId(i) !== itemId);
         } else {
           return [...prev, item];
         }
@@ -106,7 +119,59 @@ export default function RentalLanding() {
   };
 
   const isItemSelected = (item: any) => {
-    return selectedItems.some(i => (i.item_id || i.id) === (item.item_id || item.id));
+    return selectedItems.some(i => getItemId(i) === getItemId(item));
+  };
+
+  const updateCardSizeQuantity = (item: any, sizeKey: string, delta: number) => {
+    const itemId = getItemId(item);
+    const option = item.size_options?.[sizeKey] || {};
+    const maxQty = parseInt(String(option.quantity || item.total_available || '999'), 10);
+    const currentQty = parseInt(String(cardSizeSelections?.[itemId]?.[sizeKey] || 0), 10);
+    const nextQtyRaw = Math.max(0, currentQty + delta);
+
+    if (delta > 0 && !isNaN(maxQty) && nextQtyRaw > maxQty) {
+      setInlineMessage(`${option.label || sizeKey} out of stock`);
+      setInlineMessageItemId(itemId);
+      setTimeout(() => {
+        setInlineMessage('');
+        setInlineMessageItemId(null);
+      }, 1800);
+      return;
+    }
+
+    const safeQty = !isNaN(maxQty) ? Math.min(nextQtyRaw, maxQty) : nextQtyRaw;
+    const nextItemSelections = {
+      ...(cardSizeSelections[itemId] || {}),
+      [sizeKey]: safeQty
+    };
+
+    if (safeQty <= 0) {
+      delete nextItemSelections[sizeKey];
+    }
+
+    const hasAnyAfter = Object.values(nextItemSelections).some(q => parseInt(String(q), 10) > 0);
+
+    setCardSizeSelections(prev => {
+      const next = { ...prev };
+      if (hasAnyAfter) {
+        next[itemId] = nextItemSelections;
+      } else {
+        delete next[itemId];
+      }
+      return next;
+    });
+
+    setSelectedItems(prev => {
+      const exists = prev.some(i => getItemId(i) === itemId);
+      if (hasAnyAfter && !exists) return [...prev, item];
+      if (!hasAnyAfter && exists) return prev.filter(i => getItemId(i) !== itemId);
+      return prev;
+    });
+
+    if (inlineMessageItemId === itemId) {
+      setInlineMessage('');
+      setInlineMessageItemId(null);
+    }
   };
 
   const calculateItemCost = (item: any, duration: number) => {
@@ -118,13 +183,53 @@ export default function RentalLanding() {
   };
 
   const calculateBundleTotal = () => {
-    if (!bundleStartDate || !bundleDuration || selectedItems.length === 0) return 0;
-    return selectedItems.reduce((total, item) => total + calculateItemCost(item, bundleDuration), 0);
+    if (!bundleDuration || selectedItems.length === 0) return 0;
+    return selectedItems.reduce((total, item) => {
+      const selections = cardSizeSelections[getItemId(item)] || {};
+      const sizeOpts = item.size_options || {};
+      
+      if (Object.keys(sizeOpts).length === 0) {
+        return total + calculateItemCost(item, bundleDuration);
+      }
+
+      let itemTotal = 0;
+      Object.entries(selections).forEach(([sizeKey, qty]) => {
+        const q = parseInt(String(qty), 10);
+        if (isNaN(q) || q <= 0) return;
+        const sizePrice = sizeOpts[sizeKey]?.price || parseFloat(item.price || '500');
+        const validDuration = Math.floor(bundleDuration / 3) * 3;
+        itemTotal += q * sizePrice * (validDuration / 3);
+      });
+
+      return total + (itemTotal > 0 ? itemTotal : 0);
+    }, 0);
   };
 
   const calculateBundleDownpayment = () => {
     const totalCost = calculateBundleTotal();
     return totalCost * 0.5;
+  };
+
+  const getItemId = (item: any) => item?.item_id || item?.id;
+
+  const getItemSizeSelection = (item: any) => cardSizeSelections[getItemId(item)] || {};
+
+  const getItemSelectedQuantity = (item: any) => {
+    return Object.values(getItemSizeSelection(item)).reduce((sum, qty) => {
+      const parsed = parseInt(String(qty), 10);
+      return sum + (isNaN(parsed) ? 0 : parsed);
+    }, 0);
+  };
+
+  const getItemSizeSummary = (item: any) => {
+    const selections = getItemSizeSelection(item);
+    return Object.entries(selections)
+      .filter(([, qty]) => parseInt(String(qty), 10) > 0)
+      .map(([sizeKey, qty]) => {
+        const label = item.size_options?.[sizeKey]?.label || sizeKey;
+        return `${label} x${qty}`;
+      })
+      .join(', ');
   };
 
   useEffect(() => {
@@ -142,6 +247,13 @@ export default function RentalLanding() {
       Alert.alert("No Items Selected", "Please select at least one item to rent");
       return;
     }
+    
+    const selectedQty = selectedItems.reduce((sum, item) => sum + getItemSelectedQuantity(item), 0);
+    if (selectedQty <= 0) {
+      Alert.alert("Size Quantities Required", "Please choose at least one size quantity for each selected item.");
+      return;
+    }
+
     setBundleStartDate(null);
     setBundleDuration(3);
     setBundleEndDate(null);
@@ -168,27 +280,49 @@ export default function RentalLanding() {
 
     setAddingToCart(true);
     try {
-      const totalCost = calculateBundleTotal();
-      const totalDownpayment = totalCost * 0.5;
+      const itemsWithSizes = selectedItems.map(item => {
+        const selections = cardSizeSelections[getItemId(item)] || {};
+        const selectedSizes = Object.entries(selections)
+          .filter(([, qty]) => parseInt(String(qty), 10) > 0)
+          .map(([sizeKey, qty]) => ({
+            sizeKey,
+            quantity: parseInt(String(qty), 10),
+            price: item.size_options?.[sizeKey]?.price || 0,
+            label: item.size_options?.[sizeKey]?.label || sizeKey
+          }));
 
-      const bundleItems = selectedItems.map(item => ({
+        return {
+          item,
+          selectedSizes
+        };
+      });
+
+      const itemsBundle = itemsWithSizes.map(({ item, selectedSizes }) => ({
         id: item.item_id || item.id,
         item_name: item.item_name || item.name || 'Rental Item',
         brand: item.brand || 'Unknown',
-        size: item.size || 'Standard',
+        size: 'Various',
         category: item.category || 'rental',
         downpayment: item.downpayment || 0,
         image_url: rentalService.getImageUrl(item.image_url),
         front_image: item.front_image ? rentalService.getImageUrl(item.front_image) : null,
         back_image: item.back_image ? rentalService.getImageUrl(item.back_image) : null,
         side_image: item.side_image ? rentalService.getImageUrl(item.side_image) : null,
-        individual_cost: calculateItemCost(item, bundleDuration)
-      }));
+        selected_sizes: selectedSizes,
+        individual_cost: selectedSizes.reduce((sum, s) => {
+          const price = s.price > 0 ? s.price : parseFloat(item.price || '500');
+          const validDuration = Math.floor(bundleDuration / 3) * 3;
+          return sum + (s.quantity * price * (validDuration / 3));
+        }, 0)
+      })).filter(entry => entry.selected_sizes && entry.selected_sizes.length > 0);
+
+      const totalCost = calculateBundleTotal();
+      const totalDownpayment = totalCost * 0.5;
 
       const rentalData = {
         serviceType: 'rental',
-        serviceId: bundleItems[0].id,
-        quantity: selectedItems.length,
+        serviceId: itemsBundle[0]?.id,
+        quantity: itemsBundle.reduce((sum, i) => sum + i.selected_sizes.reduce((s, e) => s + e.quantity, 0), 0),
         basePrice: '0',
         finalPrice: totalCost.toString(),
         pricingFactors: {
@@ -196,17 +330,17 @@ export default function RentalLanding() {
           price: totalCost,
           downpayment: totalDownpayment.toString(),
           is_bundle: true,
-          item_count: selectedItems.length
+          item_count: itemsBundle.length
         },
         specificData: {
           is_bundle: true,
-          bundle_items: bundleItems,
-          item_names: bundleItems.map(i => i.item_name).join(', '),
-          item_name: `Rental Bundle (${selectedItems.length} items)`,
+          bundle_items: itemsBundle,
+          item_names: itemsBundle.map(i => i.item_name).join(', '),
+          item_name: `Rental Bundle (${itemsBundle.length} items)`,
           brand: 'Multiple',
           size: 'Various',
           category: 'rental_bundle',
-          image_url: bundleItems[0]?.image_url || ''
+          image_url: itemsBundle[0]?.image_url || ''
         },
         rentalDates: {
           startDate: `${bundleStartDate.getFullYear()}-${String(bundleStartDate.getMonth() + 1).padStart(2, '0')}-${String(bundleStartDate.getDate()).padStart(2, '0')}`,
@@ -218,10 +352,11 @@ export default function RentalLanding() {
       const result = await cartService.addToCart(rentalData);
 
       if (result.success) {
-        Alert.alert("Success!", `${selectedItems.length} items added to cart as bundle!`, [
+        Alert.alert("Success!", `${itemsBundle.length} items added to cart as bundle!`, [
           { text: "View Cart", onPress: () => router.push("/(tabs)/cart/Cart") },
           { text: "Continue", onPress: () => {
             setSelectedItems([]);
+            setCardSizeSelections({});
             setIsMultiSelectMode(false);
             closeBundleModal();
           }},
@@ -430,8 +565,8 @@ export default function RentalLanding() {
               <View style={styles.selectedItemsPreview}>
                 <Text style={styles.selectedItemsTitle}>Selected Items:</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectedItemsScroll}>
-                  {selectedItems.map((item, idx) => (
-                    <View key={idx} style={styles.selectedItemChip}>
+                  {selectedItems.map((item) => (
+                    <View key={getItemId(item)} style={styles.selectedItemChip}>
                       <Image
                         source={getImageSource(item)}
                         style={styles.selectedItemImage}
@@ -439,6 +574,9 @@ export default function RentalLanding() {
                       />
                       <Text style={styles.selectedItemName} numberOfLines={1}>
                         {item.item_name || item.name}
+                      </Text>
+                      <Text style={styles.selectedItemSize} numberOfLines={1}>
+                        {getItemSizeSummary(item) || 'No size'}
                       </Text>
                       <TouchableOpacity
                         onPress={() => toggleItemSelection(item)}
@@ -519,12 +657,32 @@ export default function RentalLanding() {
                 <View style={styles.costBreakdown}>
                   <Text style={styles.costBreakdownTitle}>Payment Summary</Text>
 
-                  {selectedItems.map((item, idx) => {
-                    const itemCost = calculateItemCost(item, bundleDuration);
+                  {selectedItems.map((item) => {
+                    const selections = cardSizeSelections[getItemId(item)] || {};
+                    const sizeSummary = Object.entries(selections)
+                      .filter(([, qty]) => parseInt(String(qty), 10) > 0)
+                      .map(([sizeKey, qty]) => `${item.size_options?.[sizeKey]?.label || sizeKey} x${qty}`)
+                      .join(', ');
+
+                    const itemCost = (() => {
+                      if (Object.keys(item.size_options || {}).length === 0) {
+                        return calculateItemCost(item, bundleDuration);
+                      }
+                      let total = 0;
+                      Object.entries(selections).forEach(([sizeKey, qty]) => {
+                        const q = parseInt(String(qty), 10);
+                        if (isNaN(q) || q <= 0) return;
+                        const sizePrice = item.size_options?.[sizeKey]?.price || parseFloat(item.price || '500');
+                        const validDuration = Math.floor(bundleDuration / 3) * 3;
+                        total += q * sizePrice * (validDuration / 3);
+                      });
+                      return total;
+                    })();
+
                     return (
-                      <View key={idx} style={styles.costItemRow}>
-                        <Text style={styles.costItemName} numberOfLines={1}>
-                          {item.item_name || item.name}
+                      <View key={getItemId(item)} style={styles.costItemRow}>
+                        <Text style={styles.costItemName} numberOfLines={2}>
+                          {item.item_name || item.name}{sizeSummary ? `\n(${sizeSummary})` : ''}
                         </Text>
                         <Text style={styles.costItemValue}>₱{itemCost.toFixed(2)}</Text>
                       </View>
@@ -1036,6 +1194,13 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     textAlign: 'center',
     fontWeight: '500',
+  },
+  selectedItemSize: {
+    fontSize: 11,
+    color: '#6B7280',
+    textAlign: 'center',
+    fontWeight: '400',
+    marginTop: 2,
   },
   removeItemButton: {
     marginTop: 4,

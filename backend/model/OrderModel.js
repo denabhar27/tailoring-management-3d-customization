@@ -15,7 +15,7 @@ function buildRentalReservations(cartItems) {
   const reservations = new Map();
 
   const upsertReservation = (itemId, qty, selectedSizes = []) => {
-    if (!itemId || qty <= 0) return;
+    if (!itemId || qty < 0) return;
 
     const existing = reservations.get(itemId) || {
       itemId,
@@ -23,16 +23,27 @@ function buildRentalReservations(cartItems) {
       sizeSelections: {}
     };
 
-    existing.qty += qty;
+    let derivedQtyFromSizes = 0;
 
-    if (Array.isArray(selectedSizes)) {
+    if (Array.isArray(selectedSizes) && selectedSizes.length > 0) {
       selectedSizes.forEach((entry) => {
-        const key = String(entry?.sizeKey || '').trim();
-        const sizeQty = Math.max(1, parseInt(entry?.quantity, 10) || 1);
-        if (!key) return;
+        let key = String(entry?.sizeKey ?? entry?.size_key ?? '').trim();
+        if (!key && entry?.label) {
+          const label = String(entry.label).toLowerCase();
+          if (label.includes('small') || label.trim() === 's') key = 'small';
+          else if (label.includes('medium') || label.trim() === 'm') key = 'medium';
+          else if (label.includes('large') || label.trim() === 'l') key = 'large';
+          else if (label.includes('extra') || label.includes('xl') || label.trim() === 'xl') key = 'extra_large';
+        }
+        const sizeQty = Math.max(0, parseInt(entry?.quantity, 10) || 0);
+        if (!key || sizeQty <= 0) return;
         existing.sizeSelections[key] = (existing.sizeSelections[key] || 0) + sizeQty;
+        derivedQtyFromSizes += sizeQty;
       });
     }
+
+    // Keep total_available consistent with per-size deductions when size selections exist.
+    existing.qty += derivedQtyFromSizes > 0 ? derivedQtyFromSizes : qty;
 
     reservations.set(itemId, existing);
   };
@@ -45,14 +56,21 @@ function buildRentalReservations(cartItems) {
     if (specificData?.is_bundle && Array.isArray(specificData.bundle_items) && specificData.bundle_items.length > 0) {
       specificData.bundle_items.forEach((bundleItem) => {
         const bundleItemId = parseInt(bundleItem?.item_id ?? bundleItem?.id ?? bundleItem?.service_id, 10);
-        const bundleQty = Math.max(1, parseInt(bundleItem?.quantity, 10) || 1);
-        upsertReservation(bundleItemId, bundleQty);
+        const bundleQtyRaw = parseInt(bundleItem?.quantity, 10);
+        const bundleQty = Number.isNaN(bundleQtyRaw) ? 1 : Math.max(0, bundleQtyRaw);
+
+        const selectedSizes =
+          Array.isArray(bundleItem?.selected_sizes) ? bundleItem.selected_sizes :
+          (Array.isArray(bundleItem?.selectedSizes) ? bundleItem.selectedSizes : []);
+
+        upsertReservation(bundleItemId, bundleQty, selectedSizes);
       });
       return;
     }
 
     const itemId = parseInt(cartItem.service_id, 10);
-    const qty = Math.max(1, parseInt(cartItem.quantity, 10) || 1);
+    const qtyRaw = parseInt(cartItem.quantity, 10);
+    const qty = Number.isNaN(qtyRaw) ? 1 : Math.max(0, qtyRaw);
     const selectedSizes = Array.isArray(specificData?.selected_sizes) ? specificData.selected_sizes : [];
     upsertReservation(itemId, qty, selectedSizes);
   });

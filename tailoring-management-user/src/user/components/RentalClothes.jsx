@@ -14,6 +14,21 @@ const SIZE_LABELS = {
   extra_large: 'Extra Large (XL)'
 };
 
+const SIZE_SHORT_LABELS = {
+  small: 'S',
+  medium: 'M',
+  large: 'L',
+  extra_large: 'XL'
+};
+
+const getSizeShortLabel = (sizeKey, label) => {
+  if (SIZE_SHORT_LABELS[sizeKey]) return SIZE_SHORT_LABELS[sizeKey];
+  const match = /\(([^)]+)\)/.exec(label || '');
+  if (match && match[1]) return match[1].toUpperCase();
+  if (label && label.trim()) return label.trim().slice(0, 3).toUpperCase();
+  return (sizeKey || '').slice(0, 3).toUpperCase();
+};
+
 const normalizeMeasurementValue = (value) => {
   if (value === null || value === undefined || value === '') return null;
 
@@ -166,7 +181,7 @@ const RentalImageCarousel = ({ images, itemName }) => {
         <img
           src={suitSample}
           alt={itemName}
-          style={{ maxWidth: '100%', maxHeight: '560px', objectFit: 'contain', borderRadius: '10px' }}
+          style={{ maxWidth: '100%', maxHeight: '420px', objectFit: 'contain', borderRadius: '10px' }}
         />
       </div>
     );
@@ -179,7 +194,7 @@ const RentalImageCarousel = ({ images, itemName }) => {
           src={getImageSrc(validImages[0], 0)}
           alt={itemName}
           onError={() => handleImageError(0)}
-          style={{ maxWidth: '100%', maxHeight: '560px', objectFit: 'contain', borderRadius: '10px' }}
+          style={{ maxWidth: '100%', maxHeight: '420px', objectFit: 'contain', borderRadius: '10px' }}
         />
       </div>
     );
@@ -199,13 +214,13 @@ const RentalImageCarousel = ({ images, itemName }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '520px'
+        minHeight: '360px'
       }}>
         <img
           src={getImageSrc(validImages[currentIndex], currentIndex)}
           alt={`${itemName} - ${validImages[currentIndex].label}`}
           onError={() => handleImageError(currentIndex)}
-          style={{ maxWidth: '100%', maxHeight: '560px', objectFit: 'contain' }}
+          style={{ maxWidth: '100%', maxHeight: '420px', objectFit: 'contain' }}
         />
         <div style={{
           position: 'absolute',
@@ -389,7 +404,11 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   const [addingToCart, setAddingToCart] = useState(false);
   const [measurementUnit, setMeasurementUnit] = useState('inch');
   const [sizeSelections, setSizeSelections] = useState({});
+  const [cardSizeSelections, setCardSizeSelections] = useState({});
   const [expandedMeasurementSize, setExpandedMeasurementSize] = useState(null);
+  const [collapsedSizes, setCollapsedSizes] = useState({});
+  const [inlineMessage, setInlineMessage] = useState('');
+  const [inlineMessageItemId, setInlineMessageItemId] = useState(null);
   const navigate = useNavigate();
 
   const getDisplayPrice = (item) => {
@@ -812,25 +831,136 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
     return items.reduce((total, item) => total + calculateTotalCost(duration, item), 0);
   };
 
+  const calculateBundleTotalWithSelections = (duration, items, selectionsByItem) => {
+    if (!duration || !items || items.length === 0) return 0;
+    const validDuration = Math.floor(duration / 3) * 3;
+    if (validDuration < 3) return 0;
+
+    return items.reduce((total, item) => {
+      const sizeOpts = item.sizeOptions || {};
+      const fallbackPrice = (() => {
+        const priceStr = String(item.price || '').replace(/[^\d.]/g, '');
+        const p = parseFloat(priceStr);
+        return !isNaN(p) && p > 0 ? p : 500;
+      })();
+      const selections = selectionsByItem?.[item.id || item.item_id] || {};
+      const sizeTotal = Object.entries(selections).reduce((sum, [key, qty]) => {
+        const q = parseInt(qty, 10);
+        if (isNaN(q) || q <= 0) return sum;
+        const price = sizeOpts[key]?.price > 0 ? sizeOpts[key].price : fallbackPrice;
+        return sum + q * price * (validDuration / 3);
+      }, 0);
+
+      if (Object.keys(sizeOpts).length > 0) return total + sizeTotal;
+      return total + (fallbackPrice * (validDuration / 3));
+    }, 0);
+  };
+
   const calculateMultiDownpayment = (items, duration) => {
     if (!items || items.length === 0 || !duration) return 0;
     const totalCost = calculateMultiTotalCost(duration, items);
     return totalCost * 0.5;
   };
 
+  const getItemId = (item) => item?.id || item?.item_id;
+
+  const getItemSizeSelection = (item) => cardSizeSelections[getItemId(item)] || {};
+
+  const getItemSelectedQuantity = (item) => {
+    return Object.values(getItemSizeSelection(item)).reduce((sum, qty) => {
+      const parsed = parseInt(qty, 10);
+      return sum + (isNaN(parsed) ? 0 : parsed);
+    }, 0);
+  };
+
+  const getItemSizeSummary = (item) => {
+    const selections = getItemSizeSelection(item);
+    return Object.entries(selections)
+      .filter(([, qty]) => parseInt(qty, 10) > 0)
+      .map(([sizeKey, qty]) => `${item.sizeOptions?.[sizeKey]?.label || SIZE_LABELS[sizeKey] || sizeKey} x${qty}`)
+      .join(', ');
+  };
+
   const toggleItemSelection = (item) => {
-    setSelectedItems(prev => {
-      const isSelected = prev.find(i => (i.id || i.item_id) === (item.id || item.item_id));
-      if (isSelected) {
-        return prev.filter(i => (i.id || i.item_id) !== (item.id || item.item_id));
-      } else {
-        return [...prev, item];
+    const itemId = getItemId(item);
+    const currentlySelected = selectedItems.some(i => getItemId(i) === itemId);
+
+    if (currentlySelected) {
+      setSelectedItems(prev => prev.filter(i => getItemId(i) !== itemId));
+      setCardSizeSelections(prev => {
+        const next = { ...prev };
+        delete next[itemId];
+        return next;
+      });
+      if (inlineMessageItemId === itemId) {
+        setInlineMessage('');
+        setInlineMessageItemId(null);
       }
-    });
+      return;
+    }
+
+    setSelectedItems(prev => [...prev, item]);
   };
 
   const isItemSelected = (item) => {
-    return selectedItems.some(i => (i.id || i.item_id) === (item.id || item.item_id));
+    return selectedItems.some(i => getItemId(i) === getItemId(item));
+  };
+
+  const updateCardSizeQuantity = (item, sizeKey, delta) => {
+    const itemId = getItemId(item);
+    const option = item.sizeOptions?.[sizeKey] || {};
+    const parsedOptionQty = parseInt(option.quantity, 10);
+    const parsedFallbackQty = parseInt(item.total_available, 10);
+    const maxQty = !Number.isNaN(parsedOptionQty)
+      ? Math.max(parsedOptionQty, 0)
+      : (!Number.isNaN(parsedFallbackQty) ? Math.max(parsedFallbackQty, 0) : Number.POSITIVE_INFINITY);
+
+    const currentQty = parseInt(cardSizeSelections?.[itemId]?.[sizeKey] || 0, 10);
+    const nextQtyRaw = Math.max(0, currentQty + delta);
+
+    if (delta > 0 && Number.isFinite(maxQty) && nextQtyRaw > maxQty) {
+      setInlineMessage(`${option.label || SIZE_LABELS[sizeKey] || sizeKey} is out of stock for ${item.item_name || item.name}.`);
+      setInlineMessageItemId(itemId);
+      setTimeout(() => {
+        setInlineMessage('');
+        setInlineMessageItemId(null);
+      }, 1800);
+      return;
+    }
+
+    const safeQty = Number.isFinite(maxQty) ? Math.min(nextQtyRaw, maxQty) : nextQtyRaw;
+    const nextItemSelections = {
+      ...(cardSizeSelections[itemId] || {}),
+      [sizeKey]: safeQty
+    };
+
+    if (safeQty <= 0) {
+      delete nextItemSelections[sizeKey];
+    }
+
+    const hasAnyAfter = Object.values(nextItemSelections).some(q => parseInt(q, 10) > 0);
+
+    setCardSizeSelections(prev => {
+      const next = { ...prev };
+      if (hasAnyAfter) {
+        next[itemId] = nextItemSelections;
+      } else {
+        delete next[itemId];
+      }
+      return next;
+    });
+
+    setSelectedItems(prev => {
+      const exists = prev.some(i => getItemId(i) === itemId);
+      if (hasAnyAfter && !exists) return [...prev, item];
+      if (!hasAnyAfter && exists) return prev.filter(i => getItemId(i) !== itemId);
+      return prev;
+    });
+
+    if (inlineMessageItemId === itemId) {
+      setInlineMessage('');
+      setInlineMessageItemId(null);
+    }
   };
 
   const openDateModal = async () => {
@@ -838,25 +968,38 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
       await alert('Please select at least one item', 'Selection Required', 'warning');
       return;
     }
+
+    const selectedQty = selectedItems.reduce((sum, item) => sum + getItemSelectedQuantity(item), 0);
+    if (selectedQty <= 0) {
+      await alert('Please choose at least one size quantity before setting dates.', 'Sizes Required', 'warning');
+      return;
+    }
+
     setStartDate('');
     setRentalDuration(3);
     setEndDate('');
-    setTotalCost(0);
+    const cost = calculateBundleTotalWithSelections(3, selectedItems, cardSizeSelections);
+    setTotalCost(cost);
     setCartMessage('');
     setIsDateModalOpen(true);
   };
 
   useEffect(() => {
-    if (startDate && rentalDuration && selectedItems.length > 0 && isDateModalOpen) {
-      const calculatedEndDate = calculateEndDate(startDate, rentalDuration);
-      setEndDate(calculatedEndDate);
-      const cost = calculateMultiTotalCost(rentalDuration, selectedItems);
+    if (rentalDuration && selectedItems.length > 0 && isDateModalOpen) {
+      const cost = calculateBundleTotalWithSelections(rentalDuration, selectedItems, cardSizeSelections);
       setTotalCost(cost);
+
+      if (startDate) {
+        const calculatedEndDate = calculateEndDate(startDate, rentalDuration);
+        setEndDate(calculatedEndDate);
+      } else {
+        setEndDate('');
+      }
     } else if (isDateModalOpen) {
       setEndDate('');
       setTotalCost(0);
     }
-  }, [startDate, rentalDuration, selectedItems, isDateModalOpen]);
+  }, [startDate, rentalDuration, selectedItems, isDateModalOpen, cardSizeSelections]);
 
   const closeDateModal = () => {
     setIsDateModalOpen(false);
@@ -890,13 +1033,15 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   };
 
   const openModal = (item) => {
+    const preset = cardSizeSelections[item.id || item.item_id] || {};
     setSelectedItem(item);
     setStartDate('');
     setRentalDuration(3);
     setEndDate('');
     setTotalCost(0);
     setCartMessage('');
-    setSizeSelections({});
+    setSizeSelections(preset);
+    setCollapsedSizes({});
     setExpandedMeasurementSize(null);
     setIsModalOpen(true);
   };
@@ -977,53 +1122,74 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
       return;
     }
 
+    const itemsWithSizes = selectedItems.map(item => {
+      const selections = cardSizeSelections[item.id || item.item_id] || {};
+      const selectedSizes = Object.entries(selections)
+        .filter(([, qty]) => parseInt(qty, 10) > 0)
+        .map(([sizeKey, qty]) => ({
+          sizeKey,
+          quantity: parseInt(qty, 10),
+          price: item.sizeOptions?.[sizeKey]?.price || 0,
+          label: item.sizeOptions?.[sizeKey]?.label || SIZE_LABELS[sizeKey] || sizeKey
+        }));
+
+      return {
+        item,
+        selectedSizes
+      };
+    });
+
+    const hasAtLeastOneSelection = itemsWithSizes.some(entry => entry.selectedSizes.length > 0);
+    if (!hasAtLeastOneSelection) {
+      setCartMessage('Please pick size quantities for your selected items');
+      return;
+    }
+
     setAddingToCart(true);
     setCartMessage('');
 
     try {
+      const total = calculateBundleTotalWithSelections(rentalDuration, selectedItems, cardSizeSelections);
+      const totalDownpayment = total * 0.5;
 
-      const totalDownpayment = totalCost * 0.5;
-
-      const itemsBundle = selectedItems.map(item => ({
-        selected_size: getAvailableSizeKeys(item.sizeOptions || {})[0] || null,
-        selected_size_details: (() => {
-          const firstAvailable = getAvailableSizeKeys(item.sizeOptions || {})[0];
-          return firstAvailable ? (item.sizeOptions?.[firstAvailable] || null) : null;
-        })(),
+      const itemsBundle = itemsWithSizes.map(({ item, selectedSizes }) => ({
         id: item.id || item.item_id,
         item_name: item.item_name || item.name || 'Rental Item',
         brand: item.brand || 'Unknown',
-        size: (() => {
-          const firstAvailable = getAvailableSizeKeys(item.sizeOptions || {})[0];
-          return firstAvailable ? (SIZE_LABELS[firstAvailable] || firstAvailable) : (item.size || 'Standard');
-        })(),
         category: item.category || 'rental',
+        color: item.color || null,
+        material: item.material || null,
         downpayment: item.downpayment || 0,
         image_url: item.front_image ? getRentalImageUrl(item.front_image) : getRentalImageUrl(item.image_url),
         front_image: item.front_image ? getRentalImageUrl(item.front_image) : null,
         back_image: item.back_image ? getRentalImageUrl(item.back_image) : null,
         side_image: item.side_image ? getRentalImageUrl(item.side_image) : null,
-        individual_cost: calculateTotalCost(rentalDuration, item)
-      }));
+        size_options: item.sizeOptions || {},
+        selected_sizes: selectedSizes,
+        individual_cost: selectedSizes.reduce((sum, s) => {
+          const price = s.price > 0 ? s.price : parseFloat(String(item.price || '').replace(/[^ -9.]/g, '')) || 500;
+          return sum + (s.quantity * price * (Math.floor(rentalDuration / 3)));
+        }, 0)
+      })).filter(entry => entry.selected_sizes && entry.selected_sizes.length > 0);
 
       const rentalData = {
         serviceType: 'rental',
         serviceId: itemsBundle[0].id,
-        quantity: selectedItems.length,
+        quantity: itemsBundle.reduce((sum, i) => sum + i.selected_sizes.reduce((s, e) => s + e.quantity, 0), 0),
         basePrice: '0',
-        finalPrice: totalCost.toString(),
+        finalPrice: total.toString(),
         pricingFactors: {
           duration: rentalDuration,
-          price: totalCost,
+          price: total,
           downpayment: totalDownpayment.toString(),
           is_bundle: true,
-          item_count: selectedItems.length
+          item_count: itemsBundle.length
         },
         specificData: {
           is_bundle: true,
           bundle_items: itemsBundle,
           item_names: itemsBundle.map(i => i.item_name).join(', '),
-          item_name: `Rental Bundle (${selectedItems.length} items)`,
+          item_name: `Rental Bundle (${itemsBundle.length} items)`,
           brand: 'Multiple',
           size: 'Various',
           category: 'rental_bundle'
@@ -1038,11 +1204,14 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
       const result = await addToCart(rentalData);
 
       if (result.success) {
-        setCartMessage(`✅ ${selectedItems.length} items added to cart as bundle!`);
+        setCartMessage(`✅ ${itemsBundle.length} items added to cart as bundle!`);
 
         setTimeout(() => {
           setIsDateModalOpen(false);
           setSelectedItems([]);
+          setCardSizeSelections({});
+          setInlineMessage('');
+          setInlineMessageItemId(null);
           setIsMultiSelectMode(false);
           setStartDate('');
           setEndDate('');
@@ -1062,6 +1231,8 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
   const availableItems = rentalItems.filter(item => item.status === 'available');
   const displayItems = showAll ? availableItems : availableItems.slice(0, 3);
+  const bundlePreviewTotal = calculateBundleTotalWithSelections(3, selectedItems, cardSizeSelections);
+  const selectedBundleQty = selectedItems.reduce((sum, item) => sum + getItemSelectedQuantity(item), 0);
 
   if (loading) {
     return (
@@ -1112,7 +1283,6 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
               <div className="loading-placeholder"></div>
               <div className="rental-info">
                 <h3>Loading...</h3>
-                <p className="price">P ---</p>
                 <button className="btn-view" disabled>Loading...</button>
               </div>
             </div>
@@ -1134,6 +1304,9 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                 if (isMultiSelectMode) {
                   setIsMultiSelectMode(false);
                   setSelectedItems([]);
+                  setCardSizeSelections({});
+                  setInlineMessage('');
+                  setInlineMessageItemId(null);
                 } else {
                   setIsMultiSelectMode(true);
                 }
@@ -1172,92 +1345,153 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
             displayItems.map((item, i) => (
             <div
               key={i}
-              className="rental-card"
               style={{
-                position: 'relative',
-                border: isMultiSelectMode && isItemSelected(item) ? '3px solid #007bff' : '1px solid #ddd',
-                transition: 'all 0.2s ease'
-              }}
-              onClick={() => {
-                if (isMultiSelectMode) {
-                  toggleItemSelection(item);
-                }
+                display: 'flex',
+                flexDirection: 'column',
               }}
             >
-              {isMultiSelectMode && (
-                <div style={{
-                  position: 'absolute',
-                  top: '10px',
-                  left: '10px',
-                  zIndex: 10,
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '50%',
-                  backgroundColor: isItemSelected(item) ? '#007bff' : 'white',
-                  border: isItemSelected(item) ? '2px solid #007bff' : '2px solid #ccc',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                }}>
-                  {isItemSelected(item) && (
-                    <span style={{ color: 'white', fontWeight: 'bold', fontSize: '16px' }}>✓</span>
+              <div
+                className="rental-card"
+                style={{
+                  position: 'relative',
+                  border: isMultiSelectMode && isItemSelected(item) ? '3px solid #007bff' : '1px solid #ddd',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => {
+                  if (isMultiSelectMode) {
+                    toggleItemSelection(item);
+                  }
+                }}
+              >
+                {isMultiSelectMode && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '10px',
+                    left: '10px',
+                    zIndex: 10,
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    backgroundColor: isItemSelected(item) ? '#007bff' : 'white',
+                    border: isItemSelected(item) ? '2px solid #007bff' : '2px solid #ccc',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                  }}>
+                    {isItemSelected(item) && (
+                      <span style={{ color: 'white', fontWeight: 'bold', fontSize: '16px' }}>✓</span>
+                    )}
+                  </div>
+                )}
+                <img 
+                  src={item.img} 
+                  alt={item.name} 
+                  onError={(e) => { e.target.src = suitSample; }}
+                  style={{
+                    opacity: isMultiSelectMode ? 0.9 : 1,
+                    cursor: isMultiSelectMode ? 'pointer' : 'default'
+                  }} 
+                />
+                <div className="rental-info">
+                  <h3>{item.item_name || item.name}</h3>
+                  {getAvailableSizeKeys(item.sizeOptions || {}).length > 0 && (
+                    <div className="rc-card-sizes">
+                      {getAvailableSizeKeys(item.sizeOptions || {}).map(key => {
+                        const opt = item.sizeOptions[key] || {};
+                        const labelSource = opt.label || SIZE_LABELS[key] || key;
+                        const shortLabel = getSizeShortLabel(key, labelSource);
+                        return (
+                          <span key={key} className="rc-size-chip">
+                            {shortLabel}
+                            {opt.price > 0 && ` · ₱${parseFloat(opt.price).toLocaleString('en-PH')}`}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {!isMultiSelectMode && (
+                    <button onClick={() => openModal(item)} className="btn-view">View</button>
+                  )}
+                  {isMultiSelectMode && getAvailableSizeKeys(item.sizeOptions || {}).length === 0 && (
+                    <div className="rc-card-select-hint">
+                      {isItemSelected(item) ? '✓ Selected' : 'Tap to select'}
+                    </div>
                   )}
                 </div>
-              )}
-              <img 
-                src={item.img} 
-                alt={item.name} 
-                onError={(e) => { e.target.src = suitSample; }}
-                style={{
-                  opacity: isMultiSelectMode ? 0.9 : 1,
-                  cursor: isMultiSelectMode ? 'pointer' : 'default'
-                }} 
-              />
-              <div className="rental-info">
-                <h3>{item.item_name || item.name}</h3>
-                <p className="price">From ₱{(() => {
-                  const prices = getAvailableSizeKeys(item.sizeOptions || {})
-                    .map((k) => parseFloat(item.sizeOptions?.[k]?.price))
-                    .filter((p) => !isNaN(p) && p > 0);
-                  if (prices.length > 0) {
-                    return Math.min(...prices).toLocaleString('en-PH', { minimumFractionDigits: 2 });
-                  }
-                  const fallback = parseFloat(String(item.price || '').replace(/[^\d.]/g, ''));
-                  return (!isNaN(fallback) && fallback > 0 ? fallback : 500).toLocaleString('en-PH', { minimumFractionDigits: 2 });
-                })()} / 3 days</p>
-                {/* Sizes chips */}
-                {getAvailableSizeKeys(item.sizeOptions || {}).length > 0 && (
-                  <div className="rc-card-sizes">
-                    {getAvailableSizeKeys(item.sizeOptions || {}).map(key => {
-                      const opt = item.sizeOptions[key] || {};
+              </div>
+
+              {isMultiSelectMode && isItemSelected(item) && getAvailableSizeKeys(item.sizeOptions || {}).length > 0 && (
+                <div className="rc-card-size-picker-below" onClick={(e) => e.stopPropagation()}>
+                  <div className="rc-size-boxes">
+                    {getAvailableSizeKeys(item.sizeOptions || {}).map((sizeKey) => {
+                      const opt = item.sizeOptions?.[sizeKey] || {};
+                      const itemId = getItemId(item);
+                      const currentQty = parseInt(cardSizeSelections?.[itemId]?.[sizeKey] || 0, 10);
+                      const parsedSizeQty = parseInt(opt.quantity, 10);
+                      const parsedFallbackQty = parseInt(item.total_available, 10);
+                      const maxQty = !Number.isNaN(parsedSizeQty)
+                        ? Math.max(parsedSizeQty, 0)
+                        : (!Number.isNaN(parsedFallbackQty) ? Math.max(parsedFallbackQty, 0) : Number.POSITIVE_INFINITY);
+                      const isSelected = currentQty > 0;
+                      const labelSource = opt.label || SIZE_LABELS[sizeKey] || sizeKey;
+                      const shortLabel = getSizeShortLabel(sizeKey, labelSource);
+
+                      const toggleBox = (e) => {
+                        e.stopPropagation();
+                        if (isSelected) {
+                          updateCardSizeQuantity(item, sizeKey, -currentQty);
+                        } else {
+                          updateCardSizeQuantity(item, sizeKey, 1);
+                        }
+                      };
+
                       return (
-                        <span key={key} className="rc-size-chip">
-                          {opt.label || SIZE_LABELS[key] || key}
-                          {opt.price > 0 && ` · ₱${parseFloat(opt.price).toLocaleString('en-PH')}`}
-                        </span>
+                        <div key={sizeKey} className={`rc-size-box ${isSelected ? 'selected' : ''}`}>
+                          <button
+                            type="button"
+                            className="rc-size-box-btn"
+                            onClick={toggleBox}
+                            disabled={Number.isFinite(maxQty) && maxQty <= 0}
+                          >
+                            <span className="rc-size-letter">{shortLabel}</span>
+                          </button>
+                          {isSelected && (
+                            <div className="rc-size-qty-inline">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateCardSizeQuantity(item, sizeKey, -1);
+                                }}
+                                disabled={currentQty <= 0}
+                              >
+                                -
+                              </button>
+                              <span>{currentQty}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateCardSizeQuantity(item, sizeKey, 1);
+                                }}
+                                disabled={Number.isFinite(maxQty) && currentQty >= maxQty}
+                              >
+                                +
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
-                )}
-
-                {!isMultiSelectMode && (
-                  <button onClick={() => openModal(item)} className="btn-view">View</button>
-                )}
-                {isMultiSelectMode && (
-                  <div style={{
-                    padding: '8px 12px',
-                    backgroundColor: isItemSelected(item) ? '#e3f2fd' : '#f8f9fa',
-                    borderRadius: '5px',
-                    fontSize: '13px',
-                    color: isItemSelected(item) ? '#1976d2' : '#666',
-                    fontWeight: isItemSelected(item) ? '600' : '400'
-                  }}>
-                    {isItemSelected(item) ? '✓ Selected' : 'Tap to select'}
-                  </div>
-                )}
-              </div>
+                  {inlineMessage && inlineMessageItemId === getItemId(item) && (
+                    <div className="rc-inline-stock-msg">{inlineMessage}</div>
+                  )}
+                </div>
+              )}
             </div>
             ))
           )}
@@ -1298,40 +1532,37 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
         )}
       </section>
       {isMultiSelectMode && selectedItems.length > 0 && (
-        <div style={{
-          position: 'fixed',
-          bottom: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          backgroundColor: '#1a1a2e',
-          color: 'white',
-          padding: '15px 25px',
-          borderRadius: '30px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '20px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-          zIndex: 1000
-        }}>
-          <span style={{ fontSize: '15px' }}>
-            <strong>{selectedItems.length}</strong> item{selectedItems.length > 1 ? 's' : ''} selected
-          </span>
-          <span style={{ color: '#aaa' }}>|</span>
-          <span style={{ fontSize: '14px', color: '#aaa' }}>
-            Est. Downpayment: ₱{totalCost > 0 ? (totalCost * 0.5).toFixed(2) : '0.00'}
-          </span>
+        <div className="rc-bundle-bar">
+          <div className="rc-bundle-thumbs">
+            {selectedItems.map((item) => {
+              const qty = getItemSelectedQuantity(item);
+              return (
+                <div
+                  key={getItemId(item)}
+                  className="rc-bundle-thumb"
+                  title={`${item.item_name || item.name}${getItemSizeSummary(item) ? ` - ${getItemSizeSummary(item)}` : ''}`}
+                >
+                  <img
+                    src={item.img}
+                    alt={item.item_name || item.name}
+                    onError={(e) => { e.target.src = suitSample; }}
+                  />
+                  <span className="rc-bundle-thumb-qty">{qty}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="rc-bundle-meta">
+            <span><strong>{selectedItems.length}</strong> item{selectedItems.length > 1 ? 's' : ''} selected</span>
+            <span>{selectedBundleQty} pcs total</span>
+            <span>Est. downpayment: ₱{(bundlePreviewTotal * 0.5).toFixed(2)}</span>
+          </div>
+
           <button
             onClick={openDateModal}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '20px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '14px'
-            }}
+            className="rc-bundle-btn"
+            disabled={bundlePreviewTotal <= 0}
           >
             Set Dates & Add to Cart →
           </button>
@@ -1371,45 +1602,22 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
             <h2 style={{ marginBottom: '20px', color: '#1a1a2e' }}>
               Rental Bundle ({selectedItems.length} items)
             </h2>
-            <div style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '10px',
-              marginBottom: '20px',
-              padding: '15px',
-              backgroundColor: '#f8f9fa',
-              borderRadius: '10px'
-            }}>
-              {selectedItems.map((item, idx) => (
-                <div key={idx} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 12px',
-                  backgroundColor: 'white',
-                  borderRadius: '20px',
-                  border: '1px solid #ddd',
-                  fontSize: '13px'
-                }}>
+            <div className="rc-bundle-strip">
+              {selectedItems.map((item) => (
+                <div key={getItemId(item)} className="rc-bundle-strip-item">
                   <img
                     src={item.img}
                     alt={item.item_name || item.name}
-                    style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover' }}
+                    onError={(e) => { e.target.src = suitSample; }}
                   />
-                  <span>{item.item_name || item.name}</span>
-                  <button
-                    onClick={() => toggleItemSelection(item)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#dc3545',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      fontSize: '14px'
-                    }}
-                  >
-                    ✕
-                  </button>
+                  <div className="rc-bundle-strip-info">
+                    <span className="rc-bundle-strip-name">{item.item_name || item.name}</span>
+                    <span className="rc-bundle-strip-sizes">{getItemSizeSummary(item) || 'No size selected yet'}</span>
+                  </div>
+                  <div className="rc-bundle-strip-actions">
+                    <span>{getItemSelectedQuantity(item)} pcs</span>
+                    <button onClick={() => toggleItemSelection(item)} type="button">✕</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1494,11 +1702,27 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
               <div className="cost-breakdown">
                 <h4>Payment Details</h4>
                 <div style={{ marginBottom: '10px' }}>
-                  {selectedItems.map((item, idx) => {
-                    const itemCost = calculateTotalCost(rentalDuration, item);
+                  {selectedItems.map((item) => {
+                    const itemId = getItemId(item);
+                    const selections = cardSizeSelections[itemId] || {};
+                    const sizeSummary = Object.entries(selections)
+                      .filter(([, qty]) => parseInt(qty, 10) > 0)
+                      .map(([sizeKey, qty]) => `${item.sizeOptions?.[sizeKey]?.label || SIZE_LABELS[sizeKey] || sizeKey} x${qty}`)
+                      .join(', ');
+                    const itemCost = calculateTotalCostWithSelections(selections, item, rentalDuration);
+
+                    if (itemCost <= 0) {
+                      return (
+                        <div key={itemId} className="cost-item">
+                          <span>{item.item_name || item.name}</span>
+                          <span style={{ color: '#c62828', fontWeight: '600' }}>Select size qty</span>
+                        </div>
+                      );
+                    }
+
                     return (
-                      <div key={idx} className="cost-item">
-                        <span>{item.item_name || item.name}:</span>
+                      <div key={itemId} className="cost-item">
+                        <span>{item.item_name || item.name}{sizeSummary ? ` (${sizeSummary})` : ''}:</span>
                         <span>₱{itemCost.toFixed(2)}</span>
                       </div>
                     );
@@ -1515,7 +1739,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                 </div>
                 <div className="cost-total">
                   <span>Total Rental Cost (Due on Return):</span>
-                  <span>₱{totalCost.toFixed(2)}</span>
+                  <span>₱{(totalCost * 0.5).toFixed(2)}</span>
                 </div>
                 <div style={{
                   marginTop: '15px',
@@ -1620,7 +1844,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                         <button className={measurementUnit === 'cm' ? 'active' : ''} onClick={() => setMeasurementUnit('cm')}>cm</button>
                       </div>
                     </div>
-                    <div className="rc-selection-summary" style={{ marginTop: '10px' }}>
+                    <div className="rc-selection-summary" style={{ marginTop: '4px' }}>
                       Available Sizes:{' '}
                       {getAvailableSizeKeys(selectedItem.sizeOptions || {})
                         .map((key) => {
@@ -1640,6 +1864,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                           : (Number.isNaN(parsedFallbackTotal) ? 0 : parsedFallbackTotal);
                         const currentQty = parseInt(sizeSelections[sizeKey] || 0, 10);
                         const isExpanded = expandedMeasurementSize === sizeKey;
+                        const isCollapsed = collapsedSizes[sizeKey] !== false;
                         const resolvedMeasurements = normalizeMeasurementsObject(
                           opt.measurements || selectedItem.measurementProfile
                         );
@@ -1671,41 +1896,57 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                             <div className="rc-size-row-header">
                               <span className="rc-size-label">{opt.label || SIZE_LABELS[sizeKey] || sizeKey}</span>
                               {opt.price > 0 && (
-                                <span className="rc-size-price">₱{parseFloat(opt.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })} / 3 days</span>
+                                <span className="rc-size-price">₱ {parseFloat(opt.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })} / 3 days</span>
                               )}
-                              <span className="rc-size-avail">{maxQty > 0 ? `${maxQty} available` : 'available'}</span>
-                              <div className="rc-qty-control">
-                                <button
-                                  disabled={currentQty <= 0}
-                                  onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.max(0, currentQty - 1) }))}
-                                >−</button>
-                                <span>{currentQty}</span>
-                                <button
-                                  disabled={currentQty >= maxQty}
-                                  onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.min(maxQty, currentQty + 1) }))}
-                                >+</button>
-                              </div>
-                              {hasMeasurements && measurementRows.length > 0 && (
-                                <button
-                                  className="rc-meas-toggle"
-                                  onClick={() => setExpandedMeasurementSize(isExpanded ? null : sizeKey)}
-                                >
-                                  {isExpanded ? '▲ Hide' : '▼ Measurements'}
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                className="rc-collapse-toggle"
+                                onClick={() => {
+                                  setCollapsedSizes(prev => ({ ...prev, [sizeKey]: !isCollapsed }));
+                                  if (!isCollapsed && expandedMeasurementSize === sizeKey) {
+                                    setExpandedMeasurementSize(null);
+                                  }
+                                }}
+                              >
+                                {isCollapsed ? '▼' : '▲'}
+                              </button>
                             </div>
-                            {isExpanded && measurementRows.length > 0 && (
-                              <div className="rc-measurements-panel">
-                                <table className="rc-meas-table">
-                                  <thead>
-                                    <tr><th>Measurement</th><th>Value</th></tr>
-                                  </thead>
-                                  <tbody>
-                                    {measurementRows.map((r, idx) => (
-                                      <tr key={idx}><td>{r.label}</td><td>{r.value}</td></tr>
-                                    ))}
-                                  </tbody>
-                                </table>
+                            {!isCollapsed && (
+                              <div className="rc-size-row-body">
+                                <div className="rc-qty-control">
+                                  <button
+                                    disabled={currentQty <= 0}
+                                    onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.max(0, currentQty - 1) }))}
+                                  >−</button>
+                                  <span>{currentQty}</span>
+                                  <button
+                                    disabled={currentQty >= maxQty}
+                                    onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.min(maxQty, currentQty + 1) }))}
+                                  >+
+                                  </button>
+                                </div>
+                                {hasMeasurements && measurementRows.length > 0 && (
+                                  <button
+                                    className="rc-meas-toggle"
+                                    onClick={() => setExpandedMeasurementSize(isExpanded ? null : sizeKey)}
+                                  >
+                                    {isExpanded ? '▲ Hide' : '▼ Measurements'}
+                                  </button>
+                                )}
+                                {isExpanded && measurementRows.length > 0 && (
+                                  <div className="rc-measurements-panel">
+                                    <table className="rc-meas-table">
+                                      <thead>
+                                        <tr><th>Measurement</th><th>Value</th></tr>
+                                      </thead>
+                                      <tbody>
+                                        {measurementRows.map((r, idx) => (
+                                          <tr key={idx}><td>{r.label}</td><td>{r.value}</td></tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

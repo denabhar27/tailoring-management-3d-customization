@@ -43,6 +43,62 @@ function getSizeEntriesTotal(sizeRaw) {
   return null;
 }
 
+function mapSizeInputToKey(sizeInput = '', entries = []) {
+  const raw = String(sizeInput || '').trim().toLowerCase();
+  if (!raw) return '';
+
+  const aliasMap = {
+    s: 'small',
+    small: 'small',
+    m: 'medium',
+    medium: 'medium',
+    l: 'large',
+    large: 'large',
+    xl: 'extra_large',
+    'extra large': 'extra_large',
+    extra_large: 'extra_large'
+  };
+
+  if (aliasMap[raw]) return aliasMap[raw];
+
+  const byExact = entries.find((e) => String(e?.sizeKey || '').toLowerCase() === raw);
+  if (byExact) return byExact.sizeKey;
+
+  const byLabel = entries.find((e) => String(e?.label || '').toLowerCase() === raw);
+  if (byLabel) return byLabel.sizeKey;
+
+  return raw;
+}
+
+function collectSelectedSizesFromSpecificData(specificData = {}, fallbackItemId = null) {
+  const selections = [];
+
+  const appendSelection = (itemId, selectedSizes = []) => {
+    if (!itemId || !Array.isArray(selectedSizes)) return;
+    selectedSizes.forEach((s) => {
+      const key = String(s?.sizeKey ?? s?.size_key ?? '').trim();
+      const qty = Math.max(0, parseInt(s?.quantity, 10) || 0);
+      if (!key || qty <= 0) return;
+      selections.push({ itemId: Number(itemId), sizeKey: key, quantity: qty });
+    });
+  };
+
+  if (specificData?.is_bundle && Array.isArray(specificData.bundle_items)) {
+    specificData.bundle_items.forEach((bundleItem) => {
+      const itemId = parseInt(bundleItem?.item_id ?? bundleItem?.id ?? bundleItem?.service_id, 10);
+      const selectedSizes =
+        Array.isArray(bundleItem?.selected_sizes) ? bundleItem.selected_sizes :
+        (Array.isArray(bundleItem?.selectedSizes) ? bundleItem.selectedSizes : []);
+      appendSelection(itemId, selectedSizes);
+    });
+    return selections;
+  }
+
+  const selectedSizes = Array.isArray(specificData?.selected_sizes) ? specificData.selected_sizes : [];
+  appendSelection(fallbackItemId, selectedSizes);
+  return selections;
+}
+
 const RentalInventory = {
   
   create: (itemData, callback) => {
@@ -74,7 +130,80 @@ const RentalInventory = {
 
   getAll: (callback) => {
     const sql = "SELECT * FROM rental_inventory ORDER BY created_at DESC";
-    db.query(sql, callback);
+    db.query(sql, (err, rows) => {
+      if (err) return callback(err);
+
+      const items = rows || [];
+      if (items.length === 0) return callback(null, []);
+
+      const rentedSql = `
+        SELECT item_id, service_id, specific_data
+        FROM order_items
+        WHERE service_type = 'rental'
+          AND approval_status IN ('rented', 'picked_up')
+      `;
+
+      db.query(rentedSql, (rentedErr, rentedRows) => {
+        if (rentedErr) return callback(rentedErr);
+
+        const damageSql = `
+          SELECT inventory_item_id, size_key, SUM(quantity) AS qty
+          FROM damage_logs
+          WHERE status = 'active'
+          GROUP BY inventory_item_id, size_key
+        `;
+
+        db.query(damageSql, (damageErr, damageRows) => {
+          if (damageErr) {
+            // Migration-safe fallback while damage_logs may not yet exist.
+            if (!String(damageErr.message || '').toLowerCase().includes('doesn\'t exist')) {
+              return callback(damageErr);
+            }
+            damageRows = [];
+          }
+
+          const rentedMap = new Map();
+          (rentedRows || []).forEach((row) => {
+            const specific = parseJsonSafely(row.specific_data) || {};
+            const serviceId = parseInt(row.service_id, 10);
+            const selections = collectSelectedSizesFromSpecificData(specific, serviceId);
+            selections.forEach((sel) => {
+              const key = `${sel.itemId}:${sel.sizeKey}`;
+              rentedMap.set(key, (rentedMap.get(key) || 0) + sel.quantity);
+            });
+          });
+
+          const damagedMap = new Map();
+          (damageRows || []).forEach((row) => {
+            const itemId = parseInt(row.inventory_item_id, 10);
+            const key = `${itemId}:${row.size_key}`;
+            damagedMap.set(key, parseInt(row.qty, 10) || 0);
+          });
+
+          const enriched = items.map((item) => {
+            const sizePayload = parseJsonSafely(item.size);
+            const sizeEntries = Array.isArray(sizePayload?.size_entries) ? sizePayload.size_entries : [];
+            const reasonCounts = {};
+            sizeEntries.forEach((entry) => {
+              const sizeKey = String(entry?.sizeKey || '').trim();
+              if (!sizeKey) return;
+              const mapKey = `${item.item_id}:${sizeKey}`;
+              reasonCounts[sizeKey] = {
+                rented: rentedMap.get(mapKey) || 0,
+                maintenance: damagedMap.get(mapKey) || 0
+              };
+            });
+
+            return {
+              ...item,
+              size_reason_counts: reasonCounts
+            };
+          });
+
+          callback(null, enriched);
+        });
+      });
+    });
   },
 
   getAvailableItems: (filters = {}, callback) => {
@@ -337,6 +466,256 @@ const RentalInventory = {
       const sql = "UPDATE rental_inventory SET status = ?, damage_notes = ? WHERE item_id = ?";
       db.query(sql, [status, damage_notes, item_id], callback);
     }
+  },
+
+  restockReturnedSizes: (itemId, selectedSizes = [], callback) => {
+    const numericItemId = parseInt(itemId, 10);
+    const normalizedSelections = Array.isArray(selectedSizes)
+      ? selectedSizes.map((entry) => ({
+          sizeKey: String(entry?.sizeKey || entry?.size_key || '').trim(),
+          quantity: Math.max(0, parseInt(entry?.quantity, 10) || 0)
+        })).filter((entry) => entry.sizeKey && entry.quantity > 0)
+      : [];
+
+    if (normalizedSelections.length === 0) {
+      return callback(null, {
+        item_id: numericItemId,
+        total_available: null,
+        restocked: 0
+      });
+    }
+
+    const getSql = `SELECT item_id, size, total_available FROM rental_inventory WHERE item_id = ? LIMIT 1`;
+    db.query(getSql, [numericItemId], (getErr, rows) => {
+      if (getErr) return callback(getErr);
+      if (!rows || rows.length === 0) {
+        const err = new Error('Rental item not found.');
+        err.statusCode = 404;
+        return callback(err);
+      }
+
+      const item = rows[0];
+      const parsed = parseJsonSafely(item.size);
+      if (!parsed || !Array.isArray(parsed.size_entries)) {
+        const err = new Error('Item size profile is missing. Please re-save the rental item in Post Rent.');
+        err.statusCode = 400;
+        return callback(err);
+      }
+
+      let restocked = 0;
+      normalizedSelections.forEach((sel) => {
+        const normalizedKey = mapSizeInputToKey(sel.sizeKey, parsed.size_entries);
+        const idx = parsed.size_entries.findIndex((entry) => String(entry?.sizeKey || '') === normalizedKey);
+        if (idx === -1) return;
+        const currentQty = Math.max(0, parseInt(parsed.size_entries[idx].quantity, 10) || 0);
+        parsed.size_entries[idx].quantity = currentQty + sel.quantity;
+        restocked += sel.quantity;
+      });
+
+      const nextTotal = parsed.size_entries.reduce((sum, entry) => sum + (Math.max(0, parseInt(entry?.quantity, 10) || 0)), 0);
+      const updateSql = `
+        UPDATE rental_inventory
+        SET size = ?, total_available = ?, status = ?
+        WHERE item_id = ?
+      `;
+      db.query(updateSql, [JSON.stringify(parsed), nextTotal, nextTotal > 0 ? 'available' : 'maintenance', numericItemId], (updateErr) => {
+        if (updateErr) return callback(updateErr);
+        callback(null, {
+          item_id: numericItemId,
+          total_available: nextTotal,
+          restocked
+        });
+      });
+    });
+  },
+
+  markSizeDamaged: (itemId, damageData, callback) => {
+    const numericItemId = parseInt(itemId, 10);
+    const qty = Math.max(1, parseInt(damageData?.quantity, 10) || 1);
+    const damageLevel = String(damageData?.damage_level || '').trim().toLowerCase();
+    const damageNote = String(damageData?.damage_note || '').trim();
+
+    const validLevels = ['minor', 'moderate', 'severe'];
+    if (!validLevels.includes(damageLevel)) {
+      const err = new Error('Invalid damage level. Allowed: minor, moderate, severe.');
+      err.statusCode = 400;
+      return callback(err);
+    }
+
+    const getSql = `SELECT item_id, item_name, size, total_available, status FROM rental_inventory WHERE item_id = ? LIMIT 1`;
+    db.query(getSql, [numericItemId], (getErr, rows) => {
+      if (getErr) return callback(getErr);
+      if (!rows || rows.length === 0) {
+        const err = new Error('Rental item not found.');
+        err.statusCode = 404;
+        return callback(err);
+      }
+
+      const item = rows[0];
+      const parsed = parseJsonSafely(item.size);
+      if (!parsed || !Array.isArray(parsed.size_entries)) {
+        const err = new Error('Item size profile is missing. Please re-save the rental item in Post Rent.');
+        err.statusCode = 400;
+        return callback(err);
+      }
+
+      const normalizedKey = mapSizeInputToKey(damageData?.size_key || damageData?.size || damageData?.size_label, parsed.size_entries);
+      const idx = parsed.size_entries.findIndex((entry) => String(entry?.sizeKey || '') === normalizedKey);
+      if (idx === -1) {
+        const err = new Error(`Size "${damageData?.size_key || damageData?.size || ''}" not found on this item.`);
+        err.statusCode = 400;
+        return callback(err);
+      }
+
+      const currentSizeQty = Math.max(0, parseInt(parsed.size_entries[idx].quantity, 10) || 0);
+      if (currentSizeQty < qty) {
+        const err = new Error(`Not enough available quantity for ${parsed.size_entries[idx].label || normalizedKey}. Available: ${currentSizeQty}, requested: ${qty}.`);
+        err.statusCode = 400;
+        return callback(err);
+      }
+
+      parsed.size_entries[idx].quantity = currentSizeQty - qty;
+      const nextTotalBySizes = parsed.size_entries.reduce((sum, entry) => sum + (Math.max(0, parseInt(entry?.quantity, 10) || 0)), 0);
+      const nextTotal = Math.max(0, nextTotalBySizes);
+      const nextStatus = nextTotal <= 0 ? 'maintenance' : (item.status || 'available');
+      const updatedSizeJson = JSON.stringify(parsed);
+
+      const updateSql = `
+        UPDATE rental_inventory
+        SET size = ?, total_available = ?, status = ?
+        WHERE item_id = ?
+      `;
+      db.query(updateSql, [updatedSizeJson, nextTotal, nextStatus, numericItemId], (updateErr) => {
+        if (updateErr) return callback(updateErr);
+
+        const insertLogSql = `
+          INSERT INTO damage_logs
+          (inventory_item_id, item_name, size_key, size_label, quantity, damage_level, damage_note, damaged_customer_name, processed_by_user_id, processed_by_role, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+        `;
+        const processedByUserId = damageData?.processed_by_user_id || null;
+        const processedByRole = damageData?.processed_by_role || 'admin';
+        const damagedCustomerName = String(damageData?.damaged_customer_name || '').trim() || null;
+        const sizeLabel = parsed.size_entries[idx].label || normalizedKey;
+
+        db.query(
+          insertLogSql,
+          [numericItemId, item.item_name, normalizedKey, sizeLabel, qty, damageLevel, damageNote || null, damagedCustomerName, processedByUserId, processedByRole],
+          (logErr, logResult) => {
+            if (logErr) return callback(logErr);
+
+            callback(null, {
+              item_id: numericItemId,
+              item_name: item.item_name,
+              size_key: normalizedKey,
+              size_label: sizeLabel,
+              damaged_quantity: qty,
+              damage_level: damageLevel,
+              status: nextStatus,
+              total_available: nextTotal,
+              damage_log_id: logResult?.insertId || null
+            });
+          }
+        );
+      });
+    });
+  },
+
+  getSizeActivity: (itemId, sizeKey, callback) => {
+    const numericItemId = parseInt(itemId, 10);
+    const normalizedSizeKey = mapSizeInputToKey(sizeKey || '');
+    if (!normalizedSizeKey) {
+      const err = new Error('size_key is required');
+      err.statusCode = 400;
+      return callback(err);
+    }
+
+    const rentalSql = `
+      SELECT oi.order_id, oi.service_id, oi.approval_status, oi.specific_data,
+             CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS customer_name
+      FROM order_items oi
+      LEFT JOIN orders o ON o.order_id = oi.order_id
+      LEFT JOIN user u ON u.user_id = o.user_id
+      WHERE oi.service_type = 'rental'
+        AND oi.approval_status IN ('pending','ready_to_pickup','picked_up','rented','returned')
+    `;
+
+    db.query(rentalSql, (rentedErr, rentedRows) => {
+      if (rentedErr) {
+        console.error('getSizeActivity rental query error:', rentedErr);
+        return callback(null, { item_id: numericItemId, size_key: normalizedSizeKey, activities: [] });
+      }
+
+      const rentedActivities = [];
+      (rentedRows || []).forEach((row) => {
+        const specific = parseJsonSafely(row.specific_data) || {};
+        const selections = collectSelectedSizesFromSpecificData(specific, row.service_id);
+        selections
+          .filter((sel) => {
+            const selKey = mapSizeInputToKey(sel.sizeKey || sel.size_key || '');
+            return Number(sel.itemId) === numericItemId && selKey === normalizedSizeKey;
+          })
+          .forEach((sel) => {
+            const customerName =
+              String(row.customer_name || '').trim() ||
+              `Order #${row.order_id}`;
+            const activityType = String(row.approval_status || 'rented').toLowerCase();
+            rentedActivities.push({
+              activity_type: activityType,
+              quantity: sel.quantity,
+              person_name: customerName,
+              damage_level: null,
+              damage_note: null,
+              processed_by: null,
+              created_at: null
+            });
+          });
+      });
+
+      const damageSql = `
+        SELECT dl.quantity, dl.damage_level, dl.damage_note, dl.damaged_customer_name, dl.created_at,
+               CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS processed_name,
+               dl.processed_by_role
+        FROM damage_logs dl
+        LEFT JOIN user u ON u.user_id = dl.processed_by_user_id
+        WHERE dl.inventory_item_id = ?
+          AND dl.size_key = ?
+          AND dl.status = 'active'
+        ORDER BY dl.created_at DESC
+      `;
+
+      db.query(damageSql, [numericItemId, normalizedSizeKey], (damageErr, damageRows) => {
+        if (damageErr) {
+          const msg = String(damageErr.message || '').toLowerCase();
+          const tableMissing = msg.includes("doesn't exist") || msg.includes('no such table') || msg.includes('unknown table');
+          if (!tableMissing) {
+            console.error('getSizeActivity damage query error:', damageErr);
+            return callback(null, { item_id: numericItemId, size_key: normalizedSizeKey, activities: rentedActivities });
+          }
+          damageRows = [];
+        }
+
+        const maintenanceActivities = (damageRows || []).map((row) => {
+          const processedName = String(row.processed_name || '').trim();
+          const processedBy = String(row.damaged_customer_name || '').trim() || processedName || row.processed_by_role || 'admin';
+          return {
+            activity_type: 'maintenance',
+            quantity: Math.max(0, parseInt(row.quantity, 10) || 0),
+            person_name: null,
+            damage_level: row.damage_level || null,
+            damage_note: row.damage_note || null,
+            processed_by: processedBy,
+            created_at: row.created_at || null
+          };
+        });
+
+        callback(null, {
+          item_id: numericItemId,
+          size_key: normalizedSizeKey,
+          activities: [...rentedActivities, ...maintenanceActivities]
+        });
+      });
+    });
   },
 
   updateRentedCount: (item_id, change, callback) => {

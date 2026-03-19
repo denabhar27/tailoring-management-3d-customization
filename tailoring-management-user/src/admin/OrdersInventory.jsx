@@ -4,7 +4,7 @@ import AdminHeader from './AdminHeader';
 import Sidebar from './Sidebar';
 import { getAllBillingRecords, getBillingStats, updateBillingRecordStatus } from '../api/BillingApi';
 import { getCompletedItems, getInventoryStats } from '../api/InventoryApi';
-import { getAllRentals, createRental, updateRental, deleteRental, getRentalImageUrl } from '../api/RentalApi';
+import { getAllRentals, createRental, updateRental, deleteRental, getRentalImageUrl, getRentalSizeActivity } from '../api/RentalApi';
 import { useAlert } from '../context/AlertContext';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
@@ -58,25 +58,54 @@ const getSizeAvailabilityRows = (item) => {
   const rows = parseRentalSizeEntries(item?.size);
   if (rows.length === 0) return [];
 
-  const itemStatus = (item?.status || 'available').toLowerCase();
+  const reasonCounts = item?.size_reason_counts && typeof item.size_reason_counts === 'object'
+    ? item.size_reason_counts
+    : {};
+
   return rows.map((row) => {
-    let reason = '';
-    if (itemStatus === 'maintenance') {
-      reason = 'Maintenance';
-    } else if (itemStatus === 'rented') {
-      reason = 'Rented';
+    const rowReasons = reasonCounts[row.key] || {};
+    const rentedQty = Math.max(0, parseInt(rowReasons?.rented, 10) || 0);
+    const maintenanceQty = Math.max(0, parseInt(rowReasons?.maintenance, 10) || 0);
+    const hasReasons = rentedQty > 0 || maintenanceQty > 0;
+
+    let reason = 'Available';
+    if (hasReasons) {
+      const segments = [];
+      if (rentedQty > 0) segments.push(`${rentedQty} rented`);
+      if (maintenanceQty > 0) segments.push(`${maintenanceQty} maintenance`);
+      reason = segments.join(' + ');
     } else if (row.quantity <= 0) {
       reason = 'Out of stock';
-    } else {
-      reason = 'Available';
     }
 
     return {
       ...row,
       reason,
-      isOut: row.quantity <= 0 || itemStatus === 'maintenance' || itemStatus === 'rented'
+      rentedQty,
+      maintenanceQty,
+      isOut: row.quantity <= 0
     };
   });
+};
+
+const normalizeSizeKey = (key = '') => {
+  const raw = String(key || '').trim().toLowerCase();
+  if (!raw) return '';
+  const simplified = raw.replace(/\([^)]*\)/g, '').trim();
+  const alias = {
+    s: 'small',
+    small: 'small',
+    m: 'medium',
+    medium: 'medium',
+    l: 'large',
+    large: 'large',
+    xl: 'extra_large',
+    'extra large': 'extra_large',
+    extra_large: 'extra_large'
+  };
+  if (alias[simplified]) return alias[simplified];
+  if (alias[raw]) return alias[raw];
+  return simplified || raw;
 };
 
 // ImageCarousel component for rental items
@@ -238,6 +267,10 @@ const OrdersInventory = () => {
   const [isRentalLoading, setIsRentalLoading] = useState(false);
   const [selectedRentalItem, setSelectedRentalItem] = useState(null);
   const [isRentalDetailModalOpen, setIsRentalDetailModalOpen] = useState(false);
+  const [isSizeActivityModalOpen, setIsSizeActivityModalOpen] = useState(false);
+  const [sizeActivityLoading, setSizeActivityLoading] = useState(false);
+  const [sizeActivityRows, setSizeActivityRows] = useState([]);
+  const [sizeActivityContext, setSizeActivityContext] = useState({ itemName: '', sizeLabel: '', sizeKey: '' });
 
   // Fetch all data on component mount
   useEffect(() => {
@@ -665,6 +698,30 @@ const OrdersInventory = () => {
     setSelectedRentalItem(null);
   };
 
+  const openSizeActivityModal = async (item, row, event) => {
+    if (event) event.stopPropagation();
+    const normalizedKey = normalizeSizeKey(row?.key);
+    setSizeActivityContext({
+      itemName: item?.item_name || 'Rental Item',
+      sizeLabel: row?.label || row?.key || 'Size',
+      sizeKey: normalizedKey || row?.key || ''
+    });
+    setIsSizeActivityModalOpen(true);
+    setSizeActivityLoading(true);
+    setSizeActivityRows([]);
+
+    try {
+      const result = await getRentalSizeActivity(item?.item_id, normalizedKey || row?.key);
+      const rows = Array.isArray(result?.data?.activities) ? result.data.activities : [];
+      setSizeActivityRows(rows);
+    } catch (error) {
+      console.error('Error loading size activity:', error);
+      setSizeActivityRows([]);
+    } finally {
+      setSizeActivityLoading(false);
+    }
+  };
+
   const filteredRentalItems = rentalFilter 
     ? rentalItems.filter(i => (i.status || 'available') === rentalFilter) 
     : rentalItems;
@@ -928,8 +985,8 @@ const OrdersInventory = () => {
                 const sizeRows = getSizeAvailabilityRows(item);
                 const outCount = sizeRows.filter((s) => s.isOut).length;
                 const totalCount = sizeRows.length;
-                const stockStatus = (item.status || 'available') === 'available' ? 'In Stock' : 'Out of Stock';
-                const isOutOfStock = (item.status || 'available') !== 'available';
+                const isOutOfStock = totalCount > 0 ? outCount >= totalCount : (item.total_available || 0) <= 0;
+                const stockStatus = isOutOfStock ? 'Out of Stock' : 'In Stock';
                 return (
                   <div key={item.item_id} className={`rental-item-card ${isOutOfStock ? 'out-of-stock' : ''}`} onClick={() => openRentalDetailModal(item)}>
                     <div className="rental-item-image-wrapper">
@@ -960,8 +1017,10 @@ const OrdersInventory = () => {
                       {sizeRows.length > 0 && (
                         <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                           {sizeRows.map((row) => (
-                            <span
+                            <button
                               key={`${item.item_id}-${row.key}-${row.label}`}
+                              type="button"
+                              onClick={(e) => openSizeActivityModal(item, row, e)}
                               style={{
                                 fontSize: '11px',
                                 fontWeight: 700,
@@ -969,12 +1028,13 @@ const OrdersInventory = () => {
                                 padding: '3px 8px',
                                 border: row.isOut ? '1px solid #ef9a9a' : '1px solid #a5d6a7',
                                 background: row.isOut ? '#ffebee' : '#e8f5e9',
-                                color: row.isOut ? '#b71c1c' : '#1b5e20'
+                                color: row.isOut ? '#b71c1c' : '#1b5e20',
+                                cursor: 'pointer'
                               }}
                               title={`${row.label}: ${row.quantity} (${row.reason})`}
                             >
-                              {row.label}: {row.quantity}{row.isOut ? ' OUT' : ''}
-                            </span>
+                              {row.label}: {row.quantity} ({row.reason})
+                            </button>
                           ))}
                           <span
                             style={{
@@ -1143,7 +1203,22 @@ const OrdersInventory = () => {
                       <tbody>
                         {getSizeAvailabilityRows(selectedRentalItem).map((row, idx) => (
                           <tr key={`${row.key}-${idx}`} style={{ borderTop: idx === 0 ? 'none' : '1px solid #f1f1f1' }}>
-                            <td style={{ padding: '8px 10px', fontWeight: 600 }}>{row.label}</td>
+                            <td style={{ padding: '8px 10px', fontWeight: 600 }}>
+                              <button
+                                type="button"
+                                onClick={(e) => openSizeActivityModal(selectedRentalItem, row, e)}
+                                style={{
+                                  border: 'none',
+                                  background: 'transparent',
+                                  color: '#1976d2',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  padding: 0
+                                }}
+                              >
+                                {row.label}
+                              </button>
+                            </td>
                             <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>{row.quantity}</td>
                             <td style={{ padding: '8px 10px', color: row.isOut ? '#b71c1c' : '#2e7d32', fontWeight: 700 }}>
                               {row.reason}
@@ -1173,6 +1248,55 @@ const OrdersInventory = () => {
             </div>
             <div className="modal-footer">
               <button className="close-btn" onClick={closeRentalDetailModal}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isSizeActivityModalOpen && (
+        <div className="modal-overlay active" onClick={(e) => { if (e.target.classList.contains('modal-overlay')) setIsSizeActivityModalOpen(false); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Size Activity Log</h2>
+              <span className="close-modal" onClick={() => setIsSizeActivityModalOpen(false)}>×</span>
+            </div>
+            <div className="modal-body">
+              <div style={{ marginBottom: '8px', fontWeight: 700, color: '#5d4037' }}>
+                {sizeActivityContext.itemName} - {sizeActivityContext.sizeLabel}
+              </div>
+              {sizeActivityLoading ? (
+                <div style={{ padding: '10px 0' }}>Loading size activity...</div>
+              ) : sizeActivityRows.length === 0 ? (
+                <div style={{ padding: '10px 0', color: '#666' }}>No renter/maintenance records for this size.</div>
+              ) : (
+                <div style={{ border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#fafafa' }}>
+                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px' }}>Name</th>
+                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px' }}>Status</th>
+                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px' }}>Damage Level</th>
+                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px' }}>Damage Note</th>
+                        <th style={{ textAlign: 'center', padding: '8px 10px', fontSize: '12px' }}>Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sizeActivityRows.map((entry, idx) => (
+                        <tr key={`${entry.activity_type}-${idx}`} style={{ borderTop: idx === 0 ? 'none' : '1px solid #f1f1f1' }}>
+                          <td style={{ padding: '8px 10px' }}>{entry.activity_type === 'maintenance' ? (entry.processed_by || '-') : (entry.person_name || '-')}</td>
+                          <td style={{ padding: '8px 10px', fontWeight: 700, textTransform: 'capitalize' }}>{entry.activity_type}</td>
+                          <td style={{ padding: '8px 10px', textTransform: 'capitalize' }}>{entry.activity_type === 'maintenance' ? (entry.damage_level || 'N/A') : 'N/A'}</td>
+                          <td style={{ padding: '8px 10px' }}>{entry.activity_type === 'maintenance' ? (entry.damage_note || 'N/A') : 'N/A'}</td>
+                          <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>{entry.quantity || 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="close-btn" onClick={() => setIsSizeActivityModalOpen(false)}>Close</button>
             </div>
           </div>
         </div>

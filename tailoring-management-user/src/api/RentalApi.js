@@ -158,6 +158,52 @@ export async function updateRentalStatus(item_id, status, damage_notes = null, d
   }
 }
 
+export async function markRentalItemDamaged(item_id, payload) {
+  try {
+    const response = await axios.post(`${BASE_URL}/rentals/${item_id}/mark-damaged`, payload, {
+      headers: getAuthHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Mark rental item damaged error:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Error marking item as damaged"
+    };
+  }
+}
+
+export async function getRentalSizeActivity(item_id, size_key) {
+  try {
+    const response = await axios.get(`${BASE_URL}/rentals/${item_id}/size-activity/${encodeURIComponent(size_key)}`, {
+      headers: getAuthHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Get rental size activity error:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Error fetching size activity",
+      data: { activities: [] }
+    };
+  }
+}
+
+export async function restockReturnedRentalSizes(item_id, selected_sizes = []) {
+  try {
+    const response = await axios.post(`${BASE_URL}/rentals/${item_id}/restock-sizes`, { selected_sizes }, {
+      headers: getAuthHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Restock returned rental sizes error:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Error restocking returned rental sizes"
+    };
+  }
+}
+
 export async function deleteRental(item_id) {
   try {
     const response = await axios.delete(`${BASE_URL}/rentals/${item_id}`);

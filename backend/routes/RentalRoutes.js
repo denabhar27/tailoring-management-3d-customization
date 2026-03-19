@@ -58,11 +58,13 @@ router.get('/search', rentalController.searchRentals);
 
 router.get('/category/:category', rentalController.getRentalsByCategory);
 
-router.get('/:item_id', rentalController.getRentalById);
-
 router.put('/:item_id', rentalImageFields, rentalController.updateRental);
 
 router.put('/:item_id/status', rentalController.updateRentalStatus);
+router.post('/:item_id/mark-damaged', rentalController.markRentalItemDamaged);
+router.post('/:item_id/restock-sizes', rentalController.restockReturnedRentalSizes);
+router.get('/:item_id/size-activity/:size_key', rentalController.getRentalSizeActivity);
+router.get('/:item_id', rentalController.getRentalById);
 
 router.delete('/:item_id', rentalController.deleteRental);
 

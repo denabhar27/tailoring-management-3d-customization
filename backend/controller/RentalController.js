@@ -303,6 +303,85 @@ exports.updateRentalStatus = (req, res) => {
   }
 };
 
+exports.markRentalItemDamaged = (req, res) => {
+  const { item_id } = req.params;
+  const {
+    size_key,
+    size_label,
+    quantity,
+    damage_level,
+    damage_note,
+    damaged_customer_name
+  } = req.body;
+
+  if (!size_key && !size_label) {
+    return res.status(400).json({ message: 'Size is required.' });
+  }
+
+  RentalInventory.markSizeDamaged(item_id, {
+    size_key: size_key || null,
+    size_label: size_label || null,
+    quantity,
+    damage_level,
+    damage_note,
+    damaged_customer_name,
+    processed_by_user_id: req.user?.id || null,
+    processed_by_role: req.user?.role || 'admin'
+  }, (err, result) => {
+    if (err) {
+      return res.status(err.statusCode || 500).json({
+        message: err.message || 'Error marking rental item as damaged',
+        error: err
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Damage logged and inventory updated successfully',
+      data: result
+    });
+  });
+};
+
+exports.restockReturnedRentalSizes = (req, res) => {
+  const { item_id } = req.params;
+  const selectedSizes = Array.isArray(req.body?.selected_sizes) ? req.body.selected_sizes : [];
+  RentalInventory.restockReturnedSizes(item_id, selectedSizes, (err, result) => {
+    if (err) {
+      return res.status(err.statusCode || 500).json({
+        success: false,
+        message: err.message || 'Error restocking returned rental sizes',
+        error: err
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Returned sizes restocked successfully',
+      data: result
+    });
+  });
+};
+
+exports.getRentalSizeActivity = (req, res) => {
+  const { item_id, size_key } = req.params;
+  RentalInventory.getSizeActivity(item_id, size_key, (err, result) => {
+    if (err) {
+      return res.status(err.statusCode || 500).json({
+        success: false,
+        message: err.message || 'Error fetching size activity',
+        error: err
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Size activity retrieved successfully',
+      data: result
+    });
+  });
+};
+
 exports.deleteRental = (req, res) => {
   const { item_id } = req.params;
 

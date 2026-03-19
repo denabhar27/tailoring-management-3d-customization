@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AdminHeader from './AdminHeader';
 import Sidebar from './Sidebar';
 import '../adminStyle/rent.css';
 import '../adminStyle/dryclean.css';
 import { getAllRentalOrders, getRentalOrdersByStatus, updateRentalOrderItem, recordRentalPayment } from '../api/RentalOrderApi';
-import { updateRentalStatus, getRentalImageUrl } from '../api/RentalApi';
+import { markRentalItemDamaged, restockReturnedRentalSizes, getRentalImageUrl } from '../api/RentalApi';
 import { useAlert } from '../context/AlertContext';
 import { deleteOrderItem } from '../api/OrderApi';
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
@@ -27,6 +27,141 @@ function Rental() {
   });
   const [paymentAmount, setPaymentAmount] = useState('');
   const [pendingRentedStatus, setPendingRentedStatus] = useState(null);
+  const [showDamageFormModal, setShowDamageFormModal] = useState(false);
+  const [damageFormContext, setDamageFormContext] = useState({ displayName: '', rows: [] });
+  const [damageFormRows, setDamageFormRows] = useState([]);
+  const damageFormResolverRef = useRef(null);
+
+  const parseSizeEntries = (rawSize) => {
+    if (!rawSize) return [];
+    try {
+      const parsed = typeof rawSize === 'string' ? JSON.parse(rawSize) : rawSize;
+      if (!parsed || typeof parsed !== 'object') return [];
+      if (Array.isArray(parsed.size_entries)) {
+        return parsed.size_entries.map((entry) => ({
+          key: entry?.sizeKey || entry?.size_key || '',
+          label: entry?.label || entry?.sizeKey || 'Unknown',
+          quantity: Math.max(0, parseInt(entry?.quantity, 10) || 0)
+        })).filter((entry) => !!entry.key);
+      }
+    } catch {
+      return [];
+    }
+    return [];
+  };
+
+  const parseSizeEntriesFromSelections = (selectedSizes) => {
+    if (!Array.isArray(selectedSizes) || selectedSizes.length === 0) return [];
+    const byKey = new Map();
+    selectedSizes.forEach((entry) => {
+      const key = String(entry?.sizeKey || entry?.size_key || '').trim();
+      if (!key) return;
+      const qty = Math.max(0, parseInt(entry?.quantity, 10) || 0);
+      const label = entry?.label || key;
+      const prev = byKey.get(key);
+      if (!prev) {
+        byKey.set(key, { key, label, quantity: qty });
+      } else {
+        byKey.set(key, { ...prev, quantity: prev.quantity + qty });
+      }
+    });
+    return Array.from(byKey.values());
+  };
+
+  const mergeSizeRows = (rawSize, selectedSizes = []) => {
+    const parsedRows = parseSizeEntries(rawSize);
+    const selectedRows = parseSizeEntriesFromSelections(selectedSizes);
+    if (selectedRows.length > 0) {
+      const labelByKey = new Map(parsedRows.map((row) => [row.key, row.label]));
+      return selectedRows.map((row) => ({
+        key: row.key,
+        label: labelByKey.get(row.key) || row.label,
+        quantity: row.quantity
+      }));
+    }
+    return parsedRows;
+  };
+
+  const openDamageForm = (displayName, sizeRows) => {
+    setDamageFormContext({ displayName, rows: sizeRows });
+    setDamageFormRows(sizeRows.map((row) => ({
+      size_key: row.key,
+      size_label: row.label,
+      max_quantity: Math.max(0, parseInt(row.quantity, 10) || 0),
+      is_damaged: false,
+      quantity: 1,
+      damage_level: 'minor',
+      damage_note: ''
+    })));
+    setShowDamageFormModal(true);
+  };
+
+  const collectDamageInputsFromForm = async (displayName, rawSize, selectedSizes = []) => {
+    const hasDamage = await confirm(
+      `Is "${displayName}" damaged?`,
+      'Check for Damage',
+      'question',
+      { confirmText: 'Yes', cancelText: 'No' }
+    );
+    if (!hasDamage) return [];
+
+    const sizeRows = mergeSizeRows(rawSize, selectedSizes).filter((row) => row.quantity > 0);
+    if (sizeRows.length === 0) {
+      await alert(`Cannot mark damage for "${displayName}" because no return size quantity was found.`, 'Error', 'error');
+      return null;
+    }
+
+    return await new Promise((resolve) => {
+      damageFormResolverRef.current = resolve;
+      openDamageForm(displayName, sizeRows);
+    });
+  };
+
+  const updateDamageFormRow = (sizeKey, updates) => {
+    setDamageFormRows((prev) => prev.map((row) => (
+      row.size_key === sizeKey ? { ...row, ...updates } : row
+    )));
+  };
+
+  const handleDamageFormCancel = () => {
+    setShowDamageFormModal(false);
+    const resolver = damageFormResolverRef.current;
+    damageFormResolverRef.current = null;
+    if (resolver) resolver(null);
+  };
+
+  const handleDamageFormSubmit = async () => {
+    const selectedRows = damageFormRows.filter((row) => row.is_damaged);
+    for (const row of selectedRows) {
+      const qty = Math.max(0, parseInt(row.quantity, 10) || 0);
+      if (qty <= 0 || qty > row.max_quantity) {
+        await alert(`Invalid quantity for ${row.size_label}. Enter 1 to ${row.max_quantity}.`, 'Warning', 'warning');
+        return;
+      }
+      const level = String(row.damage_level || '').trim().toLowerCase();
+      if (!['minor', 'moderate', 'severe'].includes(level)) {
+        await alert(`Invalid damage level for ${row.size_label}.`, 'Warning', 'warning');
+        return;
+      }
+      if (!String(row.damage_note || '').trim()) {
+        await alert(`Damage note is required for ${row.size_label}.`, 'Warning', 'warning');
+        return;
+      }
+    }
+
+    const payload = selectedRows.map((row) => ({
+      size_key: row.size_key,
+      size_label: row.size_label,
+      quantity: Math.max(0, parseInt(row.quantity, 10) || 0),
+      damage_level: String(row.damage_level || '').trim().toLowerCase(),
+      damage_note: String(row.damage_note || '').trim()
+    }));
+
+    setShowDamageFormModal(false);
+    const resolver = damageFormResolverRef.current;
+    damageFormResolverRef.current = null;
+    if (resolver) resolver(payload);
+  };
 
   useEffect(() => {
     loadRentalOrders();
@@ -316,7 +451,8 @@ function Rental() {
     if (!confirmed) return;
 
     let damageNotes = null;
-    let itemDamageNotes = {};
+    const damageRequests = [];
+    const restockRequests = [];
 
     if (newStatus === 'returned') {
       if (rental && rental.specific_data) {
@@ -324,52 +460,54 @@ function Rental() {
         const bundleItems = rental.specific_data?.bundle_items || [];
 
         if (isBundle && bundleItems.length > 0) {
-
           for (const bundleItem of bundleItems) {
-            const hasDamage = await confirm(
-              `Is "${bundleItem.item_name}" damaged?`,
-              'Check for Damage',
-              'question',
-              { confirmText: 'Yes', cancelText: 'No' }
+            const selectedSizes = bundleItem.selected_sizes || bundleItem.selectedSizes || [];
+            restockRequests.push({
+              item_id: bundleItem.item_id || bundleItem.id,
+              selected_sizes: selectedSizes
+            });
+            const damageInputs = await collectDamageInputsFromForm(
+              bundleItem.item_name,
+              bundleItem.size,
+              selectedSizes
             );
-
-            if (hasDamage) {
-              const damageDescription = await prompt(
-                `Please describe the damage for "${bundleItem.item_name}":`,
-                'Damage Notes',
-                'Enter damage description...'
-              );
-
-              if (damageDescription === null || damageDescription === undefined) {
-                return;
-              }
-
-              if (!damageDescription || damageDescription.trim() === '') {
-                await alert('Please provide a damage description', 'Warning', 'warning');
-                return;
-              }
-
-              itemDamageNotes[bundleItem.item_name] = damageDescription.trim();
+            if (damageInputs === null) return;
+            if (Array.isArray(damageInputs) && damageInputs.length > 0) {
+              damageInputs.forEach((input) => {
+                damageRequests.push({
+                  item_id: bundleItem.item_id || bundleItem.id,
+                  item_name: bundleItem.item_name,
+                  damaged_customer_name: `${String(rental?.first_name || '').trim()} ${String(rental?.last_name || '').trim()}`.trim() || String(rental?.walk_in_customer_name || '').trim() || 'Customer',
+                  ...input
+                });
+              });
             }
           }
-
-          damageNotes = Object.keys(itemDamageNotes).length > 0 ? JSON.stringify(itemDamageNotes) : null;
         } else {
-
-          const hasDamage = await confirm('Is the returned item damaged?', 'Check for Damage', 'question', { confirmText: 'Yes', cancelText: 'No' });
-          if (hasDamage) {
-            damageNotes = await prompt('Please describe the damage:', 'Damage Notes', 'Enter damage description...');
-            if (damageNotes === null || damageNotes === undefined) {
-              return;
-            }
-            if (!damageNotes || damageNotes.trim() === '') {
-              await alert('Please provide a damage description', 'Warning', 'warning');
-              return;
-            }
-            damageNotes = damageNotes.trim();
+          const selectedSizes = rental?.specific_data?.selected_sizes || rental?.specific_data?.selectedSizes || [];
+          restockRequests.push({
+            item_id: rental?.service_id,
+            selected_sizes: selectedSizes
+          });
+          const damageInputs = await collectDamageInputsFromForm(
+            rental?.specific_data?.item_name || `Item #${rental?.service_id || rental?.item_id}`,
+            rental?.specific_data?.size,
+            selectedSizes
+          );
+          if (damageInputs === null) return;
+          if (Array.isArray(damageInputs) && damageInputs.length > 0) {
+            damageInputs.forEach((input) => {
+              damageRequests.push({
+                item_id: rental?.service_id,
+                item_name: rental?.specific_data?.item_name || 'Rental Item',
+                damaged_customer_name: `${String(rental?.first_name || '').trim()} ${String(rental?.last_name || '').trim()}`.trim() || String(rental?.walk_in_customer_name || '').trim() || 'Customer',
+                ...input
+              });
+            });
           }
         }
       }
+      damageNotes = damageRequests.length > 0 ? JSON.stringify(damageRequests) : null;
     }
 
     try {
@@ -389,33 +527,30 @@ function Rental() {
           : `Status updated to "${getStatusLabel(newStatus)}"`;
         await alert(message, 'Success', 'success');
 
-        if (newStatus === 'returned' && rental && rental.specific_data) {
-          const isBundle = rental.specific_data?.is_bundle === true || rental.specific_data?.category === 'rental_bundle';
-          const bundleItems = rental.specific_data?.bundle_items || [];
-
-          if (isBundle && bundleItems.length > 0) {
-
-            let damagedItems = {};
-            if (damageNotes) {
-              try {
-                damagedItems = JSON.parse(damageNotes);
-              } catch (e) {
-                console.error('Error parsing damage notes:', e);
-              }
+        if (newStatus === 'returned') {
+          for (const restock of restockRequests) {
+            try {
+              await restockReturnedRentalSizes(restock.item_id, restock.selected_sizes || []);
+            } catch (error) {
+              console.warn('Failed to restock returned sizes:', error);
             }
+          }
 
-            const customerName = `${rental.first_name} ${rental.last_name}`;
-            for (const bundleItem of bundleItems) {
-              try {
-                const itemDamageNote = damagedItems[bundleItem.item_name] || null;
-                const newStatus = itemDamageNote ? 'maintenance' : 'available';
-
-                await updateRentalStatus(bundleItem.item_id || bundleItem.id, newStatus, itemDamageNote, itemDamageNote ? customerName : null);
-
-                console.log(`Updated ${bundleItem.item_name} status to ${newStatus}${itemDamageNote ? ` with damage notes: "${itemDamageNote}" (damaged by: ${customerName})` : ''}`);
-              } catch (error) {
-                console.warn(`Failed to update rental inventory item status for ${bundleItem.item_name}:`, error);
+          for (const request of damageRequests) {
+            try {
+              const damageResult = await markRentalItemDamaged(request.item_id, {
+                size_key: request.size_key,
+                size_label: request.size_label,
+                quantity: request.quantity,
+                damage_level: request.damage_level,
+                damage_note: request.damage_note,
+                damaged_customer_name: request.damaged_customer_name
+              });
+              if (!damageResult?.success) {
+                console.warn(`Failed to mark damaged item ${request.item_name}:`, damageResult?.message);
               }
+            } catch (error) {
+              console.warn(`Failed to mark damaged item ${request.item_name}:`, error);
             }
           }
         }
@@ -1061,6 +1196,88 @@ function Rental() {
               <button className="btn-save" onClick={handleSaveEdit}>
                 Save Changes
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showDamageFormModal && (
+        <div className="modal-overlay active" onClick={(e) => {
+          if (e.target.classList.contains('modal-overlay')) handleDamageFormCancel();
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '820px' }}>
+            <div className="modal-header">
+              <h2>Damage Form - {damageFormContext.displayName}</h2>
+              <span className="close-modal" onClick={handleDamageFormCancel}>×</span>
+            </div>
+            <div className="modal-body">
+              <p style={{ marginBottom: '10px', color: '#555' }}>
+                Fill out only sizes that are damaged. Unchecked sizes are treated as no damage.
+              </p>
+              <div style={{ border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#fafafa' }}>
+                      <th style={{ textAlign: 'center', padding: '8px' }}>Damaged?</th>
+                      <th style={{ textAlign: 'left', padding: '8px' }}>Size</th>
+                      <th style={{ textAlign: 'center', padding: '8px' }}>Returned Qty</th>
+                      <th style={{ textAlign: 'center', padding: '8px' }}>Damaged Qty</th>
+                      <th style={{ textAlign: 'left', padding: '8px' }}>Level</th>
+                      <th style={{ textAlign: 'left', padding: '8px' }}>Damage Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {damageFormRows.map((row, idx) => (
+                      <tr key={row.size_key} style={{ borderTop: idx === 0 ? 'none' : '1px solid #f1f1f1' }}>
+                        <td style={{ textAlign: 'center', padding: '8px' }}>
+                          <input
+                            type="checkbox"
+                            checked={row.is_damaged}
+                            onChange={(e) => updateDamageFormRow(row.size_key, { is_damaged: e.target.checked })}
+                          />
+                        </td>
+                        <td style={{ padding: '8px', fontWeight: 600 }}>{row.size_label}</td>
+                        <td style={{ textAlign: 'center', padding: '8px', fontWeight: 700 }}>{row.max_quantity}</td>
+                        <td style={{ textAlign: 'center', padding: '8px' }}>
+                          <input
+                            type="number"
+                            min="1"
+                            max={row.max_quantity}
+                            disabled={!row.is_damaged}
+                            value={row.quantity}
+                            onChange={(e) => updateDamageFormRow(row.size_key, { quantity: e.target.value })}
+                            style={{ width: '80px' }}
+                          />
+                        </td>
+                        <td style={{ padding: '8px' }}>
+                          <select
+                            disabled={!row.is_damaged}
+                            value={row.damage_level}
+                            onChange={(e) => updateDamageFormRow(row.size_key, { damage_level: e.target.value })}
+                          >
+                            <option value="minor">Minor</option>
+                            <option value="moderate">Moderate</option>
+                            <option value="severe">Severe</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: '8px' }}>
+                          <input
+                            type="text"
+                            disabled={!row.is_damaged}
+                            value={row.damage_note}
+                            onChange={(e) => updateDamageFormRow(row.size_key, { damage_note: e.target.value })}
+                            placeholder="Describe the damage"
+                            style={{ width: '100%' }}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="modal-footer-centered">
+              <button className="btn-cancel" onClick={handleDamageFormCancel}>Cancel</button>
+              <button className="btn-save" onClick={handleDamageFormSubmit}>Apply Damage</button>
             </div>
           </div>
         </div>

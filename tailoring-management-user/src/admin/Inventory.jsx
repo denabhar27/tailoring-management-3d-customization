@@ -53,9 +53,11 @@ const parseSizeOptions = (rawSize) => {
 };
 
 const getAvailableSizesText = (sizeOptions) => {
-  const keys = Object.keys(sizeOptions || {}).filter((key) => (sizeOptions[key]?.quantity || 0) > 0);
-  if (keys.length === 0) return 'No sizes configured';
-  return keys.map((key) => SIZE_LABELS[key] || key).join(', ');
+  const entries = Object.entries(sizeOptions || {});
+  if (entries.length === 0) return 'No sizes configured';
+  return entries
+    .map(([key, option]) => `${SIZE_LABELS[key] || key}: ${option?.quantity || 0}`)
+    .join(', ');
 };
 
 const Inventory = () => {
@@ -344,10 +346,16 @@ const Inventory = () => {
                   <strong>Size Availability:</strong>
                   <div style={{ marginTop: '8px' }}>
                     {Object.entries(selectedItem.sizeOptions)
-                      .filter(([, option]) => (option.quantity || 0) > 0)
                       .map(([key, option]) => (
                         <div key={key} style={{ padding: '6px 0', borderBottom: '1px solid #eee' }}>
                           <strong>{SIZE_LABELS[key] || key}</strong> - Qty: {option.quantity}
+                          <span style={{
+                            marginLeft: '8px',
+                            color: (option.quantity || 0) <= 0 ? '#b71c1c' : '#2e7d32',
+                            fontWeight: 700
+                          }}>
+                            {(option.quantity || 0) <= 0 ? 'Out of stock' : 'Available'}
+                          </span>
                           {(option.cm || option.inch) ? ` (${option.cm || '-'} cm / ${option.inch || '-'} in)` : ''}
                         </div>
                       ))}

@@ -12,6 +12,73 @@ import { API_BASE_URL } from '../api/config';
 import { getUserRole } from '../api/AuthApi';
 import { useNavigate } from 'react-router-dom';
 
+const SIZE_LABELS = {
+  small: 'Small (S)',
+  medium: 'Medium (M)',
+  large: 'Large (L)',
+  extra_large: 'Extra Large (XL)'
+};
+
+const parseRentalSizeEntries = (rawSize) => {
+  if (!rawSize) return [];
+
+  try {
+    const parsed = typeof rawSize === 'string' ? JSON.parse(rawSize) : rawSize;
+    if (!parsed || typeof parsed !== 'object') return [];
+
+    if (Array.isArray(parsed.size_entries)) {
+      return parsed.size_entries.map((entry, idx) => {
+        const key = entry?.sizeKey || entry?.size_key || `custom_${idx}`;
+        const qty = parseInt(entry?.quantity, 10);
+        const quantity = Number.isNaN(qty) ? 0 : Math.max(0, qty);
+        const label =
+          key === 'custom'
+            ? (entry?.customLabel || entry?.label || `Custom ${idx + 1}`)
+            : (entry?.label || SIZE_LABELS[key] || key);
+        return { key, label, quantity };
+      });
+    }
+
+    const source = parsed.size_options || parsed.sizeOptions;
+    if (source && typeof source === 'object') {
+      return Object.entries(source).map(([key, option]) => {
+        const qty = parseInt(option?.quantity, 10);
+        const quantity = Number.isNaN(qty) ? 0 : Math.max(0, qty);
+        return { key, label: option?.label || SIZE_LABELS[key] || key, quantity };
+      });
+    }
+  } catch {
+    return [];
+  }
+
+  return [];
+};
+
+const getSizeAvailabilityRows = (item) => {
+  const rows = parseRentalSizeEntries(item?.size);
+  if (rows.length === 0) return [];
+
+  const itemStatus = (item?.status || 'available').toLowerCase();
+  return rows.map((row) => {
+    let reason = '';
+    if (itemStatus === 'maintenance') {
+      reason = 'Maintenance';
+    } else if (itemStatus === 'rented') {
+      reason = 'Rented';
+    } else if (row.quantity <= 0) {
+      reason = 'Out of stock';
+    } else {
+      reason = 'Available';
+    }
+
+    return {
+      ...row,
+      reason,
+      isOut: row.quantity <= 0 || itemStatus === 'maintenance' || itemStatus === 'rented'
+    };
+  });
+};
+
 // ImageCarousel component for rental items
 const ImageCarousel = ({ images, itemName, getRentalImageUrl }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -858,6 +925,9 @@ const OrdersInventory = () => {
               </p>
             ) : (
               filteredRentalItems.map(item => {
+                const sizeRows = getSizeAvailabilityRows(item);
+                const outCount = sizeRows.filter((s) => s.isOut).length;
+                const totalCount = sizeRows.length;
                 const stockStatus = (item.status || 'available') === 'available' ? 'In Stock' : 'Out of Stock';
                 const isOutOfStock = (item.status || 'available') !== 'available';
                 return (
@@ -887,6 +957,37 @@ const OrdersInventory = () => {
                           {item.status || 'available'}
                         </span>
                       </div>
+                      {sizeRows.length > 0 && (
+                        <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {sizeRows.map((row) => (
+                            <span
+                              key={`${item.item_id}-${row.key}-${row.label}`}
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                borderRadius: '999px',
+                                padding: '3px 8px',
+                                border: row.isOut ? '1px solid #ef9a9a' : '1px solid #a5d6a7',
+                                background: row.isOut ? '#ffebee' : '#e8f5e9',
+                                color: row.isOut ? '#b71c1c' : '#1b5e20'
+                              }}
+                              title={`${row.label}: ${row.quantity} (${row.reason})`}
+                            >
+                              {row.label}: {row.quantity}{row.isOut ? ' OUT' : ''}
+                            </span>
+                          ))}
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: '#6d4c41',
+                              padding: '3px 0'
+                            }}
+                          >
+                            {outCount}/{totalCount} sizes unavailable
+                          </span>
+                        </div>
+                      )}
                       <button className="view-details-btn" onClick={(e) => { e.stopPropagation(); openRentalDetailModal(item); }}>
                         <i className="fas fa-eye"></i> View Details
                       </button>
@@ -1027,6 +1128,36 @@ const OrdersInventory = () => {
                   {selectedRentalItem.status || 'available'}
                 </span>
               </div>
+              {getSizeAvailabilityRows(selectedRentalItem).length > 0 && (
+                <div className="detail-row" style={{ display: 'block' }}>
+                  <strong>Size Stock Breakdown:</strong>
+                  <div style={{ marginTop: '8px', border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: '#fafafa' }}>
+                          <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px' }}>Size</th>
+                          <th style={{ textAlign: 'center', padding: '8px 10px', fontSize: '12px' }}>Qty</th>
+                          <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px' }}>State</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getSizeAvailabilityRows(selectedRentalItem).map((row, idx) => (
+                          <tr key={`${row.key}-${idx}`} style={{ borderTop: idx === 0 ? 'none' : '1px solid #f1f1f1' }}>
+                            <td style={{ padding: '8px 10px', fontWeight: 600 }}>{row.label}</td>
+                            <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>{row.quantity}</td>
+                            <td style={{ padding: '8px 10px', color: row.isOut ? '#b71c1c' : '#2e7d32', fontWeight: 700 }}>
+                              {row.reason}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <small style={{ color: '#666', display: 'block', marginTop: '6px' }}>
+                    Note: this view reflects current per-size quantity and current item status.
+                  </small>
+                </div>
+              )}
               {selectedRentalItem.description && (
                 <div className="detail-row">
                   <strong>Description:</strong>

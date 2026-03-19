@@ -1,5 +1,199 @@
 const db = require('../config/db');
 
+function parseJsonSafely(value, fallback = {}) {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function buildRentalReservations(cartItems) {
+  const reservations = new Map();
+
+  const upsertReservation = (itemId, qty, selectedSizes = []) => {
+    if (!itemId || qty <= 0) return;
+
+    const existing = reservations.get(itemId) || {
+      itemId,
+      qty: 0,
+      sizeSelections: {}
+    };
+
+    existing.qty += qty;
+
+    if (Array.isArray(selectedSizes)) {
+      selectedSizes.forEach((entry) => {
+        const key = String(entry?.sizeKey || '').trim();
+        const sizeQty = Math.max(1, parseInt(entry?.quantity, 10) || 1);
+        if (!key) return;
+        existing.sizeSelections[key] = (existing.sizeSelections[key] || 0) + sizeQty;
+      });
+    }
+
+    reservations.set(itemId, existing);
+  };
+
+  (cartItems || []).forEach((cartItem) => {
+    if (!cartItem || cartItem.service_type !== 'rental') return;
+
+    const specificData = parseJsonSafely(cartItem.specific_data, {});
+
+    if (specificData?.is_bundle && Array.isArray(specificData.bundle_items) && specificData.bundle_items.length > 0) {
+      specificData.bundle_items.forEach((bundleItem) => {
+        const bundleItemId = parseInt(bundleItem?.item_id ?? bundleItem?.id ?? bundleItem?.service_id, 10);
+        const bundleQty = Math.max(1, parseInt(bundleItem?.quantity, 10) || 1);
+        upsertReservation(bundleItemId, bundleQty);
+      });
+      return;
+    }
+
+    const itemId = parseInt(cartItem.service_id, 10);
+    const qty = Math.max(1, parseInt(cartItem.quantity, 10) || 1);
+    const selectedSizes = Array.isArray(specificData?.selected_sizes) ? specificData.selected_sizes : [];
+    upsertReservation(itemId, qty, selectedSizes);
+  });
+
+  return Array.from(reservations.values());
+}
+
+function reserveRentalInventoryFromCartItems(cartItems, callback) {
+  const reservations = buildRentalReservations(cartItems);
+
+  if (reservations.length === 0) {
+    return callback(null);
+  }
+
+  const itemIds = reservations.map((r) => r.itemId);
+  const placeholders = itemIds.map(() => '?').join(',');
+
+  const selectSql = `
+    SELECT item_id, item_name, total_available, size
+    FROM rental_inventory
+    WHERE item_id IN (${placeholders})
+  `;
+
+  db.query(selectSql, itemIds, (selectErr, rows) => {
+    if (selectErr) return callback(selectErr);
+
+    const rowMap = new Map((rows || []).map((row) => [Number(row.item_id), row]));
+    const updatedSizeByItem = new Map();
+
+    for (const reservation of reservations) {
+      const row = rowMap.get(Number(reservation.itemId));
+      if (!row) {
+        const err = new Error(`Rental item ${reservation.itemId} not found.`);
+        err.statusCode = 400;
+        return callback(err);
+      }
+
+      const currentAvailable = parseInt(row.total_available, 10) || 0;
+      if (currentAvailable < reservation.qty) {
+        const err = new Error(`Not enough stock for ${row.item_name || `item ${reservation.itemId}`}. Available: ${currentAvailable}, requested: ${reservation.qty}.`);
+        err.statusCode = 400;
+        return callback(err);
+      }
+
+      const sizeSelectionEntries = Object.entries(reservation.sizeSelections || {});
+      if (sizeSelectionEntries.length > 0) {
+        const sizePayload = parseJsonSafely(row.size, null);
+        if (!sizePayload || sizePayload.format !== 'rental_size_v2' || !Array.isArray(sizePayload.size_entries)) {
+          const err = new Error(`Size profile missing for ${row.item_name || `item ${reservation.itemId}`}. Please re-save the rental item in admin.`);
+          err.statusCode = 400;
+          return callback(err);
+        }
+
+        const normalizedEntries = sizePayload.size_entries.map((entry) => ({ ...entry }));
+
+        for (const [selectedKey, requestedQty] of sizeSelectionEntries) {
+          const entryIndex = normalizedEntries.findIndex((entry) => {
+            if (entry.sizeKey === selectedKey) return true;
+            if (entry.sizeKey === 'custom' && String(entry.customLabel || '').trim().toLowerCase() === selectedKey.toLowerCase()) return true;
+            return false;
+          });
+
+          if (entryIndex === -1) {
+            const err = new Error(`Selected size "${selectedKey}" not found for ${row.item_name || `item ${reservation.itemId}`}.`);
+            err.statusCode = 400;
+            return callback(err);
+          }
+
+          const currentSizeQty = Math.max(0, parseInt(normalizedEntries[entryIndex].quantity, 10) || 0);
+          if (currentSizeQty < requestedQty) {
+            const err = new Error(`Not enough stock for size "${selectedKey}" of ${row.item_name || `item ${reservation.itemId}`}. Available: ${currentSizeQty}, requested: ${requestedQty}.`);
+            err.statusCode = 400;
+            return callback(err);
+          }
+
+          normalizedEntries[entryIndex].quantity = currentSizeQty - requestedQty;
+        }
+
+        updatedSizeByItem.set(reservation.itemId, JSON.stringify({ ...sizePayload, size_entries: normalizedEntries }));
+      }
+    }
+
+    const applied = [];
+
+    const rollbackApplied = (done) => {
+      if (applied.length === 0) return done();
+
+      let idx = 0;
+      const rollbackNext = () => {
+        if (idx >= applied.length) return done();
+        const row = applied[idx++];
+        const rollbackSql = `
+          UPDATE rental_inventory
+          SET total_available = total_available + ?,
+              size = ?,
+              status = CASE WHEN total_available + ? > 0 AND status = 'unavailable' THEN 'available' ELSE status END
+          WHERE item_id = ?
+        `;
+        db.query(rollbackSql, [row.qty, row.previousSize, row.qty, row.itemId], () => rollbackNext());
+      };
+      rollbackNext();
+    };
+
+    let applyIndex = 0;
+    const applyNext = () => {
+      if (applyIndex >= reservations.length) return callback(null);
+
+      const reservation = reservations[applyIndex++];
+      const row = rowMap.get(Number(reservation.itemId));
+      const nextSizePayload = updatedSizeByItem.has(reservation.itemId)
+        ? updatedSizeByItem.get(reservation.itemId)
+        : row.size;
+
+      const updateSql = `
+        UPDATE rental_inventory
+        SET total_available = total_available - ?,
+            size = ?,
+            status = CASE WHEN total_available - ? <= 0 THEN 'unavailable' ELSE status END
+        WHERE item_id = ? AND total_available >= ?
+      `;
+
+      db.query(updateSql, [reservation.qty, nextSizePayload, reservation.qty, reservation.itemId, reservation.qty], (updateErr, updateResult) => {
+        if (updateErr) {
+          return rollbackApplied(() => callback(updateErr));
+        }
+
+        if (!updateResult || updateResult.affectedRows === 0) {
+          const err = new Error(`Stock changed while processing rental item ${reservation.itemId}. Please try again.`);
+          err.statusCode = 409;
+          return rollbackApplied(() => callback(err));
+        }
+
+        applied.push({ itemId: reservation.itemId, qty: reservation.qty, previousSize: row.size });
+        applyNext();
+      });
+    };
+
+    applyNext();
+  });
+}
+
 const Order = {
   
   createFromCart: (userId, cartItems, totalPrice, notes, callback) => {
@@ -60,14 +254,26 @@ const Order = {
           return callback(itemErr, null);
         }
 
-        const getOrderItemsSql = `
-          SELECT item_id, service_type, appointment_date, specific_data
-          FROM order_items
-          WHERE order_id = ?
-          ORDER BY item_id ASC
-        `;
+        reserveRentalInventoryFromCartItems(cartItems, (reserveErr) => {
+          if (reserveErr) {
+            const cleanupItemsSql = `DELETE FROM order_items WHERE order_id = ?`;
+            db.query(cleanupItemsSql, [orderId], () => {
+              const cleanupOrderSql = `DELETE FROM orders WHERE order_id = ?`;
+              db.query(cleanupOrderSql, [orderId], () => {
+                return callback(reserveErr, null);
+              });
+            });
+            return;
+          }
+
+          const getOrderItemsSql = `
+            SELECT item_id, service_type, appointment_date, specific_data
+            FROM order_items
+            WHERE order_id = ?
+            ORDER BY item_id ASC
+          `;
         
-        db.query(getOrderItemsSql, [orderId], (getItemsErr, orderItems) => {
+          db.query(getOrderItemsSql, [orderId], (getItemsErr, orderItems) => {
           
           const AppointmentSlot = require('./AppointmentSlotModel');
 
@@ -230,6 +436,7 @@ const Order = {
               itemResult: itemResult
             });
           }
+          });
         });
       });
     });

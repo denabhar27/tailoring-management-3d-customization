@@ -1,7 +1,26 @@
+.rc-modal-overlay,
+.rc-modal,
+.rc-modal * {
+  box-sizing: border-box;
+}
+
+:root {
+  --rc-gold-900: #4f2b12;
+  --rc-gold-800: #6f3d1a;
+  --rc-gold-700: #8f5825;
+  --rc-gold-600: #a06b37;
+  --rc-gold-300: #e8d4b9;
+  --rc-cream-100: #ffffff;
+  --rc-cream-200: #fbf7f2;
+}
+
 .rc-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(22, 16, 12, 0.68);
+  background:
+    radial-gradient(circle at 18% 16%, rgba(225, 186, 120, 0.18), transparent 34%),
+    radial-gradient(circle at 82% 80%, rgba(206, 155, 84, 0.12), transparent 30%),
+    rgba(22, 16, 12, 0.78);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -12,11 +31,34 @@
 .rc-modal {
   width: min(1120px, 96vw);
   max-height: 94vh;
-  background: #fffdf9;
-  border-radius: 16px;
+  background: #ffffff;
+  border-radius: 20px;
   position: relative;
-  box-shadow: 0 25px 80px rgba(40, 24, 12, 0.3);
-  overflow: hidden;
+  border: 1px solid rgba(128, 78, 35, 0.24);
+  box-shadow: 0 30px 90px rgba(34, 20, 8, 0.42);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.rc-modal::-webkit-scrollbar {
+  width: 10px;
+}
+
+.rc-modal::-webkit-scrollbar-thumb {
+  background: #8f5825;
+  border-radius: 999px;
+}
+
+.rc-modal::-webkit-scrollbar-track {
+  background: #f2e7d9;
+}
+
+.rc-modal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(130deg, rgba(255, 255, 255, 0.2) 8%, transparent 42%, rgba(140, 87, 34, 0.04) 100%);
+  pointer-events: none;
 }
 
 .rc-modal-close {
@@ -27,11 +69,12 @@
   height: 36px;
   border: none;
   border-radius: 50%;
-  background: #f2ede7;
-  color: #6b3a0a;
+  background: linear-gradient(135deg, #f7ebd8 0%, #e5c99f 100%);
+  color: #694018;
   font-size: 24px;
   cursor: pointer;
   z-index: 2;
+  border: 1px solid rgba(148, 95, 42, 0.4);
 }
 
 .rc-modal-inner {
@@ -43,19 +86,20 @@
 
 .rc-modal-images {
   padding: 18px;
-  background: linear-gradient(180deg, #faf4ee 0%, #f6efe8 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f9f4ec 100%);
   min-height: 360px;
 }
 
 .rc-modal-details {
   padding: 22px;
   overflow-y: auto;
+  background: #ffffff;
 }
 
 .rc-modal-title {
   margin: 0 0 10px;
   font-size: 1.6rem;
-  color: #3d220d;
+  color: var(--rc-gold-900);
 }
 
 .rc-meta-row {
@@ -67,18 +111,18 @@
 
 .rc-meta-tag {
   padding: 6px 10px;
-  background: #fff3e6;
-  color: #7a3f10;
-  border: 1px solid #f2d9bf;
+  background: #fffaf4;
+  color: #734117;
+  border: 1px solid #d9ba92;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
 }
 
 .rc-sizes-section {
-  border: 1px solid #eedfce;
+  border: 1px solid #d3b086;
   border-radius: 12px;
-  background: #fff;
+  background: #ffffff;
   overflow: hidden;
   margin-bottom: 14px;
 }
@@ -88,8 +132,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px 12px;
-  background: #f9f3ec;
-  border-bottom: 1px solid #efe2d4;
+  background: linear-gradient(180deg, #f7eee2 0%, #f2e1cc 100%);
+  border-bottom: 1px solid #d8b384;
 }
 
 .rc-section-header-row h4 {
@@ -118,7 +162,7 @@
 }
 
 .rc-unit-toggle button.active {
-  background: #8b4513;
+  background: linear-gradient(135deg, var(--rc-gold-800) 0%, var(--rc-gold-600) 100%);
   color: #fff;
 }
 
@@ -136,12 +180,12 @@
 }
 
 .rc-size-row.selected {
-  background: #fffaf4;
+  background: #fff2df;
 }
 
 .rc-size-row-header {
-  display: grid;
-  grid-template-columns: minmax(130px, 1.2fr) minmax(110px, 1fr) auto auto auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
@@ -151,24 +195,28 @@
   font-weight: 700;
   color: #3e220f;
   font-size: 13px;
+  min-width: 130px;
+  flex: 1 1 180px;
 }
 
 .rc-size-price {
   font-size: 12px;
-  color: #8b4513;
+  color: var(--rc-gold-800);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .rc-size-avail {
   font-size: 11px;
   color: #6f6155;
+  white-space: nowrap;
 }
 
 .rc-qty-control {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid #d7c0a5;
+  border: 1px solid #c79f6f;
   border-radius: 999px;
   padding: 2px 6px;
   background: #fff;
@@ -176,8 +224,8 @@
 
 .rc-qty-control button {
   border: none;
-  background: #f3ebe3;
-  color: #5f3412;
+  background: #f1dec2;
+  color: #633511;
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -199,14 +247,16 @@
 }
 
 .rc-meas-toggle {
-  border: 1px solid #d6bfaa;
-  background: #fff;
+  border: 1px solid #c89f69;
+  background: #fff8ee;
   color: #6e3e17;
   font-size: 11px;
   font-weight: 600;
   border-radius: 999px;
   padding: 6px 10px;
   cursor: pointer;
+  white-space: nowrap;
+  margin-left: auto;
 }
 
 .rc-measurements-panel {
@@ -216,7 +266,7 @@
 .rc-meas-table {
   width: 100%;
   border-collapse: collapse;
-  border: 1px solid #ebdfd1;
+  border: 1px solid #ddc39f;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -230,7 +280,7 @@
 }
 
 .rc-meas-table th {
-  background: #f9f4ee;
+  background: linear-gradient(180deg, #f8e7cd 0%, #eed6b2 100%);
   color: #5f3412;
   font-weight: 700;
 }
@@ -239,8 +289,8 @@
   margin: 10px 12px 12px;
   font-size: 12px;
   color: #5f3412;
-  background: #fff4e8;
-  border: 1px solid #f0d6bb;
+  background: #fff8ec;
+  border: 1px solid #dfbe8e;
   border-radius: 8px;
   padding: 8px 10px;
 }
@@ -248,8 +298,8 @@
 .rc-desc {
   margin: 10px 0;
   padding: 10px 12px;
-  border: 1px solid #efe3d4;
-  background: #fff;
+  border: 1px solid #e2c49a;
+  background: #ffffff;
   border-radius: 10px;
 }
 
@@ -310,10 +360,10 @@
 
 .rc-cost-box {
   margin-top: 12px;
-  border: 1px solid #e8d9c7;
+  border: 1px solid #d8b78d;
   border-radius: 10px;
   padding: 10px 12px;
-  background: #fffcf7;
+  background: #fffdf9;
 }
 
 .rc-cost-line {
@@ -376,7 +426,7 @@
   margin-top: 12px;
   border: none;
   border-radius: 10px;
-  background: linear-gradient(135deg, #8b4513 0%, #a0522d 100%);
+  background: linear-gradient(135deg, #6f3b16 0%, #b68448 100%);
   color: #fff;
   padding: 12px 14px;
   font-size: 14px;
@@ -387,7 +437,7 @@
 
 .rc-btn-rent:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(111, 60, 24, 0.28);
+  box-shadow: 0 12px 28px rgba(94, 49, 16, 0.36);
 }
 
 .rc-btn-rent:disabled {
@@ -407,8 +457,8 @@
   font-size: 11px;
   padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid #ead8c5;
-  background: #fff7ed;
+  border: 1px solid #dcc1a3;
+  background: #fffaf4;
   color: #6d3c14;
   font-weight: 600;
 }
@@ -427,7 +477,13 @@
   }
 
   .rc-size-row-header {
+    display: grid;
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+
+  .rc-meas-toggle {
+    margin-left: 0;
+    justify-self: start;
   }
 }

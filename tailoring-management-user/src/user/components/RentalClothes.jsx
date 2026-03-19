@@ -14,6 +14,52 @@ const SIZE_LABELS = {
   extra_large: 'Extra Large (XL)'
 };
 
+const normalizeMeasurementValue = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+
+  if (typeof value === 'object' && value !== null) {
+    return {
+      inch: value.inch ?? '',
+      cm: value.cm ?? ''
+    };
+  }
+
+  const asString = String(value).trim();
+  if (!asString) return null;
+  return { inch: asString, cm: '' };
+};
+
+const normalizeMeasurementsObject = (raw) => {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const source = typeof raw === 'string' ? (() => {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  })() : raw;
+
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return null;
+
+  const normalized = {};
+  const mergeSection = (section) => {
+    if (!section || typeof section !== 'object') return;
+    Object.entries(section).forEach(([key, value]) => {
+      const parsed = normalizeMeasurementValue(value);
+      if (parsed) normalized[key] = parsed;
+    });
+  };
+
+  if (source.top || source.bottom) {
+    mergeSection(source.top);
+    mergeSection(source.bottom);
+  }
+
+  mergeSection(source);
+  return Object.keys(normalized).length > 0 ? normalized : null;
+};
+
 const parseRentalSizeConfig = (rawSize) => {
   const fallback = { sizeOptions: {}, measurementProfile: null };
 
@@ -27,22 +73,30 @@ const parseRentalSizeConfig = (rawSize) => {
     if (parsed.format === 'rental_size_v2' && Array.isArray(parsed.size_entries)) {
       const sizeOptions = {};
       let measurementProfile = null;
-      parsed.size_entries.forEach(entry => {
+      parsed.size_entries.forEach((entry, idx) => {
         const key = entry.sizeKey !== 'custom'
           ? entry.sizeKey
-          : (entry.customLabel || 'custom');
+          : (entry.customLabel || `Custom ${idx + 1}`);
         const qty = parseInt(entry.quantity, 10);
         const price = parseFloat(entry.price) || 0;
+        const normalizedMeasurements = normalizeMeasurementsObject(
+          entry.measurements || entry.measurement_profile || entry.measurementProfile
+        );
         sizeOptions[key] = {
-          quantity: isNaN(qty) ? 0 : Math.max(0, qty),
+          quantity: isNaN(qty) ? null : Math.max(0, qty),
           price,
-          measurements: entry.measurements || null,
+          measurements: normalizedMeasurements,
           label: SIZE_LABELS[key] || entry.customLabel || key
         };
-        if (!measurementProfile && entry.measurements) {
-          measurementProfile = entry.measurements;
+        if (!measurementProfile && normalizedMeasurements) {
+          measurementProfile = normalizedMeasurements;
         }
       });
+
+      if (!measurementProfile) {
+        measurementProfile = normalizeMeasurementsObject(parsed.measurement_profile || parsed.measurementProfile);
+      }
+
       return { sizeOptions, measurementProfile };
     }
 
@@ -60,19 +114,20 @@ const parseRentalSizeConfig = (rawSize) => {
         normalizedOptions[key] = {
           inch: option.inch || '',
           cm: option.cm || '',
-          quantity: Number.isNaN(quantity) ? 0 : Math.max(0, quantity)
+          quantity: Number.isNaN(quantity) ? null : Math.max(0, quantity),
+          measurements: normalizeMeasurementsObject(option.measurements)
         };
       });
 
       return {
         sizeOptions: normalizedOptions,
-        measurementProfile: parsed.measurement_profile || parsed.measurementProfile || null
+        measurementProfile: normalizeMeasurementsObject(parsed.measurement_profile || parsed.measurementProfile)
       };
     }
 
     return {
       sizeOptions: {},
-      measurementProfile: parsed
+      measurementProfile: normalizeMeasurementsObject(parsed)
     };
   } catch (e) {
     return fallback;
@@ -80,7 +135,12 @@ const parseRentalSizeConfig = (rawSize) => {
 };
 
 const getAvailableSizeKeys = (sizeOptions = {}) => {
-  return Object.keys(sizeOptions).filter((key) => (sizeOptions?.[key]?.quantity || 0) > 0);
+  return Object.keys(sizeOptions).filter((key) => {
+    const qty = sizeOptions?.[key]?.quantity;
+    if (qty === null || qty === undefined || qty === '') return true;
+    const parsedQty = parseInt(qty, 10);
+    return !Number.isNaN(parsedQty) && parsedQty > 0;
+  });
 };
 
 const RentalImageCarousel = ({ images, itemName }) => {
@@ -106,7 +166,7 @@ const RentalImageCarousel = ({ images, itemName }) => {
         <img
           src={suitSample}
           alt={itemName}
-          style={{ maxWidth: '100%', maxHeight: '450px', objectFit: 'contain', borderRadius: '10px' }}
+          style={{ maxWidth: '100%', maxHeight: '560px', objectFit: 'contain', borderRadius: '10px' }}
         />
       </div>
     );
@@ -119,7 +179,7 @@ const RentalImageCarousel = ({ images, itemName }) => {
           src={getImageSrc(validImages[0], 0)}
           alt={itemName}
           onError={() => handleImageError(0)}
-          style={{ maxWidth: '100%', maxHeight: '450px', objectFit: 'contain', borderRadius: '10px' }}
+          style={{ maxWidth: '100%', maxHeight: '560px', objectFit: 'contain', borderRadius: '10px' }}
         />
       </div>
     );
@@ -139,13 +199,13 @@ const RentalImageCarousel = ({ images, itemName }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '400px'
+        minHeight: '520px'
       }}>
         <img
           src={getImageSrc(validImages[currentIndex], currentIndex)}
           alt={`${itemName} - ${validImages[currentIndex].label}`}
           onError={() => handleImageError(currentIndex)}
-          style={{ maxWidth: '100%', maxHeight: '450px', objectFit: 'contain' }}
+          style={{ maxWidth: '100%', maxHeight: '560px', objectFit: 'contain' }}
         />
         <div style={{
           position: 'absolute',
@@ -331,6 +391,20 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   const [sizeSelections, setSizeSelections] = useState({});
   const [expandedMeasurementSize, setExpandedMeasurementSize] = useState(null);
   const navigate = useNavigate();
+
+  const getDisplayPrice = (item) => {
+    if (!item) return 500;
+    const prices = getAvailableSizeKeys(item.sizeOptions || {})
+      .map((k) => parseFloat(item.sizeOptions?.[k]?.price))
+      .filter((p) => !isNaN(p) && p > 0);
+
+    if (prices.length > 0) {
+      return Math.min(...prices);
+    }
+
+    const fallback = parseFloat(String(item.price || '').replace(/[^\d.]/g, ''));
+    return !isNaN(fallback) && fallback > 0 ? fallback : 500;
+  };
 
   const calculateEndDate = (start, duration) => {
     if (!start) return '';
@@ -1529,10 +1603,11 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                 {/* Meta info */}
                 <div className="rc-meta-row">
                   {selectedItem.category && (
-                    <span className="rc-meta-tag">{selectedItem.category.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</span>
+                    <span className="rc-meta-tag">Category: {selectedItem.category.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</span>
                   )}
-                  {selectedItem.color && <span className="rc-meta-tag">{selectedItem.color}</span>}
-                  {selectedItem.material && <span className="rc-meta-tag">{selectedItem.material}</span>}
+                  {selectedItem.color && <span className="rc-meta-tag">Color: {selectedItem.color}</span>}
+                  {selectedItem.material && <span className="rc-meta-tag">Material: {selectedItem.material}</span>}
+                  <span className="rc-meta-tag">Price: from ₱{getDisplayPrice(selectedItem).toLocaleString('en-PH', { minimumFractionDigits: 2 })} / 3 days</span>
                 </div>
 
                 {/* Sizes + Measurements table */}
@@ -1545,13 +1620,30 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                         <button className={measurementUnit === 'cm' ? 'active' : ''} onClick={() => setMeasurementUnit('cm')}>cm</button>
                       </div>
                     </div>
+                    <div className="rc-selection-summary" style={{ marginTop: '10px' }}>
+                      Available Sizes:{' '}
+                      {getAvailableSizeKeys(selectedItem.sizeOptions || {})
+                        .map((key) => {
+                          const opt = selectedItem.sizeOptions[key] || {};
+                          const qty = opt.quantity;
+                          const hasQty = qty !== null && qty !== undefined && qty !== '' && !Number.isNaN(parseInt(qty, 10));
+                          return `${opt.label || SIZE_LABELS[key] || key}${hasQty ? ` (${parseInt(qty, 10)} pcs)` : ''}`;
+                        })
+                        .join(', ')}
+                    </div>
                     <div className="rc-sizes-table">
                       {getAvailableSizeKeys(selectedItem.sizeOptions || {}).map((sizeKey) => {
                         const opt = selectedItem.sizeOptions[sizeKey] || {};
-                        const maxQty = opt.quantity || 0;
+                        const parsedFallbackTotal = parseInt(selectedItem.total_available, 10);
+                        const maxQty = Number.isFinite(opt.quantity)
+                          ? opt.quantity
+                          : (Number.isNaN(parsedFallbackTotal) ? 0 : parsedFallbackTotal);
                         const currentQty = parseInt(sizeSelections[sizeKey] || 0, 10);
                         const isExpanded = expandedMeasurementSize === sizeKey;
-                        const hasMeasurements = opt.measurements && typeof opt.measurements === 'object';
+                        const resolvedMeasurements = normalizeMeasurementsObject(
+                          opt.measurements || selectedItem.measurementProfile
+                        );
+                        const hasMeasurements = !!resolvedMeasurements;
 
                         const getMeasVal = (m, key) => {
                           if (!m) return null;
@@ -1569,7 +1661,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                         const bottomFields = ['waist','hips','inseam','outseam','thigh','length'];
                         const measurementRows = hasMeasurements
                           ? [...new Set([...topFields, ...bottomFields])].map(k => {
-                              const v = getMeasVal(opt.measurements, k);
+                              const v = getMeasVal(resolvedMeasurements, k);
                               return v ? { label: k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()), value: v } : null;
                             }).filter(Boolean)
                           : [];
@@ -1581,7 +1673,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                               {opt.price > 0 && (
                                 <span className="rc-size-price">₱{parseFloat(opt.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })} / 3 days</span>
                               )}
-                              <span className="rc-size-avail">{maxQty} available</span>
+                              <span className="rc-size-avail">{maxQty > 0 ? `${maxQty} available` : 'available'}</span>
                               <div className="rc-qty-control">
                                 <button
                                   disabled={currentQty <= 0}

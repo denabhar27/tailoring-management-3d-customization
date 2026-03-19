@@ -392,7 +392,7 @@ exports.submitCart = (req, res) => {
 
     Order.createFromCart(userId, filteredItems, totalPrice.toString(), notes, (err, orderResult) => {
       if (err) {
-        return res.status(500).json({ 
+        return res.status(err.statusCode || 500).json({ 
           success: false, 
           message: "Error creating order", 
           error: err 

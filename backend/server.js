@@ -447,6 +447,25 @@ try {
   console.error('[SERVER] Error updating approval_status ENUM:', err.message);
 }
 
+// Auto-migrate rental size column so admin size+measurement JSON is not truncated
+try {
+  const alterRentalSizeColumnSQL = `
+    ALTER TABLE rental_inventory
+    MODIFY COLUMN size LONGTEXT NULL
+  `;
+  db.query(alterRentalSizeColumnSQL, (err) => {
+    if (err) {
+      if (!err.message.includes("doesn't exist") && !err.message.includes('Unknown table')) {
+        console.log('[SERVER] rental_inventory.size migration note:', err.message);
+      }
+    } else {
+      console.log('[SERVER] ✅ rental_inventory.size migrated to LONGTEXT');
+    }
+  });
+} catch (err) {
+  console.error('[SERVER] Error updating rental_inventory.size column:', err.message);
+}
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

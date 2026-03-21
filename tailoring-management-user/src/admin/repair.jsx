@@ -6,13 +6,29 @@ import { getAllRepairOrders, getRepairOrdersByStatus, updateRepairOrderItem } fr
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
 import { useAlert } from '../context/AlertContext';
-import { getAllRepairGarmentTypesAdmin, createRepairGarmentType, updateRepairGarmentType, deleteRepairGarmentType } from '../api/RepairGarmentTypeApi';
+import {
+  getAllRepairGarmentTypesAdmin,
+  createRepairGarmentType,
+  updateRepairGarmentType,
+  deleteRepairGarmentType,
+  createRepairDamageLevel,
+  updateRepairDamageLevel,
+  deleteRepairDamageLevel
+} from '../api/RepairGarmentTypeApi';
 import { recordPayment } from '../api/PaymentApi';
 import { deleteOrderItem } from '../api/OrderApi';
 import { API_BASE_URL } from '../api/config';
 
 const Repair = () => {
   const { alert, confirm } = useAlert();
+  const createEmptyDamageLevel = (sortOrder = 1) => ({
+    repair_damage_level_id: null,
+    level_name: '',
+    level_description: '',
+    base_price: '',
+    sort_order: sortOrder,
+    is_active: 1
+  });
   const [allItems, setAllItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,6 +56,9 @@ const Repair = () => {
   const [repairGarmentTypeForm, setRepairGarmentTypeForm] = useState({
     garment_name: '',
     description: '',
+    has_damage_levels: 1,
+    default_damage_level_id: null,
+    damage_levels: [createEmptyDamageLevel(1)],
     is_active: 1
   });
 
@@ -190,18 +209,85 @@ const Repair = () => {
       return;
     }
 
+    const normalizedDamageLevels = (repairGarmentTypeForm.damage_levels || [])
+      .filter((level) => level && String(level.level_name || '').trim() !== '')
+      .map((level, index) => ({
+        repair_damage_level_id: level.repair_damage_level_id || null,
+        level_name: String(level.level_name || '').trim(),
+        level_description: level.level_description || '',
+        base_price: parseFloat(level.base_price || 0),
+        sort_order: level.sort_order !== undefined && level.sort_order !== '' ? parseInt(level.sort_order, 10) || 0 : index + 1,
+        is_active: level.is_active !== undefined ? level.is_active : 1
+      }));
+
+    if (normalizedDamageLevels.length === 0) {
+      alert('Please add at least one damage level with a name and price', 'Error');
+      return;
+    }
+
     try {
       let result;
+      let garmentId;
+
+      const garmentPayload = {
+        garment_name: repairGarmentTypeForm.garment_name,
+        description: repairGarmentTypeForm.description,
+        has_damage_levels: 1,
+        default_damage_level_id: repairGarmentTypeForm.default_damage_level_id || null,
+        is_active: repairGarmentTypeForm.is_active
+      };
+
       if (editingRepairGarmentType) {
-        result = await updateRepairGarmentType(editingRepairGarmentType.repair_garment_id, repairGarmentTypeForm);
+        garmentId = editingRepairGarmentType.repair_garment_id;
+        result = await updateRepairGarmentType(garmentId, garmentPayload);
       } else {
-        result = await createRepairGarmentType(repairGarmentTypeForm);
+        result = await createRepairGarmentType({
+          ...garmentPayload,
+          damage_levels: normalizedDamageLevels
+        });
+        garmentId = result?.garment?.repair_garment_id;
       }
 
       if (result.success) {
+        if (editingRepairGarmentType && garmentId) {
+          const existingLevels = editingRepairGarmentType.damage_levels || [];
+          const existingById = new Map(
+            existingLevels
+              .filter((level) => level?.repair_damage_level_id)
+              .map((level) => [String(level.repair_damage_level_id), level])
+          );
+
+          const currentIds = new Set(
+            normalizedDamageLevels
+              .filter((level) => level.repair_damage_level_id)
+              .map((level) => String(level.repair_damage_level_id))
+          );
+
+          const createPromises = normalizedDamageLevels
+            .filter((level) => !level.repair_damage_level_id)
+            .map((level) => createRepairDamageLevel(garmentId, level));
+
+          const updatePromises = normalizedDamageLevels
+            .filter((level) => level.repair_damage_level_id)
+            .map((level) => updateRepairDamageLevel(garmentId, level.repair_damage_level_id, level));
+
+          const deletePromises = Array.from(existingById.values())
+            .filter((level) => !currentIds.has(String(level.repair_damage_level_id)))
+            .map((level) => deleteRepairDamageLevel(garmentId, level.repair_damage_level_id));
+
+          await Promise.all([...createPromises, ...updatePromises, ...deletePromises]);
+        }
+
         alert(editingRepairGarmentType ? 'Repair garment type updated successfully!' : 'Repair garment type created successfully!', 'Success');
         setShowRepairGarmentTypeModal(false);
-        setRepairGarmentTypeForm({ garment_name: '', description: '', is_active: 1 });
+        setRepairGarmentTypeForm({
+          garment_name: '',
+          description: '',
+          has_damage_levels: 1,
+          default_damage_level_id: null,
+          damage_levels: [createEmptyDamageLevel(1)],
+          is_active: 1
+        });
         setEditingRepairGarmentType(null);
         await loadRepairGarmentTypes();
       } else {
@@ -235,9 +321,25 @@ const Repair = () => {
 
   const openEditRepairGarmentType = (garment) => {
     setEditingRepairGarmentType(garment);
+    const mappedDamageLevels = (garment.damage_levels || []).length > 0
+      ? garment.damage_levels
+          .sort((a, b) => (parseInt(a.sort_order, 10) || 0) - (parseInt(b.sort_order, 10) || 0))
+          .map((level, index) => ({
+            repair_damage_level_id: level.repair_damage_level_id,
+            level_name: level.level_name || '',
+            level_description: level.level_description || '',
+            base_price: level.base_price || '',
+            sort_order: level.sort_order !== undefined ? level.sort_order : index + 1,
+            is_active: level.is_active !== undefined ? level.is_active : 1
+          }))
+      : [createEmptyDamageLevel(1)];
+
     setRepairGarmentTypeForm({
       garment_name: garment.garment_name,
       description: garment.description || '',
+      has_damage_levels: garment.has_damage_levels !== undefined ? garment.has_damage_levels : 1,
+      default_damage_level_id: garment.default_damage_level_id || null,
+      damage_levels: mappedDamageLevels,
       is_active: garment.is_active
     });
     setShowRepairGarmentTypeModal(true);
@@ -245,8 +347,41 @@ const Repair = () => {
 
   const openNewRepairGarmentType = () => {
     setEditingRepairGarmentType(null);
-    setRepairGarmentTypeForm({ garment_name: '', description: '', is_active: 1 });
+    setRepairGarmentTypeForm({
+      garment_name: '',
+      description: '',
+      has_damage_levels: 1,
+      default_damage_level_id: null,
+      damage_levels: [createEmptyDamageLevel(1)],
+      is_active: 1
+    });
     setShowRepairGarmentTypeModal(true);
+  };
+
+  const addDamageLevelRow = () => {
+    setRepairGarmentTypeForm((prev) => ({
+      ...prev,
+      damage_levels: [...(prev.damage_levels || []), createEmptyDamageLevel((prev.damage_levels || []).length + 1)]
+    }));
+  };
+
+  const updateDamageLevelRow = (index, field, value) => {
+    setRepairGarmentTypeForm((prev) => ({
+      ...prev,
+      damage_levels: (prev.damage_levels || []).map((row, rowIndex) =>
+        rowIndex === index ? { ...row, [field]: value } : row
+      )
+    }));
+  };
+
+  const removeDamageLevelRow = (index) => {
+    setRepairGarmentTypeForm((prev) => {
+      const nextRows = (prev.damage_levels || []).filter((_, rowIndex) => rowIndex !== index);
+      return {
+        ...prev,
+        damage_levels: nextRows.length > 0 ? nextRows : [createEmptyDamageLevel(1)]
+      };
+    });
   };
 
   const loadRepairOrders = async () => {
@@ -543,14 +678,7 @@ const Repair = () => {
 
   const getEstimatedPrice = (item) => {
     if (!item || !item.specific_data) return null;
-    const damageLevel = item.specific_data.damageLevel;
-    const prices = {
-      'minor': 300,
-      'moderate': 500,
-      'major': 800,
-      'severe': 1200
-    };
-    return item.specific_data.estimatedPrice || prices[damageLevel] || null;
+    return item.specific_data.estimatedPrice || null;
   };
 
   const handleSaveEdit = async () => {
@@ -1123,7 +1251,14 @@ const Repair = () => {
               <span className="close-modal" onClick={() => {
                 setShowRepairGarmentTypeModal(false);
                 setEditingRepairGarmentType(null);
-                setRepairGarmentTypeForm({ garment_name: '', description: '', is_active: 1 });
+                setRepairGarmentTypeForm({
+                  garment_name: '',
+                  description: '',
+                  has_damage_levels: 1,
+                  default_damage_level_id: null,
+                  damage_levels: [createEmptyDamageLevel(1)],
+                  is_active: 1
+                });
               }}>×</span>
             </div>
 
@@ -1146,6 +1281,61 @@ const Repair = () => {
                   placeholder="Optional description..."
                   rows={3}
                 />
+              </div>
+
+              <div className="repair-form-group">
+                <label>Damage Levels *</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {(repairGarmentTypeForm.damage_levels || []).map((level, index) => (
+                    <div key={`damage-level-${index}`} style={{ border: '1px solid #e0e0e0', borderRadius: '8px', padding: '12px', background: '#fafafa' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '8px', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          value={level.level_name}
+                          onChange={(e) => updateDamageLevelRow(index, 'level_name', e.target.value)}
+                          placeholder="Level name (e.g. Minor Localized Damage)"
+                        />
+                        <input
+                          type="number"
+                          value={level.base_price}
+                          onChange={(e) => updateDamageLevelRow(index, 'base_price', e.target.value)}
+                          placeholder="Price"
+                          min="0"
+                          step="0.01"
+                        />
+                        <input
+                          type="number"
+                          value={level.sort_order}
+                          onChange={(e) => updateDamageLevelRow(index, 'sort_order', e.target.value)}
+                          placeholder="Sort"
+                          min="0"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeDamageLevelRow(index)}
+                          className="repair-garment-delete-btn"
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <textarea
+                        value={level.level_description}
+                        onChange={(e) => updateDamageLevelRow(index, 'level_description', e.target.value)}
+                        placeholder="Description (optional)"
+                        rows={2}
+                        style={{ marginTop: '8px' }}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addDamageLevelRow}
+                    style={{ alignSelf: 'flex-start', padding: '6px 12px', borderRadius: '6px', border: '1px solid #2196f3', color: '#2196f3', background: '#fff', cursor: 'pointer' }}
+                  >
+                    + Add Damage Level
+                  </button>
+                </div>
               </div>
 
               <div className="repair-form-group">
@@ -1199,7 +1389,14 @@ const Repair = () => {
               <button className="repair-btn-cancel" onClick={() => {
                 setShowRepairGarmentTypeModal(false);
                 setEditingRepairGarmentType(null);
-                setRepairGarmentTypeForm({ garment_name: '', description: '', is_active: 1 });
+                setRepairGarmentTypeForm({
+                  garment_name: '',
+                  description: '',
+                  has_damage_levels: 1,
+                  default_damage_level_id: null,
+                  damage_levels: [createEmptyDamageLevel(1)],
+                  is_active: 1
+                });
               }}>Cancel</button>
               <button
                 className="repair-btn-submit"

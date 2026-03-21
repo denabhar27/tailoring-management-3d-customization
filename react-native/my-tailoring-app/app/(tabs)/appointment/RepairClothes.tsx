@@ -22,8 +22,19 @@ import { addRepairToCart, uploadRepairImage } from "../../../utils/repairService
 import apiCall, { appointmentSlotService, API_BASE_URL } from "../../../utils/apiService";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const DEFAULT_DAMAGE_LEVELS: any[] = [];
+
 const DEFAULT_REPAIR_GARMENT_TYPES = [
-  "Shirt", "Pants", "Jacket", "Coat", "Dress", "Skirt", "Suit", "Blouse", "Sweater", "Other"
+  { repair_garment_id: 1, garment_name: 'Shirt', is_active: 1, damage_levels: DEFAULT_DAMAGE_LEVELS },
+  { repair_garment_id: 2, garment_name: 'Pants', is_active: 1, damage_levels: DEFAULT_DAMAGE_LEVELS },
+  { repair_garment_id: 3, garment_name: 'Jacket', is_active: 1, damage_levels: DEFAULT_DAMAGE_LEVELS },
+  { repair_garment_id: 4, garment_name: 'Coat', is_active: 1, damage_levels: DEFAULT_DAMAGE_LEVELS },
+  { repair_garment_id: 5, garment_name: 'Dress', is_active: 1, damage_levels: DEFAULT_DAMAGE_LEVELS },
+  { repair_garment_id: 6, garment_name: 'Skirt', is_active: 1, damage_levels: DEFAULT_DAMAGE_LEVELS },
+  { repair_garment_id: 7, garment_name: 'Suit', is_active: 1, damage_levels: DEFAULT_DAMAGE_LEVELS },
+  { repair_garment_id: 8, garment_name: 'Blouse', is_active: 1, damage_levels: DEFAULT_DAMAGE_LEVELS },
+  { repair_garment_id: 9, garment_name: 'Sweater', is_active: 1, damage_levels: DEFAULT_DAMAGE_LEVELS },
+  { repair_garment_id: 10, garment_name: 'Other', is_active: 1, damage_levels: DEFAULT_DAMAGE_LEVELS }
 ];
 
 const { width, height } = Dimensions.get("window");
@@ -44,7 +55,24 @@ interface RepairGarmentItem {
   id: number;
   garmentType: string;
   damageLevel: string;
+  damageLevelId?: number | string;
   notes: string;
+}
+
+interface RepairDamageLevel {
+  repair_damage_level_id: number | string;
+  level_name: string;
+  level_description?: string;
+  base_price: number;
+  sort_order?: number;
+  is_active?: number | boolean;
+}
+
+interface RepairGarmentTypeOption {
+  repair_garment_id: number;
+  garment_name: string;
+  is_active: number | boolean;
+  damage_levels?: RepairDamageLevel[];
 }
 
 export default function RepairClothes() {
@@ -54,7 +82,7 @@ export default function RepairClothes() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const [garments, setGarments] = useState<RepairGarmentItem[]>([
-    { id: 1, garmentType: '', damageLevel: '', notes: '' }
+    { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', notes: '' }
   ]);
 
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
@@ -65,19 +93,30 @@ export default function RepairClothes() {
   const [isShopOpen, setIsShopOpen] = useState(true);
   const [estimatedPrice, setEstimatedPrice] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [repairGarmentTypes, setRepairGarmentTypes] = useState<string[]>(DEFAULT_REPAIR_GARMENT_TYPES);
+  const [repairGarmentTypes, setRepairGarmentTypes] = useState<RepairGarmentTypeOption[]>(DEFAULT_REPAIR_GARMENT_TYPES);
   const [loadingGarments, setLoadingGarments] = useState(false);
 
-  const damageLevels = [
-    { value: 'minor', label: 'Minor', basePrice: 300, description: 'Small tears, loose threads, missing buttons' },
-    { value: 'moderate', label: 'Moderate', basePrice: 500, description: 'Broken zippers, medium tears, seam repairs' },
-    { value: 'major', label: 'Major', basePrice: 800, description: 'Large tears, structural damage, extensive repairs' },
-    { value: 'severe', label: 'Severe', basePrice: 1500, description: 'Complete reconstruction, multiple major issues' }
-  ];
+  const getDamageLevelsForGarment = (garmentTypeName: string): RepairDamageLevel[] => {
+    const selectedGarment = repairGarmentTypes.find((g) => g.garment_name === garmentTypeName);
+    const activeLevels = (selectedGarment?.damage_levels || [])
+      .filter((level) => level && (level.is_active === 1 || level.is_active === true))
+      .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
+
+    return activeLevels.length > 0 ? activeLevels : DEFAULT_DAMAGE_LEVELS;
+  };
+
+  const getSelectedDamageLevel = (garment: RepairGarmentItem): RepairDamageLevel | null => {
+    if (!garment?.garmentType || !garment?.damageLevel) return null;
+    const levels = getDamageLevelsForGarment(garment.garmentType);
+    return levels.find((level) =>
+      String(level.repair_damage_level_id) === String(garment.damageLevelId || '') ||
+      String(level.level_name) === String(garment.damageLevel)
+    ) || null;
+  };
 
   const addGarment = () => {
     const newId = Math.max(...garments.map(g => g.id)) + 1;
-    setGarments([...garments, { id: newId, garmentType: '', damageLevel: '', notes: '' }]);
+    setGarments([...garments, { id: newId, garmentType: '', damageLevel: '', damageLevelId: '', notes: '' }]);
   };
 
   const removeGarment = (id: number) => {
@@ -87,16 +126,28 @@ export default function RepairClothes() {
   };
 
   const updateGarment = (id: number, field: keyof RepairGarmentItem, value: string) => {
-    setGarments(garments.map(g =>
-      g.id === id ? { ...g, [field]: value } : g
+    setGarments(garments.map(g => {
+      if (g.id !== id) return g;
+      if (field === 'garmentType') {
+        return { ...g, garmentType: value, damageLevel: '', damageLevelId: '' };
+      }
+      return { ...g, [field]: value };
+    }));
+  };
+
+  const updateGarmentDamageLevel = (id: number, damageLevelId: string, damageLevelName: string) => {
+    setGarments(garments.map((g) =>
+      g.id === id
+        ? { ...g, damageLevelId: damageLevelId || '', damageLevel: damageLevelName || '' }
+        : g
     ));
   };
 
   const calculateTotalPrice = (): number => {
     return garments.reduce((total, garment) => {
       if (!garment.damageLevel) return total;
-      const damageLevelObj = damageLevels.find(level => level.value === garment.damageLevel);
-      let basePrice = damageLevelObj ? damageLevelObj.basePrice : 500;
+      const damageLevelObj = getSelectedDamageLevel(garment);
+      let basePrice = damageLevelObj ? Number(damageLevelObj.base_price || 0) : 500;
 
       let garmentMultiplier = 1.0;
       if (garment.garmentType === 'Suit' || garment.garmentType === 'Coat') {
@@ -149,12 +200,19 @@ export default function RepairClothes() {
         if (data.success && data.garments && data.garments.length > 0) {
           const garmentTypes = data.garments
             .filter((g: any) => g.is_active === 1 || g.is_active === true)
-            .map((garment: any) => garment.garment_name);
+            .map((garment: any) => ({
+              repair_garment_id: garment.repair_garment_id,
+              garment_name: garment.garment_name,
+              is_active: garment.is_active,
+              damage_levels: Array.isArray(garment.damage_levels) && garment.damage_levels.length > 0
+                ? garment.damage_levels
+                : DEFAULT_DAMAGE_LEVELS
+            }));
 
           if (garmentTypes.length > 0) {
             setRepairGarmentTypes(garmentTypes);
             console.log('✅ [RepairClothes] SUCCESS - Loaded', garmentTypes.length, 'garment types from API');
-            console.log('✅ [RepairClothes] Types:', garmentTypes.join(', '));
+            console.log('✅ [RepairClothes] Types:', garmentTypes.map((g: any) => g.garment_name).join(', '));
           } else {
             console.log('[RepairClothes] No active garment types found, using defaults');
           }
@@ -481,10 +539,12 @@ export default function RepairClothes() {
       const pickupDateTime = `${dateStr}T${selectedTimeSlot}`;
 
       const garmentsData = garments.map(garment => {
-        const damageLevelObj = damageLevels.find(level => level.value === garment.damageLevel);
-        const basePrice = damageLevelObj ? damageLevelObj.basePrice : 500;
+        const damageLevelObj = getSelectedDamageLevel(garment);
+        const basePrice = damageLevelObj ? Number(damageLevelObj.base_price || 0) : 500;
         return {
           damageLevel: garment.damageLevel,
+          damageLevelId: garment.damageLevelId || null,
+          damageLevelDescription: damageLevelObj?.level_description || '',
           garmentType: garment.garmentType,
           notes: garment.notes,
           basePrice: basePrice
@@ -522,7 +582,7 @@ export default function RepairClothes() {
             {
               text: "Add More",
               onPress: () => {
-                setGarments([{ id: 1, garmentType: '', damageLevel: '', notes: '' }]);
+                setGarments([{ id: 1, garmentType: '', damageLevel: '', damageLevelId: '', notes: '' }]);
                 setImages([]);
                 setCurrentImageIndex(0);
                 setAppointmentDate(null);
@@ -638,38 +698,6 @@ export default function RepairClothes() {
                 </View>
               )}
 
-              <Text style={styles.sectionTitle}>Damage Level *</Text>
-              <View style={styles.damageLevelContainer}>
-                {damageLevels.map((level) => (
-                  <TouchableOpacity
-                    key={level.value}
-                    style={[
-                      styles.damageLevelCard,
-                      garment.damageLevel === level.value && styles.damageLevelCardSelected,
-                    ]}
-                    onPress={() => updateGarment(garment.id, 'damageLevel', level.value)}
-                  >
-                    <View style={styles.damageLevelHeader}>
-                      <Text style={[
-                        styles.damageLevelLabel,
-                        garment.damageLevel === level.value && styles.damageLevelLabelSelected,
-                      ]}>
-                        {level.label} - ₱{level.basePrice}
-                      </Text>
-                      {garment.damageLevel === level.value && (
-                        <Ionicons name="checkmark-circle" size={20} color="#B8860B" />
-                      )}
-                    </View>
-                    <Text style={[
-                      styles.damageLevelDescription,
-                      garment.damageLevel === level.value && styles.damageLevelDescriptionSelected,
-                    ]}>
-                      {level.description}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
               <Text style={styles.sectionTitle}>Garment Type *</Text>
               {loadingGarments ? (
                 <View style={[styles.pickerWrapper, { justifyContent: 'center', alignItems: 'center', paddingVertical: 15 }]}>
@@ -684,9 +712,50 @@ export default function RepairClothes() {
                   >
                     <Picker.Item label="Select garment type..." value="" />
                     {repairGarmentTypes.map((item, idx) => (
-                      <Picker.Item label={item} value={item} key={`${garment.id}-${item}-${idx}`} />
+                      <Picker.Item label={item.garment_name} value={item.garment_name} key={`${garment.id}-${item.garment_name}-${idx}`} />
                     ))}
                   </Picker>
+                </View>
+              )}
+
+              <Text style={styles.sectionTitle}>Damage Level *</Text>
+              {garment.garmentType ? (
+                <View style={styles.damageLevelContainer}>
+                  {getDamageLevelsForGarment(garment.garmentType).map((level) => {
+                    const isSelected = String(garment.damageLevelId || '') === String(level.repair_damage_level_id);
+                    return (
+                      <TouchableOpacity
+                        key={`${garment.id}-${level.repair_damage_level_id}`}
+                        style={[
+                          styles.damageLevelCard,
+                          isSelected && styles.damageLevelCardSelected,
+                        ]}
+                        onPress={() => updateGarmentDamageLevel(garment.id, String(level.repair_damage_level_id), level.level_name)}
+                      >
+                        <View style={styles.damageLevelHeader}>
+                          <Text style={[
+                            styles.damageLevelLabel,
+                            isSelected && styles.damageLevelLabelSelected,
+                          ]}>
+                            {level.level_name} - ₱{Number(level.base_price || 0)}
+                          </Text>
+                          {isSelected && (
+                            <Ionicons name="checkmark-circle" size={20} color="#B8860B" />
+                          )}
+                        </View>
+                        <Text style={[
+                          styles.damageLevelDescription,
+                          isSelected && styles.damageLevelDescriptionSelected,
+                        ]}>
+                          {level.level_description || 'No description provided'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View style={{ padding: 12, borderWidth: 1, borderColor: '#E8D5C4', borderRadius: 12, backgroundColor: '#FFF' }}>
+                  <Text style={{ color: '#8D6E63' }}>Select garment type first to view damage levels.</Text>
                 </View>
               )}
 
@@ -827,7 +896,7 @@ export default function RepairClothes() {
               {garments.filter(g => g.damageLevel).map((g, idx) => (
                 <View key={g.id} style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>{g.garmentType || `Garment ${idx + 1}`}:</Text>
-                  <Text style={styles.summaryValue}>{damageLevels.find(l => l.value === g.damageLevel)?.label || g.damageLevel}</Text>
+                  <Text style={styles.summaryValue}>{getSelectedDamageLevel(g)?.level_name || g.damageLevel}</Text>
                 </View>
               ))}
               <Text style={styles.summaryNote}>

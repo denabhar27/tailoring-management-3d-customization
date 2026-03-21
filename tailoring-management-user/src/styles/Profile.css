@@ -684,6 +684,13 @@
   word-break: break-word;
 }
 
+.service-details .detail-label,
+.service-details .detail-value {
+  margin-left: 0;
+  padding-left: 0;
+  text-indent: 0;
+}
+
 .damage-photo {
   max-width: 200px;
   max-height: 150px;

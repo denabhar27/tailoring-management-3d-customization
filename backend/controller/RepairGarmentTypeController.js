@@ -1,28 +1,79 @@
 const RepairGarmentType = require('../model/RepairGarmentTypeModel');
-const db = require('../config/db');
 
 const ensureTableExists = (callback) => {
-  const createTableSQL = `
-    CREATE TABLE IF NOT EXISTS repair_garment_types (
-      repair_garment_id INT AUTO_INCREMENT PRIMARY KEY,
-      garment_name VARCHAR(100) NOT NULL UNIQUE,
-      description TEXT,
-      is_active TINYINT(1) DEFAULT 1,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      
-      INDEX idx_garment_name (garment_name),
-      INDEX idx_is_active (is_active),
-      INDEX idx_created_at (created_at)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `;
-  
-  db.query(createTableSQL, (err) => {
+  RepairGarmentType.initializeDamageLevelSchema((err) => {
     if (err) {
-      console.error('Error creating repair_garment_types table:', err);
+      console.error('Error initializing repair garment + damage level schema:', err);
       return callback(err);
     }
     callback(null);
+  });
+};
+
+const groupDenormalizedRows = (rows) => {
+  const garmentMap = {};
+  
+  (rows || []).forEach((row) => {
+    const garmentId = row.repair_garment_id;
+    
+    if (!garmentMap[garmentId]) {
+      // First occurrence of this garment - extract base garment data
+      garmentMap[garmentId] = {
+        repair_garment_id: row.repair_garment_id,
+        garment_name: row.garment_name,
+        garment_description: row.garment_description,
+        base_price: row.base_price,
+        estimate_hours: row.estimate_hours,
+        is_active: row.is_active,
+        has_damage_levels: row.has_damage_levels,
+        default_damage_level_id: row.default_damage_level_id,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        damage_levels: []
+      };
+    }
+    
+    // Add damage level if it exists in this row
+    if (row.repair_damage_level_id) {
+      garmentMap[garmentId].damage_levels.push({
+        repair_damage_level_id: row.repair_damage_level_id,
+        repair_garment_id: garmentId,
+        level_name: row.level_name,
+        level_description: row.level_description,
+        base_price: row.base_price,
+        is_active: row.damage_level_is_active,
+        sort_order: row.damage_level_sort_order
+      });
+    }
+  });
+  
+  return Object.values(garmentMap);
+};
+
+const parseDamageLevelsJson = (garment) => {
+  if (!garment) return garment;
+
+  let parsedLevels = [];
+  try {
+    if (Array.isArray(garment.damage_levels)) {
+      parsedLevels = garment.damage_levels;
+    } else if (typeof garment.damage_levels === 'string') {
+      parsedLevels = JSON.parse(garment.damage_levels || '[]');
+    }
+  } catch (err) {
+    parsedLevels = [];
+  }
+
+  garment.damage_levels = (parsedLevels || []).filter((level) => level && level.repair_damage_level_id);
+  return garment;
+};
+
+exports.initializeRepairDamageLevelSystem = () => {
+  ensureTableExists((err) => {
+    if (err) {
+      return console.error('[REPAIR] Failed to initialize repair damage level system:', err.message);
+    }
+    console.log('[REPAIR] Repair garment type and damage level schema initialized');
   });
 };
 
@@ -35,7 +86,7 @@ exports.getAllRepairGarmentTypes = (req, res) => {
       });
     }
     
-    RepairGarmentType.getAll((err, garments) => {
+    RepairGarmentType.getAllWithDamageLevels((err, rows) => {
       if (err) {
         console.error('Get repair garment types error:', err);
         return res.status(500).json({
@@ -45,9 +96,11 @@ exports.getAllRepairGarmentTypes = (req, res) => {
         });
       }
       
+      const garments = groupDenormalizedRows(rows);
+
       res.json({
         success: true,
-        garments: garments || []
+        garments: garments
       });
     });
   });
@@ -62,7 +115,7 @@ exports.getAllRepairGarmentTypesAdmin = (req, res) => {
       });
     }
     
-    RepairGarmentType.getAllAdmin((err, garments) => {
+    RepairGarmentType.getAllAdminWithDamageLevels((err, rows) => {
       if (err) {
         console.error('Get repair garment types (admin) error:', err);
         return res.status(500).json({
@@ -72,9 +125,11 @@ exports.getAllRepairGarmentTypesAdmin = (req, res) => {
         });
       }
       
+      const garments = groupDenormalizedRows(rows);
+
       res.json({
         success: true,
-        garments: garments || []
+        garments: garments
       });
     });
   });
@@ -83,7 +138,7 @@ exports.getAllRepairGarmentTypesAdmin = (req, res) => {
 exports.getRepairGarmentTypeById = (req, res) => {
   const garmentId = req.params.garmentId;
   
-  RepairGarmentType.getById(garmentId, (err, garment) => {
+  RepairGarmentType.getByIdWithDamageLevels(garmentId, (err, rows) => {
     if (err) {
       console.error('Get repair garment type error:', err);
       return res.status(500).json({
@@ -93,16 +148,19 @@ exports.getRepairGarmentTypeById = (req, res) => {
       });
     }
     
-    if (!garment || garment.length === 0) {
+    if (!rows || rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Repair garment type not found'
       });
     }
     
+    const garments = groupDenormalizedRows(rows);
+    const garment = garments[0];
+
     res.json({
       success: true,
-      garment: garment[0]
+      garment: garment
     });
   });
 };
@@ -116,7 +174,7 @@ exports.createRepairGarmentType = (req, res) => {
     });
   }
   
-  const { garment_name, description, is_active } = req.body;
+  const { garment_name, description, is_active, has_damage_levels, default_damage_level_id, damage_levels } = req.body;
   
   if (!garment_name || !garment_name.trim()) {
     return res.status(400).json({
@@ -136,6 +194,8 @@ exports.createRepairGarmentType = (req, res) => {
     const garmentData = {
       garment_name: garment_name.trim(),
       description: description || null,
+      has_damage_levels: has_damage_levels !== undefined ? has_damage_levels : 1,
+      default_damage_level_id: default_damage_level_id || null,
       is_active: is_active !== undefined ? is_active : 1
     };
     
@@ -154,14 +214,71 @@ exports.createRepairGarmentType = (req, res) => {
           error: process.env.NODE_ENV === 'development' ? err.message : undefined
         });
       }
-      
-      res.json({
-        success: true,
-        message: 'Repair garment type created successfully',
-        garment: {
-          repair_garment_id: result.insertId,
-          ...garmentData
-        }
+
+      const createdGarmentId = result.insertId;
+
+      const normalizedDamageLevels = Array.isArray(damage_levels)
+        ? damage_levels.filter((level) => level && level.level_name && String(level.level_name).trim() !== '')
+        : [];
+
+      if (normalizedDamageLevels.length === 0) {
+        return res.json({
+          success: true,
+          message: 'Repair garment type created successfully',
+          garment: {
+            repair_garment_id: createdGarmentId,
+            ...garmentData,
+            damage_levels: []
+          }
+        });
+      }
+
+      let createdCount = 0;
+      let createFailed = false;
+
+      normalizedDamageLevels.forEach((level) => {
+        if (createFailed) return;
+        RepairGarmentType.createDamageLevel({
+          repair_garment_id: createdGarmentId,
+          level_name: String(level.level_name).trim(),
+          level_description: level.level_description || null,
+          base_price: parseFloat(level.base_price || 0),
+          is_active: level.is_active !== undefined ? level.is_active : 1,
+          sort_order: level.sort_order !== undefined ? level.sort_order : 0
+        }, (createErr) => {
+          if (createErr && !createFailed) {
+            createFailed = true;
+            console.error('Create repair damage level error:', createErr);
+            return res.status(500).json({
+              success: false,
+              message: 'Repair garment created but failed to add one or more damage levels',
+              error: process.env.NODE_ENV === 'development' ? createErr.message : undefined
+            });
+          }
+
+          createdCount += 1;
+          if (createdCount === normalizedDamageLevels.length && !createFailed) {
+            return RepairGarmentType.getByIdWithDamageLevels(createdGarmentId, (getErr, rows) => {
+              if (getErr) {
+                return res.json({
+                  success: true,
+                  message: 'Repair garment type created successfully',
+                  garment: {
+                    repair_garment_id: createdGarmentId,
+                    ...garmentData
+                  }
+                });
+              }
+
+              const garments = groupDenormalizedRows(rows);
+              return res.json({
+                success: true,
+                message: 'Repair garment type created successfully',
+                garment: garments[0]
+              });
+            });
+          }
+        });
       });
     });
   });
@@ -177,7 +294,7 @@ exports.updateRepairGarmentType = (req, res) => {
   }
   
   const garmentId = req.params.garmentId;
-  const { garment_name, description, is_active } = req.body;
+  const { garment_name, description, is_active, has_damage_levels, default_damage_level_id } = req.body;
   
   if (!garment_name || !garment_name.trim()) {
     return res.status(400).json({
@@ -189,6 +306,8 @@ exports.updateRepairGarmentType = (req, res) => {
   const garmentData = {
     garment_name: garment_name.trim(),
     description: description || null,
+    has_damage_levels: has_damage_levels !== undefined ? has_damage_levels : 1,
+    default_damage_level_id: default_damage_level_id || null,
     is_active: is_active !== undefined ? is_active : 1
   };
   
@@ -281,5 +400,194 @@ exports.deleteRepairGarmentType = (req, res) => {
       });
     });
   }
+};
+
+exports.getDamageLevelsByGarmentId = (req, res) => {
+  const garmentId = req.params.garmentId;
+  const includeInactive = req.query.includeInactive === 'true';
+
+  ensureTableExists((initErr) => {
+    if (initErr) {
+      return res.status(500).json({
+        success: false,
+        message: 'Database error. Please contact administrator.'
+      });
+    }
+
+    RepairGarmentType.getDamageLevelsByGarmentId(garmentId, includeInactive, (err, damageLevels) => {
+      if (err) {
+        console.error('Get repair damage levels error:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Error fetching repair damage levels',
+          error: process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
+      }
+
+      return res.json({
+        success: true,
+        damage_levels: damageLevels || []
+      });
+    });
+  });
+};
+
+exports.createDamageLevel = (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin only.'
+    });
+  }
+
+  const garmentId = req.params.garmentId;
+  const { level_name, level_description, base_price, is_active, sort_order } = req.body;
+
+  if (!level_name || !String(level_name).trim()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Damage level name is required'
+    });
+  }
+
+  if (base_price === undefined || isNaN(parseFloat(base_price))) {
+    return res.status(400).json({
+      success: false,
+      message: 'Valid base price is required'
+    });
+  }
+
+  RepairGarmentType.createDamageLevel({
+    repair_garment_id: garmentId,
+    level_name: String(level_name).trim(),
+    level_description: level_description || null,
+    base_price: parseFloat(base_price),
+    is_active: is_active !== undefined ? is_active : 1,
+    sort_order: sort_order !== undefined ? parseInt(sort_order, 10) || 0 : 0
+  }, (err, result) => {
+    if (err) {
+      console.error('Create repair damage level error:', err);
+      if (err.code === 'ER_DUP_ENTRY') {
+        return res.status(400).json({
+          success: false,
+          message: 'Damage level with this name already exists for this garment type'
+        });
+      }
+      return res.status(500).json({
+        success: false,
+        message: 'Error creating repair damage level',
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Damage level created successfully',
+      damage_level: {
+        repair_damage_level_id: result.insertId,
+        repair_garment_id: parseInt(garmentId, 10),
+        level_name: String(level_name).trim(),
+        level_description: level_description || null,
+        base_price: parseFloat(base_price),
+        is_active: is_active !== undefined ? is_active : 1,
+        sort_order: sort_order !== undefined ? parseInt(sort_order, 10) || 0 : 0
+      }
+    });
+  });
+};
+
+exports.updateDamageLevel = (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin only.'
+    });
+  }
+
+  const damageLevelId = req.params.damageLevelId;
+  const { level_name, level_description, base_price, is_active, sort_order } = req.body;
+
+  if (!level_name || !String(level_name).trim()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Damage level name is required'
+    });
+  }
+
+  if (base_price === undefined || isNaN(parseFloat(base_price))) {
+    return res.status(400).json({
+      success: false,
+      message: 'Valid base price is required'
+    });
+  }
+
+  RepairGarmentType.updateDamageLevel(damageLevelId, {
+    level_name: String(level_name).trim(),
+    level_description: level_description || null,
+    base_price: parseFloat(base_price),
+    is_active: is_active !== undefined ? is_active : 1,
+    sort_order: sort_order !== undefined ? parseInt(sort_order, 10) || 0 : 0
+  }, (err, result) => {
+    if (err) {
+      console.error('Update repair damage level error:', err);
+      if (err.code === 'ER_DUP_ENTRY') {
+        return res.status(400).json({
+          success: false,
+          message: 'Damage level with this name already exists for this garment type'
+        });
+      }
+      return res.status(500).json({
+        success: false,
+        message: 'Error updating repair damage level',
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Damage level not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Damage level updated successfully'
+    });
+  });
+};
+
+exports.deleteDamageLevel = (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin only.'
+    });
+  }
+
+  const damageLevelId = req.params.damageLevelId;
+
+  RepairGarmentType.deleteDamageLevel(damageLevelId, (err, result) => {
+    if (err) {
+      console.error('Delete repair damage level error:', err);
+      return res.status(500).json({
+        success: false,
+        message: 'Error deleting repair damage level',
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Damage level not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Damage level deleted successfully'
+    });
+  });
 };
 

@@ -7,8 +7,10 @@ import '../../styles/SharedModal.css';
 
 const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
+  const defaultDamageLevels = [];
+
   const [garments, setGarments] = useState([
-    { id: 1, damageLevel: '', garmentType: '', notes: '' }
+    { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', notes: '' }
   ]);
 
   const [formData, setFormData] = useState({
@@ -29,12 +31,24 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const [priceLoading, setPriceLoading] = useState(false);
   const [repairGarmentTypes, setRepairGarmentTypes] = useState([]);
 
-  const damageLevels = [
-    { value: 'minor', label: 'Minor', basePrice: 300, description: 'Small tears, loose threads, missing buttons' },
-    { value: 'moderate', label: 'Moderate', basePrice: 500, description: 'Broken zippers, medium tears, seam repairs' },
-    { value: 'major', label: 'Major', basePrice: 800, description: 'Large tears, structural damage, extensive repairs' },
-    { value: 'severe', label: 'Severe', basePrice: 1500, description: 'Complete reconstruction, multiple major issues' }
-  ];
+  const getDamageLevelsForGarment = (garmentTypeName) => {
+    const selectedGarment = repairGarmentTypes.find((g) => g.garment_name === garmentTypeName);
+    const activeLevels = (selectedGarment?.damage_levels || [])
+      .filter((level) => level && (level.is_active === 1 || level.is_active === true))
+      .sort((a, b) => (parseInt(a.sort_order, 10) || 0) - (parseInt(b.sort_order, 10) || 0));
+
+    return activeLevels.length > 0 ? activeLevels : defaultDamageLevels;
+  };
+
+  const getSelectedDamageLevel = (garment) => {
+    if (!garment?.garmentType || !garment?.damageLevel) return null;
+    const availableLevels = getDamageLevelsForGarment(garment.garmentType);
+
+    return availableLevels.find((level) =>
+      String(level.repair_damage_level_id) === String(garment.damageLevelId) ||
+      String(level.level_name) === String(garment.damageLevel)
+    ) || null;
+  };
 
   useEffect(() => {
     loadRepairGarmentTypes();
@@ -48,32 +62,32 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       } else {
 
         setRepairGarmentTypes([
-          { repair_garment_id: 1, garment_name: 'Shirt' },
-          { repair_garment_id: 2, garment_name: 'Pants' },
-          { repair_garment_id: 3, garment_name: 'Jacket' },
-          { repair_garment_id: 4, garment_name: 'Coat' },
-          { repair_garment_id: 5, garment_name: 'Dress' },
-          { repair_garment_id: 6, garment_name: 'Skirt' },
-          { repair_garment_id: 7, garment_name: 'Suit' },
-          { repair_garment_id: 8, garment_name: 'Blouse' },
-          { repair_garment_id: 9, garment_name: 'Sweater' },
-          { repair_garment_id: 10, garment_name: 'Other' }
+          { repair_garment_id: 1, garment_name: 'Shirt', damage_levels: defaultDamageLevels },
+          { repair_garment_id: 2, garment_name: 'Pants', damage_levels: defaultDamageLevels },
+          { repair_garment_id: 3, garment_name: 'Jacket', damage_levels: defaultDamageLevels },
+          { repair_garment_id: 4, garment_name: 'Coat', damage_levels: defaultDamageLevels },
+          { repair_garment_id: 5, garment_name: 'Dress', damage_levels: defaultDamageLevels },
+          { repair_garment_id: 6, garment_name: 'Skirt', damage_levels: defaultDamageLevels },
+          { repair_garment_id: 7, garment_name: 'Suit', damage_levels: defaultDamageLevels },
+          { repair_garment_id: 8, garment_name: 'Blouse', damage_levels: defaultDamageLevels },
+          { repair_garment_id: 9, garment_name: 'Sweater', damage_levels: defaultDamageLevels },
+          { repair_garment_id: 10, garment_name: 'Other', damage_levels: defaultDamageLevels }
         ]);
       }
     } catch (err) {
       console.error("Load repair garment types error:", err);
 
       setRepairGarmentTypes([
-        { repair_garment_id: 1, garment_name: 'Shirt' },
-        { repair_garment_id: 2, garment_name: 'Pants' },
-        { repair_garment_id: 3, garment_name: 'Jacket' },
-        { repair_garment_id: 4, garment_name: 'Coat' },
-        { repair_garment_id: 5, garment_name: 'Dress' },
-        { repair_garment_id: 6, garment_name: 'Skirt' },
-        { repair_garment_id: 7, garment_name: 'Suit' },
-        { repair_garment_id: 8, garment_name: 'Blouse' },
-        { repair_garment_id: 9, garment_name: 'Sweater' },
-        { repair_garment_id: 10, garment_name: 'Other' }
+        { repair_garment_id: 1, garment_name: 'Shirt', damage_levels: defaultDamageLevels },
+        { repair_garment_id: 2, garment_name: 'Pants', damage_levels: defaultDamageLevels },
+        { repair_garment_id: 3, garment_name: 'Jacket', damage_levels: defaultDamageLevels },
+        { repair_garment_id: 4, garment_name: 'Coat', damage_levels: defaultDamageLevels },
+        { repair_garment_id: 5, garment_name: 'Dress', damage_levels: defaultDamageLevels },
+        { repair_garment_id: 6, garment_name: 'Skirt', damage_levels: defaultDamageLevels },
+        { repair_garment_id: 7, garment_name: 'Suit', damage_levels: defaultDamageLevels },
+        { repair_garment_id: 8, garment_name: 'Blouse', damage_levels: defaultDamageLevels },
+        { repair_garment_id: 9, garment_name: 'Sweater', damage_levels: defaultDamageLevels },
+        { repair_garment_id: 10, garment_name: 'Other', damage_levels: defaultDamageLevels }
       ]);
     }
   };
@@ -141,7 +155,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         time: ''
       });
       setGarments([
-        { id: 1, damageLevel: '', garmentType: '', notes: '' }
+        { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', notes: '' }
       ]);
       setAllTimeSlots([]);
       setAvailableTimeSlots([]);
@@ -168,8 +182,8 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
       garments.forEach(garment => {
         if (garment.damageLevel) {
-          const damageLevel = damageLevels.find(level => level.value === garment.damageLevel);
-          const basePrice = damageLevel ? damageLevel.basePrice : 500;
+          const damageLevel = getSelectedDamageLevel(garment);
+          const basePrice = damageLevel ? parseFloat(damageLevel.base_price || 0) : 500;
           totalPrice += basePrice;
         }
       });
@@ -184,7 +198,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const addGarment = () => {
     const newId = Math.max(...garments.map(g => g.id)) + 1;
-    setGarments([...garments, { id: newId, damageLevel: '', garmentType: '', notes: '' }]);
+    setGarments([...garments, { id: newId, garmentType: '', damageLevel: '', damageLevelId: '', notes: '' }]);
   };
 
   const removeGarment = (id) => {
@@ -194,12 +208,30 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   const updateGarment = (id, field, value) => {
-    setGarments(garments.map(g =>
-      g.id === id ? { ...g, [field]: value } : g
-    ));
+    setGarments(garments.map(g => {
+      if (g.id !== id) return g;
+
+      if (field === 'garmentType') {
+        return { ...g, garmentType: value, damageLevel: '', damageLevelId: '' };
+      }
+
+      return { ...g, [field]: value };
+    }));
 
     if (errors[`garment_${id}_${field}`]) {
       setErrors(prev => ({ ...prev, [`garment_${id}_${field}`]: '' }));
+    }
+  };
+
+  const updateGarmentDamageLevel = (id, damageLevelId, damageLevelName) => {
+    setGarments(garments.map((g) =>
+      g.id === id
+        ? { ...g, damageLevelId: damageLevelId || '', damageLevel: damageLevelName || '' }
+        : g
+    ));
+
+    if (errors[`garment_${id}_damageLevel`]) {
+      setErrors(prev => ({ ...prev, [`garment_${id}_damageLevel`]: '' }));
     }
   };
 
@@ -418,11 +450,13 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       const pickupDateTime = `${formData.date}T${formData.time}`;
 
       const garmentsData = garments.map(garment => {
-        const damageLevel = damageLevels.find(level => level.value === garment.damageLevel);
-        const basePrice = damageLevel ? damageLevel.basePrice : 500;
+        const damageLevel = getSelectedDamageLevel(garment);
+        const basePrice = damageLevel ? parseFloat(damageLevel.base_price || 0) : 500;
 
         return {
           damageLevel: garment.damageLevel,
+          damageLevelId: garment.damageLevelId || null,
+          damageLevelDescription: damageLevel?.level_description || '',
           garmentType: garment.garmentType,
           notes: garment.notes,
           basePrice: basePrice
@@ -491,7 +525,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       time: ''
     });
     setGarments([
-      { id: 1, damageLevel: '', garmentType: '', notes: '' }
+      { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', notes: '' }
     ]);
     setImageFiles([]);
     setImagePreviews([]);
@@ -535,32 +569,6 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
               <div className="form-group-shared">
                 <label className="form-label-shared">
-                  <i className="fas fa-exclamation-triangle"></i> Damage Level <span className="required-indicator">*</span>
-                </label>
-                <select
-                  value={garment.damageLevel}
-                  onChange={(e) => updateGarment(garment.id, 'damageLevel', e.target.value)}
-                  className={`form-select-shared ${errors[`garment_${garment.id}_damageLevel`] ? 'error' : ''}`}
-                >
-                  <option value="">Select damage level</option>
-                  {damageLevels.map(level => (
-                    <option key={level.value} value={level.value}>
-                      {level.label} - ₱{level.basePrice}
-                    </option>
-                  ))}
-                </select>
-                {garment.damageLevel && (
-                  <div className="help-text-shared" style={{ marginTop: '8px' }}>
-                    {damageLevels.find(l => l.value === garment.damageLevel)?.description}
-                  </div>
-                )}
-                {errors[`garment_${garment.id}_damageLevel`] && (
-                  <span className="error-message-shared">{errors[`garment_${garment.id}_damageLevel`]}</span>
-                )}
-              </div>
-
-              <div className="form-group-shared">
-                <label className="form-label-shared">
                   <i className="fas fa-tshirt"></i> Garment Type <span className="required-indicator">*</span>
                 </label>
                 <select
@@ -577,6 +585,37 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 </select>
                 {errors[`garment_${garment.id}_garmentType`] && (
                   <span className="error-message-shared">{errors[`garment_${garment.id}_garmentType`]}</span>
+                )}
+              </div>
+
+              <div className="form-group-shared">
+                <label className="form-label-shared">
+                  <i className="fas fa-exclamation-triangle"></i> Damage Level <span className="required-indicator">*</span>
+                </label>
+                <select
+                  value={garment.damageLevelId || ''}
+                  onChange={(e) => {
+                    const selectedLevel = getDamageLevelsForGarment(garment.garmentType)
+                      .find((level) => String(level.repair_damage_level_id) === String(e.target.value));
+                    updateGarmentDamageLevel(garment.id, e.target.value, selectedLevel?.level_name || '');
+                  }}
+                  className={`form-select-shared ${errors[`garment_${garment.id}_damageLevel`] ? 'error' : ''}`}
+                  disabled={!garment.garmentType}
+                >
+                  <option value="">{garment.garmentType ? 'Select damage level' : 'Select garment type first'}</option>
+                  {getDamageLevelsForGarment(garment.garmentType).map(level => (
+                    <option key={level.repair_damage_level_id} value={level.repair_damage_level_id}>
+                      {level.level_name} - ₱{parseFloat(level.base_price || 0)}
+                    </option>
+                  ))}
+                </select>
+                {garment.damageLevel && (
+                  <div className="help-text-shared" style={{ marginTop: '8px' }}>
+                    {getSelectedDamageLevel(garment)?.level_description || ''}
+                  </div>
+                )}
+                {errors[`garment_${garment.id}_damageLevel`] && (
+                  <span className="error-message-shared">{errors[`garment_${garment.id}_damageLevel`]}</span>
                 )}
               </div>
 
@@ -808,10 +847,10 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               <h4>Estimated Price: ₱{estimatedPrice}</h4>
               <div className="price-breakdown">
                 {garments.filter(g => g.damageLevel).map((garment, index) => {
-                  const damageLevel = damageLevels.find(l => l.value === garment.damageLevel);
+                  const damageLevel = getSelectedDamageLevel(garment);
                   return (
                     <p key={garment.id}>
-                      {garment.garmentType || 'Garment'} ({damageLevel?.label || garment.damageLevel}): ₱{damageLevel?.basePrice || 500}
+                      {garment.garmentType || 'Garment'} ({damageLevel?.level_name || garment.damageLevel}): ₱{parseFloat(damageLevel?.base_price || 500)}
                     </p>
                   );
                 })}

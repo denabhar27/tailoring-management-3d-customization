@@ -271,6 +271,12 @@ const Profile = () => {
     return formatted.charAt(0).toUpperCase() + formatted.slice(1);
   };
 
+  const formatCurrencyPHP = (value) => {
+    const numeric = Number.parseFloat(value);
+    const safeValue = Number.isFinite(numeric) ? numeric : 0;
+    return `₱${safeValue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
   const getColorName = (hex) => {
     if (!hex) return 'Not specified';
 
@@ -657,16 +663,6 @@ const Profile = () => {
 
       case 'repair':
 
-        const getEstimatedPrice = (damageLevel) => {
-          const prices = {
-            'minor': 300,
-            'moderate': 500,
-            'major': 800,
-            'severe': 1200
-          };
-          return prices[damageLevel] || 'N/A';
-        };
-
         const getEstimatedTimeFromLevel = (damageLevel) => {
           const times = {
             'minor': '2-3 days',
@@ -678,7 +674,17 @@ const Profile = () => {
         };
 
         const damageLevel = specific_data.garments?.[0]?.damageLevel || specific_data.damageLevel || 'N/A';
-        const estimatedPrice = specific_data.estimatedPrice || getEstimatedPrice(damageLevel);
+        const estimatedFromGarments = Array.isArray(specific_data.garments)
+          ? specific_data.garments.reduce((sum, garment) => {
+              const garmentPrice = Number.parseFloat(garment?.basePrice ?? garment?.base_price ?? 0);
+              return sum + (Number.isFinite(garmentPrice) ? garmentPrice : 0);
+            }, 0)
+          : 0;
+
+        const estimatedPrice = Number.parseFloat(specific_data.estimatedPrice);
+        const safeEstimatedPrice = Number.isFinite(estimatedPrice)
+          ? estimatedPrice
+          : estimatedFromGarments;
         const estimatedTime = specific_data.estimatedTime || getEstimatedTimeFromLevel(damageLevel);
 
         return (
@@ -716,7 +722,7 @@ const Profile = () => {
             )}
             <div className="detail-row">
               <span className="detail-label">Service Name:</span>
-              <span className="detail-value">{formatServiceName(specific_data.serviceName) || 'N/A'}</span>
+              <span className="detail-value">{String(formatServiceName(specific_data.serviceName) || 'N/A').trim()}</span>
             </div>
 
             {/* Multiple garments support */}
@@ -724,7 +730,7 @@ const Profile = () => {
               <>
                 <div className="detail-row">
                   <span className="detail-label">Garments:</span>
-                  <span className="detail-value"><strong>{specific_data.garments.length} item{specific_data.garments.length > 1 ? 's' : ''}</strong></span>
+                  <span className="detail-value"><strong>{`${specific_data.garments.length} item${specific_data.garments.length > 1 ? 's' : ''}`.trim()}</strong></span>
                 </div>
                 {specific_data.garments.map((garment, idx) => (
                   <div key={idx} className="garment-card" style={{
@@ -767,9 +773,7 @@ const Profile = () => {
             </div>
             <div className="detail-row">
               <span className="detail-label">{item.status === 'pending' ? 'Estimated Price:' : 'Final Price:'}</span>
-              <span className="detail-value">
-                ₱{parseFloat(item.status === 'pending' ? estimatedPrice : item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-              </span>
+              <span className="detail-value">{formatCurrencyPHP(item.status === 'pending' ? safeEstimatedPrice : item.final_price)}</span>
             </div>
           </div>
         );
@@ -1207,14 +1211,7 @@ const Profile = () => {
         return specificData.estimatedPrice;
       }
 
-      const damageLevel = specificData?.damageLevel;
-      const prices = {
-        'minor': 300,
-        'moderate': 500,
-        'major': 800,
-        'severe': 1200
-      };
-      return prices[damageLevel] || 0;
+      return specificData?.estimatedPrice || 0;
     } else if (serviceType === 'dry_cleaning') {
 
       if (specificData?.finalPrice) {

@@ -146,6 +146,12 @@ app.use('/api/garment-types', garmentTypeRoutes);
 app.use('/api/admin/clerks', clerkRoutes);
 const repairGarmentTypeRoutes = require('./routes/RepairGarmentTypeRoutes');
 app.use('/api/repair-garment-types', repairGarmentTypeRoutes);
+try {
+  const { initializeRepairDamageLevelSystem } = require('./controller/RepairGarmentTypeController');
+  initializeRepairDamageLevelSystem();
+} catch (err) {
+  console.error('[SERVER] Failed to initialize repair damage level system:', err.message);
+}
 const dcGarmentTypeRoutes = require('./routes/DryCleaningGarmentTypeRoutes');
 app.use('/api/dc-garment-types', dcGarmentTypeRoutes);
 const shopScheduleRoutes = require('./routes/ShopScheduleRoutes');

@@ -1400,9 +1400,55 @@ html {
 
 }
 
+.table-scroll-viewport {
+  max-height: 430px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-radius: 10px;
+  border: 1px solid #EEE;
+  position: relative;
+  isolation: isolate;
+}
+
+.table-scroll-viewport::-webkit-scrollbar {
+  width: 8px;
+}
+
+.table-scroll-viewport::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.table-scroll-viewport::-webkit-scrollbar-thumb {
+  background: #bbb;
+  border-radius: 4px;
+}
+
+.table-scroll-viewport::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+.table-container thead th,
+.table-scroll-viewport thead th {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.table-scroll-viewport tbody td,
+.table-scroll-viewport tbody tr,
+.table-scroll-viewport .action-buttons,
+.table-scroll-viewport .icon-btn {
+  position: relative;
+  z-index: 1;
+}
+
+.table-scroll-viewport table,
 table {
 
   width: 100%;
+
+  table-layout: fixed;
 
   border-collapse: collapse;
 
@@ -1487,6 +1533,10 @@ tbody td {
   color: #2D3436;
 
   line-height: 1.4;
+
+  overflow-wrap: anywhere;
+
+  word-break: break-word;
 
 }
 

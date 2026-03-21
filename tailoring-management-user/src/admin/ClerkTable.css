@@ -79,23 +79,44 @@
 
 .clerk-actions {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-wrap: nowrap;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .btn-link {
-  background: none;
-  border: none;
-  padding: 0;
+  background: #ffffff;
+  border: 1px solid rgba(139, 69, 19, 0.18);
+  border-radius: 10px;
+  height: 30px;
+  min-width: 30px;
+  padding: 0 8px;
   color: #8b4513;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1;
+  text-decoration: none;
 }
 
 .btn-link:hover {
-  text-decoration: underline;
+  background: #fff9f2;
+  border-color: rgba(139, 69, 19, 0.32);
+  text-decoration: none;
 }
 
 .btn-link.danger {
   color: #c0392b;
+  border-color: rgba(192, 57, 43, 0.25);
+  padding: 0 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.btn-link i {
+  font-size: 12px;
 }

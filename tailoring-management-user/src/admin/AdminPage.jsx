@@ -465,7 +465,7 @@ function AdminPage() {
           )}
         </div>
 
-        <div className="recent-activity">
+        <div className="recent-activity scrollable">
           <table className="activity-table">
             <thead>
               <tr className="tr-activity">

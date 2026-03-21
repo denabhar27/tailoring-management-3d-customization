@@ -829,6 +829,7 @@ const Repair = () => {
           </select>
         </div>
         <div className="table-container">
+          <div className="table-scroll-viewport">
           <table>
             <thead>
               <tr>
@@ -972,6 +973,7 @@ const Repair = () => {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
       {showEditModal && selectedOrder && (

@@ -803,6 +803,7 @@ function Rental() {
               Loading rental orders...
             </div>
           ) : (
+            <div className="table-scroll-viewport">
             <table>
               <thead>
                 <tr className="tr-rental">
@@ -1099,6 +1100,7 @@ function Rental() {
                 )}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

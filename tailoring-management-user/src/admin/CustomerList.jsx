@@ -405,6 +405,7 @@ const CustomerList = () => {
         </div>
         <div className="table-container">
 
+          <div className="table-scroll-viewport">
           <table>
 
             <thead>
@@ -624,6 +625,7 @@ const CustomerList = () => {
             </tbody>
 
           </table>
+          </div>
 
         </div>
 

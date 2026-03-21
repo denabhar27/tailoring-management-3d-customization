@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { getAllRentals, getRentalImageUrl } from '../../api/RentalApi';
 import { addToCart } from '../../api/CartApi';
 import suitSample from "../../assets/suits.png";
+import shirtIcon from "../../assets/shirt-icon.png";
+import tuxedoIcon from "../../assets/tuxedo.png";
 import { useAlert } from '../../context/AlertContext';
 import '../../components/SimpleImageCarousel.css';
 import '../../styles/RentalClothes.css';
@@ -726,6 +728,43 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
+
+  const categoryFilters = [
+    { id: 'all', label: 'All', iconType: 'emoji', icon: '🧾' },
+    { id: 'tshirt', label: 'T-Shirt', iconType: 'image', icon: shirtIcon },
+    { id: 'pants', label: 'Pants', iconType: 'emoji', icon: '👖' },
+    { id: 'barong', label: 'Barong', iconType: 'image', icon: shirtIcon },
+    { id: 'tuxedo', label: 'Tuxedo', iconType: 'image', icon: tuxedoIcon }
+  ];
+
+  const normalizeCategoryText = (value) => String(value || '').toLowerCase().replace(/[_-]/g, ' ').trim();
+
+  const belongsToFilter = (item, filterId) => {
+    if (filterId === 'all') return true;
+
+    const category = normalizeCategoryText(item?.category);
+    const name = normalizeCategoryText(item?.item_name || item?.name);
+    const combined = `${category} ${name}`;
+
+    if (filterId === 'tshirt') {
+      return combined.includes('t shirt') || combined.includes('tshirt') || combined.includes('shirt') || combined.includes('casual');
+    }
+
+    if (filterId === 'pants') {
+      return combined.includes('pants') || combined.includes('trouser');
+    }
+
+    if (filterId === 'barong') {
+      return combined.includes('barong') || combined.includes('formal') || combined.includes('business');
+    }
+
+    if (filterId === 'tuxedo') {
+      return combined.includes('tuxedo') || combined.includes('suit');
+    }
+
+    return true;
+  };
 
   useEffect(() => {
     const fetchRentals = async () => {
@@ -1230,7 +1269,8 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   };
 
   const availableItems = rentalItems.filter(item => item.status === 'available');
-  const displayItems = showAll ? availableItems : availableItems.slice(0, 3);
+  const filteredItems = availableItems.filter(item => belongsToFilter(item, selectedCategoryFilter));
+  const displayItems = showAll ? filteredItems : filteredItems.slice(0, 3);
   const bundlePreviewTotal = calculateBundleTotalWithSelections(3, selectedItems, cardSizeSelections);
   const selectedBundleQty = selectedItems.reduce((sum, item) => sum + getItemSelectedQuantity(item), 0);
 
@@ -1330,6 +1370,34 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
             </button>
           </div>
         </div>
+
+        {showAll && (
+          <div className="rc-category-filter" role="tablist" aria-label="Rental categories">
+            {categoryFilters.map((category) => {
+              const isActive = selectedCategoryFilter === category.id;
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  className={`rc-category-chip ${isActive ? 'active' : ''}`}
+                  onClick={() => setSelectedCategoryFilter(category.id)}
+                  role="tab"
+                  aria-selected={isActive}
+                >
+                  <span className="rc-category-icon" aria-hidden="true">
+                    {category.iconType === 'image' ? (
+                      <img src={category.icon} alt="" />
+                    ) : (
+                      category.icon
+                    )}
+                  </span>
+                  <span className="rc-category-label">{category.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div className="rental-grid">
           {displayItems.length === 0 ? (
             <div style={{
@@ -1339,7 +1407,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
               color: '#666',
               fontSize: '18px'
             }}>
-              <p style={{ margin: 0, fontWeight: '500' }}>No rental clothes</p>
+              <p style={{ margin: 0, fontWeight: '500' }}>No rental clothes under this category</p>
             </div>
           ) : (
             displayItems.map((item, i) => (
@@ -1496,7 +1564,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
             ))
           )}
         </div>
-        {!showAll && rentalItems.length > 3 && (
+        {!showAll && filteredItems.length > 3 && (
           <div style={{
             display: 'flex',
             justifyContent: 'center',

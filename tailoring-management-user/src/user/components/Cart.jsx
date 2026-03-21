@@ -401,6 +401,14 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
     return types[serviceType] || serviceType;
   };
 
+  const getDisplayImageUrl = (url) => {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('data:image') || url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    return `${API_BASE_URL}${url}`;
+  };
+
   const renderSizeMeasurements = (sizeData) => {
     if (!sizeData) return null;
 
@@ -720,6 +728,11 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                       )}
                       {item.service_type === 'customization' && item.specific_data && (
                         <div className="customization-details">
+                          {(() => {
+                            const hasGarments = item.specific_data.garments && item.specific_data.garments.length > 0;
+                            const hasTopLevelAngles = item.specific_data.designData?.angleImageUrls || item.specific_data.designData?.angleImages;
+                            return (
+                              <>
                           <p>Garment Type: {item.specific_data.garmentType || 'N/A'}</p>
                           <p>Fabric Type: {item.specific_data.fabricType || 'N/A'}</p>
                           <p>Preferred Date & Time: {
@@ -730,18 +743,99 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           {item.specific_data.notes && (
                             <p>Notes: {item.specific_data.notes}</p>
                           )}
-                          {item.specific_data.designData?.angleImages && (
+                          {item.specific_data.garments && item.specific_data.garments.length > 0 && (
+                            <div style={{ marginTop: '10px' }}>
+                              <p className="garments-header-cart">
+                                <strong>{item.specific_data.garments.length} Garment{item.specific_data.garments.length > 1 ? 's' : ''}</strong>
+                              </p>
+                              {item.specific_data.garments.map((garment, idx) => {
+                                const angleImages = garment.designData?.angleImageUrls || garment.designData?.angleImages || {};
+                                return (
+                                  <div key={idx} style={{ border: '1px solid #e5e5e5', borderRadius: '8px', padding: '10px', marginBottom: '10px' }}>
+                                    <p style={{ margin: '0 0 6px 0', fontWeight: 700 }}>Garment #{idx + 1}</p>
+                                    <p style={{ margin: '4px 0' }}>Garment Type: {garment.garmentType || 'N/A'}</p>
+                                    <p style={{ margin: '4px 0' }}>Fabric Type: {garment.fabricType || 'N/A'}</p>
+
+                                    {Object.keys(angleImages).length > 0 && (
+                                      <div style={{ marginTop: '8px' }}>
+                                        <strong style={{ display: 'block', marginBottom: '8px', fontSize: '13px' }}>Design Views:</strong>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                                          {['front', 'back', 'right', 'left'].map((angle) => {
+                                            const imageUrl = getDisplayImageUrl(angleImages[angle]);
+                                            if (!imageUrl) return null;
+                                            return (
+                                              <div key={angle} style={{ position: 'relative' }}>
+                                                <img
+                                                  src={imageUrl}
+                                                  alt={`${angle} view`}
+                                                  className="clickable-image"
+                                                  onClick={() => openImagePreview(imageUrl, `${angle} view`)}
+                                                  style={{
+                                                    width: '100%',
+                                                    height: 'auto',
+                                                    borderRadius: '6px',
+                                                    border: '2px solid #e0e0e0',
+                                                    cursor: 'pointer'
+                                                  }}
+                                                  onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                  }}
+                                                />
+                                                <div style={{
+                                                  position: 'absolute',
+                                                  bottom: '4px',
+                                                  left: '4px',
+                                                  background: 'rgba(0,0,0,0.7)',
+                                                  color: 'white',
+                                                  padding: '2px 6px',
+                                                  borderRadius: '3px',
+                                                  fontSize: '10px',
+                                                  textTransform: 'capitalize',
+                                                  fontWeight: 'bold'
+                                                }}>
+                                                  {angle}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {!Object.keys(angleImages).length && garment.imageUrl && garment.imageUrl !== 'no-image' && (
+                                      <div className="cart-item-image" style={{ marginTop: '8px' }}>
+                                        <img
+                                          src={getDisplayImageUrl(garment.imageUrl)}
+                                          alt="Garment preview"
+                                          className="cart-damage-photo clickable-image"
+                                          onClick={() => openImagePreview(getDisplayImageUrl(garment.imageUrl), `Garment #${idx + 1} preview`)}
+                                          title="Click to enlarge"
+                                          onError={(e) => {
+                                            e.target.style.display = 'none';
+                                          }}
+                                        />
+                                        <small>Garment preview</small>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {!hasGarments && hasTopLevelAngles && (
                             <div style={{ marginTop: '10px', marginBottom: '10px' }}>
                               <strong style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>Design Views:</strong>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                                {['front', 'back', 'right', 'left'].map((angle) => (
-                                  item.specific_data.designData.angleImages[angle] && (
+                                {['front', 'back', 'right', 'left'].map((angle) => {
+                                  const topLevelAngleImages = item.specific_data.designData?.angleImageUrls || item.specific_data.designData?.angleImages;
+                                  return topLevelAngleImages?.[angle] && (
                                     <div key={angle} style={{ position: 'relative' }}>
                                       <img
-                                        src={item.specific_data.designData.angleImages[angle]}
+                                        src={getDisplayImageUrl(topLevelAngleImages[angle])}
                                         alt={`${angle} view`}
                                         className="clickable-image"
-                                        onClick={() => openImagePreview(item.specific_data.designData.angleImages[angle], `${angle} view`)}
+                                        onClick={() => openImagePreview(getDisplayImageUrl(topLevelAngleImages[angle]), `${angle} view`)}
                                         style={{
                                           width: '100%',
                                           height: 'auto',
@@ -768,19 +862,20 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                                         {angle}
                                       </div>
                                     </div>
-                                  )
-                                ))}
+                                  );
+                                })}
                               </div>
                               <small style={{ display: 'block', fontSize: '11px', color: '#888', marginTop: '4px' }}>Click any image to enlarge</small>
                             </div>
                           )}
-                          {!item.specific_data.designData?.angleImages && item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
+
+                          {!hasGarments && !hasTopLevelAngles && item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && (
                             <div className="cart-item-image" style={{ marginTop: '10px' }}>
                               <img
-                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`}
+                                src={getDisplayImageUrl(item.specific_data.imageUrl)}
                                 alt="Design preview"
                                 className="cart-damage-photo clickable-image"
-                                onClick={() => openImagePreview(`${API_BASE_URL}${item.specific_data.imageUrl}`, 'Design Preview')}
+                                onClick={() => openImagePreview(getDisplayImageUrl(item.specific_data.imageUrl), 'Design Preview')}
                                 title="Click to enlarge"
                                 onError={(e) => {
                                   e.target.style.display = 'none';
@@ -860,21 +955,9 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                               )}
                             </div>
                           )}
-                          {item.specific_data.imageUrl && item.specific_data.imageUrl !== 'no-image' && !item.specific_data.designData?.angleImages && (
-                            <div className="cart-item-image">
-                              <img
-                                src={`${API_BASE_URL}${item.specific_data.imageUrl}`}
-                                alt="Design preview"
-                                className="cart-damage-photo clickable-image"
-                                onClick={() => openImagePreview(`${API_BASE_URL}${item.specific_data.imageUrl}`, 'Design Preview')}
-                                title="Click to enlarge"
-                                onError={(e) => {
-                                  e.target.style.display = 'none';
-                                }}
-                              />
-                              <small>Design preview uploaded</small>
-                            </div>
-                          )}
+                              </>
+                            );
+                          })()}
                         </div>
                       )}
 

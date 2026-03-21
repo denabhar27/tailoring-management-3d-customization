@@ -1264,6 +1264,72 @@ const Customize = () => {
 
   };
 
+  const getCustomizationGarments = (specificData) => {
+    return Array.isArray(specificData?.garments) ? specificData.garments : [];
+  };
+
+  const getGarmentSummaryText = (specificData) => {
+    const garments = getCustomizationGarments(specificData);
+    if (!garments.length) {
+      return specificData?.garmentType || 'N/A';
+    }
+
+    const names = garments
+      .map((g) => (g?.garmentType || '').trim())
+      .filter(Boolean);
+
+    if (!names.length) {
+      return `${garments.length} item${garments.length > 1 ? 's' : ''}`;
+    }
+
+    const uniqueNames = [...new Set(names)];
+    if (uniqueNames.length === 1) {
+      return `${uniqueNames[0]} x${garments.length}`;
+    }
+
+    const preview = uniqueNames.slice(0, 2).join(', ');
+    return uniqueNames.length > 2 ? `${preview} +${uniqueNames.length - 2} more` : preview;
+  };
+
+  const getFabricSummaryText = (specificData) => {
+    const garments = getCustomizationGarments(specificData);
+    if (!garments.length) {
+      return specificData?.fabricType || 'N/A';
+    }
+
+    const fabrics = garments
+      .map((g) => (g?.fabricType || '').trim())
+      .filter(Boolean);
+
+    if (!fabrics.length) {
+      return specificData?.fabricType || 'N/A';
+    }
+
+    const uniqueFabrics = [...new Set(fabrics)];
+    return uniqueFabrics.join(', ');
+  };
+
+  const getDisplayImageUrl = (url) => {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('data:image') || url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    return `${API_BASE_URL}${url}`;
+  };
+
+  const parseDesignData = (value) => {
+    if (!value) return null;
+    if (typeof value === 'object') return value;
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
   const getAllGarmentCategories = () => {
 
     const categories = [...defaultGarmentCategories];
@@ -1673,6 +1739,11 @@ const Customize = () => {
       (item.walk_in_customer_name && item.walk_in_customer_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
 
       item.specific_data?.garmentType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+
+      (Array.isArray(item.specific_data?.garments) && item.specific_data.garments.some(g =>
+        (g?.garmentType || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (g?.fabricType || '').toLowerCase().includes(searchTerm.toLowerCase())
+      )) ||
 
       item.specific_data?.fabricType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
 
@@ -2796,9 +2867,9 @@ const Customize = () => {
 
                       </td>
 
-                      <td>{item.specific_data?.garmentType || 'N/A'}</td>
+                      <td>{getGarmentSummaryText(item.specific_data)}</td>
 
-                      <td><span style={{ fontSize: '0.9em', color: '#5D4037' }}>{item.specific_data?.fabricType || 'N/A'}</span></td>
+                      <td><span style={{ fontSize: '0.9em', color: '#5D4037' }}>{getFabricSummaryText(item.specific_data)}</span></td>
 
                       <td>{new Date(item.order_date).toLocaleDateString()}</td>
 
@@ -3022,9 +3093,6 @@ const Customize = () => {
 
               <div className="detail-row"><strong>Order ID:</strong> #{selectedOrder.order_id}</div>
 
-              <div className="detail-row"><strong>Garment:</strong> {selectedOrder.specific_data?.garmentType || 'N/A'}</div>
-
-              <div className="detail-row"><strong>Fabric:</strong> {selectedOrder.specific_data?.fabricType || 'N/A'}</div>
               {selectedOrder.order_type === 'walk_in' && selectedOrder.specific_data?.referenceImage && (
                 <div className="detail-row">
                   <strong>Reference Image:</strong>
@@ -3430,10 +3498,6 @@ const Customize = () => {
 
               )}
 
-              <div className="detail-row"><strong>Garment:</strong> {selectedOrder.specific_data?.garmentType || 'N/A'}</div>
-
-              <div className="detail-row"><strong>Fabric:</strong> {selectedOrder.specific_data?.fabricType || 'N/A'}</div>
-
               <div className="detail-row"><strong>Preferred Date:</strong> {selectedOrder.specific_data?.preferredDate || 'N/A'}</div>
 
               <div className="detail-row"><strong>Date Received:</strong> {new Date(selectedOrder.order_date).toLocaleDateString()}</div>
@@ -3567,330 +3631,252 @@ const Customize = () => {
                 </div>
               )}
               {(() => {
+                const garments = Array.isArray(selectedOrder.specific_data?.garments)
+                  ? selectedOrder.specific_data.garments
+                  : [];
 
-                let designData = selectedOrder.specific_data?.designData;
+                if (garments.length > 0) {
+                  return (
+                    <div className="detail-row">
+                      <strong>Garments:</strong>
+                      <div style={{ marginTop: '10px', width: '100%' }}>
+                        {garments.map((garment, idx) => {
+                          const garmentDesignData = parseDesignData(garment.designData);
+                          const garmentAngleImages = garmentDesignData?.angleImageUrls || garmentDesignData?.angleImages;
 
-                let angleImages = null;
+                          return (
+                            <div key={idx} style={{ border: '1px solid #e0e0e0', borderRadius: '8px', padding: '12px', marginBottom: '12px', background: '#fafafa' }}>
+                              <div style={{ marginBottom: '6px', fontWeight: '700' }}>Garment #{idx + 1}</div>
+                              <div style={{ marginBottom: '6px' }}><strong>Garment Type:</strong> {garment.garmentType || 'N/A'}</div>
+                              <div style={{ marginBottom: '6px' }}><strong>Fabric Type:</strong> {garment.fabricType || 'N/A'}</div>
 
-                if (typeof designData === 'string') {
+                              {garmentAngleImages && (
+                                <div style={{ marginTop: '8px' }}>
+                                  <strong>Design Views:</strong>
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginTop: '8px' }}>
+                                    {['front', 'back', 'right', 'left'].map((angle) => {
+                                      const angleUrl = getDisplayImageUrl(garmentAngleImages[angle]);
+                                      if (!angleUrl) return null;
 
-                  try {
+                                      return (
+                                        <div key={angle} style={{ position: 'relative' }}>
+                                          <div className="clickable-image" style={{ cursor: 'pointer' }} onClick={() => openImagePreview(angleUrl, `${angle} view`)}>
+                                            <img
+                                              src={angleUrl}
+                                              alt={`${angle} view`}
+                                              style={{ width: '100%', height: 'auto', maxHeight: '200px', borderRadius: '8px', border: '2px solid #ddd', objectFit: 'contain' }}
+                                              onError={(e) => {
+                                                e.target.style.display = 'none';
+                                              }}
+                                            />
+                                            <div style={{ position: 'absolute', bottom: '5px', left: '5px', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', textTransform: 'capitalize', fontWeight: 'bold' }}>
+                                              {angle}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
 
-                    designData = JSON.parse(designData);
-
-                  } catch (e) {
-
-                    console.warn('Failed to parse designData:', e);
-
-                    designData = null;
-
-                  }
-
+                              {!garmentAngleImages && garment.imageUrl && garment.imageUrl !== 'no-image' && (
+                                <div style={{ marginTop: '10px' }}>
+                                  <strong>Design Preview:</strong>
+                                  <div className="clickable-image" style={{ marginTop: '8px', cursor: 'pointer' }} onClick={() => openImagePreview(getDisplayImageUrl(garment.imageUrl), `Garment #${idx + 1} preview`)}>
+                                    <img
+                                      src={getDisplayImageUrl(garment.imageUrl)}
+                                      alt={`Garment #${idx + 1} preview`}
+                                      style={{ maxWidth: '100%', maxHeight: '220px', borderRadius: '8px', border: '1px solid #ddd' }}
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
                 }
 
-                if (designData && designData.angleImages) {
-
-                  angleImages = designData.angleImages;
-
-                }
+                const designData = parseDesignData(selectedOrder.specific_data?.designData);
+                const angleImages = designData?.angleImageUrls || designData?.angleImages;
 
                 if (angleImages && (angleImages.front || angleImages.back || angleImages.right || angleImages.left)) {
-
                   return (
-
                     <div className="detail-row">
-
                       <strong>Design Views:</strong>
-
                       <div style={{ marginTop: '10px' }}>
-
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-
                           {['front', 'back', 'right', 'left'].map((angle) => (
-
                             angleImages[angle] && (
-
                               <div key={angle} style={{ position: 'relative' }}>
-
-                                <div
-
-                                  className="clickable-image"
-
-                                  style={{ cursor: 'pointer' }}
-
-                                  onClick={() => openImagePreview(angleImages[angle], `${angle} view`)}
-
-                                >
-
+                                <div className="clickable-image" style={{ cursor: 'pointer' }} onClick={() => openImagePreview(getDisplayImageUrl(angleImages[angle]), `${angle} view`)}>
                                   <img
-
-                                    src={angleImages[angle]}
-
+                                    src={getDisplayImageUrl(angleImages[angle])}
                                     alt={`${angle} view`}
-
-                                    style={{
-
-                                      width: '100%',
-
-                                      height: 'auto',
-
-                                      maxHeight: '200px',
-
-                                      borderRadius: '8px',
-
-                                      border: '2px solid #ddd',
-
-                                      objectFit: 'contain'
-
-                                    }}
-
+                                    style={{ width: '100%', height: 'auto', maxHeight: '200px', borderRadius: '8px', border: '2px solid #ddd', objectFit: 'contain' }}
                                     onError={(e) => {
-
                                       e.target.style.display = 'none';
-
                                     }}
-
                                   />
-
-                                  <div style={{
-
-                                    position: 'absolute',
-
-                                    bottom: '5px',
-
-                                    left: '5px',
-
-                                    background: 'rgba(0,0,0,0.7)',
-
-                                    color: 'white',
-
-                                    padding: '4px 8px',
-
-                                    borderRadius: '4px',
-
-                                    fontSize: '12px',
-
-                                    textTransform: 'capitalize',
-
-                                    fontWeight: 'bold'
-
-                                  }}>
-
+                                  <div style={{ position: 'absolute', bottom: '5px', left: '5px', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', textTransform: 'capitalize', fontWeight: 'bold' }}>
                                     {angle}
-
                                   </div>
-
                                 </div>
-
                               </div>
-
                             )
-
                           ))}
-
                         </div>
-
                         <small className="click-hint" style={{ display: 'block', fontSize: '11px', color: '#888', marginTop: '8px' }}>Click any image to expand</small>
-
                       </div>
-
                     </div>
-
                   );
-
                 }
 
                 if (selectedOrder.specific_data?.imageUrl && selectedOrder.specific_data.imageUrl !== 'no-image') {
-
                   return (
-
                     <div className="detail-row">
-
                       <strong>Design Preview:</strong>
-
-                      <div
-
-                        className="clickable-image"
-
-                        style={{ marginTop: '10px', cursor: 'pointer' }}
-
-                        onClick={() => openImagePreview(`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`, 'Design preview')}
-
-                      >
-
+                      <div className="clickable-image" style={{ marginTop: '10px', cursor: 'pointer' }} onClick={() => openImagePreview(getDisplayImageUrl(selectedOrder.specific_data.imageUrl), 'Design preview')}>
                         <img
-
-                          src={`${API_BASE_URL}${selectedOrder.specific_data.imageUrl}`}
-
+                          src={getDisplayImageUrl(selectedOrder.specific_data.imageUrl)}
                           alt="Design preview"
-
                           style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid #ddd' }}
-
                           onError={(e) => {
-
                             e.target.style.display = 'none';
-
                           }}
-
                         />
-
                         <small className="click-hint" style={{ display: 'block', fontSize: '11px', color: '#888', marginTop: '4px' }}>Click to expand</small>
-
                       </div>
-
                     </div>
-
                   );
-
                 }
 
                 return null;
 
               })()}
               {(() => {
+                const garments = Array.isArray(selectedOrder.specific_data?.garments)
+                  ? selectedOrder.specific_data.garments
+                  : [];
 
-                let designData = selectedOrder.specific_data?.designData;
+                if (garments.length > 0) {
+                  const garmentsWithDesign = garments.filter((g) => {
+                    const d = parseDesignData(g.designData);
+                    return d && (d.size || d.fit || d.colors || d.pattern || d.personalization || d.buttons || d.accessories);
+                  });
 
-                if (typeof designData === 'string') {
-
-                  try {
-
-                    designData = JSON.parse(designData);
-
-                  } catch (e) {
-
-                    console.warn('Failed to parse designData:', e);
-
-                    designData = null;
-
-                  }
-
-                }
-
-                if (designData && (designData.size || designData.fit || designData.colors || designData.pattern || designData.personalization || designData.buttons || designData.accessories)) {
+                  if (!garmentsWithDesign.length) return null;
 
                   return (
-
                     <div className="detail-row" style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
-
                       <div style={{ width: '100%' }}>
-
                         <h5 style={{ margin: '0 0 15px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>
-
                           3D Customization Choices
-
                         </h5>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '14px' }}>
-
-                          {designData.size && (
-
-                            <div className="detail-row">
-
-                              <strong>Size:</strong> {designData.size.charAt(0).toUpperCase() + designData.size.slice(1)}
-
-                            </div>
-
-                          )}
-
-                          {designData.fit && (
-
-                            <div className="detail-row">
-
-                              <strong>Fit:</strong> {designData.fit.charAt(0).toUpperCase() + designData.fit.slice(1)}
-
-                            </div>
-
-                          )}
-
-                          {designData.colors && designData.colors.fabric && (
-
-                            <div className="detail-row">
-
-                              <strong>Color:</strong> {getColorName(designData.colors.fabric)}
-
-                            </div>
-
-                          )}
-
-                          {designData.pattern && designData.pattern !== 'none' && (
-
-                            <div className="detail-row">
-
-                              <strong>Pattern:</strong> {designData.pattern.charAt(0).toUpperCase() + designData.pattern.slice(1)}
-
-                            </div>
-
-                          )}
-
-                          {designData.personalization && designData.personalization.initials && (
-
-                            <div className="detail-row" style={{ gridColumn: '1 / -1' }}>
-
-                              <strong>Personalization:</strong> {designData.personalization.initials}
-
-                              {designData.personalization.font && ` (${designData.personalization.font} font)`}
-
-                            </div>
-
-                          )}
-
-                          {designData.buttons && designData.buttons.length > 0 && (
-
-                            <div className="detail-row" style={{ gridColumn: '1 / -1' }}>
-
-                              <strong>Button Types:</strong>
-
-                              <div style={{ marginLeft: '10px', marginTop: '5px', fontSize: '13px' }}>
-
-                                {designData.buttons.map((btn, index) => (
-
-                                  <div key={btn.id || index} style={{ margin: '5px 0' }}>
-
-                                    Button {index + 1}: {getButtonType(btn.modelPath)}
-
+                        {garmentsWithDesign.map((garment, idx) => {
+                          const designData = parseDesignData(garment.designData);
+                          return (
+                            <div key={idx} style={{ marginBottom: '12px', padding: '10px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+                              <div style={{ marginBottom: '8px', fontWeight: '700' }}>Garment #{idx + 1}</div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '14px' }}>
+                                {designData.size && <div><strong>Size:</strong> {designData.size.charAt(0).toUpperCase() + designData.size.slice(1)}</div>}
+                                {designData.fit && <div><strong>Fit:</strong> {designData.fit.charAt(0).toUpperCase() + designData.fit.slice(1)}</div>}
+                                {designData.colors && designData.colors.fabric && <div><strong>Color:</strong> {getColorName(designData.colors.fabric)}</div>}
+                                {designData.pattern && designData.pattern !== 'none' && <div><strong>Pattern:</strong> {designData.pattern.charAt(0).toUpperCase() + designData.pattern.slice(1)}</div>}
+                                {designData.personalization && designData.personalization.initials && (
+                                  <div style={{ gridColumn: '1 / -1' }}>
+                                    <strong>Personalization:</strong> {designData.personalization.initials}
+                                    {designData.personalization.font && ` (${designData.personalization.font} font)`}
                                   </div>
-
-                                ))}
-
-                              </div>
-
-                            </div>
-
-                          )}
-
-                          {designData.accessories && designData.accessories.length > 0 && (
-
-                            <div className="detail-row" style={{ gridColumn: '1 / -1' }}>
-
-                              <strong>Accessories:</strong>
-
-                              <div style={{ marginLeft: '10px', marginTop: '5px', fontSize: '13px' }}>
-
-                                {designData.accessories.map((acc, index) => (
-
-                                  <div key={acc.id || index} style={{ margin: '5px 0' }}>
-
-                                    {getAccessoryName(acc.modelPath)}
-
+                                )}
+                                {designData.buttons && designData.buttons.length > 0 && (
+                                  <div style={{ gridColumn: '1 / -1' }}>
+                                    <strong>Button Types:</strong>
+                                    <div style={{ marginLeft: '10px', marginTop: '5px', fontSize: '13px' }}>
+                                      {designData.buttons.map((btn, index) => (
+                                        <div key={btn.id || index} style={{ margin: '5px 0' }}>
+                                          Button {index + 1}: {getButtonType(btn.modelPath)}
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
-
-                                ))}
-
+                                )}
+                                {designData.accessories && designData.accessories.length > 0 && (
+                                  <div style={{ gridColumn: '1 / -1' }}>
+                                    <strong>Accessories:</strong>
+                                    <div style={{ marginLeft: '10px', marginTop: '5px', fontSize: '13px' }}>
+                                      {designData.accessories.map((acc, index) => (
+                                        <div key={acc.id || index} style={{ margin: '5px 0' }}>
+                                          {getAccessoryName(acc.modelPath)}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-
                             </div>
-
-                          )}
-
-                        </div>
-
+                          );
+                        })}
                       </div>
-
                     </div>
-
                   );
+                }
 
+                const designData = parseDesignData(selectedOrder.specific_data?.designData);
+
+                if (designData && (designData.size || designData.fit || designData.colors || designData.pattern || designData.personalization || designData.buttons || designData.accessories)) {
+                  return (
+                    <div className="detail-row" style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+                      <div style={{ width: '100%' }}>
+                        <h5 style={{ margin: '0 0 15px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>
+                          3D Customization Choices
+                        </h5>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '14px' }}>
+                          {designData.size && <div className="detail-row"><strong>Size:</strong> {designData.size.charAt(0).toUpperCase() + designData.size.slice(1)}</div>}
+                          {designData.fit && <div className="detail-row"><strong>Fit:</strong> {designData.fit.charAt(0).toUpperCase() + designData.fit.slice(1)}</div>}
+                          {designData.colors && designData.colors.fabric && <div className="detail-row"><strong>Color:</strong> {getColorName(designData.colors.fabric)}</div>}
+                          {designData.pattern && designData.pattern !== 'none' && <div className="detail-row"><strong>Pattern:</strong> {designData.pattern.charAt(0).toUpperCase() + designData.pattern.slice(1)}</div>}
+                          {designData.personalization && designData.personalization.initials && (
+                            <div className="detail-row" style={{ gridColumn: '1 / -1' }}>
+                              <strong>Personalization:</strong> {designData.personalization.initials}
+                              {designData.personalization.font && ` (${designData.personalization.font} font)`}
+                            </div>
+                          )}
+                          {designData.buttons && designData.buttons.length > 0 && (
+                            <div className="detail-row" style={{ gridColumn: '1 / -1' }}>
+                              <strong>Button Types:</strong>
+                              <div style={{ marginLeft: '10px', marginTop: '5px', fontSize: '13px' }}>
+                                {designData.buttons.map((btn, index) => (
+                                  <div key={btn.id || index} style={{ margin: '5px 0' }}>
+                                    Button {index + 1}: {getButtonType(btn.modelPath)}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {designData.accessories && designData.accessories.length > 0 && (
+                            <div className="detail-row" style={{ gridColumn: '1 / -1' }}>
+                              <strong>Accessories:</strong>
+                              <div style={{ marginLeft: '10px', marginTop: '5px', fontSize: '13px' }}>
+                                {designData.accessories.map((acc, index) => (
+                                  <div key={acc.id || index} style={{ margin: '5px 0' }}>
+                                    {getAccessoryName(acc.modelPath)}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
                 }
 
                 return null;

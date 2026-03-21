@@ -361,6 +361,27 @@ const Profile = () => {
     return accessoryMap[modelPath] || modelPath.split('/').pop().replace('.glb', '').replace(/\d+/g, '').trim();
   };
 
+  const getDisplayImageUrl = (url) => {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('data:image') || url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    return `${API_BASE_URL}${url}`;
+  };
+
+  const parseDesignData = (value) => {
+    if (!value) return null;
+    if (typeof value === 'object') return value;
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
   const handleViewDetails = (item) => {
     setSelectedItem(item);
     setDetailsModalOpen(true);
@@ -780,22 +801,128 @@ const Profile = () => {
 
       case 'customize':
       case 'customization':
+        {
+        const garments = Array.isArray(specific_data.garments) ? specific_data.garments : [];
+        const topLevelDesignData = parseDesignData(specific_data.designData);
+        const topLevelAngleImages = topLevelDesignData?.angleImageUrls || topLevelDesignData?.angleImages;
+
         return (
           <div className="service-details customize-details">
             <h4>Customization Details</h4>
-            {specific_data.designData?.angleImages ? (
+
+            <div className="detail-row">
+              <span className="detail-label">Preferred Date & Time:</span>
+              <span className="detail-value">
+                {specific_data.preferredDate && specific_data.preferredTime
+                  ? formatDateTo12Hour(`${specific_data.preferredDate}T${specific_data.preferredTime}`)
+                  : specific_data.preferredDate || 'N/A'}
+              </span>
+            </div>
+            {specific_data.notes && (
+              <div className="detail-row">
+                <span className="detail-label">Notes:</span>
+                <span className="detail-value">{specific_data.notes}</span>
+              </div>
+            )}
+
+            {garments.length > 0 ? (
+              <>
+                <div className="detail-row">
+                  <span className="detail-label">Garments:</span>
+                  <span className="detail-value"><strong>{garments.length} item{garments.length > 1 ? 's' : ''}</strong></span>
+                </div>
+
+                {garments.map((garment, idx) => {
+                  const garmentDesignData = parseDesignData(garment.designData);
+                  const garmentAngleImages = garmentDesignData?.angleImageUrls || garmentDesignData?.angleImages;
+
+                  return (
+                    <div key={idx} className="garment-card" style={{
+                      marginTop: '12px',
+                      padding: '12px 14px',
+                      backgroundColor: '#f9f9f9',
+                      borderRadius: '8px',
+                      border: '1px solid #e0e0e0',
+                      textAlign: 'left'
+                    }}>
+                      <div style={{ marginBottom: '6px', fontWeight: '700' }}>Garment #{idx + 1}</div>
+                      <div style={{ marginBottom: '6px' }}><strong>Garment Type:</strong> {garment.garmentType || 'N/A'}</div>
+                      <div style={{ marginBottom: '6px' }}><strong>Fabric Type:</strong> {garment.fabricType || 'N/A'}</div>
+
+                      {garmentAngleImages && (
+                        <div style={{ marginTop: '10px' }}>
+                          <strong style={{ display: 'block', marginBottom: '8px' }}>Design Views:</strong>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                            {['front', 'back', 'right', 'left'].map((angle) => {
+                              const angleUrl = getDisplayImageUrl(garmentAngleImages[angle]);
+                              if (!angleUrl) return null;
+                              return (
+                                <div key={angle} style={{ position: 'relative' }}>
+                                  <img
+                                    src={angleUrl}
+                                    alt={`${angle} view`}
+                                    className="damage-photo clickable-image"
+                                    onClick={() => openImagePreview(angleUrl, `${angle} view`)}
+                                    title="Click to enlarge"
+                                    style={{ width: '100%', height: 'auto', borderRadius: '8px', border: '2px solid #e0e0e0', cursor: 'pointer' }}
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                    }}
+                                  />
+                                  <div style={{ position: 'absolute', bottom: '5px', left: '5px', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', textTransform: 'capitalize', fontWeight: 'bold' }}>
+                                    {angle}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {!garmentAngleImages && garment.imageUrl && garment.imageUrl !== 'no-image' && (
+                        <div style={{ marginTop: '10px' }}>
+                          <strong>Design Preview:</strong>
+                          <img
+                            src={getDisplayImageUrl(garment.imageUrl)}
+                            alt={`Garment #${idx + 1} preview`}
+                            className="damage-photo clickable-image"
+                            onClick={() => openImagePreview(getDisplayImageUrl(garment.imageUrl), `Garment #${idx + 1} preview`)}
+                            title="Click to enlarge"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {garmentDesignData && (
+                        <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+                          <h5 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '600' }}>3D Customization Choices</h5>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '13px' }}>
+                            {garmentDesignData.size && <div><strong>Size:</strong> {garmentDesignData.size.charAt(0).toUpperCase() + garmentDesignData.size.slice(1)}</div>}
+                            {garmentDesignData.fit && <div><strong>Fit:</strong> {garmentDesignData.fit.charAt(0).toUpperCase() + garmentDesignData.fit.slice(1)}</div>}
+                            {garmentDesignData.colors?.fabric && <div><strong>Color:</strong> {getColorName(garmentDesignData.colors.fabric)}</div>}
+                            {garmentDesignData.pattern && garmentDesignData.pattern !== 'none' && <div><strong>Pattern:</strong> {garmentDesignData.pattern.charAt(0).toUpperCase() + garmentDesignData.pattern.slice(1)}</div>}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            ) : topLevelAngleImages ? (
               <div className="detail-row">
                 <span className="detail-label">Design Views:</span>
                 <div className="detail-value">
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginTop: '10px' }}>
                     {['front', 'back', 'right', 'left'].map((angle) => (
-                      specific_data.designData.angleImages[angle] && (
+                      topLevelAngleImages[angle] && (
                         <div key={angle} style={{ position: 'relative' }}>
                           <img
-                            src={specific_data.designData.angleImages[angle]}
+                            src={getDisplayImageUrl(topLevelAngleImages[angle])}
                             alt={`${angle} view`}
                             className="damage-photo clickable-image"
-                            onClick={() => openImagePreview(specific_data.designData.angleImages[angle], `${angle} view`)}
+                            onClick={() => openImagePreview(getDisplayImageUrl(topLevelAngleImages[angle]), `${angle} view`)}
                             title="Click to enlarge"
                             style={{
                               width: '100%',
@@ -835,10 +962,10 @@ const Profile = () => {
                 <span className="detail-label">Design Preview:</span>
                 <div className="detail-value">
                   <img
-                    src={`${API_BASE_URL}${specific_data.imageUrl}`}
+                    src={getDisplayImageUrl(specific_data.imageUrl)}
                     alt="Design preview"
                     className="damage-photo clickable-image"
-                    onClick={() => openImagePreview(`${API_BASE_URL}${specific_data.imageUrl}`, 'Design Preview')}
+                    onClick={() => openImagePreview(getDisplayImageUrl(specific_data.imageUrl), 'Design Preview')}
                     title="Click to enlarge"
                     onError={(e) => {
                       e.target.style.display = 'none';
@@ -849,27 +976,17 @@ const Profile = () => {
               </div>
             ) : null}
 
-            <div className="detail-row">
-              <span className="detail-label">Garment Type:</span>
-              <span className="detail-value">{specific_data.garmentType || 'N/A'}</span>
-            </div>
-            <div className="detail-row">
-              <span className="detail-label">Fabric Type:</span>
-              <span className="detail-value">{specific_data.fabricType || 'N/A'}</span>
-            </div>
-            <div className="detail-row">
-              <span className="detail-label">Preferred Date & Time:</span>
-              <span className="detail-value">
-                {specific_data.preferredDate && specific_data.preferredTime
-                  ? formatDateTo12Hour(`${specific_data.preferredDate}T${specific_data.preferredTime}`)
-                  : specific_data.preferredDate || 'N/A'}
-              </span>
-            </div>
-            {specific_data.notes && (
-              <div className="detail-row">
-                <span className="detail-label">Notes:</span>
-                <span className="detail-value">{specific_data.notes}</span>
-              </div>
+            {garments.length === 0 && (
+              <>
+                <div className="detail-row">
+                  <span className="detail-label">Garment Type:</span>
+                  <span className="detail-value">{specific_data.garmentType || 'N/A'}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Fabric Type:</span>
+                  <span className="detail-value">{specific_data.fabricType || 'N/A'}</span>
+                </div>
+              </>
             )}
             {specific_data.measurements && (
               <div className="detail-row">
@@ -877,51 +994,51 @@ const Profile = () => {
                 <span className="detail-value">{specific_data.measurements}</span>
               </div>
             )}
-            {specific_data.designData && (
+            {garments.length === 0 && topLevelDesignData && (
               <div className="detail-row" style={{ marginTop: '15px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
                 <div style={{ width: '100%' }}>
                   <h5 style={{ margin: '0 0 15px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>
                     🎨 3D Customization Choices
                   </h5>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '14px' }}>
-                    {specific_data.designData.size && (
+                    {topLevelDesignData.size && (
                       <div className="detail-row">
                         <span className="detail-label">Size:</span>
-                        <span className="detail-value">{specific_data.designData.size.charAt(0).toUpperCase() + specific_data.designData.size.slice(1)}</span>
+                        <span className="detail-value">{topLevelDesignData.size.charAt(0).toUpperCase() + topLevelDesignData.size.slice(1)}</span>
                       </div>
                     )}
-                    {specific_data.designData.fit && (
+                    {topLevelDesignData.fit && (
                       <div className="detail-row">
                         <span className="detail-label">Fit:</span>
-                        <span className="detail-value">{specific_data.designData.fit.charAt(0).toUpperCase() + specific_data.designData.fit.slice(1)}</span>
+                        <span className="detail-value">{topLevelDesignData.fit.charAt(0).toUpperCase() + topLevelDesignData.fit.slice(1)}</span>
                       </div>
                     )}
-                    {specific_data.designData.colors && specific_data.designData.colors.fabric && (
+                    {topLevelDesignData.colors && topLevelDesignData.colors.fabric && (
                       <div className="detail-row">
                         <span className="detail-label">Color:</span>
-                        <span className="detail-value">{getColorName(specific_data.designData.colors.fabric)}</span>
+                        <span className="detail-value">{getColorName(topLevelDesignData.colors.fabric)}</span>
                       </div>
                     )}
-                    {specific_data.designData.pattern && specific_data.designData.pattern !== 'none' && (
+                    {topLevelDesignData.pattern && topLevelDesignData.pattern !== 'none' && (
                       <div className="detail-row">
                         <span className="detail-label">Pattern:</span>
-                        <span className="detail-value">{specific_data.designData.pattern.charAt(0).toUpperCase() + specific_data.designData.pattern.slice(1)}</span>
+                        <span className="detail-value">{topLevelDesignData.pattern.charAt(0).toUpperCase() + topLevelDesignData.pattern.slice(1)}</span>
                       </div>
                     )}
-                    {specific_data.designData.personalization && specific_data.designData.personalization.initials && (
+                    {topLevelDesignData.personalization && topLevelDesignData.personalization.initials && (
                       <div className="detail-row" style={{ gridColumn: '1 / -1' }}>
                         <span className="detail-label">Personalization:</span>
                         <span className="detail-value">
-                          {specific_data.designData.personalization.initials}
-                          {specific_data.designData.personalization.font && ` (${specific_data.designData.personalization.font} font)`}
+                          {topLevelDesignData.personalization.initials}
+                          {topLevelDesignData.personalization.font && ` (${topLevelDesignData.personalization.font} font)`}
                         </span>
                       </div>
                     )}
-                    {specific_data.designData.buttons && specific_data.designData.buttons.length > 0 && (
+                    {topLevelDesignData.buttons && topLevelDesignData.buttons.length > 0 && (
                       <div className="detail-row" style={{ gridColumn: '1 / -1' }}>
                         <span className="detail-label">Button Types:</span>
                         <div style={{ marginLeft: '10px', marginTop: '5px', fontSize: '13px' }}>
-                          {specific_data.designData.buttons.map((btn, index) => (
+                          {topLevelDesignData.buttons.map((btn, index) => (
                             <div key={btn.id || index} style={{ margin: '5px 0' }}>
                               Button {index + 1}: {getButtonType(btn.modelPath)}
                             </div>
@@ -929,11 +1046,11 @@ const Profile = () => {
                         </div>
                       </div>
                     )}
-                    {specific_data.designData.accessories && specific_data.designData.accessories.length > 0 && (
+                    {topLevelDesignData.accessories && topLevelDesignData.accessories.length > 0 && (
                       <div className="detail-row" style={{ gridColumn: '1 / -1' }}>
                         <span className="detail-label">Accessories:</span>
                         <div style={{ marginLeft: '10px', marginTop: '5px', fontSize: '13px' }}>
-                          {specific_data.designData.accessories.map((acc, index) => (
+                          {topLevelDesignData.accessories.map((acc, index) => (
                             <div key={acc.id || index} style={{ margin: '5px 0' }}>
                               {getAccessoryName(acc.modelPath)}
                             </div>
@@ -947,6 +1064,7 @@ const Profile = () => {
             )}
           </div>
         );
+        }
 
       case 'dry_cleaning':
       case 'drycleaning':

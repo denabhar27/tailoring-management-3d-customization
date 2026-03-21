@@ -469,6 +469,7 @@ const Customizer3DPage = () => {
 
     const finalDesign = {
       ...customizationData,
+      targetGarmentId: customizationData?.targetGarmentId || 1,
       design: {
         garment: garmentCode,
         garmentType: garmentTypeName,

@@ -9,6 +9,7 @@ import { getAllSlotsWithAvailability, bookSlot } from '../../api/AppointmentSlot
 
 const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const navigate = useNavigate();
+  const MODAL_STATE_KEY = 'customizationModalState';
   const [garments, setGarments] = useState([
     { id: 1, uploadedImage: null, imagePreview: '', fabricType: '', garmentType: '', designDetails: null }
   ]);
@@ -23,7 +24,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
-  const [pendingGarmentAutoFill, setPendingGarmentAutoFill] = useState(false);
+  const [pendingGarmentAutoFillId, setPendingGarmentAutoFillId] = useState(null);
 
   const defaultFabricTypes = {
     'Cotton': 200,
@@ -155,6 +156,54 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     return accessoryMap[modelPath] || modelPath.split('/').pop().replace('.glb', '').replace(/\d+/g, '').trim();
   };
 
+  const dataUrlToFile = (dataUrl, fileName = 'customization-design.png') => {
+    try {
+      const [meta, base64Data] = String(dataUrl).split(',');
+      if (!meta || !base64Data) return null;
+      const mimeMatch = meta.match(/data:(.*?);base64/);
+      const mimeType = mimeMatch?.[1] || 'image/png';
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      return new File([new Uint8Array(byteNumbers)], fileName, { type: mimeType });
+    } catch (error) {
+      console.error('Failed converting data URL to file:', error);
+      return null;
+    }
+  };
+
+  const uploadAngleImageUrls = async (angleImages, garmentId) => {
+    if (!angleImages || typeof angleImages !== 'object') {
+      return {};
+    }
+
+    const uploadedAngles = {};
+    const angles = ['front', 'back', 'right', 'left'];
+
+    for (const angle of angles) {
+      const angleData = angleImages[angle];
+      if (!angleData) continue;
+
+      if (typeof angleData === 'string' && angleData.startsWith('/uploads/')) {
+        uploadedAngles[angle] = angleData;
+        continue;
+      }
+
+      if (typeof angleData === 'string' && angleData.startsWith('data:image')) {
+        const angleFile = dataUrlToFile(angleData, `garment-${garmentId}-${angle}.png`);
+        if (!angleFile) continue;
+        const uploadResult = await uploadCustomizationImage(angleFile);
+        if (uploadResult.success && uploadResult.imageUrl) {
+          uploadedAngles[angle] = uploadResult.imageUrl;
+        }
+      }
+    }
+
+    return uploadedAngles;
+  };
+
   useEffect(() => {
     if (isOpen) {
       const loadFabricTypes = async () => {
@@ -273,10 +322,10 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   useEffect(() => {
-    const firstGarment = garments[0];
-    if (pendingGarmentAutoFill && firstGarment?.designDetails && Object.keys(garmentCodeToName).length > 0) {
+    const targetGarment = garments.find(g => g.id === pendingGarmentAutoFillId);
+    if (pendingGarmentAutoFillId && targetGarment?.designDetails && Object.keys(garmentCodeToName).length > 0) {
       console.log('🎯 Processing pending garment auto-fill...');
-      const designDets = firstGarment.designDetails;
+      const designDets = targetGarment.designDetails;
 
       let mappedGarment = '';
 
@@ -313,20 +362,38 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       }
 
       if (mappedGarment) {
-        setGarments(prev => prev.map((g, i) => i === 0 ? { ...g, garmentType: mappedGarment } : g));
+        setGarments(prev => prev.map(g => g.id === pendingGarmentAutoFillId ? { ...g, garmentType: mappedGarment } : g));
       }
 
-      setPendingGarmentAutoFill(false);
+      setPendingGarmentAutoFillId(null);
     }
-  }, [garmentCodeToName, pendingGarmentAutoFill]);
+  }, [garmentCodeToName, pendingGarmentAutoFillId, garments]);
 
   useEffect(() => {
     if (isOpen) {
+      const savedModalState = sessionStorage.getItem(MODAL_STATE_KEY);
+      if (savedModalState) {
+        try {
+          const parsedState = JSON.parse(savedModalState);
+          if (Array.isArray(parsedState.garments) && parsedState.garments.length > 0) {
+            setGarments(parsedState.garments);
+          }
+          if (parsedState.formData) {
+            setFormData(prev => ({ ...prev, ...parsedState.formData }));
+          }
+        } catch (error) {
+          console.error('Error restoring customization modal state:', error);
+        } finally {
+          sessionStorage.removeItem(MODAL_STATE_KEY);
+        }
+      }
+
       const finalDesignData = sessionStorage.getItem('finalDesignData');
       if (finalDesignData) {
         try {
           const design = JSON.parse(finalDesignData);
           console.log('Loading 3D customization data:', design);
+          const targetGarmentId = Number(design.targetGarmentId) || 1;
 
           let angleImages = design.design?.angleImages || null;
           let designImage = design.design?.designImage || design.designImage || null;
@@ -336,8 +403,8 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           }
 
           if (design.design) {
-            setGarments(prev => prev.map((g, i) => i === 0 ? { ...g, designDetails: design.design } : g));
-            setPendingGarmentAutoFill(true);
+            setGarments(prev => prev.map(g => g.id === targetGarmentId ? { ...g, designDetails: design.design } : g));
+            setPendingGarmentAutoFillId(targetGarmentId);
           }
 
           if (designImage) {
@@ -359,7 +426,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               const byteArray = new Uint8Array(byteNumbers);
               const blob = new Blob([byteArray], { type: 'image/png' });
               const file = new File([blob], '3d-design.png', { type: 'image/png' });
-              setGarments(prev => prev.map((g, i) => i === 0 ? { ...g, uploadedImage: file, imagePreview: preview } : g));
+              setGarments(prev => prev.map(g => g.id === targetGarmentId ? { ...g, uploadedImage: file, imagePreview: preview } : g));
             } catch (err) {
               console.error('Error converting image:', err);
             }
@@ -374,7 +441,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
             };
             const fabricName = fabricMap[design.design.fabric.toLowerCase()] ||
                               (design.design.fabric.charAt(0).toUpperCase() + design.design.fabric.slice(1));
-            setGarments(prev => prev.map((g, i) => i === 0 ? { ...g, fabricType: fabricName } : g));
+            setGarments(prev => prev.map(g => g.id === targetGarmentId ? { ...g, fabricType: fabricName } : g));
           }
 
           if (design.notes || design.design?.notes) {
@@ -514,9 +581,14 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       const garmentsData = [];
       for (const garment of garments) {
         let imageUrl = 'no-image';
+        let imageFileToUpload = garment.uploadedImage;
 
-        if (garment.uploadedImage) {
-          const uploadResult = await uploadCustomizationImage(garment.uploadedImage);
+        if (!imageFileToUpload && garment.imagePreview && garment.imagePreview.startsWith('data:image')) {
+          imageFileToUpload = dataUrlToFile(garment.imagePreview, `garment-${garment.id}-design.png`);
+        }
+
+        if (imageFileToUpload) {
+          const uploadResult = await uploadCustomizationImage(imageFileToUpload);
           if (uploadResult.success) {
             imageUrl = uploadResult.imageUrl;
           } else {
@@ -527,8 +599,16 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         let cleanDesignData = null;
         if (garment.designDetails) {
           cleanDesignData = JSON.parse(JSON.stringify(garment.designDetails));
+
+          const uploadedAngleImageUrls = await uploadAngleImageUrls(cleanDesignData.angleImages, garment.id);
+          if (Object.keys(uploadedAngleImageUrls).length > 0) {
+            cleanDesignData.angleImageUrls = uploadedAngleImageUrls;
+          }
+
           if (cleanDesignData.designImage) delete cleanDesignData.designImage;
+          if (cleanDesignData.angleImages) delete cleanDesignData.angleImages;
           if (cleanDesignData.design?.designImage) delete cleanDesignData.design.designImage;
+          if (cleanDesignData.design?.angleImages) delete cleanDesignData.design.angleImages;
         }
 
         const isUniform = garment.garmentType === 'Uniform';
@@ -600,13 +680,28 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   const handleOpen3DCustomizer = () => {
+    handleOpen3DCustomizerForGarment(garments[0]?.id || 1);
+  };
+
+  const handleOpen3DCustomizerForGarment = (garmentId) => {
+    const selectedGarment = garments.find(g => g.id === garmentId) || garments[0];
+    const serializableGarments = garments.map(g => ({
+      ...g,
+      uploadedImage: null,
+    }));
+
+    sessionStorage.setItem(MODAL_STATE_KEY, JSON.stringify({
+      garments: serializableGarments,
+      formData,
+    }));
 
     sessionStorage.setItem('customizationFormData', JSON.stringify({
-      fabricType: garments[0]?.fabricType || '',
-      garmentType: garments[0]?.garmentType || '',
+      fabricType: selectedGarment?.fabricType || '',
+      garmentType: selectedGarment?.garmentType || '',
       preferredDate: formData.preferredDate,
       notes: formData.notes,
-      imagePreview: garments[0]?.imagePreview || '',
+      imagePreview: selectedGarment?.imagePreview || '',
+      targetGarmentId: garmentId,
     }));
 
     sessionStorage.setItem('reopenCustomizationModal', 'true');
@@ -627,6 +722,8 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     setAllTimeSlots([]);
     setIsShopOpen(true);
     setErrors({});
+    setPendingGarmentAutoFillId(null);
+    sessionStorage.removeItem(MODAL_STATE_KEY);
   };
 
   const handleClose = () => {
@@ -873,6 +970,19 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                   </div>
                 </div>
               )}
+
+              <div className="form-group-shared" style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="btn-shared btn-secondary-shared"
+                  onClick={() => handleOpen3DCustomizerForGarment(garment.id)}
+                  disabled={loading}
+                  style={{ fontSize: '13px', width: '100%' }}
+                >
+                  <i className="fas fa-tshirt" style={{ marginRight: '8px' }}></i>
+                  {garment.designDetails ? 'Edit 3D Design for This Garment' : '3D Customize This Garment'}
+                </button>
+              </div>
             </div>
           ))}
 

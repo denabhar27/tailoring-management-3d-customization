@@ -11,10 +11,12 @@ const getAuthHeaders = () => {
     };
 };
 
-export async function recordPayment(itemId, paymentAmount) {
+export async function recordPayment(itemId, paymentAmount, cashReceived = paymentAmount, paymentMethod = 'cash') {
     try {
         const response = await axios.post(`${BASE_URL}/orders/items/${itemId}/payment`, {
-            paymentAmount: paymentAmount
+            paymentAmount: paymentAmount,
+            cashReceived: cashReceived,
+            paymentMethod: paymentMethod
         }, {
             headers: getAuthHeaders()
         });

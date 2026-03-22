@@ -7,7 +7,6 @@ import { getAdminDashboardOverview } from '../api/AdminDashboardApi';
 import { getAllTransactionLogs } from '../api/TransactionLogApi';
 import { getBillingStats } from '../api/BillingApi';
 import AnalyticsDashboard from '../components/analytics/AnalyticsDashboard';
-import { format, subMonths } from 'date-fns';
 import { getUserRole } from '../api/AuthApi';
 
 function AdminPage() {
@@ -29,9 +28,42 @@ function AdminPage() {
 
   const [serviceFilter, setServiceFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [startDate, setStartDate] = useState(format(subMonths(new Date(), 1), 'yyyy-MM-dd'));
-  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
+
+  const extractPaymentMetaFromNotes = (notes = '') => {
+    const text = String(notes || '');
+    const handledByMatch = text.match(/^([^\n.]+?)\s+recorded payment/i);
+    const customerMatch = text.match(/Customer:\s*([^\n.]+?)(?:\.|\n|\s+Method:|$)/i);
+    const cashMatch = text.match(/Cash\s*received:\s*₱([\d,]+\.?\d*)/i);
+    const changeMatch = text.match(/Change:\s*₱([\d,]+\.?\d*)/i);
+
+    return {
+      handledBy: handledByMatch?.[1]?.trim() || null,
+      customerName: customerMatch?.[1]?.trim() || null,
+      cashReceived: cashMatch ? parseFloat(cashMatch[1].replace(/,/g, '')) : null,
+      changeAmount: changeMatch ? parseFloat(changeMatch[1].replace(/,/g, '')) : null
+    };
+  };
+
+  const formatStatusDetails = (activity) => {
+    const raw = String(activity?.reason || activity?.notes || '').trim();
+    if (!raw) return ['-'];
+
+    const lines = raw
+      .replace(/\s+\|\s+/g, '\n')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    const hasCustomerLine = lines.some((line) => /^customer\s*:/i.test(line));
+    if (activity?.customer && !hasCustomerLine) {
+      lines.push(`Customer: ${activity.customer}`);
+    }
+
+    return lines;
+  };
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -67,11 +99,11 @@ function AdminPage() {
 
   useEffect(() => {
     const fetchAllPayments = async () => {
-      if (statusFilter === 'payment') {
+      if (statusFilter === 'transaction') {
         try {
           setLoading(true);
           const result = await getAllTransactionLogs();
-          if (result.success && result.logs) {
+          if (result.success && Array.isArray(result.logs) && result.logs.length > 0) {
 
             const sortedLogs = [...result.logs].sort((a, b) => {
               if (a.order_item_id !== b.order_item_id) {
@@ -130,6 +162,13 @@ function AdminPage() {
               const totalPaid = runningTotals[itemId];
 
               const paymentMethod = tx.payment_method === 'system_auto' ? 'cash' : (tx.payment_method || 'cash');
+              const actionBy = tx.created_by || 'admin';
+              const cashReceived = tx.cash_received !== null && tx.cash_received !== undefined
+                ? parseFloat(tx.cash_received)
+                : parseFloat((tx.notes?.match(/Cash received:\s*₱([\d,]+\.?\d*)/i)?.[1] || '0').replace(/,/g, ''));
+              const changeAmount = tx.change_amount !== null && tx.change_amount !== undefined
+                ? parseFloat(tx.change_amount)
+                : parseFloat((tx.notes?.match(/Change:\s*₱([\d,]+\.?\d*)/i)?.[1] || '0').replace(/,/g, ''));
 
               return {
                 customer: customerName,
@@ -142,25 +181,51 @@ function AdminPage() {
                 time: formatDate(orderDate),
                 reason: null,
                 actionType: 'payment',
-                actionBy: tx.created_by || 'admin',
-                notes: `Admin recorded payment of ₱${paymentAmount.toFixed(2)}. Total paid: ₱${totalPaid.toFixed(2)}. Customer: ${customerName}`,
+                actionBy,
+                notes: `${actionBy} recorded payment of ₱${paymentAmount.toFixed(2)}. Total paid: ₱${totalPaid.toFixed(2)}. Customer: ${customerName}${cashReceived > 0 ? `. Cash received: ₱${cashReceived.toFixed(2)}.` : ''}${changeAmount > 0 ? ` Change: ₱${changeAmount.toFixed(2)}.` : ''}`,
                 isPayment: true,
                 paymentInfo: {
                   amount: paymentAmount,
                   payment_method: paymentMethod,
                   payment_status: tx.new_payment_status || 'paid',
-                  total_paid: totalPaid
+                  total_paid: totalPaid,
+                  cash_received: Number.isNaN(cashReceived) ? null : cashReceived,
+                  change_amount: Number.isNaN(changeAmount) ? null : changeAmount
                 }
               };
             });
 
             paymentActivities.sort((a, b) => new Date(b.time) - new Date(a.time));
 
-            setAllPayments(paymentActivities);
+            const fallbackPayments = (allActivities || []).filter((activity) => activity?.isPayment);
+            const mergedPayments = [...paymentActivities, ...fallbackPayments];
+            const seen = new Set();
+            const dedupedPayments = mergedPayments.filter((entry) => {
+              const key = [
+                entry.time || '',
+                entry.customer || '',
+                entry.service || '',
+                Number(entry.paymentInfo?.amount || 0).toFixed(2),
+                (entry.paymentInfo?.payment_status || entry.status || '').toLowerCase()
+              ].join('|');
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+            dedupedPayments.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+            setAllPayments(dedupedPayments);
+          } else {
+            const fallbackPayments = (allActivities || []).filter((activity) => activity?.isPayment);
+            setAllPayments(fallbackPayments);
           }
         } catch (err) {
           console.error('Error fetching all payments:', err);
-          setError('Failed to load payment history');
+          const fallbackPayments = (allActivities || []).filter((activity) => activity?.isPayment);
+          setAllPayments(fallbackPayments);
+          if (fallbackPayments.length === 0) {
+            setError('Failed to load payment history');
+          }
         } finally {
           setLoading(false);
         }
@@ -176,7 +241,7 @@ function AdminPage() {
   }, [statusFilter, allActivities]);
 
   useEffect(() => {
-    if (statusFilter === 'payment' && allPayments.length > 0) {
+    if (statusFilter === 'transaction' && allPayments.length > 0) {
       let filtered = [...allPayments];
 
       if (serviceFilter !== 'all') {
@@ -208,14 +273,14 @@ function AdminPage() {
       }
 
       setRecentActivities(filtered);
-    } else if (statusFilter === 'payment' && allPayments.length === 0) {
+    } else if (statusFilter === 'transaction' && allPayments.length === 0) {
 
       setRecentActivities([]);
     }
   }, [paymentStatusFilter, statusFilter, allPayments, serviceFilter]);
 
   useEffect(() => {
-    if (statusFilter === 'payment') {
+    if (statusFilter === 'transaction') {
 
       return;
     }
@@ -393,7 +458,7 @@ function AdminPage() {
             <label>Status:</label>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="filter-select">
               <option value="all">All Status</option>
-              <option value="payment">Paid</option>
+              <option value="transaction">Transaction</option>
               <option value="pending">Pending</option>
               <option value="in-progress">In Progress</option>
               <option value="completed">Completed</option>
@@ -418,7 +483,7 @@ function AdminPage() {
               />
             </div>
           </div>
-          {statusFilter === 'payment' && (
+          {statusFilter === 'transaction' && (
             <div className="filter-dropdown">
               <label>Payment:</label>
               <select value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value)} className="filter-select">
@@ -445,7 +510,7 @@ function AdminPage() {
           <table className="activity-table">
             <thead>
               <tr className="tr-activity">
-                <th>Customer</th>
+                <th>Name</th>
                 <th>Type of Service</th>
                 <th>Status / Payment</th>
                 <th>Details / Payment Record</th>
@@ -462,7 +527,21 @@ function AdminPage() {
               ) : recentActivities.length > 0 ? (
                 recentActivities.map((activity, index) => (
                   <tr key={index}>
-                    <td className="customer">{activity.customer}</td>
+                    {(() => {
+                      const parsed = extractPaymentMetaFromNotes(activity.notes || '');
+                      const handledBy = activity.actionBy || parsed.handledBy;
+                      const displayCustomer = parsed.customerName || activity.customer;
+                      const statusLines = formatStatusDetails({ ...activity, customer: displayCustomer });
+                      const cashReceived = activity.paymentInfo?.cash_received !== null && activity.paymentInfo?.cash_received !== undefined
+                        ? parseFloat(activity.paymentInfo.cash_received)
+                        : parsed.cashReceived;
+                      const changeAmount = activity.paymentInfo?.change_amount !== null && activity.paymentInfo?.change_amount !== undefined
+                        ? parseFloat(activity.paymentInfo.change_amount)
+                        : parsed.changeAmount;
+
+                      return (
+                        <>
+                    <td className="customer">{displayCustomer}</td>
                     <td>{activity.service}</td>
                     <td>
                       {activity.isPayment ? (
@@ -489,11 +568,6 @@ function AdminPage() {
                                          activity.paymentInfo?.payment_status === 'partial_payment' ? 'Partial Payment' :
                                          activity.paymentInfo?.payment_status || 'Payment'}
                           </span>
-                          {activity.paymentInfo?.amount && (
-                            <span style={{ fontSize: '11px', color: '#28a745', fontWeight: 'bold' }}>
-                              Amount: ₱{parseFloat(activity.paymentInfo.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          )}
                         </div>
                       ) : (
                         <span className={`status ${activity.status}`}>
@@ -504,14 +578,48 @@ function AdminPage() {
                     <td style={{
                       color: activity.reason || activity.notes ? '#666' : '#999',
                       fontStyle: activity.reason || activity.notes ? 'normal' : 'italic',
-                      maxWidth: '200px',
+                      maxWidth: '240px',
                       wordWrap: 'break-word',
-                      fontSize: activity.isPayment ? '12px' : '14px'
+                      fontSize: activity.isPayment ? '11px' : '12px',
+                      lineHeight: '1.35'
                     }}>
                       {activity.isPayment ? (
                         <div>
-                          {activity.notes && (
-                            <div style={{ marginBottom: '4px' }}>{activity.notes}</div>
+                          {handledBy && (
+                            <div style={{ marginBottom: '4px' }}>Handled by: {handledBy}</div>
+                          )}
+                          {activity.paymentInfo?.amount !== undefined && activity.paymentInfo?.amount !== null && (
+                            <div style={{ marginBottom: '4px' }}>
+                              Payment: ₱{parseFloat(activity.paymentInfo.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          )}
+                          {activity.paymentInfo?.total_paid !== undefined && activity.paymentInfo?.total_paid !== null && (
+                            <div style={{ marginBottom: '4px' }}>
+                              Total paid: ₱{parseFloat(activity.paymentInfo.total_paid).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          )}
+                          {displayCustomer && (
+                            <div style={{ marginBottom: '4px' }}>Customer: {displayCustomer}</div>
+                          )}
+                          {activity.paymentInfo?.cash_received !== null && activity.paymentInfo?.cash_received !== undefined && (
+                            <div style={{ marginBottom: '4px' }}>
+                              Cash received: ₱{parseFloat(activity.paymentInfo.cash_received).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          )}
+                          {(activity.paymentInfo?.cash_received === null || activity.paymentInfo?.cash_received === undefined) && cashReceived !== null && !Number.isNaN(cashReceived) && (
+                            <div style={{ marginBottom: '4px' }}>
+                              Cash received: ₱{cashReceived.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          )}
+                          {activity.paymentInfo?.change_amount !== null && activity.paymentInfo?.change_amount !== undefined && (
+                            <div style={{ marginBottom: '4px' }}>
+                              Change: ₱{parseFloat(activity.paymentInfo.change_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          )}
+                          {(activity.paymentInfo?.change_amount === null || activity.paymentInfo?.change_amount === undefined) && changeAmount !== null && !Number.isNaN(changeAmount) && (
+                            <div style={{ marginBottom: '4px' }}>
+                              Change: ₱{changeAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
                           )}
                           {activity.paymentInfo?.payment_method && (
                             <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
@@ -520,10 +628,19 @@ function AdminPage() {
                           )}
                         </div>
                       ) : (
-                        activity.reason || activity.notes || '-'
+                        <div>
+                          {statusLines.map((line, lineIndex) => (
+                            <div key={`${index}-${lineIndex}`} style={{ marginBottom: lineIndex < statusLines.length - 1 ? '4px' : 0 }}>
+                              {line}
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </td>
                     <td>{activity.time}</td>
+                        </>
+                      );
+                    })()}
                   </tr>
                 ))
               ) : (

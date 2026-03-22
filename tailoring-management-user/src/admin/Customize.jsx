@@ -94,6 +94,8 @@ const Customize = () => {
 
   const [paymentAmount, setPaymentAmount] = useState('');
 
+  const [cashReceived, setCashReceived] = useState('');
+
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const [showPriceConfirmationModal, setShowPriceConfirmationModal] = useState(false);
@@ -2285,19 +2287,61 @@ const Customize = () => {
 
     }
 
+    const pricingFactors = typeof selectedOrder.pricing_factors === 'string'
+
+      ? JSON.parse(selectedOrder.pricing_factors || '{}')
+
+      : (selectedOrder.pricing_factors || {});
+
+    const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
+
+    const finalPrice = parseFloat(selectedOrder.final_price || 0);
+
+    const remainingBalance = Math.max(0, finalPrice - amountPaid);
+
+    if (amount > remainingBalance) {
+
+      await alert(`Payment amount exceeds remaining balance (₱${remainingBalance.toFixed(2)})`, 'Error', 'error');
+
+      return;
+
+    }
+
+    const cashGiven = parseFloat(cashReceived);
+
+    if (isNaN(cashGiven) || cashGiven <= 0) {
+
+      await alert('Please enter a valid cash received amount', 'Error', 'error');
+
+      return;
+
+    }
+
+    if (cashGiven < amount) {
+
+      await alert('Cash received cannot be less than payment amount', 'Error', 'error');
+
+      return;
+
+    }
+
     try {
 
-      const result = await recordPayment(selectedOrder.item_id, amount);
+      const result = await recordPayment(selectedOrder.item_id, amount, cashGiven, 'cash');
 
       if (result.success) {
 
         const remaining = result.payment?.remaining_balance || 0;
 
-        await alert(`Payment of ₱${amount.toFixed(2)} recorded successfully. ${remaining > 0 ? `Remaining balance: ₱${remaining.toFixed(2)}` : 'Payment complete!'}`, 'Success', 'success');
+        const changeAmount = parseFloat(result.payment?.change_amount || 0);
+
+        await alert(`Payment of ₱${amount.toFixed(2)} recorded successfully. Change: ₱${changeAmount.toFixed(2)}. ${remaining > 0 ? `Remaining balance: ₱${remaining.toFixed(2)}` : 'Payment complete!'}`, 'Success', 'success');
 
         setShowPaymentModal(false);
 
         setPaymentAmount('');
+
+        setCashReceived('');
 
         await loadCustomizationOrders();
 
@@ -3000,6 +3044,8 @@ const Customize = () => {
                                   setSelectedOrder(item);
 
                                   setPaymentAmount('');
+
+                                  setCashReceived('');
 
                                   setShowPaymentModal(true);
 
@@ -5924,6 +5970,40 @@ const Customize = () => {
 
               </div>
 
+              <div className="payment-form-group">
+
+                <label>Cash Received *</label>
+
+                <input
+
+                  type="number"
+
+                  value={cashReceived}
+
+                  onChange={(e) => setCashReceived(e.target.value)}
+
+                  className="form-control"
+
+                  placeholder="Enter cash received (e.g. 1000)"
+
+                  min="0"
+
+                  step="0.01"
+
+                />
+
+                {!Number.isNaN(parseFloat(paymentAmount)) && !Number.isNaN(parseFloat(cashReceived)) && parseFloat(cashReceived) >= parseFloat(paymentAmount) && (
+
+                  <small style={{ color: '#2e7d32', marginTop: '5px', display: 'block' }}>
+
+                    Change: ₱{(parseFloat(cashReceived) - parseFloat(paymentAmount)).toFixed(2)}
+
+                  </small>
+
+                )}
+
+              </div>
+
             </div>
 
             <div className="modal-footer-centered">
@@ -5933,6 +6013,8 @@ const Customize = () => {
                 setShowPaymentModal(false);
 
                 setPaymentAmount('');
+
+                setCashReceived('');
 
               }}>
 

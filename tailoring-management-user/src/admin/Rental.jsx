@@ -26,6 +26,7 @@ function Rental() {
     damageNotes: ''
   });
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [cashReceived, setCashReceived] = useState('');
   const [pendingRentedStatus, setPendingRentedStatus] = useState(null);
   const [showDamageFormModal, setShowDamageFormModal] = useState(false);
   const [damageFormContext, setDamageFormContext] = useState({ displayName: '', rows: [] });
@@ -376,6 +377,7 @@ function Rental() {
 
           setShowEditModal(false);
           setPaymentAmount(downpayment.toFixed(2));
+          setCashReceived(downpayment.toFixed(2));
           setPendingRentedStatus(selectedRental.item_id);
           setShowPaymentModal(true);
           return;
@@ -438,6 +440,7 @@ function Rental() {
 
           setSelectedRental(currentRental);
           setPaymentAmount(downpayment.toFixed(2));
+          setCashReceived(downpayment.toFixed(2));
           setShowPaymentModal(true);
           setPendingRentedStatus(itemId);
           return;
@@ -579,12 +582,36 @@ function Rental() {
       return;
     }
 
+    const pricingFactors = typeof selectedRental.pricing_factors === 'string'
+      ? JSON.parse(selectedRental.pricing_factors || '{}')
+      : (selectedRental.pricing_factors || {});
+    const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
+    const finalPrice = parseFloat(selectedRental.final_price || 0);
+    const remainingBalance = Math.max(0, finalPrice - amountPaid);
+    if (amount > remainingBalance) {
+      await alert(`Payment amount exceeds remaining balance (₱${remainingBalance.toFixed(2)})`, 'Error', 'error');
+      return;
+    }
+
+    const cashGiven = parseFloat(cashReceived);
+    if (isNaN(cashGiven) || cashGiven <= 0) {
+      await alert('Please enter a valid cash received amount', 'Error', 'error');
+      return;
+    }
+
+    if (cashGiven < amount) {
+      await alert('Cash received cannot be less than payment amount', 'Error', 'error');
+      return;
+    }
+
     try {
-      const result = await recordRentalPayment(selectedRental.item_id, amount);
+      const result = await recordRentalPayment(selectedRental.item_id, amount, cashGiven, 'cash');
       if (result.success) {
-        await alert(`Payment of ₱${amount.toFixed(2)} recorded successfully. Remaining balance: ₱${result.payment.remaining_balance.toFixed(2)}`, 'Success', 'success');
+        const changeAmount = parseFloat(result.payment?.change_amount || 0);
+        await alert(`Payment of ₱${amount.toFixed(2)} recorded successfully. Change: ₱${changeAmount.toFixed(2)}. Remaining balance: ₱${result.payment.remaining_balance.toFixed(2)}`, 'Success', 'success');
         setShowPaymentModal(false);
         setPaymentAmount('');
+        setCashReceived('');
 
         if (pendingRentedStatus) {
           const itemIdToUpdate = pendingRentedStatus;
@@ -1079,6 +1106,7 @@ function Rental() {
                                       e.stopPropagation();
                                       setSelectedRental(rental);
                                       setPaymentAmount('');
+                                      setCashReceived('');
                                       setShowPaymentModal(true);
                                     }}
                                     title="Record Payment"
@@ -1373,11 +1401,30 @@ function Rental() {
                   Enter the amount the customer is paying now
                 </small>
               </div>
+
+              <div className="payment-form-group">
+                <label>Cash Received *</label>
+                <input
+                  type="number"
+                  value={cashReceived}
+                  onChange={(e) => setCashReceived(e.target.value)}
+                  className="form-control"
+                  placeholder="Enter cash received (e.g. 1000)"
+                  min="0"
+                  step="0.01"
+                />
+                {!Number.isNaN(parseFloat(paymentAmount)) && !Number.isNaN(parseFloat(cashReceived)) && parseFloat(cashReceived) >= parseFloat(paymentAmount) && (
+                  <small style={{ color: '#2e7d32', marginTop: '5px', display: 'block' }}>
+                    Change: ₱{(parseFloat(cashReceived) - parseFloat(paymentAmount)).toFixed(2)}
+                  </small>
+                )}
+              </div>
             </div>
             <div className="modal-footer-centered">
               <button className="btn-cancel" onClick={() => {
                 setShowPaymentModal(false);
                 setPaymentAmount('');
+                setCashReceived('');
               }}>
                 Cancel
               </button>

@@ -45,6 +45,7 @@ const DryCleaning = () => {
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [cashReceived, setCashReceived] = useState('');
 
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState('');
@@ -596,13 +597,37 @@ const DryCleaning = () => {
       return;
     }
 
+    const pricingFactors = typeof selectedOrder.pricing_factors === 'string'
+      ? JSON.parse(selectedOrder.pricing_factors || '{}')
+      : (selectedOrder.pricing_factors || {});
+    const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
+    const finalPrice = parseFloat(selectedOrder.final_price || 0);
+    const remainingBalance = Math.max(0, finalPrice - amountPaid);
+    if (amount > remainingBalance) {
+      showToast(`Payment amount exceeds remaining balance (₱${remainingBalance.toFixed(2)})`, 'error');
+      return;
+    }
+
+    const cashGiven = parseFloat(cashReceived);
+    if (isNaN(cashGiven) || cashGiven <= 0) {
+      showToast('Please enter a valid cash received amount', 'error');
+      return;
+    }
+
+    if (cashGiven < amount) {
+      showToast('Cash received cannot be less than payment amount', 'error');
+      return;
+    }
+
     try {
-      const result = await recordPayment(selectedOrder.item_id, amount);
+      const result = await recordPayment(selectedOrder.item_id, amount, cashGiven, 'cash');
       if (result.success) {
         const remaining = result.payment?.remaining_balance || 0;
-        showToast(`Payment of ₱${amount.toFixed(2)} recorded successfully. ${remaining > 0 ? `Remaining balance: ₱${remaining.toFixed(2)}` : 'Payment complete!'}`, 'success');
+        const changeAmount = parseFloat(result.payment?.change_amount || 0);
+        showToast(`Payment of ₱${amount.toFixed(2)} recorded successfully. Change: ₱${changeAmount.toFixed(2)}. ${remaining > 0 ? `Remaining balance: ₱${remaining.toFixed(2)}` : 'Payment complete!'}`, 'success');
         setShowPaymentModal(false);
         setPaymentAmount('');
+        setCashReceived('');
         await loadDryCleaningOrders();
       } else {
         showToast(result.message || 'Failed to record payment', 'error');
@@ -862,6 +887,7 @@ const DryCleaning = () => {
                                 e.stopPropagation();
                                 setSelectedOrder(item);
                                 setPaymentAmount('');
+                                setCashReceived('');
                                 setShowPaymentModal(true);
                               }}
                               title="Record Payment"
@@ -1442,11 +1468,30 @@ const DryCleaning = () => {
                   Enter the amount the customer is paying now
                 </small>
               </div>
+
+              <div className="payment-form-group">
+                <label>Cash Received *</label>
+                <input
+                  type="number"
+                  value={cashReceived}
+                  onChange={(e) => setCashReceived(e.target.value)}
+                  className="form-control"
+                  placeholder="Enter cash received (e.g. 1000)"
+                  min="0"
+                  step="0.01"
+                />
+                {!Number.isNaN(parseFloat(paymentAmount)) && !Number.isNaN(parseFloat(cashReceived)) && parseFloat(cashReceived) >= parseFloat(paymentAmount) && (
+                  <small style={{ color: '#2e7d32', marginTop: '5px', display: 'block' }}>
+                    Change: ₱{(parseFloat(cashReceived) - parseFloat(paymentAmount)).toFixed(2)}
+                  </small>
+                )}
+              </div>
             </div>
             <div className="modal-footer-centered">
               <button className="btn-cancel" onClick={() => {
                 setShowPaymentModal(false);
                 setPaymentAmount('');
+                setCashReceived('');
               }}>
                 Cancel
               </button>

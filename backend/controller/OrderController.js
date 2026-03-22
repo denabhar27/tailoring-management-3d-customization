@@ -1764,7 +1764,7 @@ exports.updateRentalOrderItem = (req, res) => {
 
 exports.recordRentalPayment = (req, res) => {
   const itemId = req.params.id;
-  const { paymentAmount } = req.body;
+  const { paymentAmount, cashReceived, paymentMethod } = req.body;
 
   if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
@@ -1778,6 +1778,25 @@ exports.recordRentalPayment = (req, res) => {
     return res.status(400).json({
       success: false,
       message: "Invalid payment amount. Amount must be greater than 0."
+    });
+  }
+
+  const cashTenderedRaw = cashReceived !== undefined && cashReceived !== null && cashReceived !== ''
+    ? cashReceived
+    : paymentAmount;
+  const cashTendered = parseFloat(cashTenderedRaw);
+
+  if (!cashTendered || cashTendered <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid cash received. Cash received must be greater than 0."
+    });
+  }
+
+  if (cashTendered < amount) {
+    return res.status(400).json({
+      success: false,
+      message: `Cash received (₱${cashTendered.toFixed(2)}) cannot be less than payment amount (₱${amount.toFixed(2)}).`
     });
   }
 
@@ -1800,6 +1819,7 @@ exports.recordRentalPayment = (req, res) => {
     const finalPrice = parseFloat(item.final_price || 0);
     const newAmountPaid = currentAmountPaid + amount;
     const remainingBalance = finalPrice - newAmountPaid;
+    const changeAmount = cashTendered - amount;
 
     if (newAmountPaid > finalPrice) {
       return res.status(400).json({
@@ -1850,54 +1870,75 @@ exports.recordRentalPayment = (req, res) => {
         });
       }
 
-      const getUserSql = `SELECT first_name, last_name FROM user WHERE user_id = ?`;
-      db.query(getUserSql, [item.user_id], (userErr, userResults) => {
-        const customerName = userResults && userResults.length > 0 
-          ? `${userResults[0].first_name} ${userResults[0].last_name}`
+      const getCustomerSql = `
+        SELECT 
+          COALESCE(
+            NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
+            wc.name,
+            'Customer'
+          ) AS customer_name
+        FROM orders o
+        LEFT JOIN user u ON o.user_id = u.user_id
+        LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
+        WHERE o.order_id = ?
+        LIMIT 1
+      `;
+      db.query(getCustomerSql, [item.order_id], (userErr, userResults) => {
+        const customerName = userResults && userResults.length > 0 && userResults[0].customer_name
+          ? userResults[0].customer_name
           : 'Customer';
+        const logUserId = item.user_id || req.user?.id || null;
+
+        if (!logUserId) {
+          console.error('[TRANSACTION LOG] Cannot create payment logs: both customer user_id and actor user_id are missing');
+        }
 
       const ActionLog = require('../model/ActionLogModel');
       const previousPaymentStatus = item.payment_status || 'unpaid';
-      const actorId = req.user?.id || item.user_id;
-      const actorRole = req.user?.role === 'clerk' ? 'clerk' : 'admin';
-      ActionLog.create({
-        order_item_id: itemId,
-        user_id: actorId,
-        action_type: 'payment',
-        action_by: actorRole,
-        previous_status: previousPaymentStatus,
-        new_status: newPaymentStatus,
-        reason: null,
-        notes: `${actorRole === 'clerk' ? 'Clerk' : 'Admin'} recorded payment of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)}. Customer: ${customerName}`
-      }, (actionLogErr) => {
-        if (actionLogErr) {
-          console.error('Error creating payment action log:', actionLogErr);
-        } else {
-          console.log('Payment action log created successfully');
-        }
-      });
+      const actorName = req.user?.username || `${req.user?.first_name || ''} ${req.user?.last_name || ''}`.trim() || req.user?.role || 'admin';
+      const methodLabel = paymentMethod || 'cash';
+      if (logUserId) {
+        ActionLog.create({
+          order_item_id: itemId,
+          user_id: logUserId,
+          action_type: 'payment',
+          action_by: actorName,
+          previous_status: previousPaymentStatus,
+          new_status: newPaymentStatus,
+          reason: null,
+          notes: `${actorName} recorded payment of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}. Cash received: ₱${cashTendered.toFixed(2)}. Change: ₱${changeAmount.toFixed(2)}. Customer: ${customerName}. Method: ${methodLabel}`
+        }, (actionLogErr) => {
+          if (actionLogErr) {
+            console.error('Error creating payment action log:', actionLogErr);
+          } else {
+            console.log('Payment action log created successfully');
+          }
+        });
+      }
 
       const TransactionLog = require('../model/TransactionLogModel');
       const transactionType = newPaymentStatus === 'down-payment' ? 'downpayment' : 
                               (newPaymentStatus === 'paid' || newPaymentStatus === 'fully_paid') ? 'final_payment' : 'partial_payment';
       
-      TransactionLog.create({
-        order_item_id: itemId,
-        user_id: item.user_id,
-        transaction_type: transactionType,
-        amount: amount,
-        previous_payment_status: previousPaymentStatus,
-        new_payment_status: newPaymentStatus,
-        payment_method: 'cash', 
-        notes: `${actorRole === 'clerk' ? 'Clerk' : 'Admin'} recorded ${transactionType.replace('_', ' ')} of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}`,
-        created_by: actorRole
-      }, (transLogErr, transLogResult) => {
-        if (transLogErr) {
-          console.error('[TRANSACTION LOG] Error creating transaction log:', transLogErr);
-        } else {
-          console.log(`[TRANSACTION LOG] Created: ${transactionType} - ₱${amount.toFixed(2)} for item ${itemId}`);
-        }
-      });
+      if (logUserId) {
+        TransactionLog.create({
+          order_item_id: itemId,
+          user_id: logUserId,
+          transaction_type: transactionType,
+          amount: amount,
+          previous_payment_status: previousPaymentStatus,
+          new_payment_status: newPaymentStatus,
+          payment_method: paymentMethod || 'cash',
+          notes: `${actorName} recorded payment of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}. Cash received: ₱${cashTendered.toFixed(2)}. Change: ₱${changeAmount.toFixed(2)}. Customer: ${customerName}. Method: ${methodLabel}`,
+          created_by: actorName
+        }, (transLogErr, transLogResult) => {
+          if (transLogErr) {
+            console.error('[TRANSACTION LOG] Error creating transaction log:', transLogErr);
+          } else {
+            console.log(`[TRANSACTION LOG] Created: ${transactionType} - ₱${amount.toFixed(2)} for item ${itemId}`);
+          }
+        });
+      }
       });
 
       if (item.user_id) {
@@ -1907,7 +1948,7 @@ exports.recordRentalPayment = (req, res) => {
           item.user_id,
           itemId,
           amount,
-          'cash', 
+          paymentMethod || 'cash',
           serviceType,
           (notifErr) => {
             if (notifErr) {
@@ -1925,6 +1966,8 @@ exports.recordRentalPayment = (req, res) => {
         payment: {
           amount_paid: newAmountPaid,
           remaining_balance: Math.max(0, remainingBalance),
+          cash_received: cashTendered,
+          change_amount: Math.max(0, changeAmount),
           payment_status: newPaymentStatus,
           total_price: finalPrice
         }

@@ -204,7 +204,7 @@ exports.getDashboardOverview = async (req, res) => {
     const recentActivityQuery = Promise.all([
       
       new Promise((resolve) => {
-        ActionLog.getAll(30, (err, logs) => {
+        ActionLog.getAll(500, (err, logs) => {
           if (err) {
             console.error('Error fetching action logs:', err);
             resolve([]);
@@ -236,7 +236,9 @@ exports.getDashboardOverview = async (req, res) => {
               notes: `Payment: ₱${parseFloat(tx.amount || 0).toFixed(2)} via ${tx.payment_method || 'cash'}. Status: ${tx.previous_payment_status || 'unpaid'} → ${tx.new_payment_status}`,
               amount: tx.amount,
               payment_method: tx.payment_method,
-              payment_status: tx.new_payment_status
+              payment_status: tx.new_payment_status,
+              cash_received: tx.notes?.match(/Cash received:\s*₱([\d,]+\.?\d*)/i)?.[1]?.replace(/,/g, '') || null,
+              change_amount: tx.notes?.match(/Change:\s*₱([\d,]+\.?\d*)/i)?.[1]?.replace(/,/g, '') || null
             }));
             resolve(paymentActivities);
           }
@@ -250,18 +252,21 @@ exports.getDashboardOverview = async (req, res) => {
            oi.approval_status,
            o.status AS order_status,
            o.order_date,
+           COALESCE(wc.name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) AS customer_name,
            u.first_name,
            u.last_name,
+           wc.name AS walk_in_customer_name,
            NULL as reason,
            'status_update' as action_type,
            'admin' as action_by,
            NULL as notes
          FROM order_items oi
          JOIN orders o ON oi.order_id = o.order_id
-         JOIN user u ON o.user_id = u.user_id
+         LEFT JOIN user u ON o.user_id = u.user_id
+         LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
          WHERE oi.approval_status IS NOT NULL
          ORDER BY o.order_date DESC, oi.item_id DESC
-         LIMIT 20`
+         LIMIT 200`
       ).catch(err => {
         console.error('Error in order items query:', err);
         return [];
@@ -272,14 +277,17 @@ exports.getDashboardOverview = async (req, res) => {
 
       logs.forEach(log => {
         const key = `${log.order_item_id || 'null'}_${log.created_at}`;
+        const walkInName = (log.walk_in_customer_name || '').trim();
+        const customerFirstName = walkInName || log.customer_first_name || log.first_name || log.actor_first_name;
+        const customerLastName = walkInName ? '' : (log.customer_last_name || log.last_name || log.actor_last_name);
         activityMap.set(key, {
           item_id: log.item_id || null,
           service_type: log.service_type || (log.action_type === 'add_measurements' ? 'Measurements' : 'N/A'),
           approval_status: log.new_status || log.previous_status || log.action_type,
           order_status: log.new_status || log.previous_status || log.action_type,
           order_date: log.created_at,
-          first_name: log.first_name,
-          last_name: log.last_name,
+          first_name: customerFirstName,
+          last_name: customerLastName,
           reason: log.reason,
           action_type: log.action_type,
           action_by: log.action_by,
@@ -299,6 +307,11 @@ exports.getDashboardOverview = async (req, res) => {
       orderItems.forEach(item => {
         const timestamp = item.order_date;
         const key = `${item.item_id}_${timestamp}`;
+        const walkInName = (item.walk_in_customer_name || '').trim();
+        const derivedCustomer = (item.customer_name || '').trim();
+        const fallbackParts = String(derivedCustomer || '').split(/\s+/).filter(Boolean);
+        const fallbackFirstName = fallbackParts.length > 0 ? fallbackParts[0] : (item.first_name || 'Customer');
+        const fallbackLastName = fallbackParts.length > 1 ? fallbackParts.slice(1).join(' ') : (item.last_name || '');
         if (!activityMap.has(key)) {
           activityMap.set(key, {
             item_id: item.item_id,
@@ -306,8 +319,8 @@ exports.getDashboardOverview = async (req, res) => {
             approval_status: item.approval_status,
             order_status: item.order_status,
             order_date: timestamp,
-            first_name: item.first_name,
-            last_name: item.last_name,
+            first_name: walkInName || fallbackFirstName,
+            last_name: walkInName ? '' : fallbackLastName,
             reason: item.reason,
             action_type: item.action_type || 'status_update',
             action_by: item.action_by || 'admin',
@@ -318,7 +331,7 @@ exports.getDashboardOverview = async (req, res) => {
 
       const activities = Array.from(activityMap.values())
         .sort((a, b) => new Date(b.order_date) - new Date(a.order_date))
-        .slice(0, 20); 
+        .slice(0, 500);
       
       return activities;
     }).catch(err => {

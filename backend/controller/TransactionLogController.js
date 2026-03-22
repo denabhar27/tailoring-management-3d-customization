@@ -80,10 +80,10 @@ exports.getMyTransactionLogs = (req, res) => {
 };
 
 exports.getAllTransactionLogs = (req, res) => {
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Admin only."
+      message: "Access denied. Admin or clerk only."
     });
   }
   
@@ -161,13 +161,31 @@ exports.getTransactionSummary = (req, res) => {
 
 exports.makePayment = (req, res) => {
   const { orderItemId } = req.params;
-  const { amount, payment_method, notes } = req.body;
+  const { amount, payment_method, notes, cashReceived } = req.body;
 
   const paymentAmount = parseFloat(amount);
   if (!paymentAmount || paymentAmount <= 0) {
     return res.status(400).json({
       success: false,
       message: "Invalid payment amount. Amount must be greater than 0."
+    });
+  }
+
+  const cashTenderedRaw = cashReceived !== undefined && cashReceived !== null && cashReceived !== ''
+    ? cashReceived
+    : amount;
+  const cashTendered = parseFloat(cashTenderedRaw);
+  if (!cashTendered || cashTendered <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid cash received. Cash received must be greater than 0."
+    });
+  }
+
+  if (cashTendered < paymentAmount) {
+    return res.status(400).json({
+      success: false,
+      message: `Cash received (₱${cashTendered.toFixed(2)}) cannot be less than payment amount (₱${paymentAmount.toFixed(2)}).`
     });
   }
 
@@ -213,6 +231,7 @@ exports.makePayment = (req, res) => {
       const totalPaid = parseFloat(summary[0]?.total_amount || 0);
       const finalPrice = parseFloat(item.final_price || 0);
       const newTotalPaid = totalPaid + paymentAmount;
+      const changeAmount = cashTendered - paymentAmount;
 
       if (newTotalPaid > finalPrice) {
         return res.status(400).json({
@@ -223,6 +242,14 @@ exports.makePayment = (req, res) => {
 
       let newPaymentStatus = item.payment_status || 'unpaid';
       const normalizedServiceType = (item.service_type || '').toLowerCase().trim();
+      const logUserId = item.user_id || req.user?.id || null;
+
+      if (!logUserId) {
+        return res.status(500).json({
+          success: false,
+          message: 'Unable to record transaction log: missing user reference for this order.'
+        });
+      }
       
       if (normalizedServiceType === 'rental') {
         
@@ -243,16 +270,19 @@ exports.makePayment = (req, res) => {
         }
       }
 
+      const actorName = req.user?.username || `${req.user?.first_name || ''} ${req.user?.last_name || ''}`.trim() || req.user?.role || 'admin';
+      const methodLabel = payment_method || 'cash';
+
       TransactionLog.create({
         order_item_id: orderItemId,
-        user_id: item.user_id,
+        user_id: logUserId,
         transaction_type: 'payment',
         amount: paymentAmount,
         previous_payment_status: item.payment_status || 'unpaid',
         new_payment_status: newPaymentStatus,
         payment_method: payment_method || 'cash',
-        notes: notes || `Manual payment of ₱${paymentAmount.toFixed(2)}`,
-        created_by: req.user.role === 'admin' ? 'admin' : 'user'
+        notes: notes || `${actorName} recorded payment of ₱${paymentAmount.toFixed(2)}. Total paid: ₱${newTotalPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}. Cash received: ₱${cashTendered.toFixed(2)}. Change: ₱${changeAmount.toFixed(2)}. Method: ${methodLabel}`,
+        created_by: actorName
       }, (logErr, logResult) => {
         
         if (!logErr) {
@@ -344,6 +374,8 @@ exports.makePayment = (req, res) => {
                 amount: paymentAmount,
                 total_paid: finalTotalPaid,
                 remaining: Math.max(0, remaining),
+                cash_received: cashTendered,
+                change_amount: Math.max(0, changeAmount),
                 payment_status: newPaymentStatus,
                 transaction_id: logResult.insertId
               }

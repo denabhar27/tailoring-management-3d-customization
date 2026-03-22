@@ -58,10 +58,12 @@ export async function updateRentalOrderItem(itemId, updateData) {
     }
 }
 
-export async function recordRentalPayment(itemId, paymentAmount) {
+export async function recordRentalPayment(itemId, paymentAmount, cashReceived = paymentAmount, paymentMethod = 'cash') {
     try {
         const response = await axios.post(`${BASE_URL}/orders/rental/items/${itemId}/payment`, {
-            paymentAmount: paymentAmount
+            paymentAmount: paymentAmount,
+            cashReceived: cashReceived,
+            paymentMethod: paymentMethod
         }, {
             headers: getAuthHeaders()
         });

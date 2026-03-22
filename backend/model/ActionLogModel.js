@@ -40,9 +40,14 @@ const ActionLog = {
     const sql = `
       SELECT 
         al.*,
-        u.first_name,
-        u.last_name,
-        u.email,
+        u.first_name AS actor_first_name,
+        u.last_name AS actor_last_name,
+        u.email AS actor_email,
+        cu.first_name AS customer_first_name,
+        cu.last_name AS customer_last_name,
+        cu.email AS customer_email,
+        wc.name AS walk_in_customer_name,
+        o.order_type,
         oi.service_type,
         oi.item_id,
         o.order_id
@@ -50,6 +55,8 @@ const ActionLog = {
       JOIN user u ON al.user_id = u.user_id
       LEFT JOIN order_items oi ON al.order_item_id = oi.item_id
       LEFT JOIN orders o ON oi.order_id = o.order_id
+      LEFT JOIN user cu ON o.user_id = cu.user_id
+      LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
       ORDER BY al.created_at DESC
       LIMIT ?
     `;

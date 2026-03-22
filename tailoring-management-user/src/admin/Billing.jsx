@@ -14,8 +14,6 @@ import ImagePreviewModal from '../components/ImagePreviewModal';
 
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
 
-import AnalyticsDashboard from '../components/analytics/AnalyticsDashboard';
-
 import { API_BASE_URL } from '../api/config';
 import { getUserRole } from '../api/AuthApi';
 import { useNavigate } from 'react-router-dom';
@@ -103,20 +101,6 @@ const Billing = () => {
     return () => clearInterval(refreshInterval);
 
   }, []);
-
-  const localStats = {
-
-    total: allBills.length,
-
-    paid: allBills.filter(b => b.status === 'Paid' || b.status === 'Fully Paid').length,
-
-    unpaid: allBills.filter(b => b.status === 'Unpaid' || b.status === 'Down-payment').length,
-
-    totalRevenue: allBills.filter(b => b.status === 'Paid' || b.status === 'Fully Paid').reduce((sum, b) => sum + b.price, 0),
-
-    pendingRevenue: allBills.filter(b => b.status === 'Unpaid' || b.status === 'Down-payment').reduce((sum, b) => sum + b.price, 0)
-
-  };
 
   const getFilteredBills = () => {
 
@@ -420,52 +404,6 @@ const Billing = () => {
           </div>
 
         </div>
-        <div className="stats-grid">
-
-          <div className="stat-card">
-
-            <div className="stat-header">
-
-              <span>Total Bills</span>
-
-              <div className="stat-icon" style={{ background: '#e3f2fd', color: '#2196f3' }}>📄</div>
-
-            </div>
-
-            <div className="stat-number">{billingStats.total || localStats.total}</div>
-
-          </div>
-
-          <div className="stat-card">
-
-            <div className="stat-header">
-
-              <span>Paid</span>
-
-              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>✓</div>
-
-            </div>
-
-            <div className="stat-number">{billingStats.paid || localStats.paid}</div>
-
-          </div>
-
-          <div className="stat-card">
-
-            <div className="stat-header">
-
-              <span>Unpaid</span>
-
-              <div className="stat-icon" style={{ background: '#ffebee', color: '#f44336' }}>⚠</div>
-
-            </div>
-
-            <div className="stat-number">{billingStats.unpaid || localStats.unpaid}</div>
-
-          </div>
-
-        </div>
-        <AnalyticsDashboard />
         <div className="search-container">
 
           <input

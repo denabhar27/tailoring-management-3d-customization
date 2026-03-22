@@ -192,6 +192,8 @@ See attached image showing desired UI pattern with size selector, quantity contr
 - Cart API endpoints
 - Admin panel display logic
 
+- run the migration directly here if theres added datatype or table so i wont have to manually add it in xampp
+
 ## Implementation Priority
 1. Individual item modal enhancement (both platforms)
 2. Bundle size selection UI (web first, then mobile)

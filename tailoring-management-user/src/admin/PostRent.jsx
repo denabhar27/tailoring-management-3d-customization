@@ -230,18 +230,46 @@ const ImageCarousel = ({ images, itemName, getRentalImageUrl }) => {
         }}>
           {validImages[currentIndex].label}
         </div>
-        <button onClick={goToPrev} style={{
-          position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)',
-          width: '32px', height: '32px', borderRadius: '50%', border: 'none',
-          backgroundColor: 'rgba(255,255,255,0.9)', color: '#333', cursor: 'pointer',
-          fontSize: '16px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-        }}>{"\u2039"}</button>
-        <button onClick={goToNext} style={{
-          position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
-          width: '32px', height: '32px', borderRadius: '50%', border: 'none',
-          backgroundColor: 'rgba(255,255,255,0.9)', color: '#333', cursor: 'pointer',
-          fontSize: '16px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-        }}>{"\u203A"}</button>
+        <button
+          onClick={goToPrev}
+          aria-label="Previous image"
+          style={{
+            position: 'absolute',
+            left: '8px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: '48px',
+            height: '48px',
+            border: 'none',
+            background: 'transparent',
+            color: '#7a7a7a',
+            cursor: 'pointer',
+            fontSize: '44px',
+            fontWeight: 700,
+            lineHeight: 1,
+            boxShadow: 'none'
+          }}
+        >{"\u2039"}</button>
+        <button
+          onClick={goToNext}
+          aria-label="Next image"
+          style={{
+            position: 'absolute',
+            right: '8px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: '48px',
+            height: '48px',
+            border: 'none',
+            background: 'transparent',
+            color: '#7a7a7a',
+            cursor: 'pointer',
+            fontSize: '44px',
+            fontWeight: 700,
+            lineHeight: 1,
+            boxShadow: 'none'
+          }}
+        >{"\u203A"}</button>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '10px' }}>
         {validImages.map((img, index) => (

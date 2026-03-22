@@ -106,6 +106,12 @@ function Sidebar() {
             Shop Schedule
           </NavLink>
         )}
+        {role === 'admin' && (
+          <NavLink to="/clerk-management" className={({ isActive }) => isActive ? 'active' : ''}>
+            <i className="fas fa-id-badge nav-icon"></i>
+            Clerk Management
+          </NavLink>
+        )}
         <NavLink to="/walk-in-orders" className={({ isActive }) => isActive ? 'active' : ''}>
           <i className="fas fa-walking nav-icon"></i>
           Walk-In Orders

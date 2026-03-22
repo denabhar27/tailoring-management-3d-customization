@@ -21,6 +21,7 @@ import CustomerList from "./admin/CustomerList";
 import ShopSchedule from "./admin/ShopSchedule";
 import WalkInOrders from "./admin/WalkInOrders";
 import OrdersInventory from "./admin/OrdersInventory";
+import ClerkManagement from "./admin/ClerkManagement";
 import Customizer3DPage from "./pages/Customizer3DPage";
 
 const App = () => {
@@ -45,6 +46,7 @@ const App = () => {
         <Route path="/shop-schedule" element={<ShopSchedule />} />
         <Route path="/walk-in-orders" element={<WalkInOrders />} />
         <Route path="/orders-inventory" element={<OrdersInventory />} />
+        <Route path="/clerk-management" element={<ClerkManagement />} />
 
       </Routes>
     </>

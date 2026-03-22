@@ -172,18 +172,46 @@ const ImageCarousel = ({ images, itemName, getRentalImageUrl }) => {
         }}>
           {validImages[currentIndex].label}
         </div>
-        <button onClick={goToPrev} style={{
-          position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)',
-          width: '32px', height: '32px', borderRadius: '50%', border: 'none',
-          backgroundColor: 'rgba(255,255,255,0.9)', color: '#333', cursor: 'pointer',
-          fontSize: '16px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-        }}>‹</button>
-        <button onClick={goToNext} style={{
-          position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
-          width: '32px', height: '32px', borderRadius: '50%', border: 'none',
-          backgroundColor: 'rgba(255,255,255,0.9)', color: '#333', cursor: 'pointer',
-          fontSize: '16px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-        }}>›</button>
+        <button
+          onClick={goToPrev}
+          aria-label="Previous image"
+          style={{
+            position: 'absolute',
+            left: '8px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: '48px',
+            height: '48px',
+            border: 'none',
+            background: 'transparent',
+            color: '#7a7a7a',
+            cursor: 'pointer',
+            fontSize: '44px',
+            fontWeight: 700,
+            lineHeight: 1,
+            boxShadow: 'none'
+          }}
+        >‹</button>
+        <button
+          onClick={goToNext}
+          aria-label="Next image"
+          style={{
+            position: 'absolute',
+            right: '8px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: '48px',
+            height: '48px',
+            border: 'none',
+            background: 'transparent',
+            color: '#7a7a7a',
+            cursor: 'pointer',
+            fontSize: '44px',
+            fontWeight: 700,
+            lineHeight: 1,
+            boxShadow: 'none'
+          }}
+        >›</button>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '10px' }}>
         {validImages.map((img, index) => (
@@ -415,6 +443,8 @@ const OrdersInventory = () => {
   // Calculate combined statistics
   const combinedStats = {
     totalOrders: billingStats.total || billingRecords.length,
+    paidBills: billingStats.paid || billingRecords.filter(b => b.status === 'Paid' || b.status === 'Fully Paid').length,
+    unpaidBills: billingStats.unpaid || billingRecords.filter(b => b.status === 'Unpaid' || b.status === 'Down-payment').length,
     totalRevenue: billingStats.totalRevenue || 0,
     activeRentals: rentalItems.filter(r => r.status === 'rented').length,
     availableItems: rentalItems.filter(r => r.status === 'available').length,
@@ -750,6 +780,30 @@ const OrdersInventory = () => {
               </div>
             </div>
             <div className="stat-number">{combinedStats.totalOrders}</div>
+          </div>
+
+          <div className="stat-card" onClick={() => setStatusFilter('all')}>
+            <div className="stat-header">
+              <span>Total Bills</span>
+              <div className="stat-icon" style={{ background: '#e3f2fd', color: '#2196f3' }}>📄</div>
+            </div>
+            <div className="stat-number">{combinedStats.totalOrders}</div>
+          </div>
+
+          <div className="stat-card" onClick={() => setStatusFilter('Paid')}>
+            <div className="stat-header">
+              <span>Paid</span>
+              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>✓</div>
+            </div>
+            <div className="stat-number">{combinedStats.paidBills}</div>
+          </div>
+
+          <div className="stat-card" onClick={() => setStatusFilter('Unpaid')}>
+            <div className="stat-header">
+              <span>Unpaid</span>
+              <div className="stat-icon" style={{ background: '#ffebee', color: '#f44336' }}>⚠</div>
+            </div>
+            <div className="stat-number">{combinedStats.unpaidBills}</div>
           </div>
 
           <div className="stat-card">

@@ -408,9 +408,33 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   const [sizeSelections, setSizeSelections] = useState({});
   const [cardSizeSelections, setCardSizeSelections] = useState({});
   const [expandedMeasurementSize, setExpandedMeasurementSize] = useState(null);
+  const [isSizesSectionOpen, setIsSizesSectionOpen] = useState(false);
   const [inlineMessage, setInlineMessage] = useState('');
   const [inlineMessageItemId, setInlineMessageItemId] = useState(null);
   const navigate = useNavigate();
+
+  const getItemDisplayName = (item) => {
+    const raw = String(item?.item_name || item?.name || '').trim();
+    if (!raw || /^\d+$/.test(raw)) {
+      return `${formatLabel(item?.category || 'rental')} Item`;
+    }
+    return raw;
+  };
+
+  const formatTagText = (value) => {
+    const val = String(value || '').trim();
+    if (!val) return '';
+    const shortMap = {
+      blu: 'Blue',
+      blk: 'Black',
+      wht: 'White',
+      gry: 'Gray',
+      grn: 'Green',
+      brn: 'Brown'
+    };
+    const mapped = shortMap[val.toLowerCase()];
+    return mapped || formatLabel(val);
+  };
 
   const getDisplayPrice = (item) => {
     if (!item) return 500;
@@ -728,6 +752,9 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
+  const [selectedColorFilter, setSelectedColorFilter] = useState('all');
+  const [selectedSizeFilter, setSelectedSizeFilter] = useState('all');
+  const [selectedPriceFilter, setSelectedPriceFilter] = useState('all');
 
   const categoryFilters = [
     { id: 'all', label: 'All', iconType: 'emoji', icon: '🧾' },
@@ -763,6 +790,73 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
     }
 
     return true;
+  };
+
+  const priceRanges = [
+    { id: 'all', label: 'All Prices' },
+    { id: 'under-1000', label: 'Under ₱1,000', min: 0, max: 1000 },
+    { id: '1000-2000', label: '₱1,000 - ₱2,000', min: 1000, max: 2000 },
+    { id: '2000-3000', label: '₱2,000 - ₱3,000', min: 2000, max: 3000 },
+    { id: 'above-3000', label: 'Above ₱3,000', min: 3000, max: Infinity }
+  ];
+
+  const formatLabel = (text) => {
+    return text
+      .replace(/[_-]/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const parsePriceValue = (price) => {
+    const priceStr = String(price || '').replace(/[^\d.]/g, '');
+    const parsed = parseFloat(priceStr);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  const isPriceInRange = (price, rangeId) => {
+    if (rangeId === 'all') return true;
+    const range = priceRanges.find(r => r.id === rangeId);
+    if (!range) return true;
+    const priceVal = parsePriceValue(price);
+    return priceVal >= range.min && priceVal <= range.max;
+  };
+
+  const getCategoryOptions = () => {
+    const categories = rentalItems.reduce((acc, item) => {
+      const cat = item.category || 'uncategorized';
+      if (!acc.find(c => c.value === cat)) {
+        acc.push({ value: cat, label: formatLabel(cat) });
+      }
+      return acc;
+    }, []);
+    return [{ value: 'all', label: 'All Clothing Types' }, ...categories];
+  };
+
+  const getColorOptions = () => {
+    const colors = rentalItems.reduce((acc, item) => {
+      const color = item.color || 'no-color';
+      if (!acc.find(c => c.value === color)) {
+        acc.push({ value: color, label: formatLabel(color) });
+      }
+      return acc;
+    }, []);
+    return [{ value: 'all', label: 'All Colors' }, ...colors];
+  };
+
+  const getSizeOptions = () => {
+    const sizes = new Set();
+    rentalItems.forEach(item => {
+      if (item.sizeOptions && typeof item.sizeOptions === 'object') {
+        Object.keys(item.sizeOptions).forEach(size => sizes.add(size));
+      }
+    });
+    const sizeArray = Array.from(sizes).sort();
+    return [{ value: 'all', label: 'All Sizes' }, ...sizeArray.map(s => ({ value: s, label: s.toUpperCase() }))];
+  };
+
+  const getPriceOptions = () => {
+    return priceRanges.map(range => ({ value: range.id, label: range.label }));
   };
 
   useEffect(() => {
@@ -821,6 +915,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
     setSelectedItem(null);
     setSizeSelections({});
     setExpandedMeasurementSize(null);
+    setIsSizesSectionOpen(false);
   };
 
   const handleSeeMore = () => {
@@ -1080,6 +1175,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
     setCartMessage('');
     setSizeSelections(preset);
     setExpandedMeasurementSize(null);
+    setIsSizesSectionOpen(false);
     setIsModalOpen(true);
   };
 
@@ -1267,10 +1363,18 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   };
 
   const availableItems = rentalItems.filter(item => item.status === 'available');
-  const filteredItems = availableItems.filter(item => belongsToFilter(item, selectedCategoryFilter));
+  const filteredItems = availableItems.filter(item => {
+    const categoryMatch = belongsToFilter(item, selectedCategoryFilter);
+    const colorMatch = selectedColorFilter === 'all' || (item.color && normalizeCategoryText(item.color) === normalizeCategoryText(selectedColorFilter));
+    const sizeMatch = selectedSizeFilter === 'all' || (item.sizeOptions && selectedSizeFilter in item.sizeOptions);
+    const priceMatch = isPriceInRange(item.price, selectedPriceFilter);
+    return categoryMatch && colorMatch && sizeMatch && priceMatch;
+  });
   const displayItems = showAll ? filteredItems : filteredItems.slice(0, 3);
   const bundlePreviewTotal = calculateBundleTotalWithSelections(3, selectedItems, cardSizeSelections);
   const selectedBundleQty = selectedItems.reduce((sum, item) => sum + getItemSelectedQuantity(item), 0);
+  const modalLiveTotal = selectedItem ? calculateTotalCostWithSelections(sizeSelections, selectedItem, rentalDuration) : 0;
+  const modalLiveDownpayment = modalLiveTotal * 0.5;
 
   if (loading) {
     return (
@@ -1333,9 +1437,13 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   return (
     <>
       <section className="rental" id="Rentals">
-        <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0 }}>{showAll ? 'All Rental Clothes' : 'Rental Clothes'}</h2>
-
+        <div className="section-header rc-rental-head">
+          <div className="rc-rental-title-wrap">
+            <h2 className="rc-rental-title">{showAll ? 'All Rental Clothes' : 'Rental Clothes'}</h2>
+            {showAll && (
+              <p className="rc-results-summary">Showing {displayItems.length} of {availableItems.length} available items</p>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               onClick={() => {
@@ -1352,8 +1460,8 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
               style={{
                 padding: '8px 16px',
                 borderRadius: '20px',
-                border: isMultiSelectMode ? '2px solid #dc3545' : '2px solid #007bff',
-                backgroundColor: isMultiSelectMode ? '#dc3545' : '#007bff',
+                border: isMultiSelectMode ? '2px solid #8f2f2f' : '2px solid #8f5825',
+                backgroundColor: isMultiSelectMode ? '#8f2f2f' : '#8f5825',
                 color: 'white',
                 cursor: 'pointer',
                 fontSize: '14px',
@@ -1368,31 +1476,48 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
             </button>
           </div>
         </div>
-
         {showAll && (
-          <div className="rc-category-filter" role="tablist" aria-label="Rental categories">
-            {categoryFilters.map((category) => {
-              const isActive = selectedCategoryFilter === category.id;
-              return (
-                <button
-                  key={category.id}
-                  type="button"
-                  className={`rc-category-chip ${isActive ? 'active' : ''}`}
-                  onClick={() => setSelectedCategoryFilter(category.id)}
-                  role="tab"
-                  aria-selected={isActive}
-                >
-                  <span className="rc-category-icon" aria-hidden="true">
-                    {category.iconType === 'image' ? (
-                      <img src={category.icon} alt="" />
-                    ) : (
-                      category.icon
-                    )}
-                  </span>
-                  <span className="rc-category-label">{category.label}</span>
-                </button>
-              );
-            })}
+          <div className="rc-filter-bar" role="group" aria-label="Filter rental clothes">
+            <span className="rc-filter-label">Filter by:</span>
+            <select 
+              className="rc-filter-select"
+              value={selectedCategoryFilter} 
+              onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+            >
+              {getCategoryOptions().map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+
+            <select 
+              className="rc-filter-select"
+              value={selectedColorFilter} 
+              onChange={(e) => setSelectedColorFilter(e.target.value)}
+            >
+              {getColorOptions().map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+
+            <select 
+              className="rc-filter-select"
+              value={selectedSizeFilter} 
+              onChange={(e) => setSelectedSizeFilter(e.target.value)}
+            >
+              {getSizeOptions().map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+
+            <select 
+              className="rc-filter-select"
+              value={selectedPriceFilter} 
+              onChange={(e) => setSelectedPriceFilter(e.target.value)}
+            >
+              {getPriceOptions().map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
           </div>
         )}
 
@@ -1453,7 +1578,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                 )}
                 <img 
                   src={item.img} 
-                  alt={item.name} 
+                  alt={getItemDisplayName(item)} 
                   onError={(e) => { e.target.src = suitSample; }}
                   style={{
                     opacity: isMultiSelectMode ? 0.9 : 1,
@@ -1461,7 +1586,12 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                   }} 
                 />
                 <div className="rental-info">
-                  <h3>{item.item_name || item.name}</h3>
+                  <h3 className="rc-item-name">{getItemDisplayName(item)}</h3>
+                  <div className="rc-item-meta">
+                    <span className="rc-item-badge">{formatLabel(item.category || 'Rental')}</span>
+                    {item.color && <span className="rc-item-badge rc-item-badge-soft">{formatLabel(item.color)}</span>}
+                  </div>
+                  <p className="rc-item-price">From ₱{parsePriceValue(item.price).toLocaleString('en-PH')}</p>
                   {getAvailableSizeKeys(item.sizeOptions || {}).length > 0 && (
                     <div className="rc-card-sizes">
                       {getAvailableSizeKeys(item.sizeOptions || {}).map(key => {
@@ -1882,21 +2012,21 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                     { url: selectedItem.side_image ? getRentalImageUrl(selectedItem.side_image) : null, label: 'Side' },
                     { url: selectedItem.img || (selectedItem.image_url ? getRentalImageUrl(selectedItem.image_url) : null), label: 'Main' }
                   ].filter(img => img.url)}
-                  itemName={selectedItem.item_name || selectedItem.name}
+                  itemName={getItemDisplayName(selectedItem)}
                 />
               </div>
 
               {/* Right: details */}
               <div className="rc-modal-details">
-                <h2 className="rc-modal-title">{selectedItem.item_name || selectedItem.name}</h2>
+                <h2 className="rc-modal-title">{getItemDisplayName(selectedItem)}</h2>
 
                 {/* Meta info */}
                 <div className="rc-meta-row">
                   {selectedItem.category && (
-                    <span className="rc-meta-tag">{selectedItem.category.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</span>
+                    <span className="rc-meta-tag rc-meta-tag-category">{formatTagText(selectedItem.category)}</span>
                   )}
-                  {selectedItem.color && <span className="rc-meta-tag">{selectedItem.color}</span>}
-                  {selectedItem.material && <span className="rc-meta-tag">{selectedItem.material}</span>}
+                  {selectedItem.color && <span className="rc-meta-tag rc-meta-tag-color">{formatTagText(selectedItem.color)}</span>}
+                  {selectedItem.material && <span className="rc-meta-tag rc-meta-tag-material">{formatTagText(selectedItem.material)}</span>}
                 </div>
                 <div className="rc-starting-price">
                   Starting from <strong>₱{getDisplayPrice(selectedItem).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong>
@@ -1908,9 +2038,18 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                   <div className="rc-sizes-section">
                     <div className="rc-section-header-row">
                       <h4>Sizes & Quantities</h4>
-                      <div className="rc-unit-toggle">
-                        <button className={measurementUnit === 'inch' ? 'active' : ''} onClick={() => setMeasurementUnit('inch')}>in</button>
-                        <button className={measurementUnit === 'cm' ? 'active' : ''} onClick={() => setMeasurementUnit('cm')}>cm</button>
+                      <div className="rc-section-tools">
+                        <div className="rc-unit-toggle">
+                          <button className={measurementUnit === 'inch' ? 'active' : ''} onClick={() => setMeasurementUnit('inch')}>in</button>
+                          <button className={measurementUnit === 'cm' ? 'active' : ''} onClick={() => setMeasurementUnit('cm')}>cm</button>
+                        </div>
+                        <button
+                          type="button"
+                          className="rc-collapse-toggle"
+                          onClick={() => setIsSizesSectionOpen(prev => !prev)}
+                        >
+                          {isSizesSectionOpen ? 'Hide details' : 'Show details'}
+                        </button>
                       </div>
                     </div>
                     <div className="rc-selection-summary" style={{ marginTop: '4px' }}>
@@ -1924,8 +2063,9 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                         })
                         .join(', ')}
                     </div>
-                    <div className="rc-sizes-table">
-                      {getAvailableSizeKeys(selectedItem.sizeOptions || {}).map((sizeKey) => {
+                    {isSizesSectionOpen && (
+                      <div className="rc-sizes-table">
+                        {getAvailableSizeKeys(selectedItem.sizeOptions || {}).map((sizeKey) => {
                         const opt = selectedItem.sizeOptions[sizeKey] || {};
                         const parsedFallbackTotal = parseInt(selectedItem.total_available, 10);
                         const maxQty = Number.isFinite(opt.quantity)
@@ -2007,8 +2147,9 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                             )}
                           </div>
                         );
-                      })}
-                    </div>
+                        })}
+                      </div>
+                    )}
                     {Object.values(sizeSelections).some(q => parseInt(q, 10) > 0) && (
                       <div className="rc-selection-summary">
                         Selected: {Object.entries(sizeSelections)
@@ -2093,13 +2234,13 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                 <button
                   className="rc-btn-rent"
                   onClick={handleAddToCart}
-                  disabled={!startDate || !rentalDuration || totalCost <= 0 || addingToCart}
+                  disabled={!startDate || !rentalDuration || modalLiveTotal <= 0 || addingToCart}
                 >
                   {addingToCart ? 'Adding...' : (
                     <>
                       <span className="rc-btn-rent-main">Add to Cart</span>
                       <span className="rc-btn-rent-sub">50% downpayment required</span>
-                      <span className="rc-btn-rent-price">₱{totalCost > 0 ? (totalCost * 0.5).toFixed(2) : '0.00'}</span>
+                      <span className="rc-btn-rent-price">₱{modalLiveDownpayment > 0 ? modalLiveDownpayment.toFixed(2) : '0.00'}</span>
                     </>
                   )}
                 </button>

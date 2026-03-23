@@ -183,7 +183,7 @@ const RentalImageCarousel = ({ images, itemName }) => {
         <img
           src={suitSample}
           alt={itemName}
-          style={{ maxWidth: '100%', maxHeight: '420px', objectFit: 'contain', borderRadius: '10px' }}
+          style={{ maxWidth: '100%', maxHeight: '560px', objectFit: 'contain', borderRadius: '10px' }}
         />
       </div>
     );
@@ -196,7 +196,7 @@ const RentalImageCarousel = ({ images, itemName }) => {
           src={getImageSrc(validImages[0], 0)}
           alt={itemName}
           onError={() => handleImageError(0)}
-          style={{ maxWidth: '100%', maxHeight: '420px', objectFit: 'contain', borderRadius: '10px' }}
+          style={{ maxWidth: '100%', maxHeight: '560px', objectFit: 'contain', borderRadius: '10px' }}
         />
       </div>
     );
@@ -216,13 +216,13 @@ const RentalImageCarousel = ({ images, itemName }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '360px'
+        minHeight: '520px'
       }}>
         <img
           src={getImageSrc(validImages[currentIndex], currentIndex)}
           alt={`${itemName} - ${validImages[currentIndex].label}`}
           onError={() => handleImageError(currentIndex)}
-          style={{ maxWidth: '100%', maxHeight: '420px', objectFit: 'contain' }}
+          style={{ maxWidth: '100%', maxHeight: '560px', objectFit: 'contain' }}
         />
         <div style={{
           position: 'absolute',
@@ -408,7 +408,6 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   const [sizeSelections, setSizeSelections] = useState({});
   const [cardSizeSelections, setCardSizeSelections] = useState({});
   const [expandedMeasurementSize, setExpandedMeasurementSize] = useState(null);
-  const [collapsedSizes, setCollapsedSizes] = useState({});
   const [inlineMessage, setInlineMessage] = useState('');
   const [inlineMessageItemId, setInlineMessageItemId] = useState(null);
   const navigate = useNavigate();
@@ -1080,7 +1079,6 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
     setTotalCost(0);
     setCartMessage('');
     setSizeSelections(preset);
-    setCollapsedSizes({});
     setExpandedMeasurementSize(null);
     setIsModalOpen(true);
   };
@@ -1895,18 +1893,21 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                 {/* Meta info */}
                 <div className="rc-meta-row">
                   {selectedItem.category && (
-                    <span className="rc-meta-tag">Category: {selectedItem.category.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</span>
+                    <span className="rc-meta-tag">{selectedItem.category.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</span>
                   )}
-                  {selectedItem.color && <span className="rc-meta-tag">Color: {selectedItem.color}</span>}
-                  {selectedItem.material && <span className="rc-meta-tag">Material: {selectedItem.material}</span>}
-                  <span className="rc-meta-tag">Price: from ₱{getDisplayPrice(selectedItem).toLocaleString('en-PH', { minimumFractionDigits: 2 })} / 3 days</span>
+                  {selectedItem.color && <span className="rc-meta-tag">{selectedItem.color}</span>}
+                  {selectedItem.material && <span className="rc-meta-tag">{selectedItem.material}</span>}
+                </div>
+                <div className="rc-starting-price">
+                  Starting from <strong>₱{getDisplayPrice(selectedItem).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong>
+                  <span> - 3-day rental</span>
                 </div>
 
                 {/* Sizes + Measurements table */}
                 {getAvailableSizeKeys(selectedItem.sizeOptions || {}).length > 0 && (
                   <div className="rc-sizes-section">
                     <div className="rc-section-header-row">
-                      <h4>Select Sizes & Quantities</h4>
+                      <h4>Sizes & Quantities</h4>
                       <div className="rc-unit-toggle">
                         <button className={measurementUnit === 'inch' ? 'active' : ''} onClick={() => setMeasurementUnit('inch')}>in</button>
                         <button className={measurementUnit === 'cm' ? 'active' : ''} onClick={() => setMeasurementUnit('cm')}>cm</button>
@@ -1932,7 +1933,6 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                           : (Number.isNaN(parsedFallbackTotal) ? 0 : parsedFallbackTotal);
                         const currentQty = parseInt(sizeSelections[sizeKey] || 0, 10);
                         const isExpanded = expandedMeasurementSize === sizeKey;
-                        const isCollapsed = collapsedSizes[sizeKey] !== false;
                         const resolvedMeasurements = normalizeMeasurementsObject(
                           opt.measurements || selectedItem.measurementProfile
                         );
@@ -1966,42 +1966,30 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                               {opt.price > 0 && (
                                 <span className="rc-size-price">₱ {parseFloat(opt.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })} / 3 days</span>
                               )}
-                              <button
-                                type="button"
-                                className="rc-collapse-toggle"
-                                onClick={() => {
-                                  setCollapsedSizes(prev => ({ ...prev, [sizeKey]: !isCollapsed }));
-                                  if (!isCollapsed && expandedMeasurementSize === sizeKey) {
-                                    setExpandedMeasurementSize(null);
-                                  }
-                                }}
-                              >
-                                {isCollapsed ? '▼' : '▲'}
-                              </button>
+                              <div className="rc-qty-control">
+                                <button
+                                  disabled={currentQty <= 0}
+                                  onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.max(0, currentQty - 1) }))}
+                                >−</button>
+                                <span>{currentQty}</span>
+                                <button
+                                  disabled={currentQty >= maxQty}
+                                  onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.min(maxQty, currentQty + 1) }))}
+                                >+
+                                </button>
+                              </div>
+                              {hasMeasurements && measurementRows.length > 0 && (
+                                <button
+                                  className="rc-meas-toggle"
+                                  onClick={() => setExpandedMeasurementSize(isExpanded ? null : sizeKey)}
+                                >
+                                  {isExpanded ? 'Hide Measurements' : 'Measurements'}
+                                </button>
+                              )}
                             </div>
-                            {!isCollapsed && (
-                              <div className="rc-size-row-body">
-                                <div className="rc-qty-control">
-                                  <button
-                                    disabled={currentQty <= 0}
-                                    onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.max(0, currentQty - 1) }))}
-                                  >−</button>
-                                  <span>{currentQty}</span>
-                                  <button
-                                    disabled={currentQty >= maxQty}
-                                    onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.min(maxQty, currentQty + 1) }))}
-                                  >+
-                                  </button>
-                                </div>
-                                {hasMeasurements && measurementRows.length > 0 && (
-                                  <button
-                                    className="rc-meas-toggle"
-                                    onClick={() => setExpandedMeasurementSize(isExpanded ? null : sizeKey)}
-                                  >
-                                    {isExpanded ? '▲ Hide' : '▼ Measurements'}
-                                  </button>
-                                )}
-                                {isExpanded && measurementRows.length > 0 && (
+                            {hasMeasurements && measurementRows.length > 0 && (
+                              <>
+                                {isExpanded && (
                                   <div className="rc-measurements-panel">
                                     <table className="rc-meas-table">
                                       <thead>
@@ -2015,7 +2003,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                                     </table>
                                   </div>
                                 )}
-                              </div>
+                              </>
                             )}
                           </div>
                         );
@@ -2107,7 +2095,13 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                   onClick={handleAddToCart}
                   disabled={!startDate || !rentalDuration || totalCost <= 0 || addingToCart}
                 >
-                  {addingToCart ? 'Adding...' : `Add to Cart — ₱${totalCost > 0 ? (totalCost * 0.5).toFixed(2) : '0.00'} downpayment`}
+                  {addingToCart ? 'Adding...' : (
+                    <>
+                      <span className="rc-btn-rent-main">Add to Cart</span>
+                      <span className="rc-btn-rent-sub">50% downpayment required</span>
+                      <span className="rc-btn-rent-price">₱{totalCost > 0 ? (totalCost * 0.5).toFixed(2) : '0.00'}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>

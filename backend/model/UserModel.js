@@ -275,6 +275,11 @@ const User = {
   deactivateClerk: (userId, callback) => {
     const sql = `UPDATE user SET status = 'inactive' WHERE user_id = ? AND role = 'clerk'`;
     db.query(sql, [userId], callback);
+  },
+
+  activateClerk: (userId, callback) => {
+    const sql = `UPDATE user SET status = 'active' WHERE user_id = ? AND role = 'clerk'`;
+    db.query(sql, [userId], callback);
   }
 
 };

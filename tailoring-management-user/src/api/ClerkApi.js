@@ -49,6 +49,16 @@ export const deactivateClerk = async (id) => {
   }
 };
 
+export const activateClerk = async (id) => {
+  try {
+    const res = await axios.post(`${BASE}/${id}/activate`, {}, { headers: authHeaders() });
+    return res.data;
+  } catch (error) {
+    console.error('Activate clerk error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to activate clerk' };
+  }
+};
+
 export const resetClerkPassword = async (id) => {
   try {
     const res = await axios.post(`${BASE}/${id}/reset-password`, {}, { headers: authHeaders() });

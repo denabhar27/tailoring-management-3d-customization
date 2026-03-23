@@ -2415,7 +2415,7 @@ const Customize = () => {
 
           <div>
 
-            <h2>Customization Management</h2>
+            <h2>Customization</h2>
 
             <p>Track and manage all customization orders</p>
 

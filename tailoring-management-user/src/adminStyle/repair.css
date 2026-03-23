@@ -789,3 +789,51 @@ tbody td {
     min-width: auto;
   }
 }
+
+/* Consistent UI table styling across all admin pages */
+.dry-cleaning-management .table-container {
+  background: #ffffff;
+  border: 1px solid #d7dff3;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(54, 75, 122, 0.08);
+  margin-top: 20px;
+}
+
+.dry-cleaning-management .table-scroll-viewport {
+  border: none;
+  max-height: 500px;
+}
+
+.dry-cleaning-management thead th {
+  color: #8a93a6;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  border-bottom: 1px solid #e7ebf5;
+  padding: 10px 16px;
+  background: #ffffff;
+}
+
+.dry-cleaning-management tbody td {
+  font-size: 12px;
+  color: #4f5a6d;
+  padding: 10px 16px;
+}
+
+.dry-cleaning-management tbody tr {
+  border-bottom: 1px solid #eef2f8;
+}
+
+.dry-cleaning-management tbody tr:hover {
+  background: #f9fbff;
+}
+
+.dry-cleaning-management .status-badge {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+}

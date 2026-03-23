@@ -92,10 +92,10 @@ function Sidebar() {
             Billing
           </NavLink>
         )}
-        <NavLink to="/inventory" className={({ isActive }) => isActive ? 'active' : ''}>
+        {/*<NavLink to="/inventory" className={({ isActive }) => isActive ? 'active' : ''}>
           <i className="fas fa-boxes nav-icon"></i>
           Inventory
-        </NavLink>
+        </NavLink>*/}
         <NavLink to="/customers" className={({ isActive }) => isActive ? 'active' : ''}>
           <i className="fas fa-users nav-icon"></i>
           Customer List

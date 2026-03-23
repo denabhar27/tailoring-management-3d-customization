@@ -1,0 +1,338 @@
+.shop-schedule-page .content {
+  background: #f3f3f3;
+}
+
+.shop-schedule-page .ss-loading-state {
+  text-align: center;
+  padding: 60px;
+  color: #6e6e6e;
+}
+
+.shop-schedule-page .ss-card {
+  background: #ffffff;
+  border: 1px solid #dfdfdf;
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+  max-width: 980px;
+  margin: 0 auto 24px;
+  padding: 28px;
+}
+
+.shop-schedule-page .ss-header-block {
+  margin-bottom: 20px;
+}
+
+.shop-schedule-page .ss-header-block h2 {
+  margin: 0;
+  font-size: 42px;
+  line-height: 1.05;
+  font-weight: 500;
+  color: #222222;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.shop-schedule-page .ss-header-block p {
+  margin: 10px 0 0;
+  color: #717171;
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+.shop-schedule-page .ss-header-block .ss-help-text {
+  color: #9a9a9a;
+  font-style: italic;
+  font-size: 18px;
+}
+
+.shop-schedule-page .ss-day-list {
+  display: grid;
+  gap: 12px;
+}
+
+.shop-schedule-page .ss-day-card {
+  border: 1px solid #d9d9d9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.shop-schedule-page .ss-day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.shop-schedule-page .ss-day-header.is-clickable {
+  cursor: pointer;
+}
+
+.shop-schedule-page .ss-day-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.shop-schedule-page .ss-day-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #b2b2b2;
+  font-size: 24px;
+  width: 22px;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform 0.2s ease;
+}
+
+.shop-schedule-page .ss-day-chevron.is-expanded {
+  transform: rotate(90deg);
+}
+
+.shop-schedule-page .ss-day-name {
+  font-size: 20px;
+  color: #222222;
+  font-weight: 600;
+}
+
+.shop-schedule-page .ss-state-pill {
+  border: 1px solid #d3d3d3;
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: #6f6f6f;
+  background: #fbfbfb;
+}
+
+.shop-schedule-page .ss-state-pill.is-open {
+  color: #2d3b4f;
+}
+
+.shop-schedule-page .ss-selected-count {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #6f6f6f;
+  background: #f7f7f7;
+  font-weight: 600;
+}
+
+.shop-schedule-page .ss-selected-hint {
+  font-size: 14px;
+  color: #a0a0a0;
+  font-style: italic;
+}
+
+.shop-schedule-page .ss-switch {
+  position: relative;
+  display: inline-flex;
+  width: 42px;
+  height: 24px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.shop-schedule-page .ss-switch-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.shop-schedule-page .ss-switch-slider {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #d1d1d1;
+  transition: background 0.2s ease;
+}
+
+.shop-schedule-page .ss-switch-slider.is-open {
+  background: #2b2b2b;
+}
+
+.shop-schedule-page .ss-switch-thumb {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.shop-schedule-page .ss-switch-slider.is-open .ss-switch-thumb {
+  transform: translateX(18px);
+}
+
+.shop-schedule-page .ss-expanded-panel {
+  padding: 16px 18px 18px;
+  border-top: 1px solid #ececec;
+  background: #ffffff;
+}
+
+.shop-schedule-page .ss-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.shop-schedule-page .ss-panel-header h4 {
+  margin: 0;
+  color: #a7a7a7;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.shop-schedule-page .ss-panel-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.shop-schedule-page .ss-panel-btn {
+  border: 1px solid #d7d7d7;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #515151;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.shop-schedule-page .ss-panel-btn.secondary {
+  color: #888888;
+}
+
+.shop-schedule-page .ss-time-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  gap: 8px;
+}
+
+.shop-schedule-page .ss-time-pill {
+  border: 1px solid #d4d4d4;
+  border-radius: 8px;
+  background: #f7f7f7;
+  color: #6d6d6d;
+  height: 30px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shop-schedule-page .ss-time-pill.selected {
+  border-color: #8b4513;
+  background: #8b4513;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(139, 69, 19, 0.28);
+  transform: translateY(-1px);
+}
+
+.shop-schedule-page .ss-time-pill:hover {
+  border-color: #b57a4a;
+  background: #fff9f4;
+}
+
+.shop-schedule-page .ss-panel-note {
+  margin: 10px 0 0;
+  color: #a0a0a0;
+  font-style: italic;
+  font-size: 13px;
+}
+
+.shop-schedule-page .ss-footer-row {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid #e6e6e6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.shop-schedule-page .ss-footer-row p {
+  margin: 0;
+  color: #b2a7a1;
+  font-size: 14px;
+}
+
+.shop-schedule-page .ss-save-btn {
+  border: none;
+  border-radius: 10px;
+  background: #8b4513;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.shop-schedule-page .ss-save-btn:hover:not(:disabled) {
+  background: #a0522d;
+  transform: translateY(-1px);
+}
+
+.shop-schedule-page .ss-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1200px) {
+  .shop-schedule-page .ss-header-block h2 {
+    font-size: 36px;
+  }
+
+  .shop-schedule-page .ss-header-block p {
+    font-size: 16px;
+  }
+
+  .shop-schedule-page .ss-help-text {
+    font-size: 15px;
+  }
+
+  .shop-schedule-page .ss-save-btn {
+    font-size: 13px;
+    padding: 9px 18px;
+  }
+}
+
+@media (max-width: 768px) {
+  .shop-schedule-page .ss-card {
+    padding: 16px;
+    margin: 0 0 18px;
+  }
+
+  .shop-schedule-page .ss-header-block h2 {
+    font-size: 28px;
+  }
+
+  .shop-schedule-page .ss-day-name {
+    font-size: 18px;
+  }
+
+  .shop-schedule-page .ss-footer-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .shop-schedule-page .ss-save-btn {
+    width: 100%;
+  }
+}

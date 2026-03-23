@@ -150,6 +150,21 @@ exports.deactivateClerk = (req, res) => {
   });
 };
 
+exports.activateClerk = (req, res) => {
+  const { id } = req.params;
+
+  User.activateClerk(id, (err, result) => {
+    if (err) {
+      console.error('[CLERK] activate error:', err);
+      return res.status(500).json({ success: false, message: 'Failed to activate clerk' });
+    }
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Clerk not found' });
+    }
+    return res.json({ success: true, message: 'Clerk activated successfully' });
+  });
+};
+
 exports.resetClerkPassword = (req, res) => {
   const { id } = req.params;
   const newPassword = generateTempPassword();

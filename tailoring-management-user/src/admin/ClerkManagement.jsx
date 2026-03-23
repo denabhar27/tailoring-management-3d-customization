@@ -5,11 +5,13 @@ import AdminHeader from './AdminHeader';
 import ClerkModal from './ClerkModal';
 import ClerkTable from './ClerkTable';
 import './ClerkTable.css';
-import { getClerks, createClerk, deactivateClerk, updateClerk } from '../api/ClerkApi';
+import { getClerks, createClerk, deactivateClerk, activateClerk, updateClerk } from '../api/ClerkApi';
 import { getUserRole } from '../api/AuthApi';
+import { useAlert } from '../context/AlertContext';
 
 function ClerkManagement() {
   const navigate = useNavigate();
+  const { alert, confirm } = useAlert();
   const [clerks, setClerks] = useState([]);
   const [clerkLoading, setClerkLoading] = useState(false);
   const [showClerkModal, setShowClerkModal] = useState(false);
@@ -41,33 +43,66 @@ function ClerkManagement() {
     fetchClerks();
   }, []);
 
+  const isClerkActive = (status) => {
+    const normalizedStatus = String(status || '').trim().toLowerCase();
+    if (normalizedStatus === '1') return true;
+    if (normalizedStatus === '0') return false;
+    if (normalizedStatus === 'active' || normalizedStatus === 'activated') return true;
+    if (normalizedStatus === 'inactive' || normalizedStatus === 'deactivated') return false;
+    return false;
+  };
+
   return (
-    <div className="admin-page">
+    <div className="admin-page clerk-management-page">
       <Sidebar />
       <AdminHeader />
 
       <div className="content">
         <div className="dashboard-title">
-          <h2>Clerk Accounts Management</h2>
+          <div>
+            <h2>Clerk Account Management</h2>
+            <p className="clerk-subtitle">Clerks have operational access only. Billing and analytics are hidden.</p>
+          </div>
+          <button className="btn-primary-shared clerk-create-btn" onClick={() => setShowClerkModal(true)}>Create New Clerk</button>
         </div>
 
         <div className="clerk-management">
-          <div className="clerk-table-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2 style={{ margin: 0 }}>Clerk Accounts Management</h2>
-              <p className="clerk-subtitle" style={{ margin: 0 }}>Clerks have operational access only. Billing and analytics are hidden.</p>
-            </div>
-            <button className="btn-primary-shared" onClick={() => setShowClerkModal(true)}>Create New Clerk</button>
-          </div>
-
           <ClerkTable
             clerks={clerks}
-            onDeactivate={async (clerk) => {
-              const res = await deactivateClerk(clerk.user_id || clerk.id);
+            onToggleStatus={async (clerk) => {
+              const isActive = isClerkActive(clerk.status);
+              const confirmMessage = isActive
+                ? 'Are you sure this staff account should be deactivated?'
+                : 'Are you sure this staff account should be activated?';
+              const confirmed = await confirm(
+                confirmMessage,
+                isActive ? 'Confirm Deactivation' : 'Confirm Activation',
+                'warning',
+                { confirmText: isActive ? 'Deactivate' : 'Activate', cancelText: 'Cancel' }
+              );
+
+              if (!confirmed) {
+                return;
+              }
+
+              const res = isActive
+                ? await deactivateClerk(clerk.user_id || clerk.id)
+                : await activateClerk(clerk.user_id || clerk.id);
+
               if (res.success) {
-                setClerks((prev) => prev.map((c) => (c.user_id === (clerk.user_id || clerk.id) ? { ...c, status: 'inactive' } : c)));
+                setClerks((prev) => prev.map((c) => {
+                  const currentId = c.user_id || c.id;
+                  return currentId === (clerk.user_id || clerk.id)
+                    ? { ...c, status: isActive ? 'inactive' : 'active' }
+                    : c;
+                }));
+                await alert(
+                  isActive ? 'Staff account deactivated successfully.' : 'Staff account activated successfully.',
+                  isActive ? 'Deactivated' : 'Activated',
+                  'success'
+                );
               } else {
-                window.alert(res.message || 'Failed to update clerk');
+                await alert(res.message || 'Failed to update clerk status', 'Error', 'error');
               }
             }}
             onEdit={(clerk) => {
@@ -98,8 +133,9 @@ function ClerkManagement() {
               setClerks((prev) => prev.map((c) => (c.user_id === (editingClerk.user_id || editingClerk.id) ? { ...c, ...payload, status: c.status } : c)));
               setShowClerkModal(false);
               setEditingClerk(null);
+              await alert('Clerk updated successfully.', 'Success', 'success');
             } else {
-              window.alert(res.message || 'Failed to update clerk');
+              await alert(res.message || 'Failed to update clerk', 'Error', 'error');
             }
           } else {
             const res = await createClerk(payload);
@@ -107,8 +143,9 @@ function ClerkManagement() {
             if (res.success) {
               setClerks((prev) => [res.clerk, ...prev]);
               setShowClerkModal(false);
+              await alert('Clerk created successfully.', 'Success', 'success');
             } else {
-              window.alert(res.message || 'Failed to create clerk');
+              await alert(res.message || 'Failed to create clerk', 'Error', 'error');
             }
           }
         }}

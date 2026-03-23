@@ -10,6 +10,7 @@ router.get('/', ClerkController.listClerks);
 router.post('/', ClerkController.createClerk);
 router.put('/:id', ClerkController.updateClerk);
 router.delete('/:id', ClerkController.deactivateClerk);
+router.post('/:id/activate', ClerkController.activateClerk);
 router.post('/:id/reset-password', ClerkController.resetClerkPassword);
 
 module.exports = router;

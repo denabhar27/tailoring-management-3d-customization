@@ -59,6 +59,54 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 400;
 }
 
+/* Consistent UI table styling across all admin pages */
+.billing-management .table-container,
+.billing-management .data-table-wrapper {
+  background: #ffffff;
+  border: 1px solid #d7dff3;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(54, 75, 122, 0.08);
+  margin-top: 20px;
+}
+
+.billing-management table thead th,
+.billing-management .table-container thead th {
+  color: #8a93a6;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  border-bottom: 1px solid #e7ebf5;
+  padding: 10px 16px;
+  background: #ffffff;
+}
+
+.billing-management table tbody td,
+.billing-management .table-container tbody td {
+  font-size: 12px;
+  color: #4f5a6d;
+  padding: 10px 16px;
+}
+
+.billing-management table tbody tr,
+.billing-management .table-container tbody tr {
+  border-bottom: 1px solid #eef2f8;
+}
+
+.billing-management table tbody tr:hover,
+.billing-management .table-container tbody tr:hover {
+  background: #f9fbff;
+}
+
+.billing-management .status-badge {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr); 

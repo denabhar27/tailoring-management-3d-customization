@@ -1,28 +1,52 @@
 .clerk-table-wrapper {
-  margin-top: 32px;
-  background: #fff;
-  border: 1px solid rgba(0,0,0,0.05);
+  margin-top: 20px;
+  background: #ffffff;
+  border: 1px solid #d7dff3;
   border-radius: 16px;
-  box-shadow: 0 12px 30px rgba(0,0,0,0.06);
+  box-shadow: 0 10px 24px rgba(54, 75, 122, 0.08);
   overflow: hidden;
 }
 
 .clerk-table-header {
   padding: 20px 24px;
-  border-bottom: 1px solid rgba(0,0,0,0.05);
-  background: linear-gradient(135deg, #fffaf4, #fff);
+  border-bottom: 1px solid #e7ebf5;
+  background: #ffffff;
 }
 
 .clerk-table-header h3 {
   margin: 0 0 6px 0;
   font-size: 1.25rem;
-  color: #2d2a26;
+  color: #4f5a6d;
 }
 
 .clerk-subtitle {
   margin: 0;
-  color: #6b625a;
-  font-size: 0.95rem;
+  color: #636e72;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.dashboard-title {
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.clerk-management-page .dashboard-title h2 {
+  margin: 0 0 4px 0;
+  color: #2d3436;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.clerk-create-btn {
+  padding: 8px 14px !important;
+  font-size: 12px !important;
+  border-radius: 8px !important;
+  min-height: 34px;
 }
 
 .clerk-table-scroll {
@@ -37,21 +61,21 @@
 
 .clerk-table th,
 .clerk-table td {
-  padding: 14px 16px;
+  padding: 10px 16px;
   text-align: left;
-  border-bottom: 1px solid rgba(0,0,0,0.04);
-  font-size: 0.95rem;
+  border-bottom: 1px solid #eef2f8;
+  font-size: 12px;
 }
 
 .clerk-table th {
-  background: #faf7f2;
-  color: #5d4e37;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  background: #ffffff;
+  color: #8a93a6;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .clerk-table tbody tr:hover {
-  background: #fff9f2;
+  background: #f9fbff;
 }
 
 .clerk-empty {
@@ -61,19 +85,18 @@
 }
 
 .clerk-status {
-  padding: 6px 10px;
-  border-radius: 10px;
-  font-weight: 700;
-  font-size: 0.85rem;
+  padding: 0;
+  border-radius: 0;
+  font-weight: 600;
+  font-size: 12px;
+  background: transparent;
 }
 
 .clerk-status.active {
-  background: #e8f5e9;
   color: #2e7d32;
 }
 
 .clerk-status.inactive {
-  background: #fbeaea;
   color: #c0392b;
 }
 
@@ -104,7 +127,7 @@
 }
 
 .btn-link:hover {
-  background: #fff9f2;
+  background: #f9fbff;
   border-color: rgba(139, 69, 19, 0.32);
   text-decoration: none;
 }
@@ -112,6 +135,14 @@
 .btn-link.danger {
   color: #c0392b;
   border-color: rgba(192, 57, 43, 0.25);
+  padding: 0 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.btn-link.success {
+  color: #2e7d32;
+  border-color: rgba(46, 125, 50, 0.25);
   padding: 0 10px;
   font-size: 0.8rem;
   font-weight: 600;

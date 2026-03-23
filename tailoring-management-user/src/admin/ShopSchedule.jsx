@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import AdminHeader from './AdminHeader';
 import '../adminStyle/admin.css';
+import '../adminStyle/shopSchedule.css';
 import '../styles/SharedModal.css';
 import { getShopScheduleAdmin, updateShopSchedule } from '../api/ShopScheduleApi';
 import { getAdminTimeSlots } from '../api/AppointmentSlotApi';
@@ -173,11 +174,11 @@ const ShopSchedule = () => {
 
   if (loading) {
     return (
-      <div className="admin-page">
+      <div className="admin-page shop-schedule-page">
         <Sidebar />
         <AdminHeader />
         <div className="content">
-          <div style={{ textAlign: 'center', padding: '60px' }}>
+          <div className="ss-loading-state">
             Loading shop schedule...
           </div>
         </div>
@@ -186,174 +187,83 @@ const ShopSchedule = () => {
   }
 
   return (
-    <div className="admin-page">
+    <div className="admin-page shop-schedule-page">
       <Sidebar />
       <AdminHeader />
 
       <div className="content">
-        <div className="dashboard-title">
-          <div>
-            <h2>Shop Schedule</h2>
-            <p>Configure which days and times the shop is open for appointments</p>
-          </div>
-        </div>
-
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          padding: '30px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          maxWidth: '900px',
-          margin: '20px auto'
-        }}>
-          <div style={{ marginBottom: '30px' }}>
-            <h3 style={{ marginBottom: '10px', color: '#333' }}>Operating Days & Available Times</h3>
-            <p style={{ color: '#666', marginBottom: '5px' }}>
+        <div className="ss-card">
+          <div className="ss-header-block">
+            <h2>Operating Days & Available Times</h2>
+            <p>
               Toggle days to open or close the shop. Click on a day to set available time slots.
             </p>
-            <p style={{ color: '#999', fontSize: '13px' }}>
+            <p className="ss-help-text">
               If no times are selected for an open day, all default time slots will be available.
             </p>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div className="ss-day-list">
             {schedule.map(day => {
               const isExpanded = expandedDay === day.day_of_week;
               const selectedCount = (day.available_times || []).length;
               
               return (
-                <div key={day.day_of_week} style={{ borderRadius: '8px', overflow: 'hidden', border: `2px solid ${day.is_open ? '#4caf50' : '#f44336'}`, transition: 'all 0.3s ease' }}>
-                  {/* Day Header - clickable to expand */}
+                <div
+                  key={day.day_of_week}
+                  className={`ss-day-card ${day.is_open ? 'is-open' : 'is-closed'} ${isExpanded ? 'is-expanded' : ''}`}
+                >
                   <div
                     onClick={() => day.is_open && handleDayClick(day.day_of_week)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '15px 20px',
-                      backgroundColor: day.is_open ? '#e8f5e9' : '#ffebee',
-                      cursor: day.is_open ? 'pointer' : 'default',
-                      transition: 'all 0.3s ease',
-                      userSelect: 'none'
-                    }}
+                    className={`ss-day-header ${day.is_open ? 'is-clickable' : ''}`}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      {day.is_open && (
-                        <span style={{
-                          fontSize: '18px',
-                          color: '#666',
-                          transition: 'transform 0.3s',
-                          transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                          display: 'inline-block'
-                        }}>▶</span>
-                      )}
-                      <div>
-                        <strong style={{ fontSize: '16px', color: '#333' }}>
-                          {day.day_name}
-                        </strong>
-                        <span style={{
-                          marginLeft: '10px',
-                          padding: '4px 12px',
-                          borderRadius: '12px',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          backgroundColor: day.is_open ? '#4caf50' : '#f44336',
-                          color: 'white'
-                        }}>
+                    <div className="ss-day-main">
+                      <span className={`ss-day-chevron ${isExpanded ? 'is-expanded' : ''}`}>›</span>
+                      <strong className="ss-day-name">{day.day_name}</strong>
+                      <span className={`ss-state-pill ${day.is_open ? 'is-open' : 'is-closed'}`}>
                           {day.is_open ? 'OPEN' : 'CLOSED'}
-                        </span>
-                        {day.is_open && selectedCount > 0 && (
-                          <span style={{
-                            marginLeft: '8px',
-                            padding: '3px 10px',
-                            borderRadius: '12px',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                            backgroundColor: '#1976d2',
-                            color: 'white'
-                          }}>
-                            {selectedCount} time{selectedCount !== 1 ? 's' : ''} selected
-                          </span>
-                        )}
-                        {day.is_open && selectedCount === 0 && (
-                          <span style={{
-                            marginLeft: '8px',
-                            fontSize: '12px',
-                            color: '#999',
-                            fontStyle: 'italic'
-                          }}>
-                            All times available (click to customize)
-                          </span>
-                        )}
-                      </div>
+                      </span>
+                      {day.is_open && selectedCount > 0 && (
+                        <span className="ss-selected-count">{selectedCount} time{selectedCount !== 1 ? 's' : ''} selected</span>
+                      )}
+                      {day.is_open && selectedCount === 0 && (
+                        <span className="ss-selected-hint">All times available (click to customize)</span>
+                      )}
                     </div>
-                    <label style={{
-                      position: 'relative',
-                      display: 'inline-block',
-                      width: '60px',
-                      height: '30px',
-                      cursor: 'pointer'
-                    }} onClick={(e) => e.stopPropagation()}>
+
+                    <label className="ss-switch" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={day.is_open}
                         onChange={() => handleToggle(day.day_of_week)}
-                        style={{ opacity: 0, width: 0, height: 0 }}
+                        className="ss-switch-input"
                       />
-                      <span style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: day.is_open ? '#4caf50' : '#ccc',
-                        borderRadius: '30px',
-                        transition: '0.3s',
-                        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)'
-                      }}>
-                        <span style={{
-                          position: 'absolute',
-                          height: '22px',
-                          width: '22px',
-                          left: day.is_open ? '34px' : '4px',
-                          bottom: '4px',
-                          backgroundColor: 'white',
-                          borderRadius: '50%',
-                          transition: '0.3s',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                        }} />
+                      <span className={`ss-switch-slider ${day.is_open ? 'is-open' : ''}`}>
+                        <span className="ss-switch-thumb" />
                       </span>
                     </label>
                   </div>
 
-                  {/* Time Slots Grid */}
                   {day.is_open && isExpanded && (
-                    <div style={{
-                      padding: '20px',
-                      backgroundColor: '#fafafa',
-                      borderTop: '1px solid #e0e0e0'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#555' }}>
-                          Select available time slots for {day.day_name}:
-                        </span>
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                    <div className="ss-expanded-panel">
+                      <div className="ss-panel-header">
+                        <h4>Available Time Slots</h4>
+                        <div className="ss-panel-actions">
                           <button
                             onClick={() => selectAllTimes(day.day_of_week)}
-                            style={{
-                              padding: '5px 14px',
-                              fontSize: '12px',
-                              backgroundColor: '#1976d2',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontWeight: '600'
-                            }}
-                          >Select All</button>
+                            className="ss-panel-btn"
+                          >
+                            Select All
+                          </button>
+                          <button
+                            onClick={() => clearAllTimes(day.day_of_week)}
+                            className="ss-panel-btn secondary"
+                          >
+                            Clear
+                          </button>
                         </div>
                       </div>
-                      <div className="time-slots-grid">
+                      <div className="ss-time-grid">
                         {timeSlots.filter(s => s.is_active).map(slot => {
                           const timeStr = typeof slot.time_slot === 'string' ? slot.time_slot : slot.time_slot.toString();
                           const normalizedTime = timeStr.substring(0, 5) + ':00';
@@ -365,15 +275,15 @@ const ShopSchedule = () => {
                             <button
                               key={slot.slot_id}
                               type="button"
-                              className={`time-slot-btn available ${isSelected ? 'selected' : ''}`}
+                              className={`ss-time-pill ${isSelected ? 'selected' : ''}`}
                               onClick={() => toggleTimeSlot(day.day_of_week, timeStr)}
                             >
-                              <span className="slot-time">{formatTime(timeStr)}</span>
-                              <span className="slot-status">{isSelected ? 'Selected' : 'Available'}</span>
+                              {timeStr.substring(0, 5)}
                             </button>
                           );
                         })}
                       </div>
+                      <p className="ss-panel-note">Select specific slots, or leave all unselected to allow all times.</p>
                     </div>
                   )}
                 </div>
@@ -381,28 +291,12 @@ const ShopSchedule = () => {
             })}
           </div>
 
-          <div style={{ marginTop: '30px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <div className="ss-footer-row">
+            <p>Changes take effect immediately after saving.</p>
             <button
               onClick={handleSave}
               disabled={saving}
-              style={{
-                padding: '12px 30px',
-                backgroundColor: '#8B4513',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '16px',
-                fontWeight: '600',
-                cursor: saving ? 'not-allowed' : 'pointer',
-                opacity: saving ? 0.6 : 1,
-                transition: 'all 0.3s ease'
-              }}
-              onMouseOver={(e) => {
-                if (!saving) e.target.style.backgroundColor = '#A0522D';
-              }}
-              onMouseOut={(e) => {
-                if (!saving) e.target.style.backgroundColor = '#8B4513';
-              }}
+              className="ss-save-btn"
             >
               {saving ? 'Saving...' : 'Save Schedule'}
             </button>

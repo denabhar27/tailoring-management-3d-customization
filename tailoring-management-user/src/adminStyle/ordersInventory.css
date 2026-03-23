@@ -330,6 +330,56 @@
   color: #2e7d32 !important;
 }
 
+/* Consistent UI table styling across all admin pages */
+.orders-inventory-management .table-container {
+  background: #ffffff;
+  border: 1px solid #d7dff3;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(54, 75, 122, 0.08);
+  margin-top: 20px;
+}
+
+.orders-inventory-management .table-container thead th {
+  color: #8a93a6;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  border-bottom: 1px solid #e7ebf5;
+  padding: 10px 16px;
+  background: #ffffff;
+}
+
+.orders-inventory-management .table-container tbody td {
+  font-size: 12px;
+  color: #4f5a6d;
+  padding: 10px 16px;
+}
+
+.orders-inventory-management .table-container tbody tr {
+  border-bottom: 1px solid #eef2f8;
+}
+
+.orders-inventory-management .table-container tbody tr:hover {
+  background: #f9fbff;
+}
+
+.orders-inventory-management .status-badge {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.scrollable-table {
+  max-height: 500px;
+  overflow-y: auto;
+  border-radius: 10px;
+  border: 1px solid #e7ebf5;
+}
+
 /* Rental Post Section */
 .rental-post-section {
   background: #FFFFFF;

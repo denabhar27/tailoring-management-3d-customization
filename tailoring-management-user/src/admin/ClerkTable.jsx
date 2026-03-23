@@ -1,13 +1,18 @@
 import React from 'react';
 import './ClerkTable.css';
 
-const ClerkTable = ({ clerks, onDeactivate, onEdit }) => {
+const ClerkTable = ({ clerks, onToggleStatus, onEdit }) => {
+  const isClerkActive = (status) => {
+    const normalizedStatus = String(status || '').trim().toLowerCase();
+    if (normalizedStatus === '1') return true;
+    if (normalizedStatus === '0') return false;
+    if (normalizedStatus === 'active' || normalizedStatus === 'activated') return true;
+    if (normalizedStatus === 'inactive' || normalizedStatus === 'deactivated') return false;
+    return false;
+  };
+
   return (
     <div className="clerk-table-wrapper">
-      <div className="clerk-table-header">
-        <h3>Clerk Accounts Management</h3>
-        <p className="clerk-subtitle">Manage access for operational staff. Clerks cannot access billing or analytics.</p>
-      </div>
       <div className="clerk-table-scroll">
         <table className="clerk-table">
           <thead>
@@ -34,8 +39,8 @@ const ClerkTable = ({ clerks, onDeactivate, onEdit }) => {
                   <td>{clerk.email}</td>
                   <td>{clerk.phone_number}</td>
                   <td>
-                    <span className={`clerk-status ${clerk.status === 'active' ? 'active' : 'inactive'}`}>
-                      {clerk.status === 'active' ? 'Active' : 'Inactive'}
+                    <span className={`clerk-status ${isClerkActive(clerk.status) ? 'active' : 'inactive'}`}>
+                      {isClerkActive(clerk.status) ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td>{clerk.created_at ? new Date(clerk.created_at).toLocaleDateString() : '—'}</td>
@@ -44,12 +49,11 @@ const ClerkTable = ({ clerks, onDeactivate, onEdit }) => {
                       <i className="fa-solid fa-pen"></i>
                     </button>
                     <button
-                      className="btn-link danger"
-                      onClick={() => onDeactivate(clerk)}
-                      disabled={clerk.status === 'inactive'}
-                      title={clerk.status === 'inactive' ? 'Already inactive' : 'Deactivate clerk'}
+                      className={`btn-link ${isClerkActive(clerk.status) ? 'danger' : 'success'}`}
+                      onClick={() => onToggleStatus(clerk)}
+                      title={isClerkActive(clerk.status) ? 'Deactivate clerk' : 'Activate clerk'}
                     >
-                      Deactivate
+                      {isClerkActive(clerk.status) ? 'Deactivate' : 'Activate'}
                     </button>
                   </td>
                 </tr>

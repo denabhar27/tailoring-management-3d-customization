@@ -98,6 +98,49 @@ html, body {
 
 .inventory-management .stat-card:hover::before {
   transform: scaleX(1);
+
+/* Consistent UI table styling across all admin pages */
+.inventory-management .table-container {
+  background: #ffffff;
+  border: 1px solid #d7dff3;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(54, 75, 122, 0.08);
+  margin-top: 20px;
+}
+
+.inventory-management table thead th {
+  color: #8a93a6;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  border-bottom: 1px solid #e7ebf5;
+  padding: 10px 16px;
+  background: #ffffff;
+}
+
+.inventory-management table tbody td {
+  font-size: 12px;
+  color: #4f5a6d;
+  padding: 10px 16px;
+}
+
+.inventory-management table tbody tr {
+  border-bottom: 1px solid #eef2f8;
+}
+
+.inventory-management table tbody tr:hover {
+  background: #f9fbff;
+}
+
+.inventory-management .status-badge {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+}
 }
 
 .inventory-management .stat-card:hover {

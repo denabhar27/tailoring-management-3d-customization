@@ -1,6 +1,6 @@
 
 import * as React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -23,6 +23,7 @@ import { notificationService, isAuthenticated } from "../../utils/apiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { height, width } = Dimensions.get("window");
+const SERVICE_PAGE_WIDTH = width - 40;
 
 const services = [
   {
@@ -55,6 +56,8 @@ export default function HomeScreen() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeServiceIndex, setActiveServiceIndex] = useState(0);
+  const servicePagerRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     checkAuth();
@@ -194,15 +197,18 @@ export default function HomeScreen() {
             resizeMode="cover"
           />
           <LinearGradient
-            colors={["rgba(0,0,0,0.1)", "rgba(120,53,15,0.8)"]}
+            colors={["rgba(0,0,0,0.18)", "rgba(120,53,15,0.72)"]}
             style={StyleSheet.absoluteFill}
           />
           <View style={styles.heroBadge}>
             <Text style={styles.heroTitle}>
-              Welcome to Jackman&apos;s Tailor Deluxe!
+              Sustainable Collection 2025
+            </Text>
+            <Text style={styles.heroSubtitle}>
+              Timeless pieces crafted with care for the planet
             </Text>
             <View style={styles.heroButton}>
-              <Text style={styles.heroButtonText}>Your Perfect Fit Awaits</Text>
+              <Text style={styles.heroButtonText}>Explore Collection</Text>
             </View>
           </View>
         </View>
@@ -218,38 +224,74 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <View style={styles.servicesGrid}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tabBar}
+          >
+            {services.map((s, idx) => {
+              const active = activeServiceIndex === idx;
+              return (
+                <TouchableOpacity
+                  key={s.id}
+                  onPress={() => {
+                    setActiveServiceIndex(idx);
+                    servicePagerRef.current?.scrollTo({ x: idx * SERVICE_PAGE_WIDTH, animated: true });
+                  }}
+                  style={[styles.tabItem, active && styles.tabItemActive]}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.tabText, active && styles.tabTextActive]}>
+                    {s.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          <ScrollView
+            ref={servicePagerRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
+            snapToInterval={SERVICE_PAGE_WIDTH}
+            snapToAlignment="start"
+            onMomentumScrollEnd={(e) => {
+              const next = Math.round(e.nativeEvent.contentOffset.x / SERVICE_PAGE_WIDTH);
+              if (next !== activeServiceIndex) setActiveServiceIndex(next);
+            }}
+          >
             {services.map((s) => (
-              <TouchableOpacity
-                key={s.id}
-                style={styles.serviceCard}
-                activeOpacity={0.85}
-                onPress={() => {
-                  if (s.id === "s1") router.push("/rental");
-                  else if (s.id === "s2")
-                    router.push("/(tabs)/appointment/CustomizationService");
-                  else if (s.id === "s3")
-                    router.push("/(tabs)/appointment/RepairClothes");
-                  else router.push("/(tabs)/appointment/DryCleaning");
-                }}
-              >
-                <View style={styles.serviceImageContainer}>
-                  <Image
-                    source={s.icon}
-                    style={styles.serviceImage}
-                    resizeMode="cover"
-                  />
+              <View key={s.id} style={{ width: SERVICE_PAGE_WIDTH }}>
+                <TouchableOpacity
+                  style={styles.serviceHeroCard}
+                  activeOpacity={0.9}
+                  onPress={() => {
+                    if (s.id === "s1") router.push("/rental");
+                    else if (s.id === "s2")
+                      router.push("/(tabs)/appointment/CustomizationService");
+                    else if (s.id === "s3")
+                      router.push("/(tabs)/appointment/RepairClothes");
+                    else router.push("/(tabs)/appointment/DryCleaning");
+                  }}
+                >
+                  <Image source={s.icon} style={styles.serviceHeroImage} resizeMode="cover" />
                   <LinearGradient
-                    colors={["transparent", "rgba(15,23,42,0.92)"]}
-                    style={styles.serviceGradient}
+                    colors={["rgba(0,0,0,0.1)", "rgba(15,23,42,0.95)"]}
+                    style={StyleSheet.absoluteFillObject}
                   />
-                </View>
-                <View style={styles.serviceLabelContainer}>
-                  <Text style={styles.serviceLabel}>{s.label}</Text>
-                </View>
-              </TouchableOpacity>
+                  <View style={styles.serviceHeroContent}>
+                    <Text style={styles.serviceHeroTitle}>{s.label}</Text>
+                    <View style={styles.serviceCTA}>
+                      <Text style={styles.serviceCTAText}>Explore</Text>
+                      <Ionicons name="arrow-forward" size={15} color="#1F2937" />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
             ))}
-          </View>
+          </ScrollView>
         </View>
 
         <View style={styles.sectionContainer}>
@@ -380,7 +422,7 @@ const styles = StyleSheet.create({
   heroContainer: {
     marginHorizontal: 20,
     marginTop: 16,
-    height: height * 0.24,
+    height: height * 0.22,
     borderRadius: 24,
     overflow: "hidden",
     shadowColor: "#000",
@@ -390,23 +432,37 @@ const styles = StyleSheet.create({
     elevation: 18,
   },
   heroImage: { width: "100%", height: "100%" },
-  heroBadge: { position: "absolute", bottom: 24, left: 24, right: 24 },
+  heroBadge: {
+    position: "absolute",
+    top: 18,
+    left: 18,
+    right: 18,
+    alignItems: "center",
+  },
   heroTitle: {
-    fontSize: 24,
+    fontSize: 34,
     fontWeight: "800",
     color: "#fff",
+    textAlign: "center",
+    lineHeight: 38,
     textShadowColor: "rgba(0,0,0,0.6)",
     textShadowRadius: 10,
-    marginBottom: 16,
+  },
+  heroSubtitle: {
+    marginTop: 4,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.92)",
+    textAlign: "center",
+    marginBottom: 10,
   },
   heroButton: {
-    backgroundColor: "#FDE68A",
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 30,
-    alignSelf: "flex-start",
+    backgroundColor: "rgba(253,230,138,0.92)",
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 16,
+    alignSelf: "center",
   },
-  heroButtonText: { color: "#78350F", fontWeight: "700", fontSize: 15 },
+  heroButtonText: { color: "#78350F", fontWeight: "700", fontSize: 11 },
 
   // Sections
   sectionContainer: { marginTop: 28, paddingHorizontal: 20 },
@@ -442,35 +498,57 @@ const styles = StyleSheet.create({
   seeMoreText: { fontSize: 14, color: "#B45309", fontWeight: "700" },
 
   // Services Grid
-  servicesGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  serviceCard: {
-    width: (width - 52) / 2,
-    height: 130,
+  tabBar: { paddingHorizontal: 6, gap: 8, marginBottom: 12 },
+  tabItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
     backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  tabItemActive: {
+    backgroundColor: "#78350F",
+    borderColor: "#78350F",
+  },
+  tabText: { color: "#78350F", fontWeight: "700", fontSize: 13 },
+  tabTextActive: { color: "#FFFFFF" },
+  serviceHeroCard: {
+    height: 170,
+    marginHorizontal: 0,
+    marginBottom: 4,
     borderRadius: 20,
     overflow: "hidden",
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.10,
-    shadowRadius: 12,
+    backgroundColor: "#000",
   },
-  serviceImageContainer: { flex: 1 },
-  serviceImage: { width: "100%", height: "100%" },
-  serviceGradient: { ...StyleSheet.absoluteFillObject },
-  serviceLabelContainer: { position: "absolute", bottom: 12, left: 12 },
-  serviceLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#ffffff",
-    textShadowColor: "rgba(0,0,0,0.8)",
-    textShadowRadius: 8,
+  serviceHeroImage: { width: "100%", height: "100%", opacity: 0.92 },
+  serviceHeroContent: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
+  serviceHeroTitle: { color: "#fff", fontWeight: "800", fontSize: 20 },
+  serviceCTA: {
+    backgroundColor: "#FDE68A",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    minWidth: 104,
+    justifyContent: "center",
+    shadowColor: "#B45309",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  serviceCTAText: { color: "#1F2937", fontWeight: "800", fontSize: 13 },
 
   // Rentals Grid
   rentalGrid: {

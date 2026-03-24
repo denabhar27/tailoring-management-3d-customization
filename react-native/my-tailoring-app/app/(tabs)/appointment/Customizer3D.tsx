@@ -148,6 +148,11 @@ export default function Customizer3DScreen() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [isShopOpen, setIsShopOpen] = useState(true);
   const [controlsHidden, setControlsHidden] = useState(false);
+  const buildFreshCustomizerUrl = () => {
+    const separator = WEB_3D_CUSTOMIZER_URL.includes('?') ? '&' : '?';
+    return `${WEB_3D_CUSTOMIZER_URL}${separator}platform=mobile&ts=${Date.now()}`;
+  };
+  const [webCustomizerUrl, setWebCustomizerUrl] = useState(buildFreshCustomizerUrl());
 
   useEffect(() => {
     if (showConfirmModal) {
@@ -730,7 +735,14 @@ export default function Customizer3DScreen() {
     setLoadError(null);
     setIsLoading(true);
     setLoadingTime(0);
-    webViewRef.current?.reload();
+    setWebCustomizerUrl(buildFreshCustomizerUrl());
+  };
+
+  const handleRefreshCustomizer = () => {
+    setLoadError(null);
+    setIsLoading(true);
+    setLoadingTime(0);
+    setWebCustomizerUrl(buildFreshCustomizerUrl());
   };
 
   const handleOpenInBrowser = async () => {
@@ -801,7 +813,7 @@ export default function Customizer3DScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>3D Customizer</Text>
         <TouchableOpacity
-          onPress={() => webViewRef.current?.reload()}
+          onPress={handleRefreshCustomizer}
           style={styles.refreshButton}
         >
           <Ionicons name="refresh" size={22} color="#5D4037" />
@@ -823,7 +835,7 @@ export default function Customizer3DScreen() {
       </TouchableOpacity>
       <WebView
         ref={webViewRef}
-        source={{ uri: WEB_3D_CUSTOMIZER_URL }}
+        source={{ uri: webCustomizerUrl }}
         style={styles.webview}
         onLoadEnd={handleLoadEnd}
         onError={handleError}
@@ -842,7 +854,7 @@ export default function Customizer3DScreen() {
         scalesPageToFit={true}
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}
-        cacheEnabled={true}
+        cacheEnabled={false}
         thirdPartyCookiesEnabled={true}
         sharedCookiesEnabled={true}
         onContentProcessDidTerminate={() => {

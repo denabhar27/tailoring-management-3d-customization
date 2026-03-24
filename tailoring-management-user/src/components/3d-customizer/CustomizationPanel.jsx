@@ -148,6 +148,11 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
     { name: 'Royal Blue', value: '#2a4d8f' },
     { name: 'Wine Red', value: '#722F37' },
   ];
+  const sizeMeasurements = useMemo(() => ({
+    small: '20-28',
+    medium: '28-36',
+    large: '38-44'
+  }), []);
 
   const isCustomModelWithCategory = (categoryPrefix) => {
     if (!garment.startsWith('custom-')) return false;
@@ -217,12 +222,20 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                 </label>
               </div>
               <div className="row">
-                <label>Size
-                  <select value={size} onChange={e => setSize(e.target.value)}>
-                    <option value="small">Small</option>
-                    <option value="medium">Medium</option>
-                    <option value="large">Large</option>
-                  </select>
+                <label className={styles.sizeLabel}>Size
+                  <div className={styles.sizeFieldRow}>
+                    <select value={size} onChange={e => setSize(e.target.value)}>
+                      <option value="small">Small</option>
+                      <option value="medium">Medium</option>
+                      <option value="large">Large</option>
+                    </select>
+                    <div className={styles.sizeSelectedMeasurement}>
+                      <span className={styles.sizeSelectedLabel}>
+                        {size.charAt(0).toUpperCase() + size.slice(1)}
+                      </span>
+                      <strong>{sizeMeasurements[size]}</strong>
+                    </div>
+                  </div>
                 </label>
               </div>
               <div className="row">

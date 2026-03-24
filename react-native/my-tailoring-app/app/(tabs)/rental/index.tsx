@@ -44,6 +44,9 @@ export default function RentalLanding() {
   const [cardSizeSelections, setCardSizeSelections] = useState<{ [itemId: string]: { [sizeKey: string]: number } }>({});
   const [inlineMessage, setInlineMessage] = useState('');
   const [inlineMessageItemId, setInlineMessageItemId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const ITEMS_PER_PAGE = 8;
 
   useEffect(() => {
     fetchRentals();
@@ -63,6 +66,7 @@ export default function RentalLanding() {
 
       if (result.items && result.items.length > 0) {
         setRentals(result.items);
+        setCurrentPage(1);
       } else {
         setError('No rental items available');
       }
@@ -76,6 +80,33 @@ export default function RentalLanding() {
         setLoading(false);
       }
     }
+  };
+
+  const getCategories = () => {
+    const cats = new Set<string>();
+    rentals.forEach(r => {
+      const c = (r.category || '').toString().trim().toLowerCase();
+      if (c) cats.add(c);
+    });
+    return ['all', ...Array.from(cats)];
+  };
+
+  const getFilteredRentals = () => {
+    const list = activeCategory === 'all'
+      ? rentals
+      : rentals.filter(r => String(r.category || '').toLowerCase() === activeCategory);
+    return list;
+  };
+
+  const getPagedRentals = () => {
+    const list = getFilteredRentals();
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return list.slice(start, start + ITEMS_PER_PAGE);
+  };
+
+  const getTotalPages = () => {
+    const count = getFilteredRentals().length;
+    return Math.max(1, Math.ceil(count / ITEMS_PER_PAGE));
   };
 
   const onRefresh = () => {
@@ -449,6 +480,31 @@ export default function RentalLanding() {
               </TouchableOpacity>
             </View>
           </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryScroll}
+          >
+            {getCategories().map((cat) => {
+              const isActive = activeCategory === cat;
+              const label = cat === 'all' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1);
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  style={[styles.categoryChip, isActive && styles.categoryChipActive]}
+                  onPress={() => {
+                    setActiveCategory(cat);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <Text style={[styles.categoryText, isActive && styles.categoryTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#94665B" />
@@ -468,60 +524,77 @@ export default function RentalLanding() {
             <Text style={styles.emptyText}>No rentals available</Text>
           </View>
         ) : (
+          <>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaCount}>{getFilteredRentals().length} items</Text>
+            </View>
+            <View style={styles.rentalGrid}>
+              {getPagedRentals().map((item) => {
+                const selected = isItemSelected(item);
+                return (
+                  <TouchableOpacity
+                    key={item.item_id}
+                    style={[
+                      styles.rentalCard,
+                      isMultiSelectMode && selected && styles.rentalCardSelected
+                    ]}
+                    activeOpacity={0.88}
+                    onPress={() => toggleItemSelection(item)}
+                  >
+                    {isMultiSelectMode && (
+                      <View style={styles.selectionCheckbox}>
+                        <View style={[
+                          styles.checkbox,
+                          selected && styles.checkboxChecked
+                        ]}>
+                          {selected && (
+                            <Ionicons name="checkmark" size={16} color="#fff" />
+                          )}
+                        </View>
+                      </View>
+                    )}
 
-          <View style={styles.rentalGrid}>
-            {rentals.map((item) => {
-              const selected = isItemSelected(item);
-              return (
-                <TouchableOpacity
-                  key={item.item_id}
-                  style={[
-                    styles.rentalCard,
-                    isMultiSelectMode && selected && styles.rentalCardSelected
-                  ]}
-                  activeOpacity={0.88}
-                  onPress={() => toggleItemSelection(item)}
-                >
-                  {isMultiSelectMode && (
-                    <View style={styles.selectionCheckbox}>
-                      <View style={[
-                        styles.checkbox,
-                        selected && styles.checkboxChecked
-                      ]}>
-                        {selected && (
-                          <Ionicons name="checkmark" size={16} color="#fff" />
-                        )}
+                    <View style={styles.imageWrapper}>
+                      <Image
+                        source={getImageSource(item)}
+                        style={[
+                          styles.rentalImage,
+                          isMultiSelectMode && selected && styles.rentalImageSelected
+                        ]}
+                        resizeMode="cover"
+                      />
+                      <LinearGradient
+                        colors={["transparent", "rgba(0,0,0,0.6)"]}
+                        style={StyleSheet.absoluteFillObject}
+                      />
+                    </View>
+                    <View style={styles.rentalInfoOverlay}>
+                      <Text style={styles.rentalTitle} numberOfLines={2}>
+                        {item.item_name}
+                      </Text>
+                      <View style={styles.priceRow}>
+                        <Text style={styles.rentalPrice}>₱{parseFloat(item.price || 0).toLocaleString()}</Text>
+                        <Text style={styles.priceLabel}>/3 days</Text>
                       </View>
                     </View>
-                  )}
-
-                  <View style={styles.imageWrapper}>
-                    <Image
-                      source={getImageSource(item)}
-                      style={[
-                        styles.rentalImage,
-                        isMultiSelectMode && selected && styles.rentalImageSelected
-                      ]}
-                      resizeMode="cover"
-                    />
-                    <LinearGradient
-                      colors={["transparent", "rgba(0,0,0,0.6)"]}
-                      style={StyleSheet.absoluteFillObject}
-                    />
-                  </View>
-                  <View style={styles.rentalInfoOverlay}>
-                    <Text style={styles.rentalTitle} numberOfLines={2}>
-                      {item.item_name}
-                    </Text>
-                    <View style={styles.priceRow}>
-                      <Text style={styles.rentalPrice}>₱{parseFloat(item.price || 0).toLocaleString()}</Text>
-                      <Text style={styles.priceLabel}>/3 days</Text>
-                    </View>
-                  </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.pager}>
+              {Array.from({ length: getTotalPages() }, (_, i) => i + 1).map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={[styles.pageBtn, currentPage === p && styles.pageBtnActive]}
+                  onPress={() => setCurrentPage(p)}
+                >
+                  <Text style={[styles.pageBtnText, currentPage === p && styles.pageBtnTextActive]}>
+                    {p}
+                  </Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
+              ))}
+            </View>
+          </>
         )}
         </View>
       </ScrollView>
@@ -920,6 +993,49 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-between",
     paddingBottom: 30,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingHorizontal: 2,
+  },
+  metaCount: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  pager: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  pageBtn: {
+    minWidth: 34,
+    height: 34,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  pageBtnActive: {
+    backgroundColor: '#78350F',
+    borderColor: '#78350F',
+  },
+  pageBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#78350F',
+  },
+  pageBtnTextActive: {
+    color: '#FFFFFF',
   },
   rentalCard: {
     width: (width - 52) / 2,

@@ -29,6 +29,7 @@ export default function RentalDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [addingToCart, setAddingToCart] = useState(false);
+  const [selectedSizeKey, setSelectedSizeKey] = useState<string | null>(null);
 
   const today = new Date();
   const [startDate, setStartDate] = useState<Date | null>(null);
@@ -156,7 +157,15 @@ export default function RentalDetail() {
       console.log('Rental details:', result);
 
       if (result.item) {
-        setItem(result.item);
+        const loaded = result.item;
+        setItem(loaded);
+        try {
+          const sizeOpts = loaded?.size_options || null;
+          if (sizeOpts && typeof sizeOpts === 'object') {
+            const firstKey = Object.keys(sizeOpts)[0] || null;
+            if (firstKey) setSelectedSizeKey(firstKey);
+          }
+        } catch {}
       } else {
         setError('Rental item not found');
       }
@@ -326,7 +335,7 @@ export default function RentalDetail() {
         specificData: {
           item_name: item.item_name,
           brand: item.brand || '',
-          size: item.size || '',
+          size: selectedSizeKey ? (item.size_options?.[selectedSizeKey]?.label || selectedSizeKey) : (item.size || ''),
           category: item.category || '',
           color: item.color || '',
           material: item.material || '',
@@ -396,6 +405,33 @@ export default function RentalDetail() {
               })()}/3 days
             </Text>
           </View>
+          {item?.size_options && Object.keys(item.size_options).length > 0 && (
+            <View style={styles.sizeSection}>
+              <Text style={styles.sizeSectionLabel}>Select Size</Text>
+              <View style={styles.sizeChips}>
+                {Object.entries(item.size_options).map(([key, opt]: any) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[
+                      styles.sizeChip,
+                      selectedSizeKey === key && styles.sizeChipActive
+                    ]}
+                    onPress={() => setSelectedSizeKey(key)}
+                    activeOpacity={0.85}
+                  >
+                    <Text
+                      style={[
+                        styles.sizeChipText,
+                        selectedSizeKey === key && styles.sizeChipTextActive
+                      ]}
+                    >
+                      {(opt?.label || key).toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
           <View style={styles.detailsGrid}>
             {[
               { key: "color", icon: "color-palette-outline", value: item.color },
@@ -475,12 +511,6 @@ export default function RentalDetail() {
             </View>
           )}
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>About this garment</Text>
-            <Text style={styles.description}>
-              {item.description || "Premium rental garment. Perfect for formal occasions."}
-            </Text>
-          </View>
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Rental Period</Text>
             <TouchableOpacity
@@ -818,6 +848,23 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   description: { fontSize: 15.5, color: "#52525B", lineHeight: 24 },
+  sizeSection: { marginTop: 20 },
+  sizeSectionLabel: { fontSize: 14, fontWeight: "700", color: "#1F2937", marginBottom: 10 },
+  sizeChips: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  sizeChip: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    backgroundColor: "#FAFAFA",
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+  },
+  sizeChipActive: {
+    backgroundColor: "#78350F",
+    borderColor: "#78350F",
+  },
+  sizeChipText: { fontSize: 13, fontWeight: "700", color: "#78350F" },
+  sizeChipTextActive: { color: "#FFFFFF" },
   calendarBtn: {
     backgroundColor: "#FAFAFA",
     padding: 18,

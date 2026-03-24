@@ -20,102 +20,117 @@ function Sidebar() {
     setRole(getUserRole() || 'admin');
   }, []);
 
-  return (
-    <aside className='sidebar'>
-      <div className='profile'>
-  <div className="profile-header">
-    <img
-  src={logo}
-  alt="D'jackman Tailor Deluxe Logo"
-  className="profile-logo"
-    />
-    <h3 className="p" style={{ color: 'rgb(139, 69, 19)' }}>D'jackman Tailor Deluxe</h3>
-  </div>
-</div>
+  const navLinkClass = ({ isActive }) => isActive ? 'sidebar-nav-link active' : 'sidebar-nav-link';
 
-      <nav>
-        {role === 'admin' && (
-          <NavLink to="/admin" className={({ isActive }) => isActive ? 'active' : ''}>
-            <i className="fas fa-home nav-icon"></i>
-            Dashboard
-          </NavLink>
-        )}
-        <NavLink to="/customize" className={({ isActive }) => isActive ? 'active' : ''}>
-          <i className="fas fa-tshirt nav-icon"></i>
-          Customization
-        </NavLink>
-        <NavLink to="/drycleaning" className={({ isActive }) => isActive ? 'active' : ''}>
-          <i className="fas fa-tint nav-icon"></i>
-          Dry Cleaning
-        </NavLink>
-        <div className="menu-item-with-submenu">
-          <div
-            onClick={() => setRentalSubmenuOpen(!rentalSubmenuOpen)}
-            className={isRentalActive ? 'menu-parent active' : 'menu-parent'}
-          >
-            <i className="fas fa-box nav-icon"></i>
-            <span>Rental</span>
-            <span className="submenu-arrow">{rentalSubmenuOpen ? '▲' : '▼'}</span>
+  return (
+    <aside className='sidebar sidebar-modern'>
+      <div className='profile'>
+        <div className="profile-header">
+          <img
+            src={logo}
+            alt="D'jackman Tailor Deluxe Logo"
+            className="profile-logo"
+          />
+          <div className="sidebar-brand-meta">
+            <h3 className="p" style={{ color: 'rgb(139, 69, 19)' }}>D'jackman Tailor Deluxe</h3>
           </div>
-          {rentalSubmenuOpen && (
-            <div className="submenu-container">
-              <NavLink
-                to="/rental"
-                className={({ isActive }) => isActive ? 'submenu-item active' : 'submenu-item'}
-              >
-                <i className="fas fa-box nav-icon"></i>
-                Rental
-              </NavLink>
-              <NavLink
-                to="/Post"
-                className={({ isActive }) => isActive ? 'submenu-item active' : 'submenu-item'}
-              >
-                <i className="fas fa-add nav-icon"></i>
-                Post rent
-              </NavLink>
-            </div>
+        </div>
+      </div>
+
+      <nav className="sidebar-nav-groups">
+        <div className="sidebar-group">
+          <p className="sidebar-group-title">Main</p>
+          {role === 'admin' && (
+            <NavLink to="/admin" className={navLinkClass}>
+              <i className="fas fa-th-large nav-icon"></i>
+              <span>Dashboard</span>
+            </NavLink>
           )}
         </div>
-        <NavLink to="/repair" className={({ isActive }) => isActive ? 'active' : ''}>
-          <i className="fas fa-cut nav-icon"></i>
-          Repair
-        </NavLink>
-        {role === 'admin' && (
-          <NavLink to="/orders-inventory" className={({ isActive }) => isActive ? 'active' : ''}>
-            <i className="fas fa-clipboard-list nav-icon"></i>
-            Orders & Inventory
+
+        <div className="sidebar-group">
+          <p className="sidebar-group-title">Operations</p>
+          <NavLink to="/customize" className={navLinkClass}>
+            <i className="fas fa-tshirt nav-icon"></i>
+            <span>Customization</span>
           </NavLink>
-        )}
-        {role === 'admin' && (
-          <NavLink to="/billing" className={({ isActive }) => isActive ? 'active' : ''}>
-            <i className="fas fa-file-invoice-dollar nav-icon"></i>
-            Billing
+          <NavLink to="/drycleaning" className={navLinkClass}>
+            <i className="fas fa-box-open nav-icon"></i>
+            <span>Dry Cleaning</span>
           </NavLink>
-        )}
-        {/*<NavLink to="/inventory" className={({ isActive }) => isActive ? 'active' : ''}>
-          <i className="fas fa-boxes nav-icon"></i>
-          Inventory
-        </NavLink>*/}
-        <NavLink to="/customers" className={({ isActive }) => isActive ? 'active' : ''}>
-          <i className="fas fa-users nav-icon"></i>
-          Customer List
-        </NavLink>
-        {role === 'admin' && (
-          <NavLink to="/shop-schedule" className={({ isActive }) => isActive ? 'active' : ''}>
-            <i className="fas fa-store nav-icon"></i>
-            Shop Schedule
+
+          <div className="menu-item-with-submenu sidebar-submenu-block">
+            <div
+              onClick={() => setRentalSubmenuOpen(!rentalSubmenuOpen)}
+              className={isRentalActive ? 'menu-parent sidebar-nav-link active' : 'menu-parent sidebar-nav-link'}
+            >
+              <i className="fas fa-box nav-icon"></i>
+              <span>Rental</span>
+              <span className="submenu-arrow">{rentalSubmenuOpen ? '▾' : '▸'}</span>
+            </div>
+            {rentalSubmenuOpen && (
+              <div className="submenu-container">
+                <NavLink to="/rental" className={({ isActive }) => isActive ? 'submenu-item active' : 'submenu-item'}>
+                  <i className="fas fa-box nav-icon"></i>
+                  <span>Rental</span>
+                </NavLink>
+                <NavLink to="/Post" className={({ isActive }) => isActive ? 'submenu-item active' : 'submenu-item'}>
+                  <i className="fas fa-plus nav-icon"></i>
+                  <span>Post rent</span>
+                </NavLink>
+              </div>
+            )}
+          </div>
+
+          <NavLink to="/repair" className={navLinkClass}>
+            <i className="fas fa-cut nav-icon"></i>
+            <span>Repair</span>
           </NavLink>
-        )}
-        {role === 'admin' && (
-          <NavLink to="/clerk-management" className={({ isActive }) => isActive ? 'active' : ''}>
-            <i className="fas fa-id-badge nav-icon"></i>
-            Clerk Management
+        </div>
+
+        <div className="sidebar-group">
+          <p className="sidebar-group-title">Commerce</p>
+          {role === 'admin' && (
+            <NavLink to="/orders-inventory" className={navLinkClass}>
+              <i className="fas fa-clipboard-list nav-icon"></i>
+              <span>Orders & Inventory</span>
+            </NavLink>
+          )}
+          {role === 'admin' && (
+            <NavLink to="/billing" className={navLinkClass}>
+              <i className="fas fa-credit-card nav-icon"></i>
+              <span>Billing</span>
+            </NavLink>
+          )}
+          <NavLink to="/walk-in-orders" className={navLinkClass}>
+            <i className="fas fa-walking nav-icon"></i>
+            <span>Walk-In Orders</span>
           </NavLink>
-        )}
-        <NavLink to="/walk-in-orders" className={({ isActive }) => isActive ? 'active' : ''}>
-          <i className="fas fa-walking nav-icon"></i>
-          Walk-In Orders
-        </NavLink>
+        </div>
+
+        <div className="sidebar-group">
+          <p className="sidebar-group-title">People</p>
+          <NavLink to="/customers" className={navLinkClass}>
+            <i className="fas fa-users nav-icon"></i>
+            <span>Customer List</span>
+          </NavLink>
+          {role === 'admin' && (
+            <NavLink to="/clerk-management" className={navLinkClass}>
+              <i className="fas fa-user-tie nav-icon"></i>
+              <span>Clerk Management</span>
+            </NavLink>
+          )}
+        </div>
+
+        <div className="sidebar-group sidebar-group-last">
+          <p className="sidebar-group-title">Settings / Admin</p>
+          {role === 'admin' && (
+            <NavLink to="/shop-schedule" className={navLinkClass}>
+              <i className="fas fa-calendar-alt nav-icon"></i>
+              <span>Shop Schedule</span>
+            </NavLink>
+          )}
+        </div>
       </nav>
     </aside>
   );

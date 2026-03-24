@@ -1,11 +1,29 @@
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAlert } from '../context/AlertContext'
 import "../adminStyle/appointments.css"
 
 function AdminHeader() {
     const navigate = useNavigate();
+  const location = useLocation();
     const { confirm } = useAlert();
+
+  const routeMetaMap = {
+    '/admin': { section: 'Main', page: 'Dashboard' },
+    '/customize': { section: 'Operations', page: 'Customization' },
+    '/drycleaning': { section: 'Operations', page: 'Dry Cleaning' },
+    '/rental': { section: 'Operations', page: 'Rental' },
+    '/Post': { section: 'Operations', page: 'Post Rent' },
+    '/repair': { section: 'Operations', page: 'Repair' },
+    '/orders-inventory': { section: 'Commerce', page: 'Orders & Inventory' },
+    '/billing': { section: 'Commerce', page: 'Billing' },
+    '/walk-in-orders': { section: 'Commerce', page: 'Walk-In Orders' },
+    '/customers': { section: 'People', page: 'Customer List' },
+    '/clerk-management': { section: 'People', page: 'Clerk Management' },
+    '/shop-schedule': { section: 'Settings / Admin', page: 'Shop Schedule' }
+  };
+
+  const currentMeta = routeMetaMap[location.pathname] || { section: 'Admin', page: 'Dashboard' };
 
     const handleLogout = async () => {
         const confirmed = await confirm(
@@ -24,29 +42,16 @@ function AdminHeader() {
     };
 
     return (
-        <nav className="navbar" style={{ justifyContent: 'space-between' }}>
-          <div className="logo" style={{ display: 'flex', alignItems: 'center' }}>
-            Welcome back, Admin!
+        <nav className="navbar admin-header-bar">
+          <div className="admin-header-breadcrumb" aria-label="Current section and action">
+            <span className="admin-header-section">{currentMeta.section}</span>
+            <span className="admin-header-separator"> / </span>
+            <span className="admin-header-page">{currentMeta.page}</span>
           </div>
           <button
             onClick={handleLogout}
             title="Logout"
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '18px',
-              color: '#ffffff',
-              padding: '8px',
-              borderRadius: '5px',
-              transition: 'all 0.2s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'transparent';
-            }}
+            className="admin-header-logout"
           >
             <i className="fa-solid fa-right-from-bracket"></i>
           </button>

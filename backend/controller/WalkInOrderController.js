@@ -112,6 +112,7 @@ exports.createRentalOrder = async (req, res) => {
       customerPhone,
       rentalItemId, 
       rentalItemIds, 
+      rentalItemSelections,
       rentalDuration,
       eventDate,
       damageDeposit,
@@ -169,51 +170,174 @@ exports.createRentalOrder = async (req, res) => {
         const endDate = new Date(startDate);
         endDate.setDate(endDate.getDate() + parseInt(rentalDuration) - 1);
 
+        const parsedDuration = Math.max(1, parseInt(rentalDuration, 10) || 1);
+        const durationMultiplier = Math.ceil(parsedDuration / 3);
+
+        const normalizeSelectionMap = () => {
+          const map = new Map();
+          if (!Array.isArray(rentalItemSelections)) return map;
+          rentalItemSelections.forEach((entry) => {
+            const itemId = parseInt(entry?.itemId || entry?.item_id || entry?.id, 10);
+            if (!itemId) return;
+            const sizes = Array.isArray(entry?.selected_sizes)
+              ? entry.selected_sizes
+              : (Array.isArray(entry?.selectedSizes) ? entry.selectedSizes : []);
+            const normalizedSizes = sizes
+              .map((size) => {
+                const sizeKey = String(size?.sizeKey || size?.size_key || '').trim();
+                const label = String(size?.label || sizeKey).trim();
+                const quantity = Math.max(0, parseInt(size?.quantity, 10) || 0);
+                const price = Math.max(0, parseFloat(size?.price || 0));
+                if (!sizeKey || quantity <= 0) return null;
+                return { sizeKey, label, quantity, price };
+              })
+              .filter(Boolean);
+
+            const quantityFromSizes = normalizedSizes.reduce((sum, s) => sum + s.quantity, 0);
+            const quantity = Math.max(0, parseInt(entry?.quantity, 10) || quantityFromSizes || 1);
+            map.set(itemId, { quantity, selected_sizes: normalizedSizes });
+          });
+          return map;
+        };
+
+        const selectionMap = normalizeSelectionMap();
+
         let totalPrice = 0;
         let totalDownpayment = 0;
         const orderItems = [];
         const bundleItems = [];
+        const inventoryUpdates = [];
+        let validationError = null;
 
         rentalItems.forEach((rentalItem) => {
-          const basePrice = parseFloat(rentalItem.price || 0); // Price is per 3 days
-          const durationMultiplier = Math.ceil(parseInt(rentalDuration) / 3); // Calculate how many 3-day periods
-          const itemPrice = basePrice * durationMultiplier;
-          const itemDownpayment = parseFloat(rentalItem.downpayment || 0);
+          const basePrice = parseFloat(rentalItem.price || 0);
+          const itemDownpaymentBase = parseFloat(rentalItem.downpayment || 0);
+          const selectedEntry = selectionMap.get(parseInt(rentalItem.item_id, 10)) || null;
+
+          let parsedSize = null;
+          try {
+            parsedSize = rentalItem.size && typeof rentalItem.size === 'string'
+              ? JSON.parse(rentalItem.size)
+              : rentalItem.size;
+          } catch {
+            parsedSize = null;
+          }
+
+          const sizeEntries = Array.isArray(parsedSize?.size_entries) ? parsedSize.size_entries : [];
+          const hasSizeProfile = sizeEntries.length > 0;
+
+          let normalizedSelectedSizes = [];
+          let itemQuantity = 1;
+
+          if (hasSizeProfile) {
+            const requestedSizes = selectedEntry?.selected_sizes || [];
+            if (!requestedSizes.length) {
+              validationError = `Please select size and quantity for "${rentalItem.item_name}".`;
+              return;
+            }
+
+            const byKey = new Map();
+            sizeEntries.forEach((entry) => {
+              const key = String(entry?.sizeKey || '').trim();
+              if (!key) return;
+              byKey.set(key, {
+                key,
+                label: entry?.label || key,
+                available: Math.max(0, parseInt(entry?.quantity, 10) || 0),
+                price: Math.max(0, parseFloat(entry?.price || 0))
+              });
+            });
+
+            requestedSizes.forEach((sel) => {
+              const key = String(sel.sizeKey || '').trim();
+              const qty = Math.max(0, parseInt(sel.quantity, 10) || 0);
+              if (!key || qty <= 0) return;
+              const source = byKey.get(key);
+              if (!source) {
+                validationError = `Size "${sel.label || key}" not found for "${rentalItem.item_name}".`;
+                return;
+              }
+              if (qty > source.available) {
+                validationError = `Not enough stock for "${source.label}" in "${rentalItem.item_name}". Available: ${source.available}, requested: ${qty}.`;
+                return;
+              }
+              normalizedSelectedSizes.push({
+                sizeKey: key,
+                label: source.label,
+                quantity: qty,
+                price: source.price > 0 ? source.price : basePrice
+              });
+            });
+
+            itemQuantity = normalizedSelectedSizes.reduce((sum, sel) => sum + sel.quantity, 0);
+            if (itemQuantity <= 0) {
+              validationError = `Please select at least one quantity for "${rentalItem.item_name}".`;
+              return;
+            }
+          } else {
+            itemQuantity = Math.max(1, parseInt(selectedEntry?.quantity, 10) || 1);
+          }
+
+          const itemPrice = hasSizeProfile
+            ? normalizedSelectedSizes.reduce((sum, sel) => sum + (sel.quantity * (sel.price > 0 ? sel.price : basePrice) * durationMultiplier), 0)
+            : (basePrice * durationMultiplier * itemQuantity);
+          const itemDownpayment = itemDownpaymentBase * itemQuantity;
           
           totalPrice += itemPrice;
           totalDownpayment += itemDownpayment;
+
+          const sizeSummary = hasSizeProfile
+            ? normalizedSelectedSizes.map((sel) => `${sel.label} x${sel.quantity}`).join(', ')
+            : (rentalItem.size || 'N/A');
+
+          if (hasSizeProfile) {
+            inventoryUpdates.push({
+              item_id: rentalItem.item_id,
+              parsedSize,
+              selected_sizes: normalizedSelectedSizes
+            });
+          } else {
+            inventoryUpdates.push({
+              item_id: rentalItem.item_id,
+              quantity: itemQuantity,
+              total_available: Math.max(0, parseInt(rentalItem.total_available, 10) || 0)
+            });
+          }
 
           bundleItems.push({
             id: rentalItem.item_id,
             item_name: rentalItem.item_name,
             brand: rentalItem.brand || '',
-            size: rentalItem.size || '',
+            size: sizeSummary,
             category: rentalItem.category || '',
             image_url: rentalItem.image_url || '',
             front_image: rentalItem.front_image || '',
             back_image: rentalItem.back_image || '',
             side_image: rentalItem.side_image || '',
+            selected_sizes: normalizedSelectedSizes,
             individual_cost: itemPrice
           });
 
           orderItems.push({
             service_type: 'rental',
             service_id: rentalItem.item_id,
-            quantity: 1,
+            quantity: itemQuantity,
             base_price: basePrice.toString(),
             final_price: itemPrice.toString(),
             rental_start_date: startDate.toISOString().split('T')[0],
             rental_end_date: endDate.toISOString().split('T')[0],
             pricing_factors: JSON.stringify({
-              rental_duration: rentalDuration.toString(),
+              rental_duration: parsedDuration.toString(),
               base_price_per_3_days: basePrice.toString(),
+              duration_multiplier: durationMultiplier.toString(),
               deposit_amount: itemDownpayment.toString(),
               downpayment: itemDownpayment.toString()
             }),
             specific_data: JSON.stringify({
               item_name: rentalItem.item_name,
               brand: rentalItem.brand || '',
-              size: rentalItem.size || '',
+              size: sizeSummary,
+              selected_sizes: normalizedSelectedSizes,
               category: rentalItem.category || '',
               image_url: rentalItem.image_url || '',
               front_image: rentalItem.front_image || '',
@@ -225,6 +349,13 @@ exports.createRentalOrder = async (req, res) => {
             })
           });
         });
+
+        if (validationError) {
+          return res.status(400).json({
+            success: false,
+            message: validationError
+          });
+        }
 
         const finalDownpayment = parseFloat(damageDeposit || totalDownpayment.toString());
 
@@ -248,56 +379,98 @@ exports.createRentalOrder = async (req, res) => {
             });
           }
 
-          const updatePlaceholders = itemIds.map(() => '?').join(',');
-          const updateInventorySql = `
-            UPDATE rental_inventory 
-            SET status = 'rented',
-                rented_by_customer_id = ?,
-                rented_date = NOW()
-            WHERE item_id IN (${updatePlaceholders})
-          `;
-          
-          const updateValues = [customer.id, ...itemIds];
-          console.log('[WALK-IN RENTAL] Updating inventory with SQL:', updateInventorySql);
-          console.log('[WALK-IN RENTAL] Update values:', updateValues);
-          
-          db.query(updateInventorySql, updateValues, (updateErr, updateResult) => {
-            if (updateErr) {
-              console.error('[WALK-IN RENTAL] ❌ Error updating rental inventory:', updateErr);
-              console.error('[WALK-IN RENTAL] SQL:', updateInventorySql);
-              console.error('[WALK-IN RENTAL] Values:', updateValues);
-              
-            } else {
-              console.log('[WALK-IN RENTAL] ✅ Inventory updated, affected rows:', updateResult?.affectedRows);
-            }
+          const orderId = orderResult?.orderId || orderResult?.order_id || null;
+          if (!orderId) {
+            return res.status(500).json({
+              success: false,
+              message: 'Order created but order ID not found in result',
+              error: 'Invalid order result structure'
+            });
+          }
 
-            console.log('[WALK-IN RENTAL] ✅ Order created successfully');
-            console.log('[WALK-IN RENTAL] Order result:', JSON.stringify(orderResult, null, 2));
-            
-            const orderId = orderResult?.orderId || orderResult?.order_id || null;
-            if (!orderId) {
-              console.error('[WALK-IN RENTAL] ❌ Order ID not found in result:', orderResult);
-              return res.status(500).json({
-                success: false,
-                message: 'Order created but order ID not found in result',
-                error: 'Invalid order result structure'
+          const applyInventoryUpdates = (index = 0) => {
+            if (index >= inventoryUpdates.length) {
+              console.log('[WALK-IN RENTAL] ✅ Inventory updates completed');
+              return res.json({
+                success: true,
+                message: `Walk-in rental order created successfully${isBundle && itemIds.length > 1 ? ' (bundle)' : ''}`,
+                order: {
+                  orderId: orderId,
+                  customer: customer,
+                  totalPrice: totalPrice,
+                  rentalItems: rentalItems.map(item => ({
+                    id: item.item_id,
+                    name: item.item_name
+                  }))
+                }
               });
             }
-            
-            res.json({
-              success: true,
-              message: `Walk-in rental order created successfully${isBundle && itemIds.length > 1 ? ' (bundle)' : ''}`,
-              order: {
-                orderId: orderId,
-                customer: customer,
-                totalPrice: totalPrice,
-                rentalItems: rentalItems.map(item => ({
-                  id: item.item_id,
-                  name: item.item_name
-                }))
+
+            const updateEntry = inventoryUpdates[index];
+
+            if (updateEntry.parsedSize && Array.isArray(updateEntry.parsedSize.size_entries)) {
+              const nextSizePayload = { ...updateEntry.parsedSize, size_entries: [...updateEntry.parsedSize.size_entries] };
+              const byKey = new Map();
+              nextSizePayload.size_entries.forEach((entry, idx) => {
+                const key = String(entry?.sizeKey || '').trim();
+                if (key) byKey.set(key, idx);
+              });
+
+              updateEntry.selected_sizes.forEach((sel) => {
+                const idxSize = byKey.get(String(sel.sizeKey || '').trim());
+                if (idxSize === undefined) return;
+                const current = Math.max(0, parseInt(nextSizePayload.size_entries[idxSize].quantity, 10) || 0);
+                nextSizePayload.size_entries[idxSize].quantity = Math.max(0, current - sel.quantity);
+              });
+
+              const nextTotal = nextSizePayload.size_entries.reduce((sum, entry) => {
+                return sum + Math.max(0, parseInt(entry?.quantity, 10) || 0);
+              }, 0);
+              const nextStatus = nextTotal > 0 ? 'available' : 'rented';
+
+              const updateSql = `
+                UPDATE rental_inventory
+                SET size = ?, total_available = ?, status = ?, rented_by_customer_id = ?, rented_date = NOW()
+                WHERE item_id = ?
+              `;
+              const values = [JSON.stringify(nextSizePayload), nextTotal, nextStatus, customer.id, updateEntry.item_id];
+
+              return db.query(updateSql, values, (invErr) => {
+                if (invErr) {
+                  console.error('[WALK-IN RENTAL] ❌ Error updating size inventory:', invErr);
+                  return res.status(500).json({
+                    success: false,
+                    message: 'Order created but failed to update rental size inventory',
+                    error: invErr.message || invErr
+                  });
+                }
+                applyInventoryUpdates(index + 1);
+              });
+            }
+
+            const currentAvailable = Math.max(0, parseInt(updateEntry.total_available, 10) || 0);
+            const nextAvailable = Math.max(0, currentAvailable - Math.max(1, parseInt(updateEntry.quantity, 10) || 1));
+            const nextStatus = nextAvailable > 0 ? 'available' : 'rented';
+            const updateSql = `
+              UPDATE rental_inventory
+              SET total_available = ?, status = ?, rented_by_customer_id = ?, rented_date = NOW()
+              WHERE item_id = ?
+            `;
+            const values = [nextAvailable, nextStatus, customer.id, updateEntry.item_id];
+            db.query(updateSql, values, (invErr) => {
+              if (invErr) {
+                console.error('[WALK-IN RENTAL] ❌ Error updating inventory:', invErr);
+                return res.status(500).json({
+                  success: false,
+                  message: 'Order created but failed to update rental inventory',
+                  error: invErr.message || invErr
+                });
               }
+              applyInventoryUpdates(index + 1);
             });
-          });
+          };
+
+          applyInventoryUpdates(0);
         });
       });
     });

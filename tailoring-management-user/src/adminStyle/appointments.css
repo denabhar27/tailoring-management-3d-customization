@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap');
 
 * {
 
@@ -30,6 +30,43 @@ body {
 
   overflow-x: hidden;
 
+}
+
+html,
+body {
+  background: #ffffff;
+}
+
+/* Keep admin page shells visually consistent across per-page stylesheets */
+.admin-page,
+.billing-management,
+.dry-cleaning-management,
+.orders-inventory-management,
+.postrent,
+.customization-management,
+.inventory-management,
+.walk-in-orders-page,
+.content {
+  background: #ffffff !important;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #e2e2e2;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #b3b3b3;
+  border-radius: 10px;
+  border: 2px solid #e2e2e2;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #979797;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -88,6 +125,100 @@ html {
 
 }
 
+.navbar.admin-header-bar {
+
+  left: 270px;
+
+  height: 54px;
+
+  padding: 0 16px;
+
+  justify-content: space-between;
+
+  background: #ffffff;
+
+  box-shadow: none;
+
+  border-bottom: 1px solid #d6d6d6;
+
+}
+
+.admin-header-breadcrumb {
+
+  display: flex;
+
+  align-items: center;
+
+  font-family: 'Outfit', sans-serif;
+
+  font-size: 14.5px;
+
+  line-height: 1.2;
+
+}
+
+.admin-header-section {
+
+  color: #a48d77;
+
+  font-weight: 500;
+
+}
+
+.admin-header-separator {
+
+  color: #8f8f8f;
+
+  margin: 0 3px;
+
+  font-weight: 500;
+
+}
+
+.admin-header-page {
+
+  color: #2d2520;
+
+  font-weight: 600;
+
+}
+
+.admin-header-logout {
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  width: 20px;
+
+  height: 20px;
+
+  border: none;
+
+  border-radius: 6px;
+
+  background: transparent;
+
+  color: #6f5b49;
+
+  cursor: pointer;
+
+  font-size: 12px;
+
+  transition: background-color 0.2s ease, color 0.2s ease;
+
+}
+
+.admin-header-logout:hover {
+
+  background: #d9d3cd;
+
+  color: #3e352d;
+
+}
+
 .logo {
 
   color: #000000;
@@ -120,7 +251,300 @@ html {
 
   overflow-x: hidden;
 
+  -ms-overflow-style: none;
+
   z-index: 200;
+
+}
+
+.sidebar::-webkit-scrollbar {
+
+  width: 0;
+
+  height: 0;
+
+  display: none;
+
+}
+
+.sidebar.sidebar-modern {
+
+  width: 270px;
+
+  background: #ffffff;
+
+  box-shadow: none;
+
+  border-right: 1px solid #dedede;
+
+  font-family: 'Outfit', sans-serif;
+
+}
+
+.sidebar.sidebar-modern .profile {
+
+  padding: 22px 18px 20px;
+
+  border-bottom: 1px solid #d8d8d8;
+
+}
+
+.sidebar.sidebar-modern .profile-header {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+
+}
+
+.sidebar.sidebar-modern .profile-logo {
+
+  width: 50px;
+
+  height: 50px;
+
+  object-fit: contain;
+
+  border-radius: 12px;
+
+}
+
+.sidebar.sidebar-modern .profile .p {
+
+  color: #111 !important;
+
+  font-size: 13px;
+
+  line-height: 1.2;
+
+  font-family: 'Outfit', sans-serif;
+
+  font-weight: 600;
+
+}
+
+.sidebar.sidebar-modern .sidebar-brand-meta {
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 1px;
+
+}
+
+.sidebar.sidebar-modern .sidebar-user-name {
+
+  font-size: 13px;
+
+  line-height: 1.25;
+
+  font-weight: 500;
+
+  color: #4b3f34;
+
+}
+
+.sidebar.sidebar-modern .sidebar-user-role {
+
+  font-size: 11px;
+
+  line-height: 1.2;
+
+  font-weight: 500;
+
+  color: #8b7d6f;
+
+}
+
+.sidebar.sidebar-modern nav.sidebar-nav-groups {
+
+  padding: 18px 12px 24px;
+
+  margin: 0;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 10px;
+
+}
+
+.sidebar.sidebar-modern .sidebar-group {
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 3px;
+
+}
+
+.sidebar.sidebar-modern .sidebar-group-last .sidebar-nav-link:last-child {
+
+  margin-bottom: 18px;
+
+}
+
+.sidebar.sidebar-modern .sidebar-group-title {
+
+  padding: 0 10px;
+
+  margin: 14px 0 6px;
+
+  font-size: 10px;
+
+  line-height: 1.2;
+
+  letter-spacing: 0.12em;
+
+  text-transform: uppercase;
+
+  color: #a48d77;
+
+  font-weight: 700;
+
+  font-family: 'Outfit', sans-serif;
+
+}
+
+.sidebar.sidebar-modern .sidebar-group:first-child .sidebar-group-title {
+
+  margin-top: 0;
+
+}
+
+.sidebar.sidebar-modern .sidebar-nav-link,
+.sidebar.sidebar-modern .menu-parent,
+.sidebar.sidebar-modern .submenu-item {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 10px;
+
+  margin: 0;
+
+  border: none;
+
+  border-radius: 12px;
+
+  color: #3e352d;
+
+  text-decoration: none;
+
+  padding: 10px 14px;
+
+  font-size: 13.5px;
+
+  line-height: 1.25;
+
+  font-weight: 500;
+
+  font-family: 'Outfit', sans-serif;
+
+  transition: background-color 0.2s ease, color 0.2s ease;
+
+}
+
+.sidebar.sidebar-modern .sidebar-nav-link:hover,
+.sidebar.sidebar-modern .menu-parent:hover,
+.sidebar.sidebar-modern .submenu-item:hover {
+
+  padding-left: 14px;
+
+  background: #ece7e1;
+
+  color: #2f261f;
+
+}
+
+.sidebar.sidebar-modern .sidebar-nav-link.active,
+.sidebar.sidebar-modern .menu-parent.active,
+.sidebar.sidebar-modern .submenu-item.active {
+
+  background: #e5dfd8;
+
+  color: #4d2f15;
+
+  font-weight: 700;
+
+  box-shadow: none;
+
+}
+
+.sidebar.sidebar-modern .menu-item-with-submenu {
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 3px;
+
+}
+
+.sidebar.sidebar-modern .submenu-container {
+
+  border-left: none;
+
+  background: transparent;
+
+  padding-left: 14px;
+
+}
+
+.sidebar.sidebar-modern .submenu-item {
+
+  font-size: 14px;
+
+  padding: 9px 12px;
+
+}
+
+.sidebar.sidebar-modern .submenu-arrow {
+
+  margin-left: auto;
+
+  font-size: 14px;
+
+  opacity: 0.75;
+
+}
+
+.sidebar.sidebar-modern .nav-icon {
+
+  width: 22px;
+
+  height: 22px;
+
+  margin-right: 2px;
+
+  color: #9f8d7f;
+
+  filter: none;
+
+  transform: none;
+
+}
+
+.sidebar.sidebar-modern .sidebar-nav-link.active .nav-icon,
+.sidebar.sidebar-modern .menu-parent.active .nav-icon,
+.sidebar.sidebar-modern .submenu-item.active .nav-icon {
+
+  color: #b07342;
+
+}
+
+.sidebar.sidebar-modern a::after,
+.sidebar.sidebar-modern a.active::before,
+.sidebar.sidebar-modern .menu-parent::before,
+.sidebar.sidebar-modern .submenu-item::before {
+
+  display: none;
 
 }
 
@@ -1052,9 +1476,9 @@ tbody td {
 
   background: rgba(0, 0, 0, 0.65);
 
-  backdrop-filter: blur(8px);
-
   -webkit-backdrop-filter: blur(8px);
+
+  backdrop-filter: blur(8px);
 
   justify-content: center;
 

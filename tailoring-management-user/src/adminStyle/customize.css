@@ -253,21 +253,26 @@ html {
 .content {
   margin-left: 270px;
   margin-top: 70px;
-  padding: 40px;
+  padding: 30px 40px;
   min-height: calc(100vh - 70px);
   overflow-x: hidden;
 }
 
 .dashboard-title {
-  margin-bottom: 30px;
+  margin-bottom: 25px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
 }
 
 .dashboard-title h2 {
   font-family: 'Montserrat', 'Poppins', sans-serif;
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 700;
   color: #2D3436;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
   letter-spacing: -0.02em;
 }
 

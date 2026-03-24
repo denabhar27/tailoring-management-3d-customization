@@ -118,7 +118,7 @@ html {
 .postrent .content {
   margin-left: 270px;
   margin-top: 70px;
-  padding: 40px;
+  padding: 30px 40px;
   min-height: calc(100vh - 70px);
   overflow-x: hidden;
   background: #ffffff;
@@ -128,17 +128,17 @@ html {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
   flex-wrap: wrap;
-  margin-bottom: 30px;
+  margin-bottom: 25px;
 }
 
 .dashboard-title h2 {
   font-family: 'Montserrat', 'Poppins', sans-serif;
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 700;
   color: #ffffff;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
   letter-spacing: -0.02em;
 }
 

@@ -11,6 +11,66 @@ import { getAllRentals, getAvailableRentals, getRentalImageUrl } from '../api/Re
 import { getAllPatterns } from '../api/PatternApi';
 import { useAlert } from '../context/AlertContext';
 
+const SIZE_LABELS = {
+  small: 'Small (S)',
+  medium: 'Medium (M)',
+  large: 'Large (L)',
+  extra_large: 'Extra Large (XL)'
+};
+
+const parseRentalSizeConfig = (rawSize) => {
+  const fallback = { sizeOptions: {} };
+  if (!rawSize) return fallback;
+
+  try {
+    const parsed = typeof rawSize === 'string' ? JSON.parse(rawSize) : rawSize;
+    if (!parsed || typeof parsed !== 'object') return fallback;
+
+    if (parsed.format === 'rental_size_v2' && Array.isArray(parsed.size_entries)) {
+      const sizeOptions = {};
+      parsed.size_entries.forEach((entry, idx) => {
+        const key = entry.sizeKey !== 'custom'
+          ? entry.sizeKey
+          : (entry.customLabel || `Custom ${idx + 1}`);
+        const qty = parseInt(entry.quantity, 10);
+        const price = parseFloat(entry.price) || 0;
+        sizeOptions[key] = {
+          quantity: Number.isNaN(qty) ? 0 : Math.max(0, qty),
+          price,
+          label: entry.label || SIZE_LABELS[key] || entry.customLabel || key
+        };
+      });
+      return { sizeOptions };
+    }
+
+    const optionsSource = parsed.size_options || parsed.sizeOptions;
+    if (optionsSource && typeof optionsSource === 'object') {
+      const sizeOptions = {};
+      Object.keys(optionsSource).forEach((key) => {
+        const option = optionsSource[key] || {};
+        const qty = parseInt(option.quantity, 10);
+        sizeOptions[key] = {
+          quantity: Number.isNaN(qty) ? 0 : Math.max(0, qty),
+          price: parseFloat(option.price) || 0,
+          label: option.label || SIZE_LABELS[key] || key
+        };
+      });
+      return { sizeOptions };
+    }
+
+    return fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const getAvailableSizeKeys = (sizeOptions = {}) => {
+  return Object.keys(sizeOptions).filter((key) => {
+    const qty = parseInt(sizeOptions?.[key]?.quantity, 10);
+    return Number.isNaN(qty) ? false : qty > 0;
+  });
+};
+
 const WalkInOrders = () => {
   const { alert } = useAlert();
   const [serviceType, setServiceType] = useState('dry_cleaning');
@@ -71,6 +131,7 @@ const WalkInOrders = () => {
   const [referenceImagePreview, setReferenceImagePreview] = useState(null);
 
   const [selectedRentalItems, setSelectedRentalItems] = useState([]);
+  const [rentalSizeSelections, setRentalSizeSelections] = useState({});
   const [rentalDuration, setRentalDuration] = useState(3);
   const [eventDate, setEventDate] = useState('');
   const [damageDeposit, setDamageDeposit] = useState('');
@@ -170,8 +231,16 @@ const WalkInOrders = () => {
         );
       }
 
-      console.log('Loaded available rental items:', items.length);
-      setAvailableRentals(items);
+      const mappedItems = (items || []).map((item) => {
+        const parsedSize = parseRentalSizeConfig(item.size);
+        return {
+          ...item,
+          sizeOptions: parsedSize.sizeOptions || {}
+        };
+      });
+
+      console.log('Loaded available rental items:', mappedItems.length);
+      setAvailableRentals(mappedItems);
     } catch (error) {
       console.error('Error loading available rentals:', error);
       setAvailableRentals([]);
@@ -217,8 +286,22 @@ const WalkInOrders = () => {
   const calculateRentalPrice = () => {
     if (selectedRentalItems.length === 0 || !rentalDuration) return 0;
     return selectedRentalItems.reduce((total, item) => {
-      const basePrice = parseFloat(item.price || 0); // Price is per 3 days
-      const durationMultiplier = Math.ceil(parseInt(rentalDuration) / 3); // Calculate how many 3-day periods
+      const basePrice = parseFloat(item.price || 0);
+      const durationMultiplier = Math.ceil(parseInt(rentalDuration) / 3);
+      const sizeKeys = getAvailableSizeKeys(item.sizeOptions || {});
+      const selections = rentalSizeSelections[item.item_id] || {};
+
+      if (sizeKeys.length > 0) {
+        const itemTotal = Object.entries(selections).reduce((sum, [sizeKey, qtyRaw]) => {
+          const qty = Math.max(0, parseInt(qtyRaw, 10) || 0);
+          if (qty <= 0) return sum;
+          const sizePrice = parseFloat(item.sizeOptions?.[sizeKey]?.price || 0);
+          const effectivePrice = sizePrice > 0 ? sizePrice : basePrice;
+          return sum + (qty * effectivePrice * durationMultiplier);
+        }, 0);
+        return total + itemTotal;
+      }
+
       return total + (basePrice * durationMultiplier);
     }, 0);
   };
@@ -275,14 +358,115 @@ const WalkInOrders = () => {
     }
   };
 
+  const getWalkInSizeSummary = (item) => {
+    if (!item) return 'N/A';
+
+    const localSelections = rentalSizeSelections[item.item_id] || {};
+    const selectedFromState = Object.entries(localSelections)
+      .map(([sizeKey, qtyRaw]) => {
+        const qty = Math.max(0, parseInt(qtyRaw, 10) || 0);
+        if (qty <= 0) return null;
+        return {
+          label: item.sizeOptions?.[sizeKey]?.label || SIZE_LABELS[sizeKey] || sizeKey,
+          quantity: qty
+        };
+      })
+      .filter(Boolean);
+
+    if (selectedFromState.length > 0) {
+      return selectedFromState.map((row) => `${row.label} x${row.quantity}`).join(', ');
+    }
+
+    const selectedSizes = Array.isArray(item.selected_sizes)
+      ? item.selected_sizes
+      : (Array.isArray(item.selectedSizes) ? item.selectedSizes : []);
+
+    if (selectedSizes.length > 0) {
+      const merged = new Map();
+      selectedSizes.forEach((entry) => {
+        const key = String(entry?.sizeKey || entry?.size_key || entry?.label || '').trim();
+        if (!key) return;
+        const label = String(entry?.label || key).trim();
+        const qty = Math.max(0, parseInt(entry?.quantity, 10) || 0);
+        const prev = merged.get(key);
+        if (!prev) {
+          merged.set(key, { label, quantity: qty });
+        } else {
+          merged.set(key, { label: prev.label || label, quantity: prev.quantity + qty });
+        }
+      });
+
+      const formatted = Array.from(merged.values())
+        .filter((row) => row.quantity > 0)
+        .map((row) => `${row.label} x${row.quantity}`)
+        .join(', ');
+
+      if (formatted) return formatted;
+    }
+
+    try {
+      const parsed = typeof item.size === 'string' ? JSON.parse(item.size) : item.size;
+      if (parsed && Array.isArray(parsed.size_entries)) {
+        const available = parsed.size_entries
+          .map((entry) => {
+            const qty = Math.max(0, parseInt(entry?.quantity, 10) || 0);
+            const label = entry?.label || entry?.sizeKey || entry?.size_key;
+            if (!label || qty <= 0) return null;
+            return `${label} (${qty})`;
+          })
+          .filter(Boolean)
+          .join(', ');
+        if (available) return available;
+      }
+    } catch {
+      // Ignore JSON parse failures and fall through to legacy string handling.
+    }
+
+    if (typeof item.size === 'string' && item.size.trim() && !item.size.trim().startsWith('{')) {
+      return item.size.trim();
+    }
+
+    return 'N/A';
+  };
+
   const toggleRentalItemSelection = (item) => {
     setSelectedRentalItems(prev => {
       const isSelected = prev.some(i => i.item_id === item.item_id);
       if (isSelected) {
+        setRentalSizeSelections((sizePrev) => {
+          const next = { ...sizePrev };
+          delete next[item.item_id];
+          return next;
+        });
         return prev.filter(i => i.item_id !== item.item_id);
       } else {
         return [...prev, item];
       }
+    });
+  };
+
+  const updateRentalSizeQuantity = (item, sizeKey, delta) => {
+    const option = item.sizeOptions?.[sizeKey] || {};
+    const maxQty = Math.max(0, parseInt(option.quantity, 10) || 0);
+
+    setRentalSizeSelections((prev) => {
+      const itemSelections = { ...(prev[item.item_id] || {}) };
+      const currentQty = Math.max(0, parseInt(itemSelections[sizeKey], 10) || 0);
+      const nextQty = Math.max(0, Math.min(maxQty, currentQty + delta));
+
+      if (nextQty <= 0) {
+        delete itemSelections[sizeKey];
+      } else {
+        itemSelections[sizeKey] = nextQty;
+      }
+
+      const next = { ...prev };
+      if (Object.keys(itemSelections).length > 0) {
+        next[item.item_id] = itemSelections;
+      } else {
+        delete next[item.item_id];
+      }
+      return next;
     });
   };
 
@@ -316,6 +500,20 @@ const WalkInOrders = () => {
     } else if (serviceType === 'rental') {
       if (selectedRentalItems.length === 0 || !rentalDuration) {
         alert('Please select at least one rental item and duration');
+        return;
+      }
+
+      const invalidItems = selectedRentalItems.filter((item) => {
+        const sizeKeys = getAvailableSizeKeys(item.sizeOptions || {});
+        if (sizeKeys.length === 0) return false;
+        const totalQty = Object.values(rentalSizeSelections[item.item_id] || {}).reduce((sum, qtyRaw) => {
+          return sum + (Math.max(0, parseInt(qtyRaw, 10) || 0));
+        }, 0);
+        return totalQty <= 0;
+      });
+
+      if (invalidItems.length > 0) {
+        alert(`Please select sizes and quantities for: ${invalidItems.map((i) => i.item_name).join(', ')}`);
         return;
       }
     }
@@ -374,14 +572,47 @@ const WalkInOrders = () => {
       } else if (serviceType === 'rental') {
 
         const totalDownpayment = selectedRentalItems.reduce((sum, item) => {
-          return sum + parseFloat(item.downpayment || '0');
+          const sizeKeys = getAvailableSizeKeys(item.sizeOptions || {});
+          const qty = sizeKeys.length > 0
+            ? Object.values(rentalSizeSelections[item.item_id] || {}).reduce((qSum, qRaw) => qSum + (Math.max(0, parseInt(qRaw, 10) || 0)), 0)
+            : 1;
+          return sum + (parseFloat(item.downpayment || '0') * Math.max(1, qty));
         }, 0);
+
+        const rentalItemSelections = selectedRentalItems
+          .map((item) => {
+            const sizeKeys = getAvailableSizeKeys(item.sizeOptions || {});
+            const selectedSizes = Object.entries(rentalSizeSelections[item.item_id] || {})
+              .map(([sizeKey, qtyRaw]) => {
+                const qty = Math.max(0, parseInt(qtyRaw, 10) || 0);
+                if (qty <= 0) return null;
+                return {
+                  sizeKey,
+                  label: item.sizeOptions?.[sizeKey]?.label || SIZE_LABELS[sizeKey] || sizeKey,
+                  quantity: qty,
+                  price: parseFloat(item.sizeOptions?.[sizeKey]?.price || 0)
+                };
+              })
+              .filter(Boolean);
+
+            const quantity = sizeKeys.length > 0
+              ? selectedSizes.reduce((qSum, entry) => qSum + entry.quantity, 0)
+              : 1;
+
+            return {
+              itemId: item.item_id,
+              quantity,
+              selected_sizes: selectedSizes
+            };
+          })
+          .filter((entry) => entry.quantity > 0);
 
         result = await createWalkInRentalOrder({
           customerName: `${customerFirstName} ${customerLastName}`.trim(),
           customerEmail,
           customerPhone,
           rentalItemIds: selectedRentalItems.map(item => item.item_id),
+          rentalItemSelections,
           rentalDuration: parseInt(rentalDuration),
           eventDate,
           damageDeposit: damageDeposit || totalDownpayment.toString(),
@@ -403,6 +634,7 @@ const WalkInOrders = () => {
         setPreferredPickupDate('');
         setPreferredPickupTime('');
         setSelectedRentalItems([]);
+        setRentalSizeSelections({});
         setRentalDuration(3);
         setEventDate('');
         setDamageDeposit('');
@@ -793,163 +1025,75 @@ const WalkInOrders = () => {
                   </div>
                 )}
               </div>
-              <div className="measurements-section" style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-                <h4 style={{ marginBottom: '15px', color: '#5D4037' }}>Customer Measurements</h4>
-
-                <div style={{ display: 'flex', gap: '20px' }}>
-                  <div style={{ flex: 1, padding: '15px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #eee' }}>
-                    <p style={{ fontWeight: '600', marginBottom: '15px', color: '#333', textAlign: 'center' }}>Top Measurements</p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px 10px' }}>
-                      <div className="form-group" style={{ marginBottom: '0' }}>
-                        <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Chest (inches)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={topMeasurements.chest}
-                          onChange={(e) => setTopMeasurements({ ...topMeasurements, chest: e.target.value })}
-                          className="form-control"
-                          placeholder="e.g. 40"
-                        />
-                      </div>
-                      <div className="form-group" style={{ marginBottom: '0' }}>
-                        <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Shoulders (inches)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={topMeasurements.shoulders}
-                          onChange={(e) => setTopMeasurements({ ...topMeasurements, shoulders: e.target.value })}
-                          className="form-control"
-                          placeholder="e.g. 18"
-                        />
-                      </div>
-                      <div className="form-group" style={{ marginBottom: '0' }}>
-                        <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Sleeve Length (inches)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={topMeasurements.sleeve_length}
-                          onChange={(e) => setTopMeasurements({ ...topMeasurements, sleeve_length: e.target.value })}
-                          className="form-control"
-                          placeholder="e.g. 25"
-                        />
-                      </div>
-                      <div className="form-group" style={{ marginBottom: '0' }}>
-                        <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Neck (inches)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={topMeasurements.neck}
-                          onChange={(e) => setTopMeasurements({ ...topMeasurements, neck: e.target.value })}
-                          className="form-control"
-                          placeholder="e.g. 16"
-                        />
-                      </div>
-                      <div className="form-group" style={{ marginBottom: '0' }}>
-                        <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Waist (inches)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={topMeasurements.waist}
-                          onChange={(e) => setTopMeasurements({ ...topMeasurements, waist: e.target.value })}
-                          className="form-control"
-                          placeholder="e.g. 34"
-                        />
-                      </div>
-                      <div className="form-group" style={{ marginBottom: '0' }}>
-                        <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Length (inches)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={topMeasurements.length}
-                          onChange={(e) => setTopMeasurements({ ...topMeasurements, length: e.target.value })}
-                          className="form-control"
-                          placeholder="e.g. 28"
-                        />
-                      </div>
+              <div style={{ display: 'flex', gap: '15px', alignItems: 'stretch', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, padding: '15px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #eee' }}>
+                  <p style={{ fontWeight: '600', marginBottom: '15px', color: '#333', textAlign: 'center' }}>Top Measurements</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px 10px' }}>
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Chest (inches)</label>
+                      <input type="number" step="0.1" value={topMeasurements.chest} onChange={(e) => setTopMeasurements({ ...topMeasurements, chest: e.target.value })} className="form-control" placeholder="e.g. 40" />
                     </div>
-                  </div>
-                  <div style={{ flex: 1, padding: '15px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #eee' }}>
-                    <p style={{ fontWeight: '600', marginBottom: '15px', color: '#333', textAlign: 'center' }}>Bottom Measurements</p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px 10px' }}>
-                      <div className="form-group" style={{ marginBottom: '0' }}>
-                        <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Waist (inches)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={bottomMeasurements.waist}
-                          onChange={(e) => setBottomMeasurements({ ...bottomMeasurements, waist: e.target.value })}
-                          className="form-control"
-                          placeholder="e.g. 32"
-                        />
-                      </div>
-                      <div className="form-group" style={{ marginBottom: '0' }}>
-                        <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Hips (inches)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={bottomMeasurements.hips}
-                          onChange={(e) => setBottomMeasurements({ ...bottomMeasurements, hips: e.target.value })}
-                          className="form-control"
-                          placeholder="e.g. 40"
-                        />
-                      </div>
-                      <div className="form-group" style={{ marginBottom: '0' }}>
-                        <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Inseam (inches)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={bottomMeasurements.inseam}
-                          onChange={(e) => setBottomMeasurements({ ...bottomMeasurements, inseam: e.target.value })}
-                          className="form-control"
-                          placeholder="e.g. 30"
-                        />
-                      </div>
-                      <div className="form-group" style={{ marginBottom: '0' }}>
-                        <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Length (inches)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={bottomMeasurements.length}
-                          onChange={(e) => setBottomMeasurements({ ...bottomMeasurements, length: e.target.value })}
-                          className="form-control"
-                          placeholder="e.g. 42"
-                        />
-                      </div>
-                      <div className="form-group" style={{ marginBottom: '0' }}>
-                        <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Thigh (inches)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={bottomMeasurements.thigh}
-                          onChange={(e) => setBottomMeasurements({ ...bottomMeasurements, thigh: e.target.value })}
-                          className="form-control"
-                          placeholder="e.g. 24"
-                        />
-                      </div>
-                      <div className="form-group" style={{ marginBottom: '0' }}>
-                        <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Outseam (inches)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={bottomMeasurements.outseam}
-                          onChange={(e) => setBottomMeasurements({ ...bottomMeasurements, outseam: e.target.value })}
-                          className="form-control"
-                          placeholder="e.g. 44"
-                        />
-                      </div>
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Shoulders (inches)</label>
+                      <input type="number" step="0.1" value={topMeasurements.shoulders} onChange={(e) => setTopMeasurements({ ...topMeasurements, shoulders: e.target.value })} className="form-control" placeholder="e.g. 18" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Sleeve Length (inches)</label>
+                      <input type="number" step="0.1" value={topMeasurements.sleeve_length} onChange={(e) => setTopMeasurements({ ...topMeasurements, sleeve_length: e.target.value })} className="form-control" placeholder="e.g. 25" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Neck (inches)</label>
+                      <input type="number" step="0.1" value={topMeasurements.neck} onChange={(e) => setTopMeasurements({ ...topMeasurements, neck: e.target.value })} className="form-control" placeholder="e.g. 16" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Waist (inches)</label>
+                      <input type="number" step="0.1" value={topMeasurements.waist} onChange={(e) => setTopMeasurements({ ...topMeasurements, waist: e.target.value })} className="form-control" placeholder="e.g. 34" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Length (inches)</label>
+                      <input type="number" step="0.1" value={topMeasurements.length} onChange={(e) => setTopMeasurements({ ...topMeasurements, length: e.target.value })} className="form-control" placeholder="e.g. 28" />
                     </div>
                   </div>
                 </div>
-                <div style={{ marginTop: '15px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: '500' }}>Measurement Notes</label>
-                  <textarea
-                    value={measurementNotes}
-                    onChange={(e) => setMeasurementNotes(e.target.value)}
-                    className="form-control"
-                    rows="2"
-                    placeholder="Any additional notes about measurements..."
-                  />
+                <div style={{ flex: 1, padding: '15px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #eee' }}>
+                  <p style={{ fontWeight: '600', marginBottom: '15px', color: '#333', textAlign: 'center' }}>Bottom Measurements</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px 10px' }}>
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Waist (inches)</label>
+                      <input type="number" step="0.1" value={bottomMeasurements.waist} onChange={(e) => setBottomMeasurements({ ...bottomMeasurements, waist: e.target.value })} className="form-control" placeholder="e.g. 32" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Hips (inches)</label>
+                      <input type="number" step="0.1" value={bottomMeasurements.hips} onChange={(e) => setBottomMeasurements({ ...bottomMeasurements, hips: e.target.value })} className="form-control" placeholder="e.g. 40" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Inseam (inches)</label>
+                      <input type="number" step="0.1" value={bottomMeasurements.inseam} onChange={(e) => setBottomMeasurements({ ...bottomMeasurements, inseam: e.target.value })} className="form-control" placeholder="e.g. 30" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Length (inches)</label>
+                      <input type="number" step="0.1" value={bottomMeasurements.length} onChange={(e) => setBottomMeasurements({ ...bottomMeasurements, length: e.target.value })} className="form-control" placeholder="e.g. 42" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Thigh (inches)</label>
+                      <input type="number" step="0.1" value={bottomMeasurements.thigh} onChange={(e) => setBottomMeasurements({ ...bottomMeasurements, thigh: e.target.value })} className="form-control" placeholder="e.g. 24" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label style={{ fontSize: '13px', display: 'block', minHeight: '36px', marginBottom: '5px' }}>Outseam (inches)</label>
+                      <input type="number" step="0.1" value={bottomMeasurements.outseam} onChange={(e) => setBottomMeasurements({ ...bottomMeasurements, outseam: e.target.value })} className="form-control" placeholder="e.g. 44" />
+                    </div>
+                  </div>
                 </div>
+              </div>
+              <div style={{ marginTop: '15px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '500' }}>Measurement Notes</label>
+                <textarea
+                  value={measurementNotes}
+                  onChange={(e) => setMeasurementNotes(e.target.value)}
+                  className="form-control"
+                  rows="2"
+                  placeholder="Any additional notes about measurements..."
+                />
               </div>
 
               <div className="form-group">
@@ -1018,9 +1162,6 @@ const WalkInOrders = () => {
                           </div>
                           <div className="rental-item-card-info">
                             <h4 className="rental-item-name">{item.item_name}</h4>
-                            {item.brand && (
-                              <p className="rental-item-brand">{item.brand}</p>
-                            )}
                             {measurements && measurements.length > 0 && (
                               <div className="rental-item-measurements">
                                 {measurements.slice(0, 3).map((m, idx) => (
@@ -1058,6 +1199,7 @@ const WalkInOrders = () => {
                   <div className="selected-items-list">
                     {selectedRentalItems.map((item, idx) => {
                       const measurements = formatMeasurements(item);
+                      const sizeKeys = getAvailableSizeKeys(item.sizeOptions || {});
                       return (
                         <div key={item.item_id} className="selected-item-detail">
                           <div className="selected-item-header">
@@ -1073,8 +1215,46 @@ const WalkInOrders = () => {
                               × Remove
                             </button>
                           </div>
-                          {item.brand && <p><strong>Brand:</strong> {item.brand}</p>}
+                          <p><strong>Order Details:</strong> {item.item_name || 'Rental Item'} ({getWalkInSizeSummary(item)})</p>
+                          <p><strong>Selected Sizes:</strong> {getWalkInSizeSummary(item)}</p>
                           {item.category && <p><strong>Category:</strong> {item.category.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</p>}
+                          {sizeKeys.length > 0 && (
+                            <div className="walkin-size-editor">
+                              <strong>Sizes and Quantity:</strong>
+                              <div className="walkin-size-grid">
+                                {sizeKeys.map((sizeKey) => {
+                                  const opt = item.sizeOptions?.[sizeKey] || {};
+                                  const currentQty = Math.max(0, parseInt(rentalSizeSelections[item.item_id]?.[sizeKey], 10) || 0);
+                                  const maxQty = Math.max(0, parseInt(opt.quantity, 10) || 0);
+                                  return (
+                                    <div key={`${item.item_id}-${sizeKey}`} className={`walkin-size-row ${currentQty > 0 ? 'active' : ''}`}>
+                                      <div className="walkin-size-label-wrap">
+                                        <span className="walkin-size-key">{(opt.label || SIZE_LABELS[sizeKey] || sizeKey).charAt(0).toUpperCase()}</span>
+                                        <span className="walkin-size-label">{opt.label || SIZE_LABELS[sizeKey] || sizeKey}</span>
+                                      </div>
+                                      <div className="walkin-size-qty-control">
+                                        <button
+                                          type="button"
+                                          onClick={() => updateRentalSizeQuantity(item, sizeKey, -1)}
+                                          disabled={currentQty <= 0}
+                                        >
+                                          -
+                                        </button>
+                                        <span>{currentQty}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => updateRentalSizeQuantity(item, sizeKey, 1)}
+                                          disabled={currentQty >= maxQty}
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                           {measurements && measurements.length > 0 && (
                             <div className="measurements-display">
                               <strong>Measurements:</strong>
@@ -1434,6 +1614,86 @@ const WalkInOrders = () => {
           font-size: 13px;
           color: #333;
           font-weight: 600;
+        }
+        .walkin-size-editor {
+          margin-top: 10px;
+          margin-bottom: 10px;
+        }
+        .walkin-size-grid {
+          margin-top: 8px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .walkin-size-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          padding: 8px 10px;
+          border: 1px solid #e4dfd8;
+          border-radius: 10px;
+          background: #f7f4f1;
+        }
+        .walkin-size-row.active {
+          border-color: #c9824c;
+          background: #efe6dc;
+        }
+        .walkin-size-label-wrap {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-width: 0;
+        }
+        .walkin-size-key {
+          width: 30px;
+          height: 30px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 8px;
+          background: #8b5e34;
+          color: #fff;
+          font-weight: 700;
+          font-size: 12px;
+          flex-shrink: 0;
+        }
+        .walkin-size-label {
+          font-size: 13px;
+          font-weight: 600;
+          color: #4b3b2e;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .walkin-size-qty-control {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          border: 1px solid #d6cec3;
+          border-radius: 999px;
+          padding: 2px 6px;
+          background: #fff;
+        }
+        .walkin-size-qty-control button {
+          width: 26px;
+          height: 26px;
+          border: none;
+          border-radius: 999px;
+          background: transparent;
+          color: #7a4317;
+          font-size: 16px;
+          cursor: pointer;
+        }
+        .walkin-size-qty-control button:disabled {
+          color: #b9aea2;
+          cursor: not-allowed;
+        }
+        .walkin-size-qty-control span {
+          min-width: 16px;
+          text-align: center;
+          font-weight: 700;
+          color: #0f172a;
         }
         .rental-item-measurements {
           display: flex;

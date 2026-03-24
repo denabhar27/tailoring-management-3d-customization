@@ -1083,10 +1083,10 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
       return next;
     });
 
+    // Keep explicit multi-select choices intact even when size qty goes back to 0.
     setSelectedItems(prev => {
       const exists = prev.some(i => getItemId(i) === itemId);
-      if (hasAnyAfter && !exists) return [...prev, item];
-      if (!hasAnyAfter && exists) return prev.filter(i => getItemId(i) !== itemId);
+      if (!exists) return [...prev, item];
       return prev;
     });
 
@@ -1099,12 +1099,6 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   const openDateModal = async () => {
     if (selectedItems.length === 0) {
       await alert('Please select at least one item', 'Selection Required', 'warning');
-      return;
-    }
-
-    const selectedQty = selectedItems.reduce((sum, item) => sum + getItemSelectedQuantity(item), 0);
-    if (selectedQty <= 0) {
-      await alert('Please choose at least one size quantity before setting dates.', 'Sizes Required', 'warning');
       return;
     }
 
@@ -1616,78 +1610,13 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                       {isItemSelected(item) ? '✓ Selected' : 'Tap to select'}
                     </div>
                   )}
-                </div>
-              </div>
-
-              {isMultiSelectMode && isItemSelected(item) && getAvailableSizeKeys(item.sizeOptions || {}).length > 0 && (
-                <div className="rc-card-size-picker-below" onClick={(e) => e.stopPropagation()}>
-                  <div className="rc-size-boxes">
-                    {getAvailableSizeKeys(item.sizeOptions || {}).map((sizeKey) => {
-                      const opt = item.sizeOptions?.[sizeKey] || {};
-                      const itemId = getItemId(item);
-                      const currentQty = parseInt(cardSizeSelections?.[itemId]?.[sizeKey] || 0, 10);
-                      const parsedSizeQty = parseInt(opt.quantity, 10);
-                      const parsedFallbackQty = parseInt(item.total_available, 10);
-                      const maxQty = !Number.isNaN(parsedSizeQty)
-                        ? Math.max(parsedSizeQty, 0)
-                        : (!Number.isNaN(parsedFallbackQty) ? Math.max(parsedFallbackQty, 0) : Number.POSITIVE_INFINITY);
-                      const isSelected = currentQty > 0;
-                      const labelSource = opt.label || SIZE_LABELS[sizeKey] || sizeKey;
-                      const shortLabel = getSizeShortLabel(sizeKey, labelSource);
-
-                      const toggleBox = (e) => {
-                        e.stopPropagation();
-                        if (isSelected) {
-                          updateCardSizeQuantity(item, sizeKey, -currentQty);
-                        } else {
-                          updateCardSizeQuantity(item, sizeKey, 1);
-                        }
-                      };
-
-                      return (
-                        <div key={sizeKey} className={`rc-size-box ${isSelected ? 'selected' : ''}`}>
-                          <button
-                            type="button"
-                            className="rc-size-box-btn"
-                            onClick={toggleBox}
-                            disabled={Number.isFinite(maxQty) && maxQty <= 0}
-                          >
-                            <span className="rc-size-letter">{shortLabel}</span>
-                          </button>
-                          {isSelected && (
-                            <div className="rc-size-qty-inline">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateCardSizeQuantity(item, sizeKey, -1);
-                                }}
-                                disabled={currentQty <= 0}
-                              >
-                                -
-                              </button>
-                              <span>{currentQty}</span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateCardSizeQuantity(item, sizeKey, 1);
-                                }}
-                                disabled={Number.isFinite(maxQty) && currentQty >= maxQty}
-                              >
-                                +
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {inlineMessage && inlineMessageItemId === getItemId(item) && (
-                    <div className="rc-inline-stock-msg">{inlineMessage}</div>
+                  {isMultiSelectMode && isItemSelected(item) && getAvailableSizeKeys(item.sizeOptions || {}).length > 0 && (
+                    <div className="rc-card-select-hint">
+                      ✓ Selected - choose sizes in next step
+                    </div>
                   )}
                 </div>
-              )}
+              </div>
             </div>
             ))
           )}
@@ -1729,36 +1658,21 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
       </section>
       {isMultiSelectMode && selectedItems.length > 0 && (
         <div className="rc-bundle-bar">
-          <div className="rc-bundle-thumbs">
-            {selectedItems.map((item) => {
-              const qty = getItemSelectedQuantity(item);
-              return (
-                <div
-                  key={getItemId(item)}
-                  className="rc-bundle-thumb"
-                  title={`${item.item_name || item.name}${getItemSizeSummary(item) ? ` - ${getItemSizeSummary(item)}` : ''}`}
-                >
-                  <img
-                    src={item.img}
-                    alt={item.item_name || item.name}
-                    onError={(e) => { e.target.src = suitSample; }}
-                  />
-                  <span className="rc-bundle-thumb-qty">{qty}</span>
-                </div>
-              );
-            })}
-          </div>
 
           <div className="rc-bundle-meta">
             <span><strong>{selectedItems.length}</strong> item{selectedItems.length > 1 ? 's' : ''} selected</span>
-            <span>{selectedBundleQty} pcs total</span>
-            <span>Est. downpayment: ₱{(bundlePreviewTotal * 0.5).toFixed(2)}</span>
+            <span>{selectedBundleQty > 0 ? `${selectedBundleQty} pcs total` : 'Set sizes & quantities in next step'}</span>
+            <span>
+              {bundlePreviewTotal > 0
+                ? `Est. downpayment: ₱${(bundlePreviewTotal * 0.5).toFixed(2)}`
+                : 'Est. downpayment: select size quantities'}
+            </span>
           </div>
 
           <button
             onClick={openDateModal}
             className="rc-bundle-btn"
-            disabled={bundlePreviewTotal <= 0}
+            disabled={selectedItems.length === 0}
           >
             Set Dates & Add to Cart →
           </button>
@@ -1795,28 +1709,117 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
               cursor: 'pointer'
             }}>×</span>
 
-            <h2 style={{ marginBottom: '20px', color: '#1a1a2e' }}>
+            <h2 style={{ marginBottom: '20px', color: '#1a1a2e', textAlign: 'left' }}>
               Rental Bundle ({selectedItems.length} items)
             </h2>
-            <div className="rc-bundle-strip">
-              {selectedItems.map((item) => (
-                <div key={getItemId(item)} className="rc-bundle-strip-item">
-                  <img
-                    src={item.img}
-                    alt={item.item_name || item.name}
-                    onError={(e) => { e.target.src = suitSample; }}
-                  />
-                  <div className="rc-bundle-strip-info">
-                    <span className="rc-bundle-strip-name">{item.item_name || item.name}</span>
-                    <span className="rc-bundle-strip-sizes">{getItemSizeSummary(item) || 'No size selected yet'}</span>
-                  </div>
-                  <div className="rc-bundle-strip-actions">
-                    <span>{getItemSelectedQuantity(item)} pcs</span>
-                    <button onClick={() => toggleItemSelection(item)} type="button">✕</button>
-                  </div>
-                </div>
-              ))}
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 12px 0', color: '#1a1a2e', textAlign: 'left' }}>Select Sizes and Quantities</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {selectedItems.map((item) => {
+                  const itemId = getItemId(item);
+                  const availableSizeKeys = getAvailableSizeKeys(item.sizeOptions || {});
+                  const hasSizeOptions = availableSizeKeys.length > 0;
+                  const selectedQty = getItemSelectedQuantity(item);
+
+                  return (
+                    <div key={`bundle-size-${itemId}`} className="rc-bundle-size-card">
+                      <div className="rc-bundle-size-header">
+                        <img
+                          src={item.img}
+                          alt={item.item_name || item.name}
+                          className="rc-bundle-size-image"
+                          onError={(e) => {
+                            e.target.src = suitSample;
+                          }}
+                        />
+                        <div className="rc-bundle-size-header-info">
+                          <strong className="rc-bundle-size-title">{item.item_name || item.name}</strong>
+                          <div className="rc-bundle-size-total">
+                            <span>Total selected</span>
+                            <span className="rc-bundle-size-total-badge">{selectedQty} pcs</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="rc-bundle-size-remove"
+                          onClick={() => toggleItemSelection(item)}
+                          aria-label={`Remove ${item.item_name || item.name} from selected items`}
+                        >
+                          Remove
+                        </button>
+                      </div>
+
+                      {hasSizeOptions ? (
+                        <div className="rc-bundle-size-list">
+                          {availableSizeKeys.map((sizeKey) => {
+                            const opt = item.sizeOptions?.[sizeKey] || {};
+                            const currentQty = parseInt(cardSizeSelections?.[itemId]?.[sizeKey] || 0, 10);
+                            const parsedSizeQty = parseInt(opt.quantity, 10);
+                            const parsedFallbackQty = parseInt(item.total_available, 10);
+                            const maxQty = !Number.isNaN(parsedSizeQty)
+                              ? Math.max(parsedSizeQty, 0)
+                              : (!Number.isNaN(parsedFallbackQty) ? Math.max(parsedFallbackQty, 0) : Number.POSITIVE_INFINITY);
+                            const isSelected = currentQty > 0;
+                            const labelSource = opt.label || SIZE_LABELS[sizeKey] || sizeKey;
+                            const shortLabel = getSizeShortLabel(sizeKey, labelSource);
+
+                            const toggleBox = () => {
+                              if (isSelected) {
+                                updateCardSizeQuantity(item, sizeKey, -currentQty);
+                              } else {
+                                updateCardSizeQuantity(item, sizeKey, 1);
+                              }
+                            };
+
+                            return (
+                              <div key={`${itemId}-${sizeKey}`} className={`rc-bundle-size-row ${isSelected ? 'selected' : ''}`}>
+                                <div className="rc-bundle-size-row-left">
+                                  <button
+                                    type="button"
+                                    className="rc-size-box-btn"
+                                    onClick={toggleBox}
+                                    disabled={Number.isFinite(maxQty) && maxQty <= 0}
+                                  >
+                                    <span className="rc-size-letter">{shortLabel}</span>
+                                  </button>
+                                  <span className="rc-bundle-size-label">{labelSource}</span>
+                                </div>
+                                <div className="rc-size-qty-inline rc-bundle-size-qty-inline">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCardSizeQuantity(item, sizeKey, -1)}
+                                    disabled={currentQty <= 0}
+                                  >
+                                    -
+                                  </button>
+                                  <span>{currentQty}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCardSizeQuantity(item, sizeKey, 1)}
+                                    disabled={Number.isFinite(maxQty) && currentQty >= maxQty}
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="rc-bundle-size-empty">
+                          No size options available for this item.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
+
+            {inlineMessage && (
+              <div className="rc-inline-stock-msg" style={{ marginBottom: '15px' }}>{inlineMessage}</div>
+            )}
+
             <div className="date-section" style={{ marginBottom: '20px' }}>
               <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
                 <div className="date-input-group" style={{ flex: 1, minWidth: '200px' }}>

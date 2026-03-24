@@ -83,6 +83,36 @@ function Rental() {
     return parsedRows;
   };
 
+  const parseSizeTextFallback = (rawSize) => {
+    const text = String(rawSize || '').trim();
+    if (!text) return [];
+    return text
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const match = part.match(/^(.*?)(?:\s*[xX]\s*(\d+))?$/);
+        const label = (match?.[1] || part).trim();
+        const quantity = Math.max(0, parseInt(match?.[2], 10) || 1);
+        return { label, quantity };
+      });
+  };
+
+  const getCustomerSelectedSizes = (selectedSizes, fallbackSize) => {
+    const rows = parseSizeEntriesFromSelections(selectedSizes);
+    if (rows.length > 0) return rows;
+    return parseSizeTextFallback(fallbackSize);
+  };
+
+  const formatCustomerSizeSummary = (selectedSizes, fallbackSize) => {
+    const rows = getCustomerSelectedSizes(selectedSizes, fallbackSize);
+    if (!rows.length) return 'N/A';
+    return rows
+      .filter((row) => row.quantity > 0)
+      .map((row) => `${row.label} x${row.quantity}`)
+      .join(', ') || 'N/A';
+  };
+
   const openDamageForm = (displayName, sizeRows) => {
     setDamageFormContext({ displayName, rows: sizeRows });
     setDamageFormRows(sizeRows.map((row) => ({
@@ -1495,8 +1525,10 @@ function Rental() {
                         <span>{[...new Set(bundleItems.map(item => item.category || 'rental'))].join(', ') || 'N/A'}</span>
                       </div>
                       <div className="detail-row">
-                        <strong>Brand:</strong>
-                        <span>{[...new Set(bundleItems.map(item => item.brand || 'N/A'))].join(', ') || 'N/A'}</span>
+                        <strong>Order Details:</strong>
+                        <span>
+                          {bundleItems.map((item) => `${item.item_name || 'Rental Item'} (${formatCustomerSizeSummary(item.selected_sizes || item.selectedSizes, item.size)})`).join('; ')}
+                        </span>
                       </div>
                     </>
                   );
@@ -1530,8 +1562,10 @@ function Rental() {
                         <span>{(selectedRental.specific_data?.category || 'N/A').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
                       </div>
                       <div className="detail-row">
-                        <strong>Brand:</strong>
-                        <span>{selectedRental.specific_data?.brand || 'N/A'}</span>
+                        <strong>Order Details:</strong>
+                        <span>
+                          {`${selectedRental.specific_data?.item_name || 'Rental Item'} (${formatCustomerSizeSummary(selectedRental.specific_data?.selected_sizes || selectedRental.specific_data?.selectedSizes, selectedRental.specific_data?.size)})`}
+                        </span>
                       </div>
                     </>
                   );
@@ -1586,67 +1620,15 @@ function Rental() {
                 </>
               )}
               <div className="detail-row" style={{ alignItems: 'flex-start', flexDirection: 'column' }}>
-                <strong style={{ marginBottom: '10px', textAlign: 'center', display: 'block', width: '100%' }}>Size:</strong>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', alignItems: 'center' }}>
+                <strong style={{ marginBottom: '10px', textAlign: 'left', display: 'block', width: '100%' }}>Customer Selected Sizes:</strong>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', alignItems: 'stretch' }}>
                   {(() => {
                     const isBundle = selectedRental.specific_data?.is_bundle === true || selectedRental.specific_data?.category === 'rental_bundle';
                     const bundleItems = selectedRental.specific_data?.bundle_items || [];
 
                     if (isBundle && bundleItems.length > 0) {
                       return bundleItems.map((item, idx) => {
-                        const formatSize = (size) => {
-                          if (!size) return null;
-
-                          if (typeof size === 'string' && !size.trim().startsWith('{')) {
-                            return [{ label: 'Size', value: size }];
-                          }
-
-                          try {
-                            let measurements = typeof size === 'string' ? JSON.parse(size) : size;
-
-                            if (!measurements || typeof measurements !== 'object' || Array.isArray(measurements)) {
-                              return [{ label: 'Size', value: typeof size === 'string' ? size : JSON.stringify(size) }];
-                            }
-
-                            const labelMap = {
-                              'chest': 'Chest',
-                              'shoulders': 'Shoulders',
-                              'sleeveLength': 'Sleeve',
-                              'neck': 'Neck',
-                              'waist': 'Waist',
-                              'length': 'Length'
-                            };
-
-                            const parts = Object.entries(measurements)
-                              .filter(([key, value]) => value !== null && value !== undefined && value !== '' && value !== '0')
-                              .map(([key, value]) => {
-                                const label = labelMap[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim();
-                                let displayValue;
-                                if (typeof value === 'object' && value !== null) {
-                                  if (value.inch !== undefined && value.cm !== undefined) {
-                                    displayValue = `${value.inch} in / ${value.cm} cm`;
-                                  } else if (value.inch !== undefined) {
-                                    displayValue = `${value.inch} in`;
-                                  } else if (value.cm !== undefined) {
-                                    displayValue = `${value.cm} cm`;
-                                  } else if (value.value !== undefined) {
-                                    displayValue = `${value.value} in`;
-                                  } else {
-                                    displayValue = JSON.stringify(value);
-                                  }
-                                } else {
-                                  displayValue = `${value} in`;
-                                }
-                                return { label, value: displayValue };
-                              });
-
-                            return parts.length > 0 ? parts : null;
-                          } catch (e) {
-                            return [{ label: 'Size', value: typeof size === 'string' ? size : 'N/A' }];
-                          }
-                        };
-
-                        const sizeData = formatSize(item.size);
+                        const sizeData = getCustomerSelectedSizes(item.selected_sizes || item.selectedSizes, item.size);
                         return (
                           <div key={idx} style={{
                             fontSize: '0.9rem',
@@ -1656,81 +1638,31 @@ function Rental() {
                             borderRadius: '6px',
                             border: '1px solid #e0e0e0',
                             width: '100%',
-                            maxWidth: '350px'
+                            maxWidth: '100%'
                           }}>
-                            <strong style={{ color: '#333', display: 'block', marginBottom: '10px', borderBottom: '1px solid #ddd', paddingBottom: '8px', textAlign: 'center' }}>
+                            <strong style={{ color: '#333', display: 'block', marginBottom: '10px', borderBottom: '1px solid #ddd', paddingBottom: '8px', textAlign: 'left' }}>
                               {item.item_name || `Item ${idx + 1}`}:
                             </strong>
                             {sizeData && Array.isArray(sizeData) ? (
-                              <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '6px 16px', color: '#666' }}>
-                                {sizeData.map((measurement, mIdx) => (
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px 16px', color: '#666' }}>
+                                {sizeData.map((sizeEntry, mIdx) => (
                                   <React.Fragment key={mIdx}>
-                                    <span style={{ fontWeight: '500', textAlign: 'center' }}>{measurement.label}:</span>
-                                    <span style={{ textAlign: 'center' }}>{measurement.value}</span>
+                                    <span style={{ fontWeight: '500', textAlign: 'left' }}>{sizeEntry.label}</span>
+                                    <span style={{ textAlign: 'right' }}>x{sizeEntry.quantity}</span>
                                   </React.Fragment>
                                 ))}
                               </div>
                             ) : (
-                              <span style={{ color: '#666', textAlign: 'center', display: 'block' }}>N/A</span>
+                              <span style={{ color: '#666', textAlign: 'left', display: 'block' }}>N/A</span>
                             )}
                           </div>
                         );
                       });
                     } else {
-
-                      const formatSize = (size) => {
-                        if (!size) return null;
-
-                        if (typeof size === 'string' && !size.trim().startsWith('{')) {
-                          return [{ label: 'Size', value: size }];
-                        }
-
-                        try {
-                          let measurements = typeof size === 'string' ? JSON.parse(size) : size;
-
-                          if (!measurements || typeof measurements !== 'object' || Array.isArray(measurements)) {
-                            return [{ label: 'Size', value: typeof size === 'string' ? size : JSON.stringify(size) }];
-                          }
-
-                          const labelMap = {
-                            'chest': 'Chest',
-                            'shoulders': 'Shoulders',
-                            'sleeveLength': 'Sleeve',
-                            'neck': 'Neck',
-                            'waist': 'Waist',
-                            'length': 'Length'
-                          };
-
-                          const parts = Object.entries(measurements)
-                            .filter(([key, value]) => value !== null && value !== undefined && value !== '' && value !== '0')
-                            .map(([key, value]) => {
-                              const label = labelMap[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim();
-                              let displayValue;
-                              if (typeof value === 'object' && value !== null) {
-                                if (value.inch !== undefined && value.cm !== undefined) {
-                                  displayValue = `${value.inch} in / ${value.cm} cm`;
-                                } else if (value.inch !== undefined) {
-                                  displayValue = `${value.inch} in`;
-                                } else if (value.cm !== undefined) {
-                                  displayValue = `${value.cm} cm`;
-                                } else if (value.value !== undefined) {
-                                  displayValue = `${value.value} in`;
-                                } else {
-                                  displayValue = JSON.stringify(value);
-                                }
-                              } else {
-                                displayValue = `${value} in`;
-                              }
-                              return { label, value: displayValue };
-                            });
-
-                          return parts.length > 0 ? parts : null;
-                        } catch (e) {
-                          return [{ label: 'Size', value: typeof size === 'string' ? size : 'N/A' }];
-                        }
-                      };
-
-                      const sizeData = formatSize(selectedRental.specific_data?.size);
+                      const sizeData = getCustomerSelectedSizes(
+                        selectedRental.specific_data?.selected_sizes || selectedRental.specific_data?.selectedSizes,
+                        selectedRental.specific_data?.size
+                      );
                       if (sizeData && Array.isArray(sizeData)) {
                         return (
                           <div style={{
@@ -1741,20 +1673,20 @@ function Rental() {
                             borderRadius: '6px',
                             border: '1px solid #e0e0e0',
                             width: '100%',
-                            maxWidth: '350px'
+                            maxWidth: '100%'
                           }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '6px 16px', color: '#666', justifyContent: 'center' }}>
-                              {sizeData.map((measurement, mIdx) => (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px 16px', color: '#666' }}>
+                              {sizeData.map((sizeEntry, mIdx) => (
                                 <React.Fragment key={mIdx}>
-                                  <span style={{ fontWeight: '500', textAlign: 'center' }}>{measurement.label}:</span>
-                                  <span style={{ textAlign: 'center' }}>{measurement.value}</span>
+                                  <span style={{ fontWeight: '500', textAlign: 'left' }}>{sizeEntry.label}</span>
+                                  <span style={{ textAlign: 'right' }}>x{sizeEntry.quantity}</span>
                                 </React.Fragment>
                               ))}
                             </div>
                           </div>
                         );
                       }
-                      return <span style={{ color: '#666', textAlign: 'center', display: 'block' }}>N/A</span>;
+                      return <span style={{ color: '#666', textAlign: 'left', display: 'block' }}>N/A</span>;
                     }
                   })()}
                 </div>

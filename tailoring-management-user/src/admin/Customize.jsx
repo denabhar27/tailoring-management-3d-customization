@@ -104,6 +104,8 @@ const Customize = () => {
 
   const [priceConfirmationPrice, setPriceConfirmationPrice] = useState('');
 
+  const [priceConfirmationReason, setPriceConfirmationReason] = useState('');
+
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
 
   const [previewImageUrl, setPreviewImageUrl] = useState('');
@@ -1853,6 +1855,8 @@ const Customize = () => {
 
     setPriceConfirmationPrice(estimatedPrice.toFixed(2));
 
+    setPriceConfirmationReason(item.pricing_factors?.adminNotes || '');
+
     setShowPriceConfirmationModal(true);
 
   };
@@ -1871,13 +1875,23 @@ const Customize = () => {
 
     }
 
+    if (!priceConfirmationReason.trim()) {
+
+      showToast("Please provide a reason for the price change", "error");
+
+      return;
+
+    }
+
     try {
 
       const result = await updateCustomizationOrderItem(priceConfirmationItem.item_id, {
 
         approvalStatus: 'price_confirmation',
 
-        finalPrice: finalPrice
+        finalPrice: finalPrice,
+
+        adminNotes: priceConfirmationReason.trim()
 
       });
 
@@ -1898,6 +1912,8 @@ const Customize = () => {
         setPriceConfirmationItem(null);
 
         setPriceConfirmationPrice('');
+
+        setPriceConfirmationReason('');
 
       } else {
 
@@ -2372,6 +2388,20 @@ const Customize = () => {
   const handleSaveEdit = async () => {
 
     if (!selectedOrder) return;
+
+    const currentPrice = parseFloat(selectedOrder.final_price || 0);
+
+    const newPrice = parseFloat(editForm.finalPrice || 0);
+
+    const isPriceChanged = !isNaN(newPrice) && Math.abs(newPrice - currentPrice) > 0.01;
+
+    if (isPriceChanged && !String(editForm.adminNotes || '').trim()) {
+
+      showToast('Please provide a reason for the price change', 'error');
+
+      return;
+
+    }
 
     try {
 
@@ -4051,6 +4081,26 @@ const Customize = () => {
 
               </div>
 
+              <div className="payment-form-group" style={{ marginTop: '12px' }}>
+
+                <label>Reason for Price Change <span style={{ color: '#d32f2f' }}>*</span></label>
+
+                <textarea
+
+                  value={priceConfirmationReason}
+
+                  onChange={(e) => setPriceConfirmationReason(e.target.value)}
+
+                  placeholder="Explain why the price was changed..."
+
+                  rows={3}
+
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+
+                />
+
+              </div>
+
               <div style={{ marginTop: '15px', padding: '12px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '0.9em', color: '#1976d2' }}>
 
                 ℹ️ Customer will be notified to confirm the price before proceeding.
@@ -4061,7 +4111,13 @@ const Customize = () => {
 
             <div className="modal-footer-centered">
 
-              <button className="btn-cancel" onClick={() => setShowPriceConfirmationModal(false)}>Cancel</button>
+              <button className="btn-cancel" onClick={() => {
+
+                setShowPriceConfirmationModal(false);
+
+                setPriceConfirmationReason('');
+
+              }}>Cancel</button>
 
               <button className="btn-save" onClick={handlePriceConfirmationSubmit}>Confirm & Move to Price Confirmation</button>
 

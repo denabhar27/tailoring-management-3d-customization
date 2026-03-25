@@ -1339,6 +1339,7 @@ tbody tr.clickable-row:active {
 
 .modal-overlay.active:has(.confirm-modal) {
   z-index: 2000;
+  animation: none;
 }
 
 .modal-overlay.confirm-modal-overlay {
@@ -1441,6 +1442,7 @@ tbody tr.clickable-row:active {
   box-shadow: 0 20px 60px rgba(139, 69, 19, 0.3), 0 8px 25px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   border: 1px solid rgba(139, 69, 19, 0.1);
+  animation: none;
 }
 
 .confirm-icon {

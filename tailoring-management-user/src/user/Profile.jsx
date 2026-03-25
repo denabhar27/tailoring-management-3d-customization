@@ -14,7 +14,7 @@ import SimpleImageCarousel from '../components/SimpleImageCarousel';
 import { API_BASE_URL, API_URL } from '../api/config';
 
 const Profile = () => {
-  const { alert } = useAlert();
+  const { alert, confirm } = useAlert();
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -112,7 +112,11 @@ const Profile = () => {
     const checkPriceConfirmation = async () => {
       if (orders.length > 0) {
         const priceConfirmationOrders = orders.filter(order =>
-          order.items && order.items.some(item => item.status === 'price_confirmation')
+          order.items && order.items.some(item => {
+            const serviceType = String(item.service_type || '').toLowerCase();
+            const isDryCleaning = serviceType === 'dry_cleaning' || serviceType === 'dry-cleaning' || serviceType === 'drycleaning';
+            return item.status === 'price_confirmation' && !isDryCleaning;
+          })
         );
 
         if (priceConfirmationOrders.length > 0) {
@@ -389,6 +393,19 @@ const Profile = () => {
 
   const handleAcceptPrice = async (item) => {
     try {
+      const isConfirmed = await confirm(
+        `Accept the updated price of ${formatCurrencyPHP(item.final_price)} for this order?`,
+        'Confirm Price Acceptance',
+        'question',
+        {
+          confirmText: 'Accept Price',
+          cancelText: 'Not Now'
+        }
+      );
+
+      if (!isConfirmed) {
+        return;
+      }
 
       const response = await fetch(`${API_URL}/orders/${item.order_item_id}/accept-price`, {
         method: 'POST',
@@ -419,6 +436,19 @@ const Profile = () => {
 
   const handleDeclinePrice = async (item) => {
     try {
+      const isConfirmed = await confirm(
+        'Declining the updated price will cancel this order. Do you want to continue?',
+        'Confirm Price Decline',
+        'warning',
+        {
+          confirmText: 'Decline Price',
+          cancelText: 'Keep Order'
+        }
+      );
+
+      if (!isConfirmed) {
+        return;
+      }
 
       const response = await fetch(`${API_URL}/orders/${item.order_item_id}/decline-price`, {
         method: 'POST',
@@ -766,6 +796,7 @@ const Profile = () => {
                   }}>
                     <div style={{ marginBottom: '6px' }}><strong>Garment #{idx + 1}:</strong> {garment.garmentType || 'N/A'}</div>
                     <div style={{ marginBottom: '6px' }}><strong>Damage Level:</strong> {garment.damageLevel ? garment.damageLevel.charAt(0).toUpperCase() + garment.damageLevel.slice(1) : 'N/A'}</div>
+                    <div style={{ marginBottom: '6px' }}><strong>Damage Level Description:</strong> {garment.damageLevelDescription || 'N/A'}</div>
                     <div style={{ marginBottom: '6px' }}><strong>Description:</strong> {garment.notes || 'N/A'}</div>
                     <div><strong>Price:</strong> ₱{garment.basePrice || 'N/A'}</div>
                   </div>
@@ -776,6 +807,10 @@ const Profile = () => {
                 <div className="detail-row">
                   <span className="detail-label">Damage Level:</span>
                   <span className="detail-value">{damageLevel ? damageLevel.charAt(0).toUpperCase() + damageLevel.slice(1) : 'N/A'}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Damage Level Description:</span>
+                  <span className="detail-value">{specific_data.damageLevelDescription || 'N/A'}</span>
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">Garment Type:</span>
@@ -1404,6 +1439,13 @@ const Profile = () => {
     console.log('Item specific_data:', item.specific_data);
     console.log('Item service_type:', item.service_type);
 
+    const serviceType = String(item.service_type || '').toLowerCase();
+    const isDryCleaning = serviceType === 'dry_cleaning' || serviceType === 'dry-cleaning' || serviceType === 'drycleaning';
+    if (isDryCleaning) {
+      console.log('Dry cleaning detected - skipping price confirmation actions');
+      return false;
+    }
+
     const isPriceConfirmationStatus = item.status === 'price_confirmation';
     console.log('Is price confirmation status:', isPriceConfirmationStatus);
 
@@ -1751,12 +1793,14 @@ const Profile = () => {
                   >
                     Pending ({getStatusCounts().pending})
                   </button>
-                  <button
-                    className={`filter-btn ${statusFilter === 'price_confirmation' ? 'active' : ''}`}
-                    onClick={() => setStatusFilter('price_confirmation')}
-                  >
-                    Price Confirmation ({getStatusCounts().price_confirmation})
-                  </button>
+                  {serviceFilter !== 'dry_cleaning' && (
+                    <button
+                      className={`filter-btn ${statusFilter === 'price_confirmation' ? 'active' : ''}`}
+                      onClick={() => setStatusFilter('price_confirmation')}
+                    >
+                      Price Confirmation ({getStatusCounts().price_confirmation})
+                    </button>
+                  )}
                   <button
                     className={`filter-btn ${statusFilter === 'in_progress' ? 'active' : ''}`}
                     onClick={() => setStatusFilter('in_progress')}
@@ -1827,6 +1871,7 @@ const Profile = () => {
                 const totalPaid = amountPaid;
                 const remainingAmount = Math.max(0, finalPrice - totalPaid);
                 const hasPayment = totalPaid > 0 && (isRental || isRepair || isDryCleaning || isCustomization);
+                const adminPriceReason = (pricingFactors?.adminNotes || item.specific_data?.adminNotes || '').toString().trim();
 
                 const isUniform = isCustomization && (
                   item.specific_data?.garmentType?.toLowerCase() === 'uniform' ||
@@ -1847,29 +1892,6 @@ const Profile = () => {
                             </span>
                           )}
                         </span>
-                      </div>
-                      <div className="order-price">
-                        {isUniform && finalPrice === 0 ? (
-                          <span style={{ color: '#e65100', fontWeight: '600' }}>Price varies</span>
-                        ) : isUniform && finalPrice > 0 ? (
-                          <span style={{ color: '#4caf50', fontWeight: '600' }}>
-                            ₱{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                          </span>
-                        ) : hasPayment && remainingAmount > 0 ? (
-                          <>
-                            <div style={{ fontSize: '14px', color: '#666', textDecoration: 'line-through' }}>
-                              ₱{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                            </div>
-                            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#ff9800' }}>
-                              ₱{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                            </div>
-                            <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                              Remaining
-                            </div>
-                          </>
-                        ) : (
-                          `₱${finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
-                        )}
                       </div>
                     </div>
 
@@ -2039,10 +2061,10 @@ const Profile = () => {
                                 {priceChanged && <span className="price-change-indicator">⚠️ Updated by Admin</span>}
                               </span>
                             </div>
-                            {priceChanged && item.specific_data?.adminNotes && (
+                            {priceChanged && adminPriceReason && (
                               <div className="admin-notes">
-                                <span className="notes-label">Admin Note:</span>
-                                <span className="notes-text">{item.specific_data.adminNotes}</span>
+                                <span className="notes-label">Price Change Reason:</span>
+                                <span className="notes-text">{adminPriceReason}</span>
                               </div>
                             )}
                             {hasPayment && (
@@ -2101,6 +2123,12 @@ const Profile = () => {
                                   <span className="price-label">Final Price:</span>
                                   <span className="price-value final">₱{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                 </div>
+                                {priceChanged && adminPriceReason && (
+                                  <div className="admin-notes">
+                                    <span className="notes-label">Price Change Reason:</span>
+                                    <span className="notes-text">{adminPriceReason}</span>
+                                  </div>
+                                )}
                                 {hasPayment && (
                                   <>
                                     <div className="price-row">
@@ -2189,13 +2217,15 @@ const Profile = () => {
                                 <div className="timeline-date">{formatDate(item.order_date)}</div>
                               </div>
                             </div>
-                            <div className={`timeline-item ${getTimelineItemClass(item.status, 'price_confirmation', item.service_type)}`}>
-                              <div className={`timeline-dot ${getStatusDotClass(item.status, 'price_confirmation', item.service_type)}`}></div>
-                              <div className="timeline-content">
-                                <div className="timeline-title">Price Confirmation</div>
-                                <div className="timeline-date">{getTimelineDate(item.status_updated_at, item.status, 'price_confirmation', item.service_type)}</div>
+                            {!(String(item.service_type || '').toLowerCase() === 'dry_cleaning' || String(item.service_type || '').toLowerCase() === 'dry-cleaning' || String(item.service_type || '').toLowerCase() === 'drycleaning') && (
+                              <div className={`timeline-item ${getTimelineItemClass(item.status, 'price_confirmation', item.service_type)}`}>
+                                <div className={`timeline-dot ${getStatusDotClass(item.status, 'price_confirmation', item.service_type)}`}></div>
+                                <div className="timeline-content">
+                                  <div className="timeline-title">Price Confirmation</div>
+                                  <div className="timeline-date">{getTimelineDate(item.status_updated_at, item.status, 'price_confirmation', item.service_type)}</div>
+                                </div>
                               </div>
-                            </div>
+                            )}
                             <div className={`timeline-item ${getTimelineItemClass(item.status, 'accepted', item.service_type)}`}>
                               <div className={`timeline-dot ${getStatusDotClass(item.status, 'accepted', item.service_type)}`}></div>
                               <div className="timeline-content">
@@ -2374,9 +2404,6 @@ const Profile = () => {
                         if (hasPayment && remainingAmount > 0) {
                           return (
                             <div>
-                              <div style={{ fontSize: '14px', color: '#666', textDecoration: 'line-through', marginBottom: '4px' }}>
-                                ₱{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                              </div>
                               <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#ff9800' }}>
                                 ₱{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                               </div>

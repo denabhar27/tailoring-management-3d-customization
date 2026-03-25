@@ -354,7 +354,7 @@ const Inventory = () => {
                             color: (option.quantity || 0) <= 0 ? '#b71c1c' : '#2e7d32',
                             fontWeight: 700
                           }}>
-                            {(option.quantity || 0) <= 0 ? 'Out of stock' : 'Available'}
+                            {(option.quantity || 0) <= 0 ? 'Unavailable' : 'Available'}
                           </span>
                           {(option.cm || option.inch) ? ` (${option.cm || '-'} cm / ${option.inch || '-'} in)` : ''}
                         </div>

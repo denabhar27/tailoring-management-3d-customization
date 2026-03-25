@@ -1898,9 +1898,9 @@ tbody td {
 
   background: rgba(0, 0, 0, 0.65);
 
-  backdrop-filter: blur(8px);
-
   -webkit-backdrop-filter: blur(8px);
+
+  backdrop-filter: blur(8px);
 
   display: flex;
 
@@ -2253,6 +2253,8 @@ tbody td {
 
   z-index: 2000;
 
+  animation: none;
+
 }
 
 .confirm-modal {
@@ -2276,6 +2278,8 @@ tbody td {
   overflow: hidden;
 
   border: 1px solid rgba(139, 69, 19, 0.1);
+
+  animation: none;
 
 }
 

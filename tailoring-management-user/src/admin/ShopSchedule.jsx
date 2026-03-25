@@ -192,17 +192,17 @@ const ShopSchedule = () => {
       <AdminHeader />
 
       <div className="content">
-        <div className="ss-card">
-          <div className="ss-header-block">
-            <h2>Operating Days & Available Times</h2>
-            <p>
-              Toggle days to open or close the shop. Click on a day to set available time slots.
-            </p>
-            <p className="ss-help-text">
-              If no times are selected for an open day, all default time slots will be available.
-            </p>
-          </div>
+        <div className="ss-header-block">
+          <h2>Operating Days & Available Times</h2>
+          <p>
+            Toggle days to open or close the shop. Click on a day to set available time slots.
+          </p>
+          <p className="ss-help-text">
+            If no times are selected for an open day, all default time slots will be available.
+          </p>
+        </div>
 
+        <div className="ss-card">
           <div className="ss-day-list">
             {schedule.map(day => {
               const isExpanded = expandedDay === day.day_of_week;

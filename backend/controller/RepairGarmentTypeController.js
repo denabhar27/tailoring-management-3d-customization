@@ -21,11 +21,11 @@ const groupDenormalizedRows = (rows) => {
       garmentMap[garmentId] = {
         repair_garment_id: row.repair_garment_id,
         garment_name: row.garment_name,
-        garment_description: row.garment_description,
-        base_price: row.base_price,
+        description: row.description || row.garment_description || null,
+        base_price: row.base_price !== undefined && row.base_price !== null ? parseFloat(row.base_price) : null,
         estimate_hours: row.estimate_hours,
-        is_active: row.is_active,
-        has_damage_levels: row.has_damage_levels,
+        is_active: Number(row.is_active) === 1 ? 1 : 0,
+        has_damage_levels: Number(row.has_damage_levels) === 1 ? 1 : 0,
         default_damage_level_id: row.default_damage_level_id,
         created_at: row.created_at,
         updated_at: row.updated_at,
@@ -40,9 +40,11 @@ const groupDenormalizedRows = (rows) => {
         repair_garment_id: garmentId,
         level_name: row.level_name,
         level_description: row.level_description,
-        base_price: row.base_price,
-        is_active: row.damage_level_is_active,
-        sort_order: row.damage_level_sort_order
+        base_price: row.base_price !== undefined && row.base_price !== null ? parseFloat(row.base_price) : 0,
+        is_active: Number(row.damage_level_is_active) === 1 ? 1 : 0,
+        sort_order: row.damage_level_sort_order !== undefined && row.damage_level_sort_order !== null
+          ? parseInt(row.damage_level_sort_order, 10) || 0
+          : 0
       });
     }
   });

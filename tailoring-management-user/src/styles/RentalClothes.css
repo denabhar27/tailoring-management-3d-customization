@@ -1515,6 +1515,63 @@
   box-shadow: 0 14px 28px rgba(91, 56, 29, 0.38);
 }
 
+.rc-modal-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.rc-btn-cancel-rent {
+  border: 1px solid #c9b5a0;
+  border-radius: 6px;
+  background: #f4efe9;
+  color: #6a4a2f;
+  padding: 10px 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.rc-btn-cancel-rent:hover {
+  background: #ece3d9;
+  transform: translateY(-1px);
+}
+
+.rc-modal-actions .rc-btn-rent {
+  margin-top: 0;
+  width: auto;
+  flex: 0 0 auto;
+  padding: 10px 20px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  grid-template-columns: none;
+  grid-template-rows: none;
+}
+
+.rc-modal-actions .rc-btn-rent-main {
+  grid-column: auto;
+  grid-row: auto;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.rc-modal-actions .rc-btn-rent-price {
+  grid-column: auto;
+  grid-row: auto;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .rental .section-header.rc-rental-head {
   max-width: 1200px;
   margin: 0 auto 12px;
@@ -1720,6 +1777,15 @@
 
   .rc-btn-rent-price {
     font-size: 21px;
+  }
+
+  .rc-modal-actions {
+    flex-direction: column;
+  }
+
+  .rc-btn-cancel-rent,
+  .rc-modal-actions .rc-btn-rent {
+    width: 100%;
   }
 
   .rc-filter-bar {

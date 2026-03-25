@@ -91,46 +91,34 @@ const RepairGarmentType = {
                 return callback(alterErr3);
               }
 
-              // Remove legacy seeded defaults so UI only shows admin-defined levels.
-              const cleanupSeededSQL = `
-                DELETE FROM repair_damage_levels
-                WHERE level_name IN ('Minor', 'Moderate', 'Major', 'Severe')
+              const syncHasDamageLevelsSQL = `
+                UPDATE repair_garment_types g
+                SET g.has_damage_levels = CASE
+                  WHEN EXISTS (
+                    SELECT 1
+                    FROM repair_damage_levels dl
+                    WHERE dl.repair_garment_id = g.repair_garment_id
+                  ) THEN 1
+                  ELSE 0
+                END
               `;
 
-              db.query(cleanupSeededSQL, (cleanupErr) => {
-                if (cleanupErr) {
-                  console.warn('Cleanup seeded damage levels warning:', cleanupErr.message);
-                }
+              db.query(syncHasDamageLevelsSQL, (syncErr) => {
+                if (syncErr) return callback(syncErr);
 
-                const syncHasDamageLevelsSQL = `
+                const setDefaultDamageLevelSQL = `
                   UPDATE repair_garment_types g
-                  SET g.has_damage_levels = CASE
-                    WHEN EXISTS (
-                      SELECT 1
-                      FROM repair_damage_levels dl
-                      WHERE dl.repair_garment_id = g.repair_garment_id
-                    ) THEN 1
-                    ELSE 0
-                  END
+                  SET g.default_damage_level_id = (
+                    SELECT dl.repair_damage_level_id
+                    FROM repair_damage_levels dl
+                    WHERE dl.repair_garment_id = g.repair_garment_id
+                    ORDER BY dl.sort_order ASC, dl.repair_damage_level_id ASC
+                    LIMIT 1
+                  )
+                  WHERE g.default_damage_level_id IS NULL
                 `;
 
-                db.query(syncHasDamageLevelsSQL, (syncErr) => {
-                  if (syncErr) return callback(syncErr);
-
-                  const setDefaultDamageLevelSQL = `
-                    UPDATE repair_garment_types g
-                    SET g.default_damage_level_id = (
-                      SELECT dl.repair_damage_level_id
-                      FROM repair_damage_levels dl
-                      WHERE dl.repair_garment_id = g.repair_garment_id
-                      ORDER BY dl.sort_order ASC, dl.repair_damage_level_id ASC
-                      LIMIT 1
-                    )
-                    WHERE g.default_damage_level_id IS NULL
-                  `;
-
-                  db.query(setDefaultDamageLevelSQL, callback);
-                });
+                db.query(setDefaultDamageLevelSQL, callback);
               });
             });
           });

@@ -12,7 +12,6 @@
   z-index: 10000;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
 .alert-modal-overlay.active {
@@ -30,13 +29,7 @@
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 8px 25px rgba(0, 0, 0, 0.2);
-  transform: scale(0.9);
-  transition: transform 0.3s ease;
   border: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.alert-modal-overlay.active .alert-modal {
-  transform: scale(1);
 }
 
 .alert-icon {

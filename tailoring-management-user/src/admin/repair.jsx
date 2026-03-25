@@ -65,6 +65,7 @@ const Repair = () => {
   const [showPriceConfirmationModal, setShowPriceConfirmationModal] = useState(false);
   const [priceConfirmationItem, setPriceConfirmationItem] = useState(null);
   const [priceConfirmationPrice, setPriceConfirmationPrice] = useState('');
+  const [priceConfirmationReason, setPriceConfirmationReason] = useState('');
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -192,7 +193,17 @@ const Repair = () => {
     try {
       const result = await getAllRepairGarmentTypesAdmin();
       if (result.success) {
-        setRepairGarmentTypes(result.garments || []);
+        const normalizedGarments = (result.garments || []).map((garment) => ({
+          ...garment,
+          is_active: Number(garment.is_active) === 1 ? 1 : 0,
+          damage_levels: (garment.damage_levels || []).map((level) => ({
+            ...level,
+            is_active: Number(level.is_active) === 1 ? 1 : 0,
+            base_price: parseFloat(level.base_price || 0),
+            sort_order: parseInt(level.sort_order, 10) || 0
+          }))
+        }));
+        setRepairGarmentTypes(normalizedGarments);
       } else {
         alert(result.message || 'Failed to load repair garment types', 'Error');
       }
@@ -217,12 +228,18 @@ const Repair = () => {
         level_name: String(level.level_name || '').trim(),
         level_description: level.level_description || '',
         base_price: parseFloat(level.base_price || 0),
-        sort_order: level.sort_order !== undefined && level.sort_order !== '' ? parseInt(level.sort_order, 10) || 0 : index + 1,
+        sort_order: index + 1,
         is_active: level.is_active !== undefined ? level.is_active : 1
       }));
 
     if (normalizedDamageLevels.length === 0) {
       alert('Please add at least one damage level with a name and price', 'Error');
+      return;
+    }
+
+    const hasInvalidPrice = normalizedDamageLevels.some((level) => !Number.isFinite(level.base_price) || level.base_price <= 0);
+    if (hasInvalidPrice) {
+      alert('Please enter a valid price greater than 0 for each damage level', 'Error');
       return;
     }
 
@@ -516,6 +533,7 @@ const Repair = () => {
     const estimatedPrice = getEstimatedPrice(item) || parseFloat(item.final_price || 0);
     setPriceConfirmationItem(item);
     setPriceConfirmationPrice(estimatedPrice.toFixed(2));
+    setPriceConfirmationReason(item.pricing_factors?.adminNotes || '');
     setShowPriceConfirmationModal(true);
   };
 
@@ -528,10 +546,16 @@ const Repair = () => {
       return;
     }
 
+    if (!priceConfirmationReason.trim()) {
+      showToast("Please provide a reason for the price change", "error");
+      return;
+    }
+
     try {
       const result = await updateRepairOrderItem(priceConfirmationItem.item_id, {
         approvalStatus: 'price_confirmation',
-        finalPrice: finalPrice
+        finalPrice: finalPrice,
+        adminNotes: priceConfirmationReason.trim()
       });
       if (result.success) {
         await loadRepairOrders();
@@ -543,6 +567,7 @@ const Repair = () => {
         setShowPriceConfirmationModal(false);
         setPriceConfirmationItem(null);
         setPriceConfirmationPrice('');
+        setPriceConfirmationReason('');
       } else {
         showToast(result.message || "Failed to accept repair request", "error");
       }
@@ -682,8 +707,29 @@ const Repair = () => {
     return item.specific_data.estimatedPrice || null;
   };
 
+  const getDamageLevelSummary = (item) => {
+    if (!item?.specific_data) return 'N/A';
+
+    if (Array.isArray(item.specific_data.garments) && item.specific_data.garments.length > 0) {
+      return item.specific_data.garments
+        .map((g) => g?.damageLevel)
+        .filter(Boolean)
+        .join(', ') || 'N/A';
+    }
+
+    return item.specific_data.damageLevel || 'N/A';
+  };
+
   const handleSaveEdit = async () => {
     if (!selectedOrder) return;
+
+    const currentPrice = parseFloat(selectedOrder.final_price || 0);
+    const newPrice = parseFloat(editForm.finalPrice || 0);
+    const isPriceChanged = !isNaN(newPrice) && Math.abs(newPrice - currentPrice) > 0.01;
+    if (isPriceChanged && !String(editForm.adminNotes || '').trim()) {
+      await alert('Please provide a reason for the price change', "Reason Required", "warning");
+      return;
+    }
 
     try {
       console.log("Frontend - Sending edit data:", editForm);
@@ -911,7 +957,7 @@ const Repair = () => {
                           ? item.specific_data.garments.map(g => g.garmentType || 'Unknown').join(', ')
                           : (item.specific_data?.garmentType || 'N/A')}
                       </td>
-                      <td><span style={{ fontSize: '0.9em', color: '#d32f2f' }}>{item.specific_data?.serviceName || 'N/A'}</span></td>
+                      <td><span style={{ fontSize: '0.9em', color: '#d32f2f' }}>{getDamageLevelSummary(item)}</span></td>
                       <td>{new Date(item.order_date).toLocaleDateString()}</td>
                       <td>₱{parseFloat(item.final_price || 0).toLocaleString()}</td>
                       <td>
@@ -1316,7 +1362,7 @@ const Repair = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {(repairGarmentTypeForm.damage_levels || []).map((level, index) => (
                     <div key={`damage-level-${index}`} style={{ border: '1px solid #e0e0e0', borderRadius: '8px', padding: '12px', background: '#fafafa' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '8px', alignItems: 'center' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '8px', alignItems: 'center' }}>
                         <input
                           type="text"
                           value={level.level_name}
@@ -1330,13 +1376,6 @@ const Repair = () => {
                           placeholder="Price"
                           min="0"
                           step="0.01"
-                        />
-                        <input
-                          type="number"
-                          value={level.sort_order}
-                          onChange={(e) => updateDamageLevelRow(index, 'sort_order', e.target.value)}
-                          placeholder="Sort"
-                          min="0"
                         />
                         <button
                           type="button"
@@ -1391,6 +1430,27 @@ const Repair = () => {
                             {garment.description && `${garment.description}`}
                             {!garment.is_active && <span className="inactive-badge">(Inactive)</span>}
                           </div>
+                          {Array.isArray(garment.damage_levels) && garment.damage_levels.length > 0 && (
+                            <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                              {garment.damage_levels
+                                .sort((a, b) => (parseInt(a.sort_order, 10) || 0) - (parseInt(b.sort_order, 10) || 0))
+                                .map((level) => (
+                                  <span
+                                    key={level.repair_damage_level_id || `${garment.repair_garment_id}-${level.level_name}`}
+                                    style={{
+                                      fontSize: '11px',
+                                      fontWeight: 600,
+                                      padding: '4px 8px',
+                                      borderRadius: '999px',
+                                      background: Number(level.is_active) === 1 ? '#e3f2fd' : '#f5f5f5',
+                                      color: Number(level.is_active) === 1 ? '#1565c0' : '#888'
+                                    }}
+                                  >
+                                    {level.level_name}: ₱{parseFloat(level.base_price || 0).toFixed(2)}
+                                  </span>
+                                ))}
+                            </div>
+                          )}
                         </div>
                         <div className="repair-item-actions">
                           <button
@@ -1475,12 +1535,26 @@ const Repair = () => {
                 })()}
               </div>
 
+              <div className="payment-form-group" style={{ marginTop: '12px' }}>
+                <label>Reason for Price Change <span style={{ color: '#d32f2f' }}>*</span></label>
+                <textarea
+                  value={priceConfirmationReason}
+                  onChange={(e) => setPriceConfirmationReason(e.target.value)}
+                  placeholder="Explain why the price was changed..."
+                  rows={3}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+              </div>
+
               <div style={{ marginTop: '15px', padding: '12px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '0.9em', color: '#1976d2' }}>
                 ℹ️ Customer will be notified to confirm the price before proceeding.
               </div>
             </div>
             <div className="modal-footer-centered">
-              <button className="btn-cancel" onClick={() => setShowPriceConfirmationModal(false)}>Cancel</button>
+              <button className="btn-cancel" onClick={() => {
+                setShowPriceConfirmationModal(false);
+                setPriceConfirmationReason('');
+              }}>Cancel</button>
               <button className="btn-save" onClick={handlePriceConfirmationSubmit}>Confirm & Move to Price Confirmation</button>
             </div>
           </div>

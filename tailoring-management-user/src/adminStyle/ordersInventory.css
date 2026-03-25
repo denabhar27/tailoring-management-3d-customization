@@ -45,6 +45,50 @@
   font-weight: 400;
 }
 
+.reports-tab-switcher {
+  display: inline-flex;
+  background: #f1f1f1;
+  border-radius: 10px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.reports-tab-btn {
+  border: none;
+  background: transparent;
+  color: #5d4037;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.reports-tab-btn.active {
+  background: #8b4513;
+  color: #fff;
+}
+
+.print-report-btn,
+.clear-filter-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.print-report-btn {
+  background: #5d4037;
+  color: #fff;
+}
+
+.clear-filter-btn {
+  background: #eceff1;
+  color: #37474f;
+}
+
 /* Combined Statistics Grid - 2x4 layout */
 .stats-grid-combined {
   display: grid;
@@ -162,6 +206,39 @@
   box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.1);
 }
 
+@media print {
+  .sidebar,
+  .admin-header-bar,
+  .reports-tab-switcher,
+  .print-report-btn,
+  .clear-filter-btn,
+  .search-filter-section,
+  .rental-post-section,
+  .dashboard-title,
+  .modal-overlay {
+    display: none !important;
+  }
+
+  .stats-grid-combined {
+    display: none !important;
+  }
+
+  .orders-inventory-management .content {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .orders-inventory-management {
+    background: #fff !important;
+  }
+
+  .combined-table-section,
+  .stats-grid-combined {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+}
+
 /* Combined Table Section */
 .combined-table-section {
   background: #FFFFFF;
@@ -171,11 +248,20 @@
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
 
+.combined-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
 .section-title {
   font-size: 18px;
   font-weight: 600;
   color: #2D3436;
-  margin-bottom: 20px;
+  margin-bottom: 0;
   display: flex;
   align-items: center;
   gap: 10px;

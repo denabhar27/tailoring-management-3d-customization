@@ -1,4 +1,9 @@
 .shop-schedule-page .content {
+  margin-left: 270px;
+  margin-top: 70px;
+  padding: 30px 40px;
+  min-height: calc(100vh - 70px);
+  overflow-x: hidden;
   background: #f3f3f3;
 }
 
@@ -13,35 +18,39 @@
   border: 1px solid #dfdfdf;
   border-radius: 14px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
-  max-width: 980px;
-  margin: 0 auto 24px;
+  margin: 0 0 24px 0;
   padding: 28px;
+  width: 100%;
 }
 
 .shop-schedule-page .ss-header-block {
-  margin-bottom: 20px;
+  margin-bottom: 25px;
 }
 
 .shop-schedule-page .ss-header-block h2 {
+  font-family: 'Montserrat', 'Poppins', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: #2D3436;
   margin: 0;
-  font-size: 42px;
-  line-height: 1.05;
-  font-weight: 500;
-  color: #222222;
-  font-family: Georgia, 'Times New Roman', serif;
+  margin-bottom: 5px;
+  letter-spacing: -0.02em;
 }
 
 .shop-schedule-page .ss-header-block p {
+  font-size: 15px;
+  color: #636E72;
+  font-weight: 400;
   margin: 10px 0 0;
-  color: #717171;
-  font-size: 20px;
   line-height: 1.4;
 }
 
 .shop-schedule-page .ss-header-block .ss-help-text {
-  color: #9a9a9a;
-  font-style: italic;
-  font-size: 18px;
+  font-size: 15px;
+  color: #636E72;
+  font-weight: 400;
+  margin: 10px 0 0;
+  line-height: 1.4;
 }
 
 .shop-schedule-page .ss-day-list {

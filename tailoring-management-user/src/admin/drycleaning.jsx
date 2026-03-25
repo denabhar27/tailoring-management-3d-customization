@@ -39,10 +39,6 @@ const DryCleaning = () => {
   const [confirmButtonText, setConfirmButtonText] = useState('Confirm');
   const [confirmButtonStyle, setConfirmButtonStyle] = useState('blue');
 
-  const [showPriceConfirmationModal, setShowPriceConfirmationModal] = useState(false);
-  const [priceConfirmationItem, setPriceConfirmationItem] = useState(null);
-  const [priceConfirmationPrice, setPriceConfirmationPrice] = useState('');
-
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [cashReceived, setCashReceived] = useState('');
@@ -204,7 +200,7 @@ const DryCleaning = () => {
       'pending_review': 'pending',
       'pending': 'pending',
       'accepted': 'accepted',
-      'price_confirmation': 'price-confirmation',
+      'price_confirmation': 'accepted',
       'confirmed': 'in-progress',
       'ready_for_pickup': 'to-pickup',
       'completed': 'completed',
@@ -219,7 +215,7 @@ const DryCleaning = () => {
       'pending_review': 'Pending',
       'pending': 'Pending',
       'accepted': 'Accepted',
-      'price_confirmation': 'Price Confirmation',
+      'price_confirmation': 'Accepted',
       'confirmed': 'In Progress',
       'ready_for_pickup': 'To Pick up',
       'completed': 'Completed',
@@ -231,6 +227,9 @@ const DryCleaning = () => {
 
   const getNextStatus = (currentStatus, serviceType = 'dry_cleaning', item = null) => {
     if (!currentStatus || currentStatus === 'pending_review' || currentStatus === 'pending') {
+      if (serviceType === 'dry_cleaning') {
+        return 'accepted';
+      }
       return 'price_confirmation';
     }
 
@@ -245,7 +244,7 @@ const DryCleaning = () => {
     const statusFlow = {
       'repair': ['pending', 'price_confirmation', 'accepted', 'confirmed', 'ready_for_pickup', 'completed'],
       'customization': ['pending', 'price_confirmation', 'accepted', 'confirmed', 'ready_for_pickup', 'completed'],
-      'dry_cleaning': ['pending', 'price_confirmation', 'accepted', 'confirmed', 'ready_for_pickup', 'completed'],
+      'dry_cleaning': ['pending', 'accepted', 'confirmed', 'ready_for_pickup', 'completed'],
       'rental': ['pending', 'ready_for_pickup', 'picked_up', 'rented', 'returned', 'completed']
     };
 
@@ -280,7 +279,6 @@ const DryCleaning = () => {
 
     const labelMap = {
       'accepted': 'Accept',
-      'price_confirmation': 'Price Confirm',
       'confirmed': 'Start Progress',
       'ready_for_pickup': 'Ready for Pickup',
       'completed': 'Complete',
@@ -341,8 +339,6 @@ const DryCleaning = () => {
       items = pendingAppointments;
     } else if (viewFilter === "accepted") {
       items = allItems.filter(item => item.approval_status === 'accepted');
-    } else if (viewFilter === "price-confirmation") {
-      items = allItems.filter(item => item.approval_status === 'price_confirmation');
     } else if (viewFilter === "in-progress") {
       items = allItems.filter(item => item.approval_status === 'confirmed');
     } else if (viewFilter === "to-pickup") {
@@ -406,67 +402,52 @@ const DryCleaning = () => {
       return;
     }
 
-    if (item.order_type === 'walk_in') {
-      try {
-        // Use actual final_price first, fall back to estimated
-        const actualPrice = parseFloat(item.final_price || 0);
-        const priceToUse = actualPrice > 0 ? actualPrice : (getEstimatedPrice(item) || 0);
-        const result = await updateDryCleaningOrderItem(itemId, {
-          approvalStatus: 'accepted',
-          finalPrice: priceToUse
-        });
-        if (result.success) {
-          await loadDryCleaningOrders();
-          showToast("Walk-in order accepted (price confirmed in person)", "success");
-        } else {
-          showToast(result.message || "Failed to accept request", "error");
+    openConfirmModal(
+      'Are you sure you want to accept this pending dry cleaning request?',
+      async () => {
+        if (item.order_type === 'walk_in') {
+          try {
+            // Use actual final_price first, fall back to estimated
+            const actualPrice = parseFloat(item.final_price || 0);
+            const priceToUse = actualPrice > 0 ? actualPrice : (getEstimatedPrice(item) || 0);
+            const result = await updateDryCleaningOrderItem(itemId, {
+              approvalStatus: 'accepted',
+              finalPrice: priceToUse
+            });
+            if (result.success) {
+              await loadDryCleaningOrders();
+              showToast("Walk-in order accepted (price confirmed in person)", "success");
+            } else {
+              showToast(result.message || "Failed to accept request", "error");
+            }
+          } catch (err) {
+            console.error("Accept error:", err);
+            showToast("Failed to accept request", "error");
+          }
+          return;
         }
-      } catch (err) {
-        console.error("Accept error:", err);
-        showToast("Failed to accept request", "error");
-      }
-      return;
-    }
 
-    // Use the actual final_price from the table first, fall back to estimated price
-    const actualPrice = parseFloat(item.final_price || 0);
-    const estimatedPrice = actualPrice > 0 ? actualPrice : (getEstimatedPrice(item) || 0);
-    setPriceConfirmationItem(item);
-    setPriceConfirmationPrice(estimatedPrice.toFixed(2));
-    setShowPriceConfirmationModal(true);
-  };
-
-  const handlePriceConfirmationSubmit = async () => {
-    if (!priceConfirmationItem) return;
-
-    const finalPrice = parseFloat(priceConfirmationPrice);
-    if (isNaN(finalPrice) || finalPrice <= 0) {
-      showToast("Please enter a valid price", "error");
-      return;
-    }
-
-    try {
-      const result = await updateDryCleaningOrderItem(priceConfirmationItem.item_id, {
-        approvalStatus: 'price_confirmation',
-        finalPrice: finalPrice
-      });
-      if (result.success) {
-        await loadDryCleaningOrders();
-
-        if (viewFilter !== 'all') {
-          setViewFilter('price-confirmation');
+        try {
+          const actualPrice = parseFloat(item.final_price || 0);
+          const priceToUse = actualPrice > 0 ? actualPrice : (getEstimatedPrice(item) || 0);
+          const result = await updateDryCleaningOrderItem(itemId, {
+            approvalStatus: 'accepted',
+            finalPrice: priceToUse
+          });
+          if (result.success) {
+            await loadDryCleaningOrders();
+            showToast('Dry cleaning request accepted!', 'success');
+          } else {
+            showToast(result.message || 'Failed to accept request', 'error');
+          }
+        } catch (err) {
+          console.error('Accept error:', err);
+          showToast('Failed to accept request', 'error');
         }
-        showToast("Dry cleaning request moved to price confirmation!", "success");
-        setShowPriceConfirmationModal(false);
-        setPriceConfirmationItem(null);
-        setPriceConfirmationPrice('');
-      } else {
-        showToast(result.message || "Failed to accept request", "error");
-      }
-    } catch (err) {
-      console.error("Accept error:", err);
-      showToast("Failed to accept request", "error");
-    }
+      },
+      'Accept',
+      'blue'
+    );
   };
 
   const handleDecline = (itemId) => {
@@ -521,8 +502,6 @@ const DryCleaning = () => {
 
               if (status === 'accepted') {
                 setViewFilter('accepted');
-              } else if (status === 'price_confirmation') {
-                setViewFilter('price-confirmation');
               } else if (status === 'confirmed') {
                 setViewFilter('in-progress');
               } else if (status === 'ready_for_pickup') {
@@ -770,7 +749,6 @@ const DryCleaning = () => {
             <option value="">All Status</option>
             <option value="pending">Pending</option>
             <option value="accepted">Accepted</option>
-            <option value="price_confirmation">Price Confirmation</option>
             <option value="confirmed">In Progress</option>
             <option value="ready_for_pickup">To Pick up</option>
             <option value="completed">Completed</option>
@@ -880,7 +858,7 @@ const DryCleaning = () => {
                               </svg>
                             </button>
                           )}
-                          {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && (
+                          {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
                             <button
                               className="icon-btn"
                               onClick={(e) => {
@@ -1000,7 +978,7 @@ const DryCleaning = () => {
                                           Math.abs(parseFloat(newPrice) - originalPrice) > 0.01;
                       if (priceChanged) {
 
-                        newStatus = isWalkIn ? 'accepted' : 'price_confirmation';
+                        newStatus = 'accepted';
                       }
                     }
 
@@ -1020,9 +998,7 @@ const DryCleaning = () => {
                           <strong>⚠️ Price Changed:</strong> Estimated: ₱{estimatedPrice.toFixed(2)} → New: ₱{parseFloat(editForm.finalPrice).toFixed(2)}
                           <br />
                           <span style={{ color: '#666', fontSize: '0.85em' }}>
-                            {isWalkIn
-                              ? 'Status will be set to "Accepted" (walk-in orders skip price confirmation).'
-                              : 'Status will be set to "Price Confirmation" to notify customer.'}
+                            Status will be set to "Accepted".
                           </span>
                         </div>
                       );
@@ -1036,34 +1012,16 @@ const DryCleaning = () => {
                 <label>Status</label>
                 <select
                   value={editForm.approvalStatus}
-                  onChange={(e) => {
-
-                    const newStatus = e.target.value;
-                    const isWalkIn = selectedOrder.order_type === 'walk_in';
-                    if (isWalkIn && newStatus === 'price_confirmation') {
-                      showToast('Walk-in orders do not require price confirmation. Status set to "Accepted".', 'info');
-                      setEditForm({ ...editForm, approvalStatus: 'accepted' });
-                    } else {
-                      setEditForm({ ...editForm, approvalStatus: newStatus });
-                    }
-                  }}
+                  onChange={(e) => setEditForm({ ...editForm, approvalStatus: e.target.value })}
                   style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
                 >
                   <option value="pending">Pending</option>
                   <option value="accepted">Accepted</option>
-                  {selectedOrder.order_type !== 'walk_in' && (
-                    <option value="price_confirmation">Price Confirmation</option>
-                  )}
                   <option value="confirmed">In Progress</option>
                   <option value="ready_for_pickup">Ready for Pickup</option>
                   <option value="completed">Completed</option>
                   <option value="cancelled">Rejected</option>
                 </select>
-                {editForm.approvalStatus === 'price_confirmation' && selectedOrder.order_type !== 'walk_in' && (
-                  <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '0.9em', color: '#1976d2' }}>
-                    ℹ️ Customer will be notified to confirm the updated price.
-                  </div>
-                )}
                 {selectedOrder.order_type === 'walk_in' && (
                   <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#fff3cd', borderRadius: '4px', fontSize: '0.9em', color: '#856404' }}>
                     ℹ️ Walk-in orders skip price confirmation (customer confirms in person).
@@ -1214,56 +1172,6 @@ const DryCleaning = () => {
             <div className="confirm-buttons">
               <button className="confirm-btn cancel" onClick={() => setShowConfirmModal(false)}>Cancel</button>
               <button className={confirmButtonStyle === 'danger' ? 'confirm-btn-danger' : 'confirm-btn-blue'} onClick={handleConfirm}>{confirmButtonText}</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {showPriceConfirmationModal && priceConfirmationItem && priceConfirmationItem.order_type !== 'walk_in' && (
-        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowPriceConfirmationModal(false)}>
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2>Price Confirmation</h2>
-              <span className="close-modal" onClick={() => setShowPriceConfirmationModal(false)}>×</span>
-            </div>
-            <div className="modal-body">
-              <div className="detail-row"><strong>Order ID:</strong> #{priceConfirmationItem.order_id}</div>
-              <div className="detail-row"><strong>Service:</strong> {priceConfirmationItem.specific_data?.serviceName || 'N/A'}</div>
-              {/* Multiple garments support */}
-              {priceConfirmationItem.specific_data?.garments && priceConfirmationItem.specific_data.garments.length > 0 ? (
-                <>
-                  <div className="detail-row"><strong>Garments:</strong> {priceConfirmationItem.specific_data.garments.length} item{priceConfirmationItem.specific_data.garments.length > 1 ? 's' : ''}</div>
-                  {priceConfirmationItem.specific_data.garments.map((garment, idx) => (
-                    <div key={idx} style={{ marginLeft: '20px', paddingLeft: '10px', borderLeft: '2px solid #e0e0e0', marginBottom: '4px' }}>
-                      <span>{garment.garmentType ? (garment.garmentType.charAt(0).toUpperCase() + garment.garmentType.slice(1)) : 'N/A'} ({garment.brand || 'N/A'}) × {garment.quantity || 1}</span>
-                    </div>
-                  ))}
-                </>
-              ) : (
-                <>
-                  <div className="detail-row"><strong>Garment Type:</strong> {priceConfirmationItem.specific_data?.garmentType || 'N/A'}</div>
-                  <div className="detail-row"><strong>Quantity:</strong> {priceConfirmationItem.specific_data?.quantity || 1}</div>
-                </>
-              )}
-
-              <div className="payment-form-group">
-                <label>Final Price (₱)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={priceConfirmationPrice}
-                  onChange={(e) => setPriceConfirmationPrice(e.target.value)}
-                  placeholder="Enter final price"
-                />
-              </div>
-
-              <div style={{ marginTop: '15px', padding: '12px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '0.9em', color: '#1976d2' }}>
-                ℹ️ Customer will be notified to confirm the price before proceeding.
-              </div>
-            </div>
-            <div className="modal-footer-centered">
-              <button className="btn-cancel" onClick={() => setShowPriceConfirmationModal(false)}>Cancel</button>
-              <button className="btn-save" onClick={handlePriceConfirmationSubmit}>Confirm & Move to Price Confirmation</button>
             </div>
           </div>
         </div>

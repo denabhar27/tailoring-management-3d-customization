@@ -10,7 +10,8 @@ import ImagePreviewModal from '../components/ImagePreviewModal';
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
 import { API_BASE_URL } from '../api/config';
 import { getUserRole } from '../api/AuthApi';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { exportToExcel } from '../utils/excelExport';
 
 const SIZE_LABELS = {
   small: 'Small (S)',
@@ -75,7 +76,7 @@ const getSizeAvailabilityRows = (item) => {
       if (maintenanceQty > 0) segments.push(`${maintenanceQty} maintenance`);
       reason = segments.join(' + ');
     } else if (row.quantity <= 0) {
-      reason = 'Out of stock';
+      reason = 'Unavailable';
     }
 
     return {
@@ -230,7 +231,9 @@ const ImageCarousel = ({ images, itemName, getRentalImageUrl }) => {
 
 const OrdersInventory = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { alert, confirm } = useAlert();
+  const isRentalInventoryPage = location.pathname === '/rental-inventory';
   
   // Combined data states
   const [billingRecords, setBillingRecords] = useState([]);
@@ -258,8 +261,9 @@ const OrdersInventory = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [serviceTypeFilter, setServiceTypeFilter] = useState('');  
+  const [serviceTypeFilter, setServiceTypeFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   
   // Modal states
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -316,7 +320,7 @@ const OrdersInventory = () => {
   // Combine billing and inventory data when they change
   useEffect(() => {
     combineData();
-  }, [billingRecords, inventoryItems, statusFilter, typeFilter, serviceTypeFilter, searchTerm]);
+  }, [billingRecords, inventoryItems, statusFilter, serviceTypeFilter, searchTerm, dateFrom, dateTo]);
 
   const fetchAllData = async () => {
     try {
@@ -406,12 +410,6 @@ const OrdersInventory = () => {
         matchesStatus = rawStatus.toLowerCase() === statusFilter.toLowerCase();
       }
       
-      // Type filter
-      let matchesType = true;
-      if (typeFilter) {
-        matchesType = item.dataType === typeFilter;
-      }
-
       // Service type filter
       let matchesService = true;
       if (serviceTypeFilter) {
@@ -425,8 +423,22 @@ const OrdersInventory = () => {
           matchesService = svc === filterSvc;
         }
       }
+
+      // Date range filter
+      let matchesDateRange = true;
+      const parsedDate = new Date(item.displayDate);
+      if (!Number.isNaN(parsedDate.getTime())) {
+        if (dateFrom) {
+          const from = new Date(`${dateFrom}T00:00:00`);
+          if (parsedDate < from) matchesDateRange = false;
+        }
+        if (dateTo) {
+          const to = new Date(`${dateTo}T23:59:59`);
+          if (parsedDate > to) matchesDateRange = false;
+        }
+      }
       
-      return matchesSearch && matchesStatus && matchesType && matchesService;
+      return matchesSearch && matchesStatus && matchesService && matchesDateRange;
     });
     
     // Sort by date (newest first)
@@ -452,6 +464,12 @@ const OrdersInventory = () => {
     inProgressOrders: billingRecords.filter(b => getOrderStatus(b) === 'in-progress').length,
     totalInventory: inventoryStats.total || inventoryItems.length,
     monthlyRevenue: billingStats.totalRevenue || 0 // Could be calculated based on current month
+  };
+
+  const rentalInventoryStats = {
+    totalInventory: rentalItems.length,
+    availableItems: rentalItems.filter((item) => (item.status || 'available') === 'available').length,
+    unavailableItems: rentalItems.filter((item) => (item.status || 'available') !== 'available').length
   };
 
   const handleViewDetails = (item) => {
@@ -521,12 +539,6 @@ const OrdersInventory = () => {
       'pending': { backgroundColor: '#fff3e0', color: '#e65100' }
     };
     return styles[normalizedStatus] || { backgroundColor: '#f5f5f5', color: '#666' };
-  };
-
-  const getTypeIndicator = (type) => {
-    return type === 'order' ? 
-      { bg: '#e3f2fd', color: '#1976d2', label: 'Order' } : 
-      { bg: '#f3e5f5', color: '#7b1fa2', label: 'Inventory' };
   };
 
   const getRentalPriceDisplay = (item) => {
@@ -756,6 +768,37 @@ const OrdersInventory = () => {
     ? rentalItems.filter(i => (i.status || 'available') === rentalFilter) 
     : rentalItems;
 
+  const handleExportReportsToExcel = async () => {
+    try {
+      const reportRows = combinedData.map((item) => ({
+        'ID': item.uniqueNo || '',
+        'Customer/Item': item.displayName || '',
+        'Service/Category': item.displayService || '',
+        'Amount/Price': parseFloat(item.displayAmount || 0),
+        'Date': item.displayDate || '',
+        'Status': item.displayStatus || item.status || ''
+      }));
+
+      await exportToExcel({
+        data: reportRows,
+        filename: 'reports_table',
+        sheetName: 'Reports',
+        headers: ['ID', 'Customer/Item', 'Service/Category', 'Amount/Price', 'Date', 'Status']
+      });
+    } catch (error) {
+      console.error('Failed to export reports:', error);
+      await alert('Failed to export reports to Excel', 'Export Error', 'error');
+    }
+  };
+
+  const clearReportFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setServiceTypeFilter('');
+    setDateFrom('');
+    setDateTo('');
+  };
+
   return (
     <div className="orders-inventory-management">
       <Sidebar />
@@ -765,23 +808,15 @@ const OrdersInventory = () => {
         {/* Page Title */}
         <div className="dashboard-title">
           <div>
-            <h2>Orders & Inventory</h2>
-            <p>Unified view of billing, orders, and inventory management</p>
+            <h2>{isRentalInventoryPage ? 'Rental Inventory' : 'Reports'}</h2>
+            <p>{isRentalInventoryPage ? 'Rental inventory tracking and availability' : 'Billing-focused order reports'}</p>
           </div>
         </div>
 
+        {!isRentalInventoryPage && (
+          <>
         {/* Combined Statistics Cards */}
-        <div className="stats-grid-combined">
-          <div className="stat-card" onClick={() => setStatusFilter('all')}>
-            <div className="stat-header">
-              <span>Total Orders</span>
-              <div className="stat-icon" style={{ background: '#e3f2fd', color: '#2196f3' }}>
-                <i className="fas fa-file-invoice"></i>
-              </div>
-            </div>
-            <div className="stat-number">{combinedStats.totalOrders}</div>
-          </div>
-
+        <div className="stats-grid-combined report-print-area">
           <div className="stat-card" onClick={() => setStatusFilter('all')}>
             <div className="stat-header">
               <span>Total Bills</span>
@@ -804,80 +839,6 @@ const OrdersInventory = () => {
               <div className="stat-icon" style={{ background: '#ffebee', color: '#f44336' }}>⚠</div>
             </div>
             <div className="stat-number">{combinedStats.unpaidBills}</div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-header">
-              <span>Total Revenue</span>
-              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>
-                <i className="fas fa-peso-sign"></i>
-              </div>
-            </div>
-            <div className="stat-number" style={{ fontSize: '24px' }}>
-              ₱{parseFloat(combinedStats.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </div>
-
-          <div className="stat-card" onClick={() => setStatusFilter('rented')}>
-            <div className="stat-header">
-              <span>Active Rentals</span>
-              <div className="stat-icon" style={{ background: '#fff3e0', color: '#ff9800' }}>
-                <i className="fas fa-exchange-alt"></i>
-              </div>
-            </div>
-            <div className="stat-number">{combinedStats.activeRentals}</div>
-          </div>
-
-          <div className="stat-card" onClick={() => setStatusFilter('available')}>
-            <div className="stat-header">
-              <span>Available Items</span>
-              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>
-                <i className="fas fa-box-open"></i>
-              </div>
-            </div>
-            <div className="stat-number">{combinedStats.availableItems}</div>
-          </div>
-
-          <div className="stat-card" onClick={() => setStatusFilter('pending')}>
-            <div className="stat-header">
-              <span>Pending Orders</span>
-              <div className="stat-icon" style={{ background: '#fff3e0', color: '#ff9800' }}>
-                <i className="fas fa-clock"></i>
-              </div>
-            </div>
-            <div className="stat-number">{combinedStats.pendingOrders}</div>
-          </div>
-
-          <div className="stat-card" onClick={() => setStatusFilter('in-progress')}>
-            <div className="stat-header">
-              <span>In Progress</span>
-              <div className="stat-icon" style={{ background: '#e3f2fd', color: '#2196f3' }}>
-                <i className="fas fa-spinner"></i>
-              </div>
-            </div>
-            <div className="stat-number">{combinedStats.inProgressOrders}</div>
-          </div>
-
-          <div className="stat-card" onClick={() => setStatusFilter('completed')}>
-            <div className="stat-header">
-              <span>Total Inventory</span>
-              <div className="stat-icon" style={{ background: '#f3e5f5', color: '#9c27b0' }}>
-                <i className="fas fa-boxes"></i>
-              </div>
-            </div>
-            <div className="stat-number">{combinedStats.totalInventory}</div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-header">
-              <span>Monthly Revenue</span>
-              <div className="stat-icon" style={{ background: '#fce4ec', color: '#e91e63' }}>
-                <i className="fas fa-chart-line"></i>
-              </div>
-            </div>
-            <div className="stat-number" style={{ fontSize: '24px' }}>
-              ₱{parseFloat(combinedStats.monthlyRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
           </div>
         </div>
 
@@ -917,23 +878,38 @@ const OrdersInventory = () => {
             <option value="rental">Rental</option>
           </select>
 
-          <select 
-            value={typeFilter} 
-            onChange={(e) => setTypeFilter(e.target.value)}
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
             className="filter-select"
-          >
-            <option value="">All Types</option>
-            <option value="order">Orders Only</option>
-            <option value="inventory">Inventory Only</option>
-          </select>
+            title="From date"
+          />
+
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="filter-select"
+            title="To date"
+          />
+
+          <button className="clear-filter-btn" onClick={clearReportFilters}>
+            Clear Filters
+          </button>
         </div>
 
         {/* Combined Billing & Inventory Table */}
         <div className="combined-table-section">
-          <h3 className="section-title">
-            <i className="fas fa-table"></i> Orders & Inventory
-            <span className="item-count">({combinedData.length} items)</span>
-          </h3>
+          <div className="combined-table-header">
+            <h3 className="section-title">
+              <i className="fas fa-table"></i> Reports
+              <span className="item-count">({combinedData.length} items)</span>
+            </h3>
+            <button className="print-report-btn" onClick={handleExportReportsToExcel}>
+              <i className="fas fa-file-excel"></i> Export to Excel
+            </button>
+          </div>
           
           <div className="table-container scrollable-table">
             {loading ? (
@@ -947,7 +923,6 @@ const OrdersInventory = () => {
                   <tr>
                     <th>ID</th>
                     <th>Customer/Item</th>
-                    <th>Type</th>
                     <th>Service/Category</th>
                     <th>Amount/Price</th>
                     <th>Date</th>
@@ -957,14 +932,13 @@ const OrdersInventory = () => {
                 <tbody>
                   {combinedData.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="empty-state">
+                      <td colSpan="6" className="empty-state">
                         No items found matching your filters
                       </td>
                     </tr>
                   ) : (
                     combinedData.map(item => {
-                      const typeIndicator = getTypeIndicator(item.dataType);
-                      
+
                       return (
                         <tr 
                           key={item.combinedId} 
@@ -973,14 +947,6 @@ const OrdersInventory = () => {
                         >
                           <td><strong>{item.uniqueNo}</strong></td>
                           <td>{item.displayName}</td>
-                          <td>
-                            <span 
-                              className="type-badge"
-                              style={{ backgroundColor: typeIndicator.bg, color: typeIndicator.color }}
-                            >
-                              {typeIndicator.label}
-                            </span>
-                          </td>
                           <td>
                             <span className="service-type-badge" data-service-type={(item.serviceType || '').toLowerCase()}>
                               {item.displayService}
@@ -1006,8 +972,11 @@ const OrdersInventory = () => {
             )}
           </div>
         </div>
+          </>
+        )}
 
-        {/* Rental Inventory Tracking Section */}
+        {isRentalInventoryPage && (
+        /* Rental Inventory Tracking Section */
         <div className="rental-post-section">
           <div className="section-header">
             <h3 className="section-title">
@@ -1018,11 +987,43 @@ const OrdersInventory = () => {
             </span>
           </div>
 
+          <div className="stats-grid-combined" style={{ marginBottom: '20px' }}>
+            <div className="stat-card" onClick={() => setRentalFilter('available')}>
+              <div className="stat-header">
+                <span>Available Items</span>
+                <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>
+                  <i className="fas fa-box-open"></i>
+                </div>
+              </div>
+              <div className="stat-number">{rentalInventoryStats.availableItems}</div>
+            </div>
+
+            <div className="stat-card" onClick={() => setRentalFilter('rented')}>
+              <div className="stat-header">
+                <span>Unavailable Items</span>
+                <div className="stat-icon" style={{ background: '#ffebee', color: '#f44336' }}>
+                  <i className="fas fa-ban"></i>
+                </div>
+              </div>
+              <div className="stat-number">{rentalInventoryStats.unavailableItems}</div>
+            </div>
+
+            <div className="stat-card" onClick={() => setRentalFilter('')}>
+              <div className="stat-header">
+                <span>Total Inventory</span>
+                <div className="stat-icon" style={{ background: '#e3f2fd', color: '#2196f3' }}>
+                  <i className="fas fa-boxes"></i>
+                </div>
+              </div>
+              <div className="stat-number">{rentalInventoryStats.totalInventory}</div>
+            </div>
+          </div>
+
           <div className="rental-filter-container">
             <select value={rentalFilter} onChange={(e) => setRentalFilter(e.target.value)}>
               <option value="">All Items</option>
               <option value="available">In Stock</option>
-              <option value="rented">Out of Stock (Rented)</option>
+              <option value="rented">Unavailable (Rented)</option>
               <option value="maintenance">Maintenance</option>
             </select>
           </div>
@@ -1040,7 +1041,7 @@ const OrdersInventory = () => {
                 const outCount = sizeRows.filter((s) => s.isOut).length;
                 const totalCount = sizeRows.length;
                 const isOutOfStock = totalCount > 0 ? outCount >= totalCount : (item.total_available || 0) <= 0;
-                const stockStatus = isOutOfStock ? 'Out of Stock' : 'In Stock';
+                const stockStatus = isOutOfStock ? 'Unavailable' : 'In Stock';
                 return (
                   <div key={item.item_id} className={`rental-item-card ${isOutOfStock ? 'out-of-stock' : ''}`} onClick={() => openRentalDetailModal(item)}>
                     <div className="rental-item-image-wrapper">
@@ -1051,7 +1052,7 @@ const OrdersInventory = () => {
                       />
                       {isOutOfStock && (
                         <div className="out-of-stock-overlay">
-                          <span>OUT OF STOCK</span>
+                          <span>UNAVAILABLE</span>
                         </div>
                       )}
                     </div>
@@ -1112,6 +1113,7 @@ const OrdersInventory = () => {
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* Detail Modal for Orders/Inventory */}
@@ -1130,12 +1132,6 @@ const OrdersInventory = () => {
               <div className="detail-row">
                 <strong>Customer Name:</strong>
                 <span>{selectedItem.displayName}</span>
-              </div>
-              <div className="detail-row">
-                <strong>Type:</strong>
-                <span className="type-badge" style={{ backgroundColor: getTypeIndicator(selectedItem.dataType).bg, color: getTypeIndicator(selectedItem.dataType).color }}>
-                  {getTypeIndicator(selectedItem.dataType).label}
-                </span>
               </div>
               <div className="detail-row">
                 <strong>Service Type:</strong>
@@ -1339,8 +1335,8 @@ const OrdersInventory = () => {
                         <tr key={`${entry.activity_type}-${idx}`} style={{ borderTop: idx === 0 ? 'none' : '1px solid #f1f1f1' }}>
                           <td style={{ padding: '8px 10px' }}>{entry.activity_type === 'maintenance' ? (entry.processed_by || '-') : (entry.person_name || '-')}</td>
                           <td style={{ padding: '8px 10px', fontWeight: 700, textTransform: 'capitalize' }}>{entry.activity_type}</td>
-                          <td style={{ padding: '8px 10px', textTransform: 'capitalize' }}>{entry.activity_type === 'maintenance' ? (entry.damage_level || 'N/A') : 'N/A'}</td>
-                          <td style={{ padding: '8px 10px' }}>{entry.activity_type === 'maintenance' ? (entry.damage_note || 'N/A') : 'N/A'}</td>
+                          <td style={{ padding: '8px 10px', textTransform: 'capitalize' }}>{entry.damage_level || 'N/A'}</td>
+                          <td style={{ padding: '8px 10px' }}>{entry.damage_note || 'N/A'}</td>
                           <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>{entry.quantity || 0}</td>
                         </tr>
                       ))}

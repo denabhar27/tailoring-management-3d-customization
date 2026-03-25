@@ -2234,19 +2234,27 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                   <div className={`rc-cart-msg ${cartMessage.includes('✅') ? 'success' : 'error'}`}>{cartMessage}</div>
                 )}
 
-                <button
-                  className="rc-btn-rent"
-                  onClick={handleAddToCart}
-                  disabled={!startDate || !rentalDuration || modalLiveTotal <= 0 || addingToCart}
-                >
-                  {addingToCart ? 'Adding...' : (
-                    <>
-                      <span className="rc-btn-rent-main">Add to Cart</span>
-                      <span className="rc-btn-rent-sub">50% downpayment required</span>
-                      <span className="rc-btn-rent-price">₱{modalLiveDownpayment > 0 ? modalLiveDownpayment.toFixed(2) : '0.00'}</span>
-                    </>
-                  )}
-                </button>
+                <div className="rc-modal-actions">
+                  <button
+                    type="button"
+                    className="rc-btn-cancel-rent"
+                    onClick={closeModal}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="rc-btn-rent"
+                    onClick={handleAddToCart}
+                    disabled={!startDate || !rentalDuration || modalLiveTotal <= 0 || addingToCart}
+                  >
+                    {addingToCart ? 'Adding...' : (
+                      <>
+                        <span className="rc-btn-rent-main">Add to Cart</span>
+                        <span className="rc-btn-rent-price">₱{modalLiveDownpayment > 0 ? modalLiveDownpayment.toFixed(2) : '0.00'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

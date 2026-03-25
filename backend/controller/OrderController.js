@@ -559,6 +559,21 @@ exports.updateRepairOrderItem = (req, res) => {
           updateData.approvalStatus = 'accepted';
         }
       }
+
+      const hasIncomingFinalPrice = updateData.finalPrice !== undefined && updateData.finalPrice !== null && updateData.finalPrice !== '';
+      if (hasIncomingFinalPrice) {
+        const nextPrice = parseFloat(updateData.finalPrice);
+        const prevPrice = parseFloat(previousPrice || 0);
+        const isPriceChanged = !Number.isNaN(nextPrice) && Math.abs(nextPrice - prevPrice) > 0.01;
+        const hasReason = String(updateData.adminNotes || '').trim().length > 0;
+
+        if (isPriceChanged && !hasReason) {
+          return res.status(400).json({
+            success: false,
+            message: "A reason is required when changing the repair price"
+          });
+        }
+      }
       
       Order.updateRepairOrderItem(itemId, updateData, (err, result) => {
         console.log("Controller - Update result:", err, result);
@@ -932,6 +947,11 @@ exports.updateDryCleaningOrderItem = (req, res) => {
       delete updateData[key];
     }
   });
+
+  // Dry cleaning no longer uses a separate price confirmation stage.
+  if (updateData.approvalStatus === 'price_confirmation') {
+    updateData.approvalStatus = 'accepted';
+  }
 
   if (Object.keys(updateData).length === 0) {
     return res.status(400).json({

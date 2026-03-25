@@ -91,17 +91,27 @@ function Sidebar() {
         <div className="sidebar-group">
           <p className="sidebar-group-title">Commerce</p>
           {role === 'admin' && (
-            <NavLink to="/orders-inventory" className={navLinkClass}>
+            <NavLink to="/reports" className={navLinkClass}>
               <i className="fas fa-clipboard-list nav-icon"></i>
-              <span>Orders & Inventory</span>
+              <span>Reports</span>
             </NavLink>
           )}
+          {role === 'admin' && (
+            <NavLink to="/rental-inventory" className={navLinkClass}>
+              <i className="fas fa-boxes nav-icon"></i>
+              <span>Rental Inventory</span>
+            </NavLink>
+          )}
+
+          {/*}
           {role === 'admin' && (
             <NavLink to="/billing" className={navLinkClass}>
               <i className="fas fa-credit-card nav-icon"></i>
               <span>Billing</span>
             </NavLink>
-          )}
+          )} */}
+
+          
           <NavLink to="/walk-in-orders" className={navLinkClass}>
             <i className="fas fa-walking nav-icon"></i>
             <span>Walk-In Orders</span>
@@ -123,7 +133,7 @@ function Sidebar() {
         </div>
 
         <div className="sidebar-group sidebar-group-last">
-          <p className="sidebar-group-title">Settings / Admin</p>
+          <p className="sidebar-group-title">Settings </p>
           {role === 'admin' && (
             <NavLink to="/shop-schedule" className={navLinkClass}>
               <i className="fas fa-calendar-alt nav-icon"></i>

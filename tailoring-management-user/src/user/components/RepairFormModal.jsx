@@ -34,7 +34,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const getDamageLevelsForGarment = (garmentTypeName) => {
     const selectedGarment = repairGarmentTypes.find((g) => g.garment_name === garmentTypeName);
     const activeLevels = (selectedGarment?.damage_levels || [])
-      .filter((level) => level && (level.is_active === 1 || level.is_active === true))
+      .filter((level) => level && (Number(level.is_active) === 1 || level.is_active === true))
       .sort((a, b) => (parseInt(a.sort_order, 10) || 0) - (parseInt(b.sort_order, 10) || 0));
 
     return activeLevels.length > 0 ? activeLevels : defaultDamageLevels;
@@ -58,7 +58,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     try {
       const result = await getAllRepairGarmentTypes();
       if (result.success && result.garments) {
-        setRepairGarmentTypes(result.garments.filter(g => g.is_active === 1));
+        setRepairGarmentTypes(result.garments.filter(g => Number(g.is_active) === 1));
       } else {
 
         setRepairGarmentTypes([

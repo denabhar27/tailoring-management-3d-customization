@@ -181,6 +181,7 @@ export async function addRepairToCart(repairData) {
         isMultipleGarments: repairData.isMultipleGarments || false,
 
         damageLevel: repairData.garments?.[0]?.damageLevel || repairData.damageLevel,
+        damageLevelDescription: repairData.garments?.[0]?.damageLevelDescription || repairData.damageLevelDescription,
         garmentType: repairData.garments?.[0]?.garmentType || repairData.garmentType,
         damageDescription: repairData.garments?.[0]?.notes || repairData.damageDescription,
         damageLocation: repairData.damageLocation

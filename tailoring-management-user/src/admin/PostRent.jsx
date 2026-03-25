@@ -925,9 +925,10 @@ const PostRent = () => {
                             onClick={() => handleEntryChange(entry.id, 'isOpen', !entry.isOpen)}
                             style={{
                               marginLeft: 'auto', padding: '5px 14px', fontSize: '12px', whiteSpace: 'nowrap',
-                              border: `1px solid ${entry.isOpen ? '#0d6efd' : '#aaa'}`, borderRadius: '14px',
-                              backgroundColor: entry.isOpen ? '#0d6efd' : '#fff',
-                              color: entry.isOpen ? '#fff' : '#555', cursor: 'pointer'
+                              border: `1px solid ${entry.isOpen ? '#8B4513' : '#A56A3F'}`, borderRadius: '14px',
+                              backgroundColor: entry.isOpen ? '#8B4513' : '#A56A3F',
+                              color: '#fff', cursor: 'pointer',
+                              fontWeight: '600'
                             }}
                           >
                             {entry.isOpen ? '▲ Hide Measurements' : '▼ Measurements'}
@@ -950,9 +951,9 @@ const PostRent = () => {
                                 onClick={() => handleEntryChange(entry.id, 'activeTab', 'top')}
                                 style={{
                                   padding: '6px 14px', borderRadius: '16px', fontSize: '12px', cursor: 'pointer', fontWeight: '600',
-                                  border: entry.activeTab === 'top' ? '1px solid #0d6efd' : '1px solid #d9d9d9',
-                                  backgroundColor: entry.activeTab === 'top' ? '#e7f1ff' : '#fff',
-                                  color: entry.activeTab === 'top' ? '#0d6efd' : '#555'
+                                  border: entry.activeTab === 'top' ? '1px solid #8B4513' : '1px solid #A56A3F',
+                                  backgroundColor: entry.activeTab === 'top' ? '#8B4513' : '#A56A3F',
+                                  color: '#fff'
                                 }}
                               >Top</button>
                               <button
@@ -960,18 +961,18 @@ const PostRent = () => {
                                 onClick={() => handleEntryChange(entry.id, 'activeTab', 'bottom')}
                                 style={{
                                   padding: '6px 14px', borderRadius: '16px', fontSize: '12px', cursor: 'pointer', fontWeight: '600',
-                                  border: entry.activeTab === 'bottom' ? '1px solid #198754' : '1px solid #d9d9d9',
-                                  backgroundColor: entry.activeTab === 'bottom' ? '#e8f8ef' : '#fff',
-                                  color: entry.activeTab === 'bottom' ? '#198754' : '#555'
+                                  border: entry.activeTab === 'bottom' ? '1px solid #8B4513' : '1px solid #A56A3F',
+                                  backgroundColor: entry.activeTab === 'bottom' ? '#8B4513' : '#A56A3F',
+                                  color: '#fff'
                                 }}
                               >Bottom</button>
                             </div>
                             <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '6px', overflow: 'hidden' }}>
                               <thead>
-                                <tr style={{ backgroundColor: '#f8f9fa' }}>
-                                  <th style={{ padding: '9px 12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#333', fontSize: '12px' }}>Measurement</th>
-                                  <th style={{ padding: '9px 12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#333', fontSize: '12px' }}>Inches</th>
-                                  <th style={{ padding: '9px 12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#333', fontSize: '12px' }}>Centimeters</th>
+                                <tr style={{ backgroundColor: '#8B4513' }}>
+                                  <th style={{ padding: '9px 12px', textAlign: 'left', borderBottom: '2px solid #6f3610', fontWeight: '600', color: '#fff', fontSize: '12px' }}>Measurement</th>
+                                  <th style={{ padding: '9px 12px', textAlign: 'left', borderBottom: '2px solid #6f3610', fontWeight: '600', color: '#fff', fontSize: '12px' }}>Inches</th>
+                                  <th style={{ padding: '9px 12px', textAlign: 'left', borderBottom: '2px solid #6f3610', fontWeight: '600', color: '#fff', fontSize: '12px' }}>Centimeters</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -1010,8 +1011,8 @@ const PostRent = () => {
                       onClick={addEntry}
                       style={{
                         marginTop: '8px', padding: '8px 18px', fontSize: '13px', width: '100%',
-                        border: '2px dashed #0d6efd', borderRadius: '8px',
-                        backgroundColor: '#f0f7ff', color: '#0d6efd', cursor: 'pointer', fontWeight: '600'
+                        border: '2px solid #8B4513', borderRadius: '8px',
+                        backgroundColor: '#8B4513', color: '#fff', cursor: 'pointer', fontWeight: '700'
                       }}
                     >+ Add Another Size</button>
                   </div>

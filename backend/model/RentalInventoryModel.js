@@ -621,6 +621,135 @@ const RentalInventory = {
     });
   },
 
+  resolveMaintenance: (itemId, damageLogId, resolveData, callback) => {
+    const numericItemId = parseInt(itemId, 10);
+    const numericLogId = parseInt(damageLogId, 10);
+    const qtyToResolve = Math.max(1, parseInt(resolveData?.quantity, 10) || 1);
+    const resolutionNote = String(resolveData?.resolution_note || '').trim() || 'Fixed and returned to available';
+
+    // Get the damage log entry
+    const getLogSql = `
+      SELECT log_id, inventory_item_id, size_key, size_label, quantity, damage_level, damage_note
+      FROM damage_logs
+      WHERE log_id = ? AND inventory_item_id = ? AND status = 'active'
+      LIMIT 1
+    `;
+
+    db.query(getLogSql, [numericLogId, numericItemId], (logErr, logRows) => {
+      if (logErr) return callback(logErr);
+      if (!logRows || logRows.length === 0) {
+        const err = new Error('Damage log not found or already resolved.');
+        err.statusCode = 404;
+        return callback(err);
+      }
+
+      const damageLog = logRows[0];
+      const currentDamageQty = Math.max(0, parseInt(damageLog.quantity, 10) || 0);
+
+      if (qtyToResolve > currentDamageQty) {
+        const err = new Error(`Cannot resolve ${qtyToResolve} items. Only ${currentDamageQty} items in maintenance.`);
+        err.statusCode = 400;
+        return callback(err);
+      }
+
+      // Get the rental item
+      const getItemSql = `SELECT item_id, item_name, size, total_available, status FROM rental_inventory WHERE item_id = ? LIMIT 1`;
+      db.query(getItemSql, [numericItemId], (itemErr, itemRows) => {
+        if (itemErr) return callback(itemErr);
+        if (!itemRows || itemRows.length === 0) {
+          const err = new Error('Rental item not found.');
+          err.statusCode = 404;
+          return callback(err);
+        }
+
+        const item = itemRows[0];
+        const parsed = parseJsonSafely(item.size);
+        if (!parsed || !Array.isArray(parsed.size_entries)) {
+          const err = new Error('Item size profile is missing.');
+          err.statusCode = 400;
+          return callback(err);
+        }
+
+        // Find the size entry
+        const idx = parsed.size_entries.findIndex((entry) => String(entry?.sizeKey || '') === damageLog.size_key);
+        if (idx === -1) {
+          const err = new Error(`Size "${damageLog.size_key}" not found on this item.`);
+          err.statusCode = 400;
+          return callback(err);
+        }
+
+        // Add the resolved quantity back to available
+        const currentSizeQty = Math.max(0, parseInt(parsed.size_entries[idx].quantity, 10) || 0);
+        parsed.size_entries[idx].quantity = currentSizeQty + qtyToResolve;
+
+        // Recalculate total
+        const nextTotal = parsed.size_entries.reduce((sum, entry) => sum + (Math.max(0, parseInt(entry?.quantity, 10) || 0)), 0);
+        const nextStatus = nextTotal > 0 ? 'available' : 'maintenance';
+        const updatedSizeJson = JSON.stringify(parsed);
+
+        // Update the rental item
+        const updateItemSql = `
+          UPDATE rental_inventory
+          SET size = ?, total_available = ?, status = ?
+          WHERE item_id = ?
+        `;
+
+        db.query(updateItemSql, [updatedSizeJson, nextTotal, nextStatus, numericItemId], (updateErr) => {
+          if (updateErr) return callback(updateErr);
+
+          // Update or delete the damage log
+          const remainingDamageQty = currentDamageQty - qtyToResolve;
+
+          if (remainingDamageQty <= 0) {
+            // Mark as resolved
+            const resolveLogSql = `
+              UPDATE damage_logs
+              SET status = 'resolved', updated_at = CURRENT_TIMESTAMP
+              WHERE log_id = ?
+            `;
+            db.query(resolveLogSql, [numericLogId], (resolveErr) => {
+              if (resolveErr) return callback(resolveErr);
+
+              callback(null, {
+                item_id: numericItemId,
+                item_name: item.item_name,
+                size_key: damageLog.size_key,
+                size_label: damageLog.size_label,
+                resolved_quantity: qtyToResolve,
+                remaining_damage_quantity: 0,
+                status: nextStatus,
+                total_available: nextTotal,
+                resolution_note: resolutionNote
+              });
+            });
+          } else {
+            // Update quantity in damage log
+            const updateLogSql = `
+              UPDATE damage_logs
+              SET quantity = ?, updated_at = CURRENT_TIMESTAMP
+              WHERE log_id = ?
+            `;
+            db.query(updateLogSql, [remainingDamageQty, numericLogId], (updateLogErr) => {
+              if (updateLogErr) return callback(updateLogErr);
+
+              callback(null, {
+                item_id: numericItemId,
+                item_name: item.item_name,
+                size_key: damageLog.size_key,
+                size_label: damageLog.size_label,
+                resolved_quantity: qtyToResolve,
+                remaining_damage_quantity: remainingDamageQty,
+                status: nextStatus,
+                total_available: nextTotal,
+                resolution_note: resolutionNote
+              });
+            });
+          }
+        });
+      });
+    });
+  },
+
   getSizeActivity: (itemId, sizeKey, callback) => {
     const numericItemId = parseInt(itemId, 10);
     const normalizedSizeKey = mapSizeInputToKey(sizeKey || '');
@@ -673,7 +802,7 @@ const RentalInventory = {
       });
 
       const damageSql = `
-        SELECT dl.quantity, dl.damage_level, dl.damage_note, dl.damaged_customer_name, dl.created_at,
+        SELECT dl.log_id, dl.quantity, dl.damage_level, dl.damage_note, dl.damaged_customer_name, dl.created_at,
                CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS processed_name,
                dl.processed_by_role
         FROM damage_logs dl
@@ -699,6 +828,7 @@ const RentalInventory = {
           const processedName = String(row.processed_name || '').trim();
           const processedBy = String(row.damaged_customer_name || '').trim() || processedName || row.processed_by_role || 'admin';
           return {
+            log_id: row.log_id || null,
             activity_type: 'maintenance',
             quantity: Math.max(0, parseInt(row.quantity, 10) || 0),
             person_name: null,

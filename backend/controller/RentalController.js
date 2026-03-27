@@ -363,6 +363,33 @@ exports.restockReturnedRentalSizes = (req, res) => {
   });
 };
 
+exports.resolveMaintenance = (req, res) => {
+  const { item_id, log_id } = req.params;
+  const { quantity, resolution_note } = req.body;
+
+  if (!quantity || parseInt(quantity, 10) <= 0) {
+    return res.status(400).json({ message: 'Valid quantity is required.' });
+  }
+
+  RentalInventory.resolveMaintenance(item_id, log_id, {
+    quantity: parseInt(quantity, 10),
+    resolution_note: resolution_note || 'Fixed and returned to available'
+  }, (err, result) => {
+    if (err) {
+      return res.status(err.statusCode || 500).json({
+        message: err.message || 'Error resolving maintenance',
+        error: err
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Maintenance resolved successfully',
+      data: result
+    });
+  });
+};
+
 exports.getRentalSizeActivity = (req, res) => {
   const { item_id, size_key } = req.params;
   RentalInventory.getSizeActivity(item_id, size_key, (err, result) => {

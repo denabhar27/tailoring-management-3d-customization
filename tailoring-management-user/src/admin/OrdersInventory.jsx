@@ -4,7 +4,7 @@ import AdminHeader from './AdminHeader';
 import Sidebar from './Sidebar';
 import { getAllBillingRecords, getBillingStats, updateBillingRecordStatus } from '../api/BillingApi';
 import { getCompletedItems, getInventoryStats } from '../api/InventoryApi';
-import { getAllRentals, createRental, updateRental, deleteRental, getRentalImageUrl, getRentalSizeActivity } from '../api/RentalApi';
+import { getAllRentals, createRental, updateRental, deleteRental, getRentalImageUrl, getRentalSizeActivity, resolveMaintenance } from '../api/RentalApi';
 import { useAlert } from '../context/AlertContext';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
@@ -302,7 +302,8 @@ const OrdersInventory = () => {
   const [isSizeActivityModalOpen, setIsSizeActivityModalOpen] = useState(false);
   const [sizeActivityLoading, setSizeActivityLoading] = useState(false);
   const [sizeActivityRows, setSizeActivityRows] = useState([]);
-  const [sizeActivityContext, setSizeActivityContext] = useState({ itemName: '', sizeLabel: '', sizeKey: '' });
+  const [sizeActivityContext, setSizeActivityContext] = useState({ itemName: '', sizeLabel: '', sizeKey: '', itemId: null });
+  const [maintenanceUpdates, setMaintenanceUpdates] = useState({});
 
   // Fetch all data on component mount
   useEffect(() => {
@@ -746,11 +747,13 @@ const OrdersInventory = () => {
     setSizeActivityContext({
       itemName: item?.item_name || 'Rental Item',
       sizeLabel: row?.label || row?.key || 'Size',
-      sizeKey: normalizedKey || row?.key || ''
+      sizeKey: normalizedKey || row?.key || '',
+      itemId: item?.item_id || null
     });
     setIsSizeActivityModalOpen(true);
     setSizeActivityLoading(true);
     setSizeActivityRows([]);
+    setMaintenanceUpdates({});
 
     try {
       const result = await getRentalSizeActivity(item?.item_id, normalizedKey || row?.key);
@@ -761,6 +764,65 @@ const OrdersInventory = () => {
       setSizeActivityRows([]);
     } finally {
       setSizeActivityLoading(false);
+    }
+  };
+
+  const handleMaintenanceUpdate = (logId, field, value) => {
+    setMaintenanceUpdates(prev => ({
+      ...prev,
+      [logId]: {
+        ...prev[logId],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleResolveMaintenance = async (logId, maxQuantity) => {
+    const update = maintenanceUpdates[logId] || {};
+    const quantity = parseInt(update.quantity || maxQuantity, 10);
+
+    if (quantity <= 0 || quantity > maxQuantity) {
+      await alert(`Please enter a valid quantity (1-${maxQuantity})`, 'Invalid Quantity', 'warning');
+      return;
+    }
+
+    const confirmed = await confirm(
+      `Move ${quantity} item(s) from maintenance to available?`,
+      'Resolve Maintenance',
+      'question'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const result = await resolveMaintenance(
+        sizeActivityContext.itemId,
+        logId,
+        quantity,
+        update.resolution_note || 'Fixed and returned to available'
+      );
+
+      if (result.success) {
+        await alert(
+          `Successfully moved ${quantity} item(s) to available. ${result.data.remaining_damage_quantity > 0 ? `${result.data.remaining_damage_quantity} item(s) remain in maintenance.` : 'All items resolved.'}`,
+          'Success',
+          'success'
+        );
+        
+        // Refresh the activity log
+        const refreshResult = await getRentalSizeActivity(sizeActivityContext.itemId, sizeActivityContext.sizeKey);
+        const rows = Array.isArray(refreshResult?.data?.activities) ? refreshResult.data.activities : [];
+        setSizeActivityRows(rows);
+        setMaintenanceUpdates({});
+        
+        // Refresh the main rental items list
+        await fetchAllData();
+      } else {
+        await alert(result.message || 'Failed to resolve maintenance', 'Error', 'error');
+      }
+    } catch (error) {
+      console.error('Error resolving maintenance:', error);
+      await alert('Error resolving maintenance', 'Error', 'error');
     }
   };
 
@@ -1270,8 +1332,14 @@ const OrdersInventory = () => {
                               </button>
                             </td>
                             <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>{row.quantity}</td>
-                            <td style={{ padding: '8px 10px', color: row.isOut ? '#b71c1c' : '#2e7d32', fontWeight: 700 }}>
-                              {row.reason}
+                            <td style={{ padding: '8px 10px' }}>
+                              {row.quantity <= 0 ? (
+                                <span style={{ color: '#b71c1c', fontWeight: 700 }}>Unavailable</span>
+                              ) : row.maintenanceQty > 0 || row.rentedQty > 0 ? (
+                                <span style={{ color: '#f57c00', fontWeight: 700 }}>{row.reason}</span>
+                              ) : (
+                                <span style={{ color: '#2e7d32', fontWeight: 700 }}>Available</span>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -1328,18 +1396,80 @@ const OrdersInventory = () => {
                         <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px' }}>Damage Level</th>
                         <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px' }}>Damage Note</th>
                         <th style={{ textAlign: 'center', padding: '8px 10px', fontSize: '12px' }}>Qty</th>
+                        <th style={{ textAlign: 'center', padding: '8px 10px', fontSize: '12px' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {sizeActivityRows.map((entry, idx) => (
-                        <tr key={`${entry.activity_type}-${idx}`} style={{ borderTop: idx === 0 ? 'none' : '1px solid #f1f1f1' }}>
-                          <td style={{ padding: '8px 10px' }}>{entry.activity_type === 'maintenance' ? (entry.processed_by || '-') : (entry.person_name || '-')}</td>
-                          <td style={{ padding: '8px 10px', fontWeight: 700, textTransform: 'capitalize' }}>{entry.activity_type}</td>
-                          <td style={{ padding: '8px 10px', textTransform: 'capitalize' }}>{entry.damage_level || 'N/A'}</td>
-                          <td style={{ padding: '8px 10px' }}>{entry.damage_note || 'N/A'}</td>
-                          <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>{entry.quantity || 0}</td>
-                        </tr>
-                      ))}
+                      {sizeActivityRows.map((entry, idx) => {
+                        const isMaintenance = entry.activity_type === 'maintenance';
+                        const update = maintenanceUpdates[entry.log_id] || {};
+                        const resolveQty = update.quantity || entry.quantity;
+                        
+                        return (
+                          <tr key={`${entry.activity_type}-${idx}`} style={{ borderTop: idx === 0 ? 'none' : '1px solid #f1f1f1' }}>
+                            <td style={{ padding: '8px 10px' }}>{isMaintenance ? (entry.processed_by || '-') : (entry.person_name || '-')}</td>
+                            <td style={{ padding: '8px 10px' }}>
+                              <span style={{ 
+                                fontWeight: 700, 
+                                textTransform: 'capitalize',
+                                color: isMaintenance ? '#f57c00' : '#666'
+                              }}>
+                                {entry.activity_type === 'ready_to_pickup' ? 'Ready To Pickup' : entry.activity_type.replace(/_/g, ' ')}
+                              </span>
+                            </td>
+                            <td style={{ padding: '8px 10px', textTransform: 'capitalize' }}>
+                              {entry.damage_level ? (
+                                <span style={{
+                                  color: entry.damage_level === 'severe' ? '#d32f2f' : entry.damage_level === 'moderate' ? '#f57c00' : '#fbc02d',
+                                  fontWeight: 600
+                                }}>
+                                  {entry.damage_level}
+                                </span>
+                              ) : 'N/A'}
+                            </td>
+                            <td style={{ padding: '8px 10px' }}>{entry.damage_note || 'N/A'}</td>
+                            <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>{entry.quantity || 0}</td>
+                            <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                              {isMaintenance && entry.log_id ? (
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'center' }}>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max={entry.quantity}
+                                    value={resolveQty}
+                                    onChange={(e) => handleMaintenanceUpdate(entry.log_id, 'quantity', e.target.value)}
+                                    style={{
+                                      width: '60px',
+                                      padding: '4px 6px',
+                                      border: '1px solid #ddd',
+                                      borderRadius: '4px',
+                                      fontSize: '12px'
+                                    }}
+                                    title="Quantity to move to available"
+                                  />
+                                  <button
+                                    onClick={() => handleResolveMaintenance(entry.log_id, entry.quantity)}
+                                    style={{
+                                      padding: '4px 12px',
+                                      backgroundColor: '#4caf50',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      fontSize: '11px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                    title="Move to available"
+                                  >
+                                    ✓ Fix
+                                  </button>
+                                </div>
+                              ) : '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

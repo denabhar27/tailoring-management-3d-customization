@@ -173,6 +173,23 @@ export async function markRentalItemDamaged(item_id, payload) {
   }
 }
 
+export async function resolveMaintenance(item_id, log_id, quantity, resolution_note = '') {
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/rentals/${item_id}/resolve-maintenance/${log_id}`,
+      { quantity, resolution_note },
+      { headers: getAuthHeaders() }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Resolve maintenance error:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Error resolving maintenance"
+    };
+  }
+}
+
 export async function getRentalSizeActivity(item_id, size_key) {
   try {
     const response = await axios.get(`${BASE_URL}/rentals/${item_id}/size-activity/${encodeURIComponent(size_key)}`, {

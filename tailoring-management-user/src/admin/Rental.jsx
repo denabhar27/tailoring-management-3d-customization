@@ -4,7 +4,7 @@ import Sidebar from './Sidebar';
 import '../adminStyle/rent.css';
 import '../adminStyle/dryclean.css';
 import { getAllRentalOrders, getRentalOrdersByStatus, updateRentalOrderItem, recordRentalPayment } from '../api/RentalOrderApi';
-import { markRentalItemDamaged, restockReturnedRentalSizes, getRentalImageUrl } from '../api/RentalApi';
+import { markRentalItemDamaged, restockReturnedRentalSizes, getRentalImageUrl, getRentalById } from '../api/RentalApi';
 import { useAlert } from '../context/AlertContext';
 import { deleteOrderItem } from '../api/OrderApi';
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
@@ -20,6 +20,7 @@ function Rental() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedRental, setSelectedRental] = useState(null);
+  const [selectedRentalWithMeasurements, setSelectedRentalWithMeasurements] = useState(null);
   const [editData, setEditData] = useState({
     approvalStatus: '',
     adminNotes: '',
@@ -39,11 +40,15 @@ function Rental() {
       const parsed = typeof rawSize === 'string' ? JSON.parse(rawSize) : rawSize;
       if (!parsed || typeof parsed !== 'object') return [];
       if (Array.isArray(parsed.size_entries)) {
-        return parsed.size_entries.map((entry) => ({
-          key: entry?.sizeKey || entry?.size_key || '',
-          label: entry?.label || entry?.sizeKey || 'Unknown',
-          quantity: Math.max(0, parseInt(entry?.quantity, 10) || 0)
-        })).filter((entry) => !!entry.key);
+        return parsed.size_entries.map((entry) => {
+          const measurements = entry?.measurements || entry?.measurement_profile || entry?.measurementProfile || null;
+          return {
+            key: entry?.sizeKey || entry?.size_key || '',
+            label: entry?.label || entry?.sizeKey || 'Unknown',
+            quantity: Math.max(0, parseInt(entry?.quantity, 10) || 0),
+            measurements: measurements
+          };
+        }).filter((entry) => !!entry.key);
       }
     } catch {
       return [];
@@ -59,11 +64,12 @@ function Rental() {
       if (!key) return;
       const qty = Math.max(0, parseInt(entry?.quantity, 10) || 0);
       const label = entry?.label || key;
+      const measurements = entry?.measurements || null;
       const prev = byKey.get(key);
       if (!prev) {
-        byKey.set(key, { key, label, quantity: qty });
+        byKey.set(key, { key, label, quantity: qty, measurements });
       } else {
-        byKey.set(key, { ...prev, quantity: prev.quantity + qty });
+        byKey.set(key, { ...prev, quantity: prev.quantity + qty, measurements: measurements || prev.measurements });
       }
     });
     return Array.from(byKey.values());
@@ -347,9 +353,67 @@ function Rental() {
     }
   };
 
-  const handleViewDetails = (rental) => {
+  const handleViewDetails = async (rental) => {
     setSelectedRental(rental);
     setShowDetailModal(true);
+    
+    // Try to fetch measurements from the rental item
+    // Check multiple possible ID fields
+    const rentalItemId = rental.service_id || rental.specific_data?.service_id || rental.specific_data?.item_id || rental.specific_data?.id;
+    
+    console.log('Attempting to fetch rental item:', rentalItemId, 'from rental:', rental);
+    
+    if (rentalItemId) {
+      try {
+        const result = await getRentalById(rentalItemId);
+        console.log('Fetched rental item result:', result);
+        
+        if (result.item && result.item.size) {
+          const sizeConfig = parseSizeEntries(result.item.size);
+          console.log('Parsed size config:', sizeConfig);
+          
+          // Create a map of measurements by size key
+          const measurementsBySizeKey = {};
+          sizeConfig.forEach(sizeEntry => {
+            if (sizeEntry.measurements) {
+              measurementsBySizeKey[sizeEntry.key] = sizeEntry.measurements;
+            }
+          });
+          
+          console.log('Measurements by size key:', measurementsBySizeKey);
+          
+          // Merge measurements into the rental data
+          const enrichedRental = { ...rental };
+          
+          // Handle bundle items
+          if (rental.specific_data?.is_bundle && rental.specific_data?.bundle_items) {
+            enrichedRental.specific_data = {
+              ...rental.specific_data,
+              bundle_items: rental.specific_data.bundle_items.map(item => ({
+                ...item,
+                measurementsBySizeKey
+              }))
+            };
+          } else {
+            // Handle single item
+            enrichedRental.specific_data = {
+              ...rental.specific_data,
+              measurementsBySizeKey
+            };
+          }
+          
+          setSelectedRentalWithMeasurements(enrichedRental);
+        }
+      } catch (error) {
+        console.error('Error fetching rental measurements:', error);
+        console.log('Will display without measurements');
+        // Set the rental without measurements so the modal still works
+        setSelectedRentalWithMeasurements(rental);
+      }
+    } else {
+      console.log('No rental item ID found, displaying without measurements');
+      setSelectedRentalWithMeasurements(rental);
+    }
   };
 
   const handleEditClick = (rental) => {
@@ -406,8 +470,9 @@ function Rental() {
         if (recordPayment) {
 
           setShowEditModal(false);
-          setPaymentAmount(downpayment.toFixed(2));
-          setCashReceived(downpayment.toFixed(2));
+          const halfPrice = (totalPrice * 0.5).toFixed(2);
+          setPaymentAmount(halfPrice);
+          setCashReceived('');
           setPendingRentedStatus(selectedRental.item_id);
           setShowPaymentModal(true);
           return;
@@ -469,8 +534,9 @@ function Rental() {
         if (recordPayment) {
 
           setSelectedRental(currentRental);
-          setPaymentAmount(downpayment.toFixed(2));
-          setCashReceived(downpayment.toFixed(2));
+          const halfPrice = (totalPrice * 0.5).toFixed(2);
+          setPaymentAmount(halfPrice);
+          setCashReceived('');
           setShowPaymentModal(true);
           setPendingRentedStatus(itemId);
           return;
@@ -1135,7 +1201,8 @@ function Rental() {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setSelectedRental(rental);
-                                      setPaymentAmount('');
+                                      const halfPrice = (parseFloat(rental.final_price || 0) * 0.5).toFixed(2);
+                                      setPaymentAmount(halfPrice);
                                       setCashReceived('');
                                       setShowPaymentModal(true);
                                     }}
@@ -1629,6 +1696,13 @@ function Rental() {
                     if (isBundle && bundleItems.length > 0) {
                       return bundleItems.map((item, idx) => {
                         const sizeData = getCustomerSelectedSizes(item.selected_sizes || item.selectedSizes, item.size);
+                        
+                        // Enrich size data with measurements from the fetched data
+                        const enrichedSizeData = sizeData.map(sizeEntry => {
+                          const measurements = item.measurementsBySizeKey?.[sizeEntry.key] || sizeEntry.measurements;
+                          return { ...sizeEntry, measurements };
+                        });
+                        
                         return (
                           <div key={idx} style={{
                             fontSize: '0.9rem',
@@ -1644,13 +1718,52 @@ function Rental() {
                               {item.item_name || `Item ${idx + 1}`}:
                             </strong>
                             {sizeData && Array.isArray(sizeData) ? (
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px 16px', color: '#666' }}>
-                                {sizeData.map((sizeEntry, mIdx) => (
-                                  <React.Fragment key={mIdx}>
-                                    <span style={{ fontWeight: '500', textAlign: 'left' }}>{sizeEntry.label}</span>
-                                    <span style={{ textAlign: 'right' }}>x{sizeEntry.quantity}</span>
-                                  </React.Fragment>
-                                ))}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {enrichedSizeData.map((sizeEntry, mIdx) => {
+                                  const measurements = sizeEntry.measurements;
+                                  const hasMeasurements = measurements && typeof measurements === 'object' && Object.keys(measurements).length > 0;
+                                  return (
+                                    <div key={mIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px 16px', color: '#666' }}>
+                                        <span style={{ fontWeight: '500', textAlign: 'left' }}>{sizeEntry.label}</span>
+                                        <span style={{ textAlign: 'right' }}>x{sizeEntry.quantity}</span>
+                                      </div>
+                                      {hasMeasurements && (
+                                        <div style={{ paddingLeft: '16px', fontSize: '0.85rem', color: '#888', lineHeight: '1.6', marginTop: '4px' }}>
+                                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                            <thead>
+                                              <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
+                                                <th style={{ textAlign: 'left', padding: '4px 8px 4px 0', fontWeight: '600', color: '#666' }}>Measurement</th>
+                                                <th style={{ textAlign: 'right', padding: '4px 0 4px 8px', fontWeight: '600', color: '#666' }}>Inches</th>
+                                                <th style={{ textAlign: 'right', padding: '4px 0 4px 8px', fontWeight: '600', color: '#666' }}>Centimeters</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {Object.entries(measurements).map(([key, value]) => {
+                                                if (!value) return null;
+                                                // Handle both object format {inch: "38", cm: "96.52"} and string format "38"
+                                                const isObject = typeof value === 'object' && value !== null;
+                                                if (isObject && !value.inch && !value.cm) return null;
+                                                
+                                                const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+                                                const inchValue = isObject ? (value.inch || '-') : (value || '-');
+                                                const cmValue = isObject ? (value.cm || '-') : '-';
+                                                
+                                                return (
+                                                  <tr key={key} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                                    <td style={{ padding: '4px 8px 4px 0', color: '#555' }}>{label}</td>
+                                                    <td style={{ textAlign: 'right', padding: '4px 0 4px 8px', color: '#555' }}>{inchValue}</td>
+                                                    <td style={{ textAlign: 'right', padding: '4px 0 4px 8px', color: '#555' }}>{cmValue}</td>
+                                                  </tr>
+                                                );
+                                              })}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             ) : (
                               <span style={{ color: '#666', textAlign: 'left', display: 'block' }}>N/A</span>
@@ -1663,7 +1776,15 @@ function Rental() {
                         selectedRental.specific_data?.selected_sizes || selectedRental.specific_data?.selectedSizes,
                         selectedRental.specific_data?.size
                       );
-                      if (sizeData && Array.isArray(sizeData)) {
+                      
+                      // Enrich size data with measurements from the fetched data
+                      const measurementsBySizeKey = selectedRentalWithMeasurements?.specific_data?.measurementsBySizeKey || {};
+                      const enrichedSizeData = sizeData.map(sizeEntry => {
+                        const measurements = measurementsBySizeKey[sizeEntry.key] || sizeEntry.measurements;
+                        return { ...sizeEntry, measurements };
+                      });
+                      
+                      if (enrichedSizeData && Array.isArray(enrichedSizeData)) {
                         return (
                           <div style={{
                             fontSize: '0.9rem',
@@ -1675,13 +1796,47 @@ function Rental() {
                             width: '100%',
                             maxWidth: '100%'
                           }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px 16px', color: '#666' }}>
-                              {sizeData.map((sizeEntry, mIdx) => (
-                                <React.Fragment key={mIdx}>
-                                  <span style={{ fontWeight: '500', textAlign: 'left' }}>{sizeEntry.label}</span>
-                                  <span style={{ textAlign: 'right' }}>x{sizeEntry.quantity}</span>
-                                </React.Fragment>
-                              ))}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              {enrichedSizeData.map((sizeEntry, mIdx) => {
+                                const measurements = sizeEntry.measurements;
+                                const hasMeasurements = measurements && typeof measurements === 'object' && Object.keys(measurements).length > 0;
+                                return (
+                                  <div key={mIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px 16px', color: '#666' }}>
+                                      <span style={{ fontWeight: '500', textAlign: 'left' }}>{sizeEntry.label}</span>
+                                      <span style={{ textAlign: 'right' }}>x{sizeEntry.quantity}</span>
+                                    </div>
+                                    {hasMeasurements && (
+                                      <div style={{ paddingLeft: '16px', fontSize: '0.85rem', color: '#888', lineHeight: '1.6', marginTop: '4px' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                          <thead>
+                                            <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
+                                              <th style={{ textAlign: 'left', padding: '4px 8px 4px 0', fontWeight: '600', color: '#666' }}>Measurement</th>
+                                              <th style={{ textAlign: 'right', padding: '4px 0 4px 8px', fontWeight: '600', color: '#666' }}>Inches</th>
+                                              <th style={{ textAlign: 'right', padding: '4px 0 4px 8px', fontWeight: '600', color: '#666' }}>Centimeters</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {Object.entries(measurements).map(([key, value]) => {
+                                              if (!value || (typeof value === 'object' && !value.inch && !value.cm)) return null;
+                                              const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+                                              const inchValue = typeof value === 'object' ? (value.inch || '-') : value;
+                                              const cmValue = typeof value === 'object' ? (value.cm || '-') : '-';
+                                              return (
+                                                <tr key={key} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                                  <td style={{ padding: '4px 8px 4px 0', color: '#555' }}>{label}</td>
+                                                  <td style={{ textAlign: 'right', padding: '4px 0 4px 8px', color: '#555' }}>{inchValue}</td>
+                                                  <td style={{ textAlign: 'right', padding: '4px 0 4px 8px', color: '#555' }}>{cmValue}</td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         );
@@ -1857,20 +2012,56 @@ function Rental() {
                   <span>{selectedRental.specific_data.adminNotes}</span>
                 </div>
               )}
-              {selectedRental.specific_data?.damageNotes && (
-                <div className="detail-row" style={{
-                  backgroundColor: '#ffebee',
-                  padding: '12px',
-                  borderRadius: '6px',
-                  border: '1px solid #f44336',
-                  marginTop: '10px'
-                }}>
-                  <strong style={{ color: '#c62828' }}>⚠️ Damage Notes:</strong>
-                  <span style={{ color: '#c62828', fontWeight: '500', display: 'block', marginTop: '5px' }}>
-                    {selectedRental.specific_data.damageNotes}
-                  </span>
-                </div>
-              )}
+              {selectedRental.specific_data?.damageNotes && (() => {
+                let damageData = [];
+                try {
+                  damageData = typeof selectedRental.specific_data.damageNotes === 'string'
+                    ? JSON.parse(selectedRental.specific_data.damageNotes)
+                    : selectedRental.specific_data.damageNotes;
+                  if (!Array.isArray(damageData)) damageData = [];
+                } catch {
+                  damageData = [];
+                }
+
+                if (damageData.length === 0) return null;
+
+                return (
+                  <div style={{
+                    backgroundColor: '#ffebee',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    border: '1px solid #f44336',
+                    marginTop: '15px'
+                  }}>
+                    <strong style={{ color: '#c62828', display: 'block', marginBottom: '12px', fontSize: '1rem' }}>⚠️ Damage Report</strong>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {damageData.map((damage, idx) => (
+                        <div key={idx} style={{
+                          backgroundColor: '#fff',
+                          padding: '12px',
+                          borderRadius: '6px',
+                          border: '1px solid #ffcdd2'
+                        }}>
+                          <div style={{ marginBottom: '8px' }}>
+                            <strong style={{ color: '#d32f2f' }}>{damage.item_name || 'Item'}</strong>
+                            <span style={{ marginLeft: '8px', color: '#666', fontSize: '0.9rem' }}>({damage.size_label})</span>
+                          </div>
+                          <div style={{ fontSize: '0.9rem', color: '#555', lineHeight: '1.6' }}>
+                            <div><strong>Quantity:</strong> {damage.quantity}</div>
+                            <div><strong>Damage Level:</strong> <span style={{ textTransform: 'capitalize', color: damage.damage_level === 'severe' ? '#d32f2f' : damage.damage_level === 'moderate' ? '#f57c00' : '#fbc02d' }}>{damage.damage_level}</span></div>
+                            <div><strong>Note:</strong> {damage.damage_note}</div>
+                            {damage.damaged_customer_name && (
+                              <div style={{ marginTop: '4px', fontSize: '0.85rem', color: '#888' }}>
+                                <em>Damaged by: {damage.damaged_customer_name}</em>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
             <div className="modal-footer">
               <button className="btn-cancel" onClick={() => setShowDetailModal(false)}>

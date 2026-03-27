@@ -96,14 +96,19 @@ exports.getAllBillingRecords = (req, res) => {
       if (dbPaymentStatus === 'fully_paid' || dbPaymentStatus === 'paid') {
         paymentStatus = 'Paid';
       } else if (remainingBalance <= 0 && finalPrice > 0 && amountPaid > 0) {
-        
         paymentStatus = 'Paid';
-      } else if (dbPaymentStatus === 'down-payment' || dbPaymentStatus === 'downpayment' || 
-                 dbPaymentStatus === 'partial_payment' || dbPaymentStatus === 'partial') {
+      } else if (dbPaymentStatus === 'partial_payment' || dbPaymentStatus === 'partial') {
+        paymentStatus = 'Partial Payment';
+      } else if (dbPaymentStatus === 'down-payment' || dbPaymentStatus === 'downpayment') {
         paymentStatus = 'Down-payment';
       } else if (amountPaid > 0 && remainingBalance > 0) {
-        
-        paymentStatus = 'Down-payment';
+        // If there's a payment but not full, check if it's a downpayment or partial
+        const halfPrice = finalPrice * 0.5;
+        if (amountPaid >= halfPrice) {
+          paymentStatus = 'Partial Payment';
+        } else {
+          paymentStatus = 'Down-payment';
+        }
       } else if (dbPaymentStatus === 'cancelled') {
         paymentStatus = 'Cancelled';
       } else {
@@ -383,13 +388,22 @@ exports.getBillingStats = (req, res) => {
       ) as paid_count,
       SUM(
         CASE 
-          WHEN oi.payment_status IN ('down-payment', 'partial_payment') THEN 1
+          WHEN oi.payment_status IN ('down-payment', 'downpayment') THEN 1
           WHEN LOWER(oi.service_type) = 'rental' 
             AND COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0 
-            AND COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) < oi.final_price THEN 1
+            AND COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) < (oi.final_price * 0.5) THEN 1
           ELSE 0
         END
       ) as downpayment_count,
+      SUM(
+        CASE 
+          WHEN oi.payment_status IN ('partial_payment', 'partial') THEN 1
+          WHEN LOWER(oi.service_type) = 'rental' 
+            AND COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) >= (oi.final_price * 0.5)
+            AND COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) < oi.final_price THEN 1
+          ELSE 0
+        END
+      ) as partial_payment_count,
       SUM(
         CASE 
           WHEN oi.payment_status IN ('unpaid', 'pending', '') OR oi.payment_status IS NULL THEN 1
@@ -434,6 +448,8 @@ exports.getBillingStats = (req, res) => {
       stats: {
         total: parseInt(stats.total_records) || 0,
         paid: parseInt(stats.paid_count) || 0,
+        downpayment: parseInt(stats.downpayment_count) || 0,
+        partialPayment: parseInt(stats.partial_payment_count) || 0,
         unpaid: parseInt(stats.unpaid_count) || 0,
         totalRevenue: parseFloat(stats.total_revenue) || 0,
         pendingRevenue: parseFloat(stats.pending_revenue) || 0

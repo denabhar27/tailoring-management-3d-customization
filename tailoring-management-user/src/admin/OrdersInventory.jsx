@@ -530,6 +530,7 @@ const OrdersInventory = () => {
       'completed': { backgroundColor: '#e8f5e9', color: '#2e7d32' },
       'paid': { backgroundColor: '#e8f5e9', color: '#2e7d32' },
       'fully paid': { backgroundColor: '#c8e6c9', color: '#1b5e20' },
+      'partial payment': { backgroundColor: '#e1f5fe', color: '#0277bd' },
       'unpaid': { backgroundColor: '#ffebee', color: '#d32f2f' },
       'down-payment': { backgroundColor: '#fff8e1', color: '#f57c00' },
       'in-progress': { backgroundColor: '#e3f2fd', color: '#1976d2' },
@@ -923,6 +924,7 @@ const OrdersInventory = () => {
             <option value="Completed">Completed</option>
             <option value="Paid">Paid</option>
             <option value="Fully Paid">Fully Paid</option>
+            <option value="Partial Payment">Partial Payment</option>
             <option value="Unpaid">Unpaid</option>
             <option value="Down-payment">Down-payment</option>
             <option value="Cancelled">Cancelled</option>

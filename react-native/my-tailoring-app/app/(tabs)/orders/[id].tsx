@@ -593,6 +593,115 @@ export default function OrderDetails() {
                       <Text style={styles.value}>{order.specific_data.brand}</Text>
                     </View>
                   )}
+                  {/* Display selected sizes with measurements */}
+                  {(() => {
+                    const selectedSizes = order.specific_data.selected_sizes || order.specific_data.selectedSizes || [];
+                    const sizeOptions = order.specific_data.size_options || {};
+                    const bundleItems = order.specific_data.bundle_items || [];
+                    const isBundle = bundleItems.length > 0;
+
+                    if (isBundle) {
+                      return (
+                        <View style={styles.sizeSection}>
+                          <Text style={styles.sizeSectionTitle}>Customer Selected Sizes</Text>
+                          {bundleItems.map((item: any, itemIdx: number) => {
+                            const itemSelectedSizes = item.selected_sizes || item.selectedSizes || [];
+                            const itemSizeOptions = item.size_options || {};
+                            return (
+                              <View key={itemIdx} style={styles.bundleItemContainer}>
+                                <Text style={styles.bundleItemName}>
+                                  {item.item_name || `Item ${itemIdx + 1}`}
+                                </Text>
+                                {itemSelectedSizes.map((sizeEntry: any, sizeIdx: number) => {
+                                  const sizeKey = sizeEntry.sizeKey || sizeEntry.size_key || sizeEntry.label?.toLowerCase();
+                                  const measurements = sizeEntry.measurements || sizeEntry.measurement_profile || sizeEntry.measurementProfile || (itemSizeOptions[sizeKey]?.measurements);
+                                  const hasMeasurements = measurements && typeof measurements === 'object' && Object.keys(measurements).length > 0;
+                                  
+                                  return (
+                                    <View key={sizeIdx} style={styles.sizeEntryContainer}>
+                                      <View style={styles.sizeHeaderRow}>
+                                        <Text style={styles.sizeEntryLabel}>{sizeEntry.label || sizeEntry.sizeKey}</Text>
+                                        <Text style={styles.sizeEntryQuantity}>x{sizeEntry.quantity}</Text>
+                                      </View>
+                                      {hasMeasurements && (
+                                        <View style={styles.measurementTable}>
+                                          <View style={styles.measurementHeaderRow}>
+                                            <Text style={[styles.measurementHeaderCell, { flex: 2 }]}>Measurement</Text>
+                                            <Text style={[styles.measurementHeaderCell, { flex: 1 }]}>Inches</Text>
+                                            <Text style={[styles.measurementHeaderCell, { flex: 1 }]}>CM</Text>
+                                          </View>
+                                          {Object.entries(measurements).map(([key, value]: [string, any]) => {
+                                            if (!value) return null;
+                                            const isObject = typeof value === 'object' && value !== null;
+                                            if (isObject && !value.inch && !value.cm) return null;
+                                            const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+                                            const inchValue = isObject ? (value.inch || '-') : (value || '-');
+                                            const cmValue = isObject ? (value.cm || '-') : '-';
+                                            return (
+                                              <View key={key} style={styles.measurementRow}>
+                                                <Text style={[styles.measurementCell, { flex: 2 }]}>{label}</Text>
+                                                <Text style={[styles.measurementCell, { flex: 1 }]}>{inchValue}</Text>
+                                                <Text style={[styles.measurementCell, { flex: 1 }]}>{cmValue}</Text>
+                                              </View>
+                                            );
+                                          })}
+                                        </View>
+                                      )}
+                                    </View>
+                                  );
+                                })}
+                              </View>
+                            );
+                          })}
+                        </View>
+                      );
+                    } else if (selectedSizes.length > 0) {
+                      return (
+                        <View style={styles.sizeSection}>
+                          <Text style={styles.sizeSectionTitle}>Customer Selected Sizes</Text>
+                          <View style={styles.sizeContainer}>
+                            {selectedSizes.map((sizeEntry: any, sizeIdx: number) => {
+                              const sizeKey = sizeEntry.sizeKey || sizeEntry.size_key || sizeEntry.label?.toLowerCase();
+                              const measurements = sizeEntry.measurements || sizeEntry.measurement_profile || sizeEntry.measurementProfile || (sizeOptions[sizeKey]?.measurements);
+                              const hasMeasurements = measurements && typeof measurements === 'object' && Object.keys(measurements).length > 0;
+                              
+                              return (
+                                <View key={sizeIdx} style={styles.sizeEntryContainer}>
+                                  <View style={styles.sizeHeaderRow}>
+                                    <Text style={styles.sizeEntryLabel}>{sizeEntry.label || sizeEntry.sizeKey}</Text>
+                                    <Text style={styles.sizeEntryQuantity}>x{sizeEntry.quantity}</Text>
+                                  </View>
+                                  {hasMeasurements && (
+                                    <View style={styles.measurementTable}>
+                                      <View style={styles.measurementHeaderRow}>
+                                        <Text style={[styles.measurementHeaderCell, { flex: 2 }]}>Measurement</Text>
+                                        <Text style={[styles.measurementHeaderCell, { flex: 1 }]}>Inches</Text>
+                                        <Text style={[styles.measurementHeaderCell, { flex: 1 }]}>CM</Text>
+                                      </View>
+                                      {Object.entries(measurements).map(([key, value]: [string, any]) => {
+                                        if (!value || (typeof value === 'object' && !value.inch && !value.cm)) return null;
+                                        const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+                                        const inchValue = typeof value === 'object' ? (value.inch || '-') : value;
+                                        const cmValue = typeof value === 'object' ? (value.cm || '-') : '-';
+                                        return (
+                                          <View key={key} style={styles.measurementRow}>
+                                            <Text style={[styles.measurementCell, { flex: 2 }]}>{label}</Text>
+                                            <Text style={[styles.measurementCell, { flex: 1 }]}>{inchValue}</Text>
+                                            <Text style={[styles.measurementCell, { flex: 1 }]}>{cmValue}</Text>
+                                          </View>
+                                        );
+                                      })}
+                                    </View>
+                                  )}
+                                </View>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      );
+                    }
+                    return null;
+                  })()}
                   {/* Only show size details if not a bundle (Various) */}
                   {order.specific_data.size && order.specific_data.size !== 'Various' && (
                     <View style={styles.sizeSection}>
@@ -1295,5 +1404,62 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
+  },
+
+  sizeEntryContainer: {
+    marginBottom: 12,
+  },
+  sizeHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  sizeEntryLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+  },
+  sizeEntryQuantity: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#666',
+  },
+  measurementTable: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  measurementHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  measurementHeaderCell: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+    textAlign: 'left',
+  },
+  measurementRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: '#FAFAFA',
+  },
+  measurementCell: {
+    fontSize: 13,
+    color: '#555',
+    textAlign: 'left',
   },
 });

@@ -634,6 +634,8 @@ const Customizer3DPage = () => {
           style={style}
           setStyle={setStyle}
           customModels={customModels}
+          measurements={measurements}
+          setMeasurements={setMeasurements}
         />
       </div>
 

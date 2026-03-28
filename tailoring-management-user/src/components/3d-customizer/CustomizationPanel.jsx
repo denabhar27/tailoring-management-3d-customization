@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import styles from './CustomizationPanel.module.css';
 import { API_BASE_URL } from '../../api/config';
 
-export default function CustomizationPanel({ garment, setGarment, size, setSize, fit, setFit, modelSize, setModelSize, colors, setColors, fabric, setFabric, patterns, pattern, setPattern, fabrics, designImage, setDesignImage, notes, setNotes, buttons, setButtons, accessories, setAccessories, pantsType, setPantsType, style, setStyle, onReview, customModels = [] }) {
+export default function CustomizationPanel({ garment, setGarment, size, setSize, fit, setFit, modelSize, setModelSize, colors, setColors, fabric, setFabric, patterns, pattern, setPattern, fabrics, designImage, setDesignImage, notes, setNotes, buttons, setButtons, accessories, setAccessories, pantsType, setPantsType, style, setStyle, onReview, customModels = [], measurements, setMeasurements }) {
   const [selectedButtonModel, setSelectedButtonModel] = useState('/orange button 3d model.glb');
   const [selectedAccessoryModel, setSelectedAccessoryModel] = useState('/accessories/gold lion pendant 3d model.glb');
   const [selectedButtonId, setSelectedButtonId] = useState(null);
@@ -15,7 +15,8 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
     buttons: false,
     accessories: false,
     position: true,
-    details: false
+    details: false,
+    measurements: true
   });
 
   const availableButtonModels = [
@@ -32,6 +33,97 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
   const customGarmentModels = customModels.filter(m => m.is_active && m.model_type === 'garment');
   const customButtonModels = customModels.filter(m => m.is_active && m.model_type === 'button');
   const customAccessoryModels = customModels.filter(m => m.is_active && m.model_type === 'accessory');
+
+  const getSizeMeasurement = (field) => {
+    const sizeCharts = {
+      coat: {
+        small: { chest: 36, waist: 30, shoulders: 16, sleeveLength: 24, neck: 14, backLength: 28 },
+        medium: { chest: 40, waist: 34, shoulders: 18, sleeveLength: 25, neck: 15, backLength: 29 },
+        large: { chest: 44, waist: 38, shoulders: 20, sleeveLength: 26, neck: 16, backLength: 30 }
+      },
+      pants: {
+        small: { waist: 28, hips: 36, inseam: 28, outseam: 40, thigh: 22, cuff: 14 },
+        medium: { waist: 32, hips: 40, inseam: 30, outseam: 42, thigh: 24, cuff: 15 },
+        large: { waist: 36, hips: 44, inseam: 32, outseam: 44, thigh: 26, cuff: 16 }
+      },
+      barong: {
+        small: { chest: 36, waist: 30, shoulders: 16, sleeveLength: 24, neck: 14, length: 28 },
+        medium: { chest: 40, waist: 34, shoulders: 18, sleeveLength: 25, neck: 15, length: 29 },
+        large: { chest: 44, waist: 38, shoulders: 20, sleeveLength: 26, neck: 16, length: 30 }
+      },
+      suit: {
+        small: { chest: 36, waist: 30, hips: 36, shoulders: 16, sleeveLength: 24, neck: 14, inseam: 28, outseam: 40 },
+        medium: { chest: 40, waist: 34, hips: 40, shoulders: 18, sleeveLength: 25, neck: 15, inseam: 30, outseam: 42 },
+        large: { chest: 44, waist: 38, hips: 44, shoulders: 20, sleeveLength: 26, neck: 16, inseam: 32, outseam: 44 }
+      }
+    };
+
+    let chartType = 'coat'; // default
+    if (garment === 'pants' || isPantsType) chartType = 'pants';
+    else if (garment === 'barong' || isBarongType) chartType = 'barong';
+    else if (garment.startsWith('suit') || isSuitType) chartType = 'suit';
+
+    return sizeCharts[chartType]?.[size]?.[field] || '--';
+  };
+
+  const updateMeasurement = (field, value) => {
+    if (setMeasurements) {
+      setMeasurements(prev => ({
+        ...prev,
+        [field]: parseFloat(value) || 0
+      }));
+    }
+  };
+
+  const getGarmentMeasurements = () => {
+    if (garment.startsWith('coat') || isCoatType) {
+      return [
+        { field: 'chest', label: 'Chest', unit: 'inches' },
+        { field: 'waist', label: 'Waist', unit: 'inches' },
+        { field: 'shoulders', label: 'Shoulders', unit: 'inches' },
+        { field: 'sleeveLength', label: 'Sleeve Length', unit: 'inches' },
+        { field: 'neck', label: 'Neck', unit: 'inches' },
+        { field: 'backLength', label: 'Back Length', unit: 'inches' }
+      ];
+    } else if (garment === 'pants' || isPantsType) {
+      return [
+        { field: 'waist', label: 'Waist', unit: 'inches' },
+        { field: 'hips', label: 'Hips', unit: 'inches' },
+        { field: 'inseam', label: 'Inseam', unit: 'inches' },
+        { field: 'outseam', label: 'Outseam', unit: 'inches' },
+        { field: 'thigh', label: 'Thigh', unit: 'inches' },
+        { field: 'cuff', label: 'Cuff/Bottom', unit: 'inches' }
+      ];
+    } else if (garment === 'barong' || isBarongType) {
+      return [
+        { field: 'chest', label: 'Chest', unit: 'inches' },
+        { field: 'waist', label: 'Waist', unit: 'inches' },
+        { field: 'shoulders', label: 'Shoulders', unit: 'inches' },
+        { field: 'sleeveLength', label: 'Sleeve Length', unit: 'inches' },
+        { field: 'neck', label: 'Neck', unit: 'inches' },
+        { field: 'length', label: 'Length', unit: 'inches' }
+      ];
+    } else if (garment.startsWith('suit') || isSuitType) {
+      return [
+        { field: 'chest', label: 'Chest', unit: 'inches' },
+        { field: 'waist', label: 'Waist', unit: 'inches' },
+        { field: 'hips', label: 'Hips', unit: 'inches' },
+        { field: 'shoulders', label: 'Shoulders', unit: 'inches' },
+        { field: 'sleeveLength', label: 'Sleeve Length', unit: 'inches' },
+        { field: 'neck', label: 'Neck', unit: 'inches' },
+        { field: 'inseam', label: 'Inseam (Pants)', unit: 'inches' },
+        { field: 'outseam', label: 'Outseam (Pants)', unit: 'inches' }
+      ];
+    }
+    
+    // Fallback measurements for any garment type
+    return [
+      { field: 'chest', label: 'Chest', unit: 'inches' },
+      { field: 'waist', label: 'Waist', unit: 'inches' },
+      { field: 'shoulders', label: 'Shoulders', unit: 'inches' },
+      { field: 'sleeveLength', label: 'Sleeve Length', unit: 'inches' }
+    ];
+  };
 
   const addButton = () => {
     const newButton = {
@@ -231,9 +323,18 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                     </select>
                     <div className={styles.sizeSelectedMeasurement}>
                       <span className={styles.sizeSelectedLabel}>
-                        {size.charAt(0).toUpperCase() + size.slice(1)}
+                        {size.charAt(0).toUpperCase() + size.slice(1)} Details:
                       </span>
-                      <strong>{sizeMeasurements[size]}</strong>
+                      <div className={styles.measurementDetails}>
+                        {getGarmentMeasurements().slice(0, 3).map((measurement) => (
+                          <div key={measurement.field} className={styles.measurementDetail}>
+                            <span className={styles.measurementName}>{measurement.label}:</span>
+                            <span className={styles.measurementValue}>
+                              {getSizeMeasurement(measurement.field)} {measurement.unit}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </label>

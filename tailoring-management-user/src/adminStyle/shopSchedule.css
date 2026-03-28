@@ -241,6 +241,8 @@
   height: 30px;
   font-size: 14px;
   font-weight: 600;
+  white-space: nowrap;
+  padding: 0 6px;
   cursor: pointer;
   transition: all 0.2s ease;
 }

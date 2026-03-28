@@ -317,7 +317,7 @@ const ShopSchedule = () => {
                           const hour = parseInt(hours);
                           const ampm = hour >= 12 ? 'PM' : 'AM';
                           const displayHour = hour % 12 || 12;
-                          const displayTime = `${displayHour}:${minutes} ${ampm}`;
+                          const displayTime = `${displayHour}:${minutes}${ampm}`;
                           
                           const currentCapacity = editingCapacity[slot.slot_id] !== undefined 
                             ? editingCapacity[slot.slot_id] 

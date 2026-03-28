@@ -135,3 +135,20 @@ export async function getAdminTimeSlots() {
   }
 }
 
+export async function updateTimeSlotCapacity(slotId, capacity, isActive) {
+  try {
+    const response = await axios.put(
+      `${BASE_URL}/appointments/admin/time-slot`,
+      { slotId, capacity, isActive },
+      { headers: getAuthHeaders() }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Update time slot capacity error:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Error updating time slot capacity"
+    };
+  }
+}
+

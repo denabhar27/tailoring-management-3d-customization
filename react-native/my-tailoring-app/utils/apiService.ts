@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 console.log('ENV API URL:', process.env.EXPO_PUBLIC_API_BASE_URL);
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://djackman-deluxe.onrender.com/api';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.202:5000/api';
 console.log('Using API_BASE_URL:', API_BASE_URL);
 const REQUEST_TIMEOUT = parseInt(process.env.EXPO_PUBLIC_REQUEST_TIMEOUT || '10000', 10);
 

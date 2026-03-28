@@ -13,7 +13,7 @@ router.delete('/cancel/:slotId', appointmentSlotController.cancelSlot);
 router.get('/user-slots', appointmentSlotController.getUserSlots);
 
 router.get('/admin/time-slots', requireAdmin, appointmentSlotController.getAllTimeSlots);
-router.put('/admin/time-slots/update', requireAdmin, appointmentSlotController.updateTimeSlotCapacity);
+router.put('/admin/time-slot', requireAdmin, appointmentSlotController.updateTimeSlotCapacity);
 router.get('/admin/availability', requireAdmin, appointmentSlotController.getTimeSlotAvailability);
 
 module.exports = router;

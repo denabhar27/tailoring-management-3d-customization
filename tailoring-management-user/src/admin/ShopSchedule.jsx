@@ -6,7 +6,7 @@ import '../adminStyle/admin.css';
 import '../adminStyle/shopSchedule.css';
 import '../styles/SharedModal.css';
 import { getShopScheduleAdmin, updateShopSchedule } from '../api/ShopScheduleApi';
-import { getAdminTimeSlots } from '../api/AppointmentSlotApi';
+import { getAdminTimeSlots, updateTimeSlotCapacity } from '../api/AppointmentSlotApi';
 import { getUserRole } from '../api/AuthApi';
 import { useAlert } from '../context/AlertContext';
 
@@ -18,6 +18,7 @@ const ShopSchedule = () => {
   const [expandedDay, setExpandedDay] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editingCapacity, setEditingCapacity] = useState({});
 
   const daysOfWeek = [
     { value: 0, name: 'Sunday' },
@@ -117,6 +118,46 @@ const ShopSchedule = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
+  const handleSlotCapacityChange = (slotId, newCapacity) => {
+    setEditingCapacity(prev => ({
+      ...prev,
+      [slotId]: newCapacity
+    }));
+  };
+
+  const handleSlotCapacityUpdate = async (slot) => {
+    const newCapacity = editingCapacity[slot.slot_id];
+    if (newCapacity === undefined || newCapacity === slot.capacity) {
+      return;
+    }
+
+    const capacity = parseInt(newCapacity, 10);
+    if (isNaN(capacity) || capacity < 0) {
+      await alert('Please enter a valid capacity (0 or greater)', 'Invalid Input', 'warning');
+      return;
+    }
+
+    try {
+      const result = await updateTimeSlotCapacity(slot.slot_id, capacity, slot.is_active);
+      if (result.success) {
+        setTimeSlots(prev => prev.map(s => 
+          s.slot_id === slot.slot_id ? { ...s, capacity } : s
+        ));
+        setEditingCapacity(prev => {
+          const newState = { ...prev };
+          delete newState[slot.slot_id];
+          return newState;
+        });
+        await alert('Slot capacity updated successfully!', 'Success', 'success');
+      } else {
+        await alert(result.message || 'Failed to update capacity', 'Error', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating capacity:', error);
+      await alert('Failed to update capacity', 'Error', 'error');
+    }
+  };
+
   const toggleTimeSlot = (dayOfWeek, timeSlot) => {
     const normalizedTime = timeSlot.substring(0, 5) + ':00';
     const shortTime = timeSlot.substring(0, 5); // HH:MM format
@@ -171,6 +212,8 @@ const ShopSchedule = () => {
       setSaving(false);
     }
   };
+
+
 
   if (loading) {
     return (
@@ -268,18 +311,54 @@ const ShopSchedule = () => {
                           const timeStr = typeof slot.time_slot === 'string' ? slot.time_slot : slot.time_slot.toString();
                           const normalizedTime = timeStr.substring(0, 5) + ':00';
                           const shortTime = timeStr.substring(0, 5);
-                          // Check for both formats (HH:MM and HH:MM:SS)
                           const isSelected = (day.available_times || []).some(t => t === normalizedTime || t === shortTime);
                           
+                          const [hours, minutes] = shortTime.split(':');
+                          const hour = parseInt(hours);
+                          const ampm = hour >= 12 ? 'PM' : 'AM';
+                          const displayHour = hour % 12 || 12;
+                          const displayTime = `${displayHour}:${minutes} ${ampm}`;
+                          
+                          const currentCapacity = editingCapacity[slot.slot_id] !== undefined 
+                            ? editingCapacity[slot.slot_id] 
+                            : slot.capacity;
+                          const isEditing = editingCapacity[slot.slot_id] !== undefined;
+                          
                           return (
-                            <button
-                              key={slot.slot_id}
-                              type="button"
-                              className={`ss-time-pill ${isSelected ? 'selected' : ''}`}
-                              onClick={() => toggleTimeSlot(day.day_of_week, timeStr)}
-                            >
-                              {timeStr.substring(0, 5)}
-                            </button>
+                            <div key={slot.slot_id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <button
+                                type="button"
+                                className={`ss-time-pill ${isSelected ? 'selected' : ''}`}
+                                onClick={() => toggleTimeSlot(day.day_of_week, timeStr)}
+                                style={{ marginBottom: '2px' }}
+                              >
+                                {displayTime}
+                              </button>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
+                                <span style={{ color: '#666', minWidth: '35px' }}>Slots:</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={currentCapacity}
+                                  onChange={(e) => handleSlotCapacityChange(slot.slot_id, e.target.value)}
+                                  onBlur={() => handleSlotCapacityUpdate(slot)}
+                                  onKeyPress={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.target.blur();
+                                    }
+                                  }}
+                                  style={{
+                                    width: '50px',
+                                    padding: '2px 4px',
+                                    border: isEditing ? '1px solid #2196f3' : '1px solid #ddd',
+                                    borderRadius: '3px',
+                                    fontSize: '11px',
+                                    textAlign: 'center'
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                            </div>
                           );
                         })}
                       </div>

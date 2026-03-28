@@ -77,11 +77,22 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
 }
 
-.print-report-btn {
-  background: #5d4037;
-  color: #fff;
+.print-report-btn i,
+.clear-filter-btn i {
+  margin-right: 4px;
+  font-size: 14px;
+}
+
+.print-report-btn:hover i,
+.clear-filter-btn:hover i {
+  transform: scale(1.1);
 }
 
 .clear-filter-btn {

@@ -921,7 +921,11 @@ const Repair = () => {
               ) : getFilteredItems().length === 0 ? (
                 <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px' }}>No repair orders found</td></tr>
               ) : (
-                getFilteredItems().map(item => {
+                getFilteredItems().filter(item => 
+                  item && 
+                  item.order_id && 
+                  item.specific_data
+                ).map(item => {
 
                   const pricingFactors = typeof item.pricing_factors === 'string'
                     ? JSON.parse(item.pricing_factors || '{}')

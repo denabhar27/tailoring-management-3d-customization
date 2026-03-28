@@ -44,16 +44,129 @@ export const exportToExcel = async ({
   filename,
   sheetName = 'Data',
   headers = null,
-  columnFormatters = {}
+  columnFormatters = {},
+  receiptInfo = null
 }) => {
   try {
     if (!data || data.length === 0) {
       throw new Error('No data to export');
     }
 
+    const excelData = [];
+
+    // Add receipt header if receiptInfo is provided
+    if (receiptInfo) {
+      excelData.push(['REPORT RECEIPT']);
+      excelData.push([`Exported by: ${receiptInfo.clerkName || 'Unknown'}`]);
+      excelData.push([`Export Date: ${receiptInfo.exportDate || new Date().toLocaleDateString()}`]);
+      excelData.push([`Report Type: ${receiptInfo.reportType || 'General Report'}`]);
+      excelData.push([`Total Records: ${data.length}`]);
+      excelData.push([]); // Empty row for spacing
+    }
+
+    // Calculate summary statistics
+    const serviceStats = {};
+    const statusStats = {};
+    let grandTotal = 0;
+
+    data.forEach(item => {
+      const service = item['Service/Category'] || 'Unknown';
+      const status = item['Status'] || 'Unknown';
+      const amount = parseFloat(item['Amount/Price']) || 0;
+
+      // Service statistics
+      if (!serviceStats[service]) {
+        serviceStats[service] = { count: 0, total: 0 };
+      }
+      serviceStats[service].count++;
+      serviceStats[service].total += amount;
+
+      // Status statistics
+      if (!statusStats[status]) {
+        statusStats[status] = { count: 0, total: 0 };
+      }
+      statusStats[status].count++;
+      statusStats[status].total += amount;
+
+      grandTotal += amount;
+    });
+
+    // Add summary section
+    excelData.push(['SUMMARY STATISTICS']);
+    excelData.push([]); // Empty row
+
+    // Create side-by-side summary
+    const maxRows = Math.max(Object.keys(serviceStats).length, Object.keys(statusStats).length) + 2; // +2 for headers and totals
+
+    for (let i = 0; i < maxRows; i++) {
+      const row = ['', '', '', '']; // 4 columns: Service Stats | | Status Stats
+
+      if (i === 0) {
+        // Headers
+        row[0] = 'SERVICE TYPE';
+        row[1] = 'ITEMS';
+        row[2] = 'TOTAL AMOUNT';
+        row[3] = '';
+        row[4] = '';
+        row[5] = 'STATUS';
+        row[6] = 'ITEMS';
+        row[7] = 'TOTAL AMOUNT';
+      } else if (i === 1) {
+        // Separator
+        row[0] = '============';
+        row[1] = '=====';
+        row[2] = '============';
+        row[3] = '';
+        row[4] = '';
+        row[5] = '======';
+        row[6] = '=====';
+        row[7] = '============';
+      } else {
+        // Service stats
+        const serviceIndex = i - 2;
+        const services = Object.entries(serviceStats);
+        if (serviceIndex < services.length) {
+          const [service, stats] = services[serviceIndex];
+          row[0] = service;
+          row[1] = stats.count;
+          row[2] = formatCurrency(stats.total);
+        }
+
+        // Status stats
+        const statusIndex = i - 2;
+        const statuses = Object.entries(statusStats);
+        if (statusIndex < statuses.length) {
+          const [status, stats] = statuses[statusIndex];
+          row[5] = status;
+          row[6] = stats.count;
+          row[7] = formatCurrency(stats.total);
+        }
+
+        // Grand total row
+        if (serviceIndex === services.length && statusIndex === statuses.length) {
+          row[0] = 'GRAND TOTAL';
+          row[1] = data.length;
+          row[2] = formatCurrency(grandTotal);
+          row[5] = 'GRAND TOTAL';
+          row[6] = data.length;
+          row[7] = formatCurrency(grandTotal);
+        }
+      }
+
+      excelData.push(row);
+    }
+
+    excelData.push([]); // Empty row
+    excelData.push(['DETAILED REPORT']);
+    excelData.push([]); // Empty row
+
+    // Add column headers
+    const keys = headers || Object.keys(data[0]);
+    excelData.push(keys);
+
+    // Add data rows
     const formattedData = data.map(row => {
       const formattedRow = {};
-      const keys = headers || Object.keys(row);
 
       keys.forEach(key => {
         let value = row[key];
@@ -75,10 +188,45 @@ export const exportToExcel = async ({
       return formattedRow;
     });
 
-    const worksheet = XLSX.utils.json_to_sheet(formattedData);
+    // Add formatted data rows
+    formattedData.forEach(row => {
+      const dataRow = keys.map(key => row[key]);
+      excelData.push(dataRow);
+    });
 
-    const keys = headers || Object.keys(data[0]);
-    worksheet['!cols'] = getColumnWidths(formattedData, keys);
+    const worksheet = XLSX.utils.aoa_to_sheet(excelData);
+
+    // Set column widths
+    const allKeys = keys.length > 0 ? [...keys] : ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    worksheet['!cols'] = allKeys.map((_, index) => {
+      if (index < 3 || index >= 5) { // Service and Status columns
+        return { wch: 20 };
+      } else { // Separator columns
+        return { wch: 5 };
+      }
+    });
+
+    // Add merges for receipt header if present
+    const merges = [];
+    if (receiptInfo) {
+      merges.push(
+        { s: { r: 0, c: 0 }, e: { r: 0, c: allKeys.length - 1 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: allKeys.length - 1 } },
+        { s: { r: 2, c: 0 }, e: { r: 2, c: allKeys.length - 1 } },
+        { s: { r: 3, c: 0 }, e: { r: 3, c: allKeys.length - 1 } },
+        { s: { r: 4, c: 0 }, e: { r: 4, c: allKeys.length - 1 } }
+      );
+    }
+
+    // Add merge for summary statistics header
+    const summaryStartRow = receiptInfo ? 7 : 0;
+    merges.push({ s: { r: summaryStartRow, c: 0 }, e: { r: summaryStartRow, c: allKeys.length - 1 } });
+
+    // Add merge for detailed report header
+    const detailedStartRow = summaryStartRow + maxRows + 2;
+    merges.push({ s: { r: detailedStartRow, c: 0 }, e: { r: detailedStartRow, c: allKeys.length - 1 } });
+
+    worksheet['!merges'] = merges;
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);

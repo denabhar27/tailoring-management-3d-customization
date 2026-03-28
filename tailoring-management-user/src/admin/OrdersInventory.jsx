@@ -9,7 +9,7 @@ import { useAlert } from '../context/AlertContext';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
 import { API_BASE_URL } from '../api/config';
-import { getUserRole } from '../api/AuthApi';
+import { getUserRole, getUser } from '../api/AuthApi';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { exportToExcel } from '../utils/excelExport';
 
@@ -833,6 +833,7 @@ const OrdersInventory = () => {
 
   const handleExportReportsToExcel = async () => {
     try {
+      const currentUser = getUser();
       const reportRows = combinedData.map((item) => ({
         'ID': item.uniqueNo || '',
         'Customer/Item': item.displayName || '',
@@ -842,11 +843,25 @@ const OrdersInventory = () => {
         'Status': item.displayStatus || item.status || ''
       }));
 
+      // Create receipt information
+      const receiptInfo = {
+        clerkName: currentUser ? `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || currentUser.username || 'Unknown Clerk' : 'Unknown Clerk',
+        exportDate: new Date().toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        reportType: 'Billing & Inventory Reports'
+      };
+
       await exportToExcel({
         data: reportRows,
         filename: 'reports_table',
         sheetName: 'Reports',
-        headers: ['ID', 'Customer/Item', 'Service/Category', 'Amount/Price', 'Date', 'Status']
+        headers: ['ID', 'Customer/Item', 'Service/Category', 'Amount/Price', 'Date', 'Status'],
+        receiptInfo: receiptInfo
       });
     } catch (error) {
       console.error('Failed to export reports:', error);

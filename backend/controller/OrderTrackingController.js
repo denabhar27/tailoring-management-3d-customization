@@ -19,8 +19,81 @@ exports.getUserOrderTracking = (req, res) => {
 
     console.log('Raw results from database:', results);
 
+    // Helper function to enrich rental data with measurements
+    const enrichRentalWithMeasurements = (specificData, callback) => {
+      if (!specificData) return callback(specificData);
+      
+      const isBundle = specificData.is_bundle === true || specificData.category === 'rental_bundle';
+      const bundleItems = specificData.bundle_items || [];
+      
+      if (isBundle && bundleItems.length > 0) {
+        let completed = 0;
+        bundleItems.forEach((item, idx) => {
+          const itemId = item.item_id || item.id;
+          if (!itemId) {
+            completed++;
+            if (completed === bundleItems.length) callback(specificData);
+            return;
+          }
+          
+          db.query('SELECT size FROM rental_inventory WHERE id = ?', [itemId], (err, rows) => {
+            if (!err && rows && rows.length > 0 && rows[0].size) {
+              try {
+                const sizeConfig = JSON.parse(rows[0].size);
+                if (sizeConfig && sizeConfig.size_entries) {
+                  const selectedSizes = item.selected_sizes || item.selectedSizes || [];
+                  const enrichedSizes = selectedSizes.map(sel => {
+                    const sizeEntry = sizeConfig.size_entries.find(s => s.sizeKey === sel.sizeKey || s.sizeKey === sel.size_key);
+                    return {
+                      ...sel,
+                      measurements: sizeEntry?.measurements || sizeEntry?.measurement_profile || sel.measurements
+                    };
+                  });
+                  bundleItems[idx].selected_sizes = enrichedSizes;
+                  bundleItems[idx].selectedSizes = enrichedSizes;
+                }
+              } catch (e) {
+                console.error('Error parsing size config:', e);
+              }
+            }
+            completed++;
+            if (completed === bundleItems.length) callback(specificData);
+          });
+        });
+      } else {
+        const itemId = specificData.service_id || specificData.item_id || specificData.id;
+        if (!itemId) return callback(specificData);
+        
+        db.query('SELECT size FROM rental_inventory WHERE id = ?', [itemId], (err, rows) => {
+          if (!err && rows && rows.length > 0 && rows[0].size) {
+            try {
+              const sizeConfig = JSON.parse(rows[0].size);
+              if (sizeConfig && sizeConfig.size_entries) {
+                const selectedSizes = specificData.selected_sizes || specificData.selectedSizes || [];
+                const enrichedSizes = selectedSizes.map(sel => {
+                  const sizeEntry = sizeConfig.size_entries.find(s => s.sizeKey === sel.sizeKey || s.sizeKey === sel.size_key);
+                  return {
+                    ...sel,
+                    measurements: sizeEntry?.measurements || sizeEntry?.measurement_profile || sel.measurements
+                  };
+                });
+                specificData.selected_sizes = enrichedSizes;
+                specificData.selectedSizes = enrichedSizes;
+              }
+            } catch (e) {
+              console.error('Error parsing size config:', e);
+            }
+          }
+          callback(specificData);
+        });
+      }
+    };
+
     const orders = {};
     const processedKeys = new Set(); 
+    
+    let itemsToProcess = results.length;
+    let processedItems = 0;
     
     results.forEach(item => {
       console.log('Processing item:', item); 
@@ -29,6 +102,12 @@ exports.getUserOrderTracking = (req, res) => {
 
       if (processedKeys.has(itemKey)) {
         console.log('Skipping duplicate item:', itemKey);
+        processedItems++;
+        if (processedItems === itemsToProcess) {
+          const finalOrders = Object.values(orders).filter(order => order.items.length > 0);
+          console.log('Final processed orders:', finalOrders);
+          res.json({ success: true, data: finalOrders });
+        }
         return;
       }
 
@@ -70,68 +149,77 @@ exports.getUserOrderTracking = (req, res) => {
           }
         }
 
-        specificData = { ...specificData, ...pricingFactors };
-
-        let nextStatuses = [];
-        try {
-          if (OrderTracking.getNextStatuses && typeof OrderTracking.getNextStatuses === 'function') {
-            nextStatuses = OrderTracking.getNextStatuses(item.service_type, item.status || 'pending');
-            console.log(`Next statuses for item ${item.order_item_id} (${item.service_type}, ${item.status}):`, nextStatuses);
-          } else {
-            console.warn('getNextStatuses function not available, using empty array');
-            nextStatuses = [];
-          }
-        } catch (statusErr) {
-          console.warn('Failed to get next statuses for item:', item.order_item_id, statusErr);
-          nextStatuses = [];
+        // Enrich rental data with measurements
+        if (item.service_type === 'rental') {
+          enrichRentalWithMeasurements(specificData, (enrichedData) => {
+            specificData = { ...enrichedData, ...pricingFactors };
+            finalizeItem(item, specificData, pricingFactors, statusInfo);
+          });
+        } else {
+          specificData = { ...specificData, ...pricingFactors };
+          finalizeItem(item, specificData, pricingFactors, statusInfo);
         }
-
-        let paymentStatusDisplay = 'Unpaid';
-        if (item.payment_status === 'paid') {
-          paymentStatusDisplay = 'Paid';
-        } else if (item.payment_status === 'down-payment') {
-          paymentStatusDisplay = 'Down-payment';
-        } else if (item.payment_status === 'fully_paid') {
-          paymentStatusDisplay = 'Fully Paid';
-        } else if (item.payment_status === 'cancelled') {
-          paymentStatusDisplay = 'Cancelled';
-        }
-
-        orders[item.order_id].items.push({
-          order_item_id: item.order_item_id,
-          service_type: item.service_type,
-          final_price: item.final_price,
-          specific_data: specificData,
-          status: item.status || 'pending',
-          status_label: statusInfo.label,
-          status_class: statusInfo.class,
-          status_updated_at: item.status_updated_at,
-          next_statuses: nextStatuses,
-          rental_start_date: item.rental_start_date || null,
-          rental_end_date: item.rental_end_date || null,
-          pricing_factors: pricingFactors,
-          payment_status: item.payment_status || 'unpaid',
-          payment_status_display: paymentStatusDisplay
-        });
       } catch (itemErr) {
         console.error('Error processing order item:', item, itemErr);
-        console.error('Item details:', {
-          order_id: item.order_id,
-          order_item_id: item.order_item_id,
-          service_type: item.service_type,
-          status: item.status
-        });
-        
+        processedItems++;
+        if (processedItems === itemsToProcess) {
+          const finalOrders = Object.values(orders).filter(order => order.items.length > 0);
+          console.log('Final processed orders:', finalOrders);
+          res.json({ success: true, data: finalOrders });
+        }
       }
     });
+    
+    function finalizeItem(item, specificData, pricingFactors, statusInfo) {
+      let nextStatuses = [];
+      try {
+        if (OrderTracking.getNextStatuses && typeof OrderTracking.getNextStatuses === 'function') {
+          nextStatuses = OrderTracking.getNextStatuses(item.service_type, item.status || 'pending');
+          console.log(`Next statuses for item ${item.order_item_id} (${item.service_type}, ${item.status}):`, nextStatuses);
+        } else {
+          console.warn('getNextStatuses function not available, using empty array');
+          nextStatuses = [];
+        }
+      } catch (statusErr) {
+        console.warn('Failed to get next statuses for item:', item.order_item_id, statusErr);
+        nextStatuses = [];
+      }
 
-    const finalOrders = Object.values(orders).filter(order => order.items.length > 0);
-    console.log('Final processed orders:', finalOrders);
+      let paymentStatusDisplay = 'Unpaid';
+      if (item.payment_status === 'paid') {
+        paymentStatusDisplay = 'Paid';
+      } else if (item.payment_status === 'down-payment') {
+        paymentStatusDisplay = 'Down-payment';
+      } else if (item.payment_status === 'fully_paid') {
+        paymentStatusDisplay = 'Fully Paid';
+      } else if (item.payment_status === 'cancelled') {
+        paymentStatusDisplay = 'Cancelled';
+      }
 
-    res.json({
-      success: true,
-      data: finalOrders
-    });
+      orders[item.order_id].items.push({
+        order_item_id: item.order_item_id,
+        service_type: item.service_type,
+        final_price: item.final_price,
+        specific_data: specificData,
+        status: item.status || 'pending',
+        status_label: statusInfo.label,
+        status_class: statusInfo.class,
+        status_updated_at: item.status_updated_at,
+        next_statuses: nextStatuses,
+        rental_start_date: item.rental_start_date || null,
+        rental_end_date: item.rental_end_date || null,
+        pricing_factors: pricingFactors,
+        payment_status: item.payment_status || 'unpaid',
+        payment_status_display: paymentStatusDisplay
+      });
+      
+      processedItems++;
+      if (processedItems === itemsToProcess) {
+        const finalOrders = Object.values(orders).filter(order => order.items.length > 0);
+        console.log('Final processed orders:', finalOrders);
+        res.json({ success: true, data: finalOrders });
+      }
+    }
   });
 };
 

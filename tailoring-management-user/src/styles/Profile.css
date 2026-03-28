@@ -825,3 +825,12 @@
 .btn-secondary:hover {
   background: #6a3d2b;
 }
+
+/* Override for measurement table headers in rental details */
+.service-details table thead th {
+  background: #fff !important;
+}
+
+.service-details table thead tr {
+  background: #fff !important;
+}

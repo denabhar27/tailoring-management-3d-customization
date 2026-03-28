@@ -582,7 +582,8 @@ const Profile = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', alignItems: 'center' }}>
                 {isBundle && bundleItems.length > 0
                   ? bundleItems.map((item, idx) => {
-                      const sizeData = formatSize(item.size) || (item.selected_sizes && item.selected_sizes.length > 0 ? item.selected_sizes.map(s => ({ label: s.label || s.sizeKey, value: `x${s.quantity}` })) : null);
+                      const selectedSizes = item.selected_sizes || item.selectedSizes || [];
+                      const sizeOptions = item.size_options || {};
                       return (
                         <div key={idx} style={{
                           fontSize: '0.9rem',
@@ -597,14 +598,51 @@ const Profile = () => {
                           <strong style={{ color: '#333', display: 'block', marginBottom: '10px', borderBottom: '1px solid #ddd', paddingBottom: '8px', textAlign: 'center' }}>
                             {item.item_name || `Item ${idx + 1}`}:
                           </strong>
-                          {sizeData && Array.isArray(sizeData) ? (
-                            <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '6px 16px', color: '#666' }}>
-                              {sizeData.map((measurement, mIdx) => (
-                                <React.Fragment key={mIdx}>
-                                  <span style={{ fontWeight: '500', textAlign: 'center' }}>{measurement.label}:</span>
-                                  <span style={{ textAlign: 'center' }}>{measurement.value}</span>
-                                </React.Fragment>
-                              ))}
+                          {selectedSizes.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              {selectedSizes.map((sizeEntry, mIdx) => {
+                                const sizeKey = sizeEntry.sizeKey || sizeEntry.size_key || sizeEntry.label?.toLowerCase();
+                                const measurements = sizeEntry.measurements || sizeEntry.measurement_profile || sizeEntry.measurementProfile || (sizeOptions[sizeKey]?.measurements);
+                                const hasMeasurements = measurements && typeof measurements === 'object' && Object.keys(measurements).length > 0;
+                                return (
+                                  <div key={mIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px 16px', color: '#666' }}>
+                                      <span style={{ fontWeight: '500', textAlign: 'left' }}>{sizeEntry.label || sizeEntry.sizeKey}</span>
+                                      <span style={{ textAlign: 'right' }}>x{sizeEntry.quantity}</span>
+                                    </div>
+                                    {hasMeasurements && (
+                                      <div style={{ paddingLeft: '16px', fontSize: '0.85rem', color: '#888', lineHeight: '1.6', marginTop: '4px' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                          <thead>
+                                            <tr style={{ borderBottom: '1px solid #e0e0e0', backgroundColor: '#fff !important' }}>
+                                              <th style={{ textAlign: 'left', padding: '4px 8px 4px 0', fontWeight: '600', color: '#666', backgroundColor: '#fff !important' }}>Measurement</th>
+                                              <th style={{ textAlign: 'right', padding: '4px 0 4px 8px', fontWeight: '600', color: '#666', backgroundColor: '#fff !important' }}>Inches</th>
+                                              <th style={{ textAlign: 'right', padding: '4px 0 4px 8px', fontWeight: '600', color: '#666', backgroundColor: '#fff !important' }}>Centimeters</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {Object.entries(measurements).map(([key, value]) => {
+                                              if (!value) return null;
+                                              const isObject = typeof value === 'object' && value !== null;
+                                              if (isObject && !value.inch && !value.cm) return null;
+                                              const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+                                              const inchValue = isObject ? (value.inch || '-') : (value || '-');
+                                              const cmValue = isObject ? (value.cm || '-') : '-';
+                                              return (
+                                                <tr key={key} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                                  <td style={{ padding: '4px 8px 4px 0', color: '#555' }}>{label}</td>
+                                                  <td style={{ textAlign: 'right', padding: '4px 0 4px 8px', color: '#555' }}>{inchValue}</td>
+                                                  <td style={{ textAlign: 'right', padding: '4px 0 4px 8px', color: '#555' }}>{cmValue}</td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           ) : (
                             <span style={{ color: '#666', textAlign: 'center', display: 'block' }}>N/A</span>
@@ -624,18 +662,52 @@ const Profile = () => {
                         maxWidth: '350px'
                       }}>
                         {(() => {
-                          const sizeData = formatSize(specific_data.size) || (specific_data.selected_sizes && specific_data.selected_sizes.length > 0
-                            ? specific_data.selected_sizes.map(s => ({ label: s.label || s.sizeKey, value: `x${s.quantity}` }))
-                            : null);
-                          if (sizeData && Array.isArray(sizeData)) {
+                          const selectedSizes = specific_data.selected_sizes || specific_data.selectedSizes || [];
+                          const sizeOptions = specific_data.size_options || {};
+                          if (selectedSizes.length > 0) {
                             return (
-                              <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '6px 16px', color: '#666', justifyContent: 'center' }}>
-                                {sizeData.map((measurement, mIdx) => (
-                                  <React.Fragment key={mIdx}>
-                                    <span style={{ fontWeight: '500', textAlign: 'center' }}>{measurement.label}:</span>
-                                    <span style={{ textAlign: 'center' }}>{measurement.value}</span>
-                                  </React.Fragment>
-                                ))}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {selectedSizes.map((sizeEntry, mIdx) => {
+                                  const sizeKey = sizeEntry.sizeKey || sizeEntry.size_key || sizeEntry.label?.toLowerCase();
+                                  const measurements = sizeEntry.measurements || sizeEntry.measurement_profile || sizeEntry.measurementProfile || (sizeOptions[sizeKey]?.measurements);
+                                  const hasMeasurements = measurements && typeof measurements === 'object' && Object.keys(measurements).length > 0;
+                                  return (
+                                    <div key={mIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px 16px', color: '#666' }}>
+                                        <span style={{ fontWeight: '500', textAlign: 'left' }}>{sizeEntry.label || sizeEntry.sizeKey}</span>
+                                        <span style={{ textAlign: 'right' }}>x{sizeEntry.quantity}</span>
+                                      </div>
+                                      {hasMeasurements && (
+                                        <div style={{ paddingLeft: '16px', fontSize: '0.85rem', color: '#888', lineHeight: '1.6', marginTop: '4px' }}>
+                                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                            <thead>
+                                              <tr style={{ borderBottom: '1px solid #e0e0e0', backgroundColor: '#fff !important' }}>
+                                                <th style={{ textAlign: 'left', padding: '4px 8px 4px 0', fontWeight: '600', color: '#666', backgroundColor: '#fff !important' }}>Measurement</th>
+                                                <th style={{ textAlign: 'right', padding: '4px 0 4px 8px', fontWeight: '600', color: '#666', backgroundColor: '#fff !important' }}>Inches</th>
+                                                <th style={{ textAlign: 'right', padding: '4px 0 4px 8px', fontWeight: '600', color: '#666', backgroundColor: '#fff !important' }}>Centimeters</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {Object.entries(measurements).map(([key, value]) => {
+                                                if (!value || (typeof value === 'object' && !value.inch && !value.cm)) return null;
+                                                const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+                                                const inchValue = typeof value === 'object' ? (value.inch || '-') : value;
+                                                const cmValue = typeof value === 'object' ? (value.cm || '-') : '-';
+                                                return (
+                                                  <tr key={key} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                                    <td style={{ padding: '4px 8px 4px 0', color: '#555' }}>{label}</td>
+                                                    <td style={{ textAlign: 'right', padding: '4px 0 4px 8px', color: '#555' }}>{inchValue}</td>
+                                                    <td style={{ textAlign: 'right', padding: '4px 0 4px 8px', color: '#555' }}>{cmValue}</td>
+                                                  </tr>
+                                                );
+                                              })}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             );
                           }

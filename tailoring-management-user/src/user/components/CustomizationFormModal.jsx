@@ -1150,15 +1150,6 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           </button>
           <button
             type="button"
-            className="btn-shared btn-secondary-shared"
-            onClick={handleOpen3DCustomizer}
-            disabled={loading}
-            style={{ fontSize: '14px' }}
-          >
-            <i className="fas fa-tshirt" style={{ marginRight: '8px' }}></i> 3D Customize
-          </button>
-          <button
-            type="button"
             className="btn-shared btn-primary-shared"
             onClick={handleAddToCart}
             disabled={loading}

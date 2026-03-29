@@ -16,7 +16,8 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
     accessories: false,
     position: true,
     details: false,
-    measurements: true
+    measurements: true,
+    sizeDetails: false
   });
 
   const availableButtonModels = [
@@ -306,14 +307,6 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                 </label>
               </div>
               <div className="row">
-                <label>Model Size
-                  <select value={modelSize} onChange={e => setModelSize(e.target.value)}>
-                    <option value="full">Full Size</option>
-                    <option value="short">Short Model</option>
-                  </select>
-                </label>
-              </div>
-              <div className="row">
                 <label className={styles.sizeLabel}>Size
                   <div className={styles.sizeFieldRow}>
                     <select value={size} onChange={e => setSize(e.target.value)}>
@@ -321,24 +314,27 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                       <option value="medium">Medium</option>
                       <option value="large">Large</option>
                     </select>
-                    <div className={styles.sizeSelectedMeasurement}>
-                      <span className={styles.sizeSelectedLabel}>
-                        {size.charAt(0).toUpperCase() + size.slice(1)} Details:
-                      </span>
-                      <div className={styles.measurementDetails}>
-                        {getGarmentMeasurements().slice(0, 3).map((measurement) => (
-                          <div key={measurement.field} className={styles.measurementDetail}>
-                            <span className={styles.measurementName}>{measurement.label}:</span>
-                            <span className={styles.measurementValue}>
-                              {getSizeMeasurement(measurement.field)} {measurement.unit}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 </label>
               </div>
+              <h3 onClick={() => toggleSection('sizeDetails')} className={styles.collapsibleHeader}>
+        <span>{size.charAt(0).toUpperCase() + size.slice(1)} Size Details</span>
+        <span className={styles.toggleIcon}>{expandedSections.sizeDetails ? '−' : '+'}</span>
+      </h3>
+              {expandedSections.sizeDetails && (
+                <div className={styles.sectionContent} style={{ marginTop: '0', paddingTop: '0' }}>
+                  <div className={styles.measurementDetails}>
+                    {getGarmentMeasurements().map((measurement) => (
+                      <div key={measurement.field} className={styles.measurementDetail}>
+                        <span className={styles.measurementName}>{measurement.label}:</span>
+                        <span className={styles.measurementValue}>
+                          {getSizeMeasurement(measurement.field)} {measurement.unit}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="row">
                 <label>Fit
                   <select value={fit} onChange={e => setFit(e.target.value)}>

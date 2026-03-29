@@ -1332,21 +1332,20 @@ const OrdersInventory = () => {
                       <tbody>
                         {getSizeAvailabilityRows(selectedRentalItem).map((row, idx) => (
                           <tr key={`${row.key}-${idx}`} style={{ borderTop: idx === 0 ? 'none' : '1px solid #f1f1f1' }}>
-                            <td style={{ padding: '8px 10px', fontWeight: 600 }}>
-                              <button
-                                type="button"
-                                onClick={(e) => openSizeActivityModal(selectedRentalItem, row, e)}
-                                style={{
-                                  border: 'none',
-                                  background: 'transparent',
-                                  color: '#1976d2',
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  padding: 0
-                                }}
+                            <td style={{ padding: '8px 10px', fontWeight: 600, color: '#1976d2' }}>
+                              <span style={{
+                                fontSize: '13px',
+                                textDecoration: 'underline',
+                                cursor: 'pointer',
+                                transition: 'color 0.2s ease'
+                              }}
+                              onMouseOver={(e) => e.target.style.color = '#1565c0'}
+                              onMouseOut={(e) => e.target.style.color = '#1976d2'}
+                              onClick={(e) => openSizeActivityModal(selectedRentalItem, row, e)}
+                              title="Click to view size activity"
                               >
                                 {row.label}
-                              </button>
+                              </span>
                             </td>
                             <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>{row.quantity}</td>
                             <td style={{ padding: '8px 10px' }}>

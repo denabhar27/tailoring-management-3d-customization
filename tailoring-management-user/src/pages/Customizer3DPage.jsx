@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Viewer3D from '../components/3d-customizer/Viewer3D';
 import CustomizationPanel from '../components/3d-customizer/CustomizationPanel';
 import { getAllCustom3DModels } from '../api/CustomizationApi';
+import { getAllGarmentTypes } from '../api/GarmentTypeApi';
 import { getAllFabricTypes } from '../api/FabricTypeApi';
 import { getAllPatterns } from '../api/PatternApi';
 import '../styles/3d-App.css';
@@ -56,6 +57,9 @@ const Customizer3DPage = () => {
   const [isRNWebView, setIsRNWebView] = useState(false);
   const [rnAuthData, setRnAuthData] = useState(null);
   const [customModels, setCustomModels] = useState([]);
+  const [userMeasurements, setUserMeasurements] = useState({});
+  const [provideOwnMeasurements, setProvideOwnMeasurements] = useState(false);
+  const [garmentTypes, setGarmentTypes] = useState([]);
 
   const defaultFabrics = ['silk', 'linen', 'cotton', 'wool', 'jusi', 'Piña'];
   const [fabrics, setFabrics] = useState(defaultFabrics);
@@ -140,6 +144,10 @@ const Customizer3DPage = () => {
           setButtons(v.buttons || []);
           setAccessories(v.accessories || []);
           setPantsType(v.pantsType || 'casual-men');
+          if (v.userMeasurements && Object.keys(v.userMeasurements).length > 0) {
+            setUserMeasurements(v.userMeasurements);
+            setProvideOwnMeasurements(true);
+          }
         }
       } catch (error) {
         console.error('Error loading saved design:', error);
@@ -168,6 +176,20 @@ const Customizer3DPage = () => {
       }
     };
     loadCustomModels();
+  }, []);
+
+  useEffect(() => {
+    const loadGarmentTypes = async () => {
+      try {
+        const result = await getAllGarmentTypes();
+        if (result.success && result.garments) {
+          setGarmentTypes(result.garments);
+        }
+      } catch (error) {
+        console.error('Error loading garment types:', error);
+      }
+    };
+    loadGarmentTypes();
   }, []);
 
   useEffect(() => {
@@ -255,6 +277,7 @@ const Customizer3DPage = () => {
       buttons,
       accessories,
       pantsType,
+      userMeasurements: provideOwnMeasurements ? userMeasurements : {},
       timestamp: new Date().toISOString(),
     };
 
@@ -486,6 +509,8 @@ const Customizer3DPage = () => {
         pantsType,
         designImage: designImage,
         angleImages: angleImages,
+        userMeasurements: provideOwnMeasurements ? userMeasurements : null,
+        provideOwnMeasurements: provideOwnMeasurements,
       },
       timestamp: new Date().toISOString(),
     };
@@ -501,6 +526,7 @@ const Customizer3DPage = () => {
         notes: notes,
         estimatedPrice: estimatedPrice,
         measurements: measurements,
+        userMeasurements: provideOwnMeasurements ? userMeasurements : null,
       });
 
       await alert('✓ Design sent to app!', 'Success', 'success');
@@ -636,6 +662,11 @@ const Customizer3DPage = () => {
           customModels={customModels}
           measurements={measurements}
           setMeasurements={setMeasurements}
+          userMeasurements={userMeasurements}
+          setUserMeasurements={setUserMeasurements}
+          provideOwnMeasurements={provideOwnMeasurements}
+          setProvideOwnMeasurements={setProvideOwnMeasurements}
+          garmentTypes={garmentTypes}
         />
       </div>
 

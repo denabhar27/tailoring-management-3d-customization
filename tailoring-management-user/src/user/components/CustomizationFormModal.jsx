@@ -967,6 +967,20 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                         </div>
                       </div>
                     )}
+                    {garment.designDetails.userMeasurements && Object.keys(garment.designDetails.userMeasurements).length > 0 && (
+                      <div style={{ gridColumn: '1 / -1', marginTop: '10px' }}>
+                        <strong>📏 My Body Measurements:</strong>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginTop: '8px', fontSize: '13px', background: '#e8f5e9', padding: '10px', borderRadius: '8px', border: '1px solid #a5d6a7' }}>
+                          {Object.entries(garment.designDetails.userMeasurements).map(([key, value]) => (
+                            value ? (
+                              <div key={key}>
+                                <strong>{key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}:</strong> {value} inches
+                              </div>
+                            ) : null
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

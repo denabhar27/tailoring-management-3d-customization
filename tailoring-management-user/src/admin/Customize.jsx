@@ -213,10 +213,32 @@ const Customize = () => {
   const [patternImageFile, setPatternImageFile] = useState(null);
 
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showSizeModal, setShowSizeModal] = useState(false);
+  const [sizeModalGarmentId, setSizeModalGarmentId] = useState('');
+  const [sizeModalMeasurements, setSizeModalMeasurements] = useState([]);
+  const [sizeModalSizeChart, setSizeModalSizeChart] = useState({});
+  const [sizeModalNewSize, setSizeModalNewSize] = useState('');
+  const [sizeModalCustomLabel, setSizeModalCustomLabel] = useState('');
+  const [sizeModalCustomUnit, setSizeModalCustomUnit] = useState('inches');
 
   const [patternImagePreview, setPatternImagePreview] = useState(null);
 
   const [uploadingPattern, setUploadingPattern] = useState(false);
+
+  const COMMON_MEASUREMENTS = [
+    { field: 'chest', label: 'Chest', unit: 'inches' },
+    { field: 'waist', label: 'Waist', unit: 'inches' },
+    { field: 'hips', label: 'Hips', unit: 'inches' },
+    { field: 'shoulders', label: 'Shoulders', unit: 'inches' },
+    { field: 'sleeveLength', label: 'Sleeve Length', unit: 'inches' },
+    { field: 'neck', label: 'Neck', unit: 'inches' },
+    { field: 'backLength', label: 'Back Length', unit: 'inches' },
+    { field: 'length', label: 'Length', unit: 'inches' },
+    { field: 'inseam', label: 'Inseam', unit: 'inches' },
+    { field: 'outseam', label: 'Outseam', unit: 'inches' },
+    { field: 'thigh', label: 'Thigh', unit: 'inches' },
+    { field: 'cuff', label: 'Cuff/Bottom', unit: 'inches' }
+  ];
 
   const defaultGarmentCategories = [
 
@@ -735,14 +757,19 @@ const Customize = () => {
     try {
 
       let result;
+      const submitPayload = {
+        ...garmentTypeForm,
+        measurement_fields: parseJSONField(editingGarmentType?.measurement_fields, null),
+        size_chart: parseJSONField(editingGarmentType?.size_chart, null)
+      };
 
       if (editingGarmentType) {
 
-        result = await updateGarmentType(editingGarmentType.garment_id, garmentTypeForm);
+        result = await updateGarmentType(editingGarmentType.garment_id, submitPayload);
 
       } else {
 
-        result = await createGarmentType(garmentTypeForm);
+        result = await createGarmentType(submitPayload);
 
       }
 
@@ -906,6 +933,121 @@ const Customize = () => {
 
     setShowGarmentTypeModal(true);
 
+  };
+
+  const parseJSONField = (value, fallback) => {
+    if (!value) return fallback;
+    if (typeof value === 'object') return value;
+    try {
+      return JSON.parse(value);
+    } catch (e) {
+      return fallback;
+    }
+  };
+
+  const getSelectedSizeModalGarment = () => garmentTypes.find(g => String(g.garment_id) === String(sizeModalGarmentId));
+
+  const openSizeModal = (garmentId = '') => {
+    const selectedId = garmentId || (garmentTypes[0]?.garment_id ? String(garmentTypes[0].garment_id) : '');
+    setSizeModalGarmentId(selectedId);
+    const selectedGarment = garmentTypes.find(g => String(g.garment_id) === String(selectedId));
+    setSizeModalMeasurements(parseJSONField(selectedGarment?.measurement_fields, []));
+    setSizeModalSizeChart(parseJSONField(selectedGarment?.size_chart, {}));
+    setSizeModalNewSize('');
+    setSizeModalCustomLabel('');
+    setSizeModalCustomUnit('inches');
+    setShowSizeModal(true);
+  };
+
+  const onChangeSizeModalGarment = (garmentId) => {
+    setSizeModalGarmentId(garmentId);
+    const selectedGarment = garmentTypes.find(g => String(g.garment_id) === String(garmentId));
+    setSizeModalMeasurements(parseJSONField(selectedGarment?.measurement_fields, []));
+    setSizeModalSizeChart(parseJSONField(selectedGarment?.size_chart, {}));
+  };
+
+  const addMeasurementToSizeModal = (measurement) => {
+    const exists = sizeModalMeasurements.some(m => m.field === measurement.field);
+    if (exists) return;
+    setSizeModalMeasurements(prev => [...prev, measurement]);
+  };
+
+  const removeMeasurementFromSizeModal = (field) => {
+    setSizeModalMeasurements(prev => prev.filter(m => m.field !== field));
+    setSizeModalSizeChart(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(sizeKey => {
+        if (next[sizeKey] && next[sizeKey][field] !== undefined) {
+          const { [field]: _removed, ...rest } = next[sizeKey];
+          next[sizeKey] = rest;
+        }
+      });
+      return next;
+    });
+  };
+
+  const addCustomMeasurementToSizeModal = () => {
+    if (!sizeModalCustomLabel.trim()) return;
+    const field = sizeModalCustomLabel.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    if (!field) return;
+    if (sizeModalMeasurements.some(m => m.field === field)) return;
+    setSizeModalMeasurements(prev => [...prev, { field, label: sizeModalCustomLabel.trim(), unit: sizeModalCustomUnit }]);
+    setSizeModalCustomLabel('');
+  };
+
+  const addSizeToSizeModal = () => {
+    const sizeKey = sizeModalNewSize.trim().toLowerCase().replace(/\s+/g, '-');
+    if (!sizeKey) return;
+    if (sizeModalSizeChart[sizeKey]) return;
+    setSizeModalSizeChart(prev => ({ ...prev, [sizeKey]: {} }));
+    setSizeModalNewSize('');
+  };
+
+  const removeSizeFromSizeModal = (sizeKey) => {
+    setSizeModalSizeChart(prev => {
+      const { [sizeKey]: _removed, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const updateSizeModalValue = (sizeKey, field, value) => {
+    setSizeModalSizeChart(prev => ({
+      ...prev,
+      [sizeKey]: {
+        ...(prev[sizeKey] || {}),
+        [field]: value === '' ? '' : (parseFloat(value) || 0)
+      }
+    }));
+  };
+
+  const handleSaveSizeModal = async () => {
+    const selectedGarment = getSelectedSizeModalGarment();
+    if (!selectedGarment) {
+      showToast('Please select a garment type', 'error');
+      return;
+    }
+    try {
+      const payload = {
+        garment_name: selectedGarment.garment_name,
+        garment_price: selectedGarment.garment_price,
+        garment_code: selectedGarment.garment_code || '',
+        description: selectedGarment.description || '',
+        is_active: selectedGarment.is_active,
+        measurement_fields: sizeModalMeasurements,
+        size_chart: sizeModalSizeChart
+      };
+      const result = await updateGarmentType(selectedGarment.garment_id, payload);
+      if (!result.success) {
+        showToast(result.message || 'Failed to save sizes', 'error');
+        return;
+      }
+      showToast('Sizes and measurements saved successfully!', 'success');
+      await loadGarmentTypes();
+      setShowSizeModal(false);
+    } catch (err) {
+      console.error('Save size modal error:', err);
+      showToast('Failed to save sizes', 'error');
+    }
   };
 
   const loadPatterns = async () => {
@@ -2739,6 +2881,58 @@ const Customize = () => {
 
                   </button>
 
+                  <button
+
+                    onClick={() => {
+
+                      openSizeModal();
+
+                      setShowAddMenu(false);
+
+                    }}
+
+                    style={{
+
+                      width: '100%',
+
+                      padding: '12px 16px',
+
+                      backgroundColor: 'white',
+
+                      color: 'white',
+
+                      border: 'none',
+
+                      cursor: 'pointer',
+
+                      fontSize: '14px',
+
+                      fontWeight: '500',
+
+                      textAlign: 'left',
+
+                      transition: 'background-color 0.2s'
+
+                    }}
+
+                    onMouseEnter={(e) => {
+
+                      e.target.style.backgroundColor = '#f5f5f5';
+
+                    }}
+
+                    onMouseLeave={(e) => {
+
+                      e.target.style.backgroundColor = 'white';
+
+                    }}
+
+                  >
+
+                    Add Sizes
+
+                  </button>
+
                 </div>
 
               )}
@@ -3667,7 +3861,45 @@ const Customize = () => {
 
                       } else {
 
-                        setMeasurements({ top: {}, bottom: {}, notes: '' });
+                        // Try to pre-populate from user-provided measurements in designData
+                        const garments = Array.isArray(selectedOrder.specific_data?.garments) ? selectedOrder.specific_data.garments : [];
+                        let userMeas = null;
+                        if (garments.length > 0) {
+                          for (const g of garments) {
+                            const dd = parseDesignData(g.designData);
+                            if (dd?.userMeasurements && Object.keys(dd.userMeasurements).length > 0) {
+                              userMeas = dd.userMeasurements;
+                              break;
+                            }
+                          }
+                        } else {
+                          const dd = parseDesignData(selectedOrder.specific_data?.designData);
+                          if (dd?.userMeasurements && Object.keys(dd.userMeasurements).length > 0) {
+                            userMeas = dd.userMeasurements;
+                          }
+                        }
+
+                        if (userMeas) {
+                          // Map user measurements to top/bottom format
+                          const topFields = ['chest', 'shoulders', 'sleeveLength', 'neck', 'waist', 'length', 'backLength'];
+                          const bottomFields = ['waist', 'hips', 'inseam', 'outseam', 'thigh', 'cuff'];
+                          const topMeas = {};
+                          const bottomMeas = {};
+                          Object.entries(userMeas).forEach(([key, val]) => {
+                            if (val) {
+                              const mappedKey = key === 'sleeveLength' ? 'sleeve_length' : key === 'backLength' ? 'length' : key;
+                              if (topFields.includes(key)) topMeas[mappedKey] = val;
+                              if (bottomFields.includes(key)) bottomMeas[mappedKey] = val;
+                            }
+                          });
+                          setMeasurements({
+                            top: topMeas,
+                            bottom: bottomMeas,
+                            notes: 'Pre-filled from customer-provided body measurements'
+                          });
+                        } else {
+                          setMeasurements({ top: {}, bottom: {}, notes: '' });
+                        }
 
                       }
 
@@ -3957,6 +4189,66 @@ const Customize = () => {
 
                 return null;
 
+              })()}
+
+              {/* User-Provided Body Measurements Section */}
+              {(() => {
+                // Collect userMeasurements from all garments' designData or from the single designData
+                const garments = Array.isArray(selectedOrder.specific_data?.garments)
+                  ? selectedOrder.specific_data.garments
+                  : [];
+
+                let allUserMeasurements = [];
+
+                if (garments.length > 0) {
+                  garments.forEach((garment, idx) => {
+                    const dData = parseDesignData(garment.designData);
+                    if (dData?.userMeasurements && Object.keys(dData.userMeasurements).length > 0) {
+                      allUserMeasurements.push({ index: idx, garmentType: garment.garmentType, measurements: dData.userMeasurements });
+                    }
+                  });
+                } else {
+                  const dData = parseDesignData(selectedOrder.specific_data?.designData);
+                  if (dData?.userMeasurements && Object.keys(dData.userMeasurements).length > 0) {
+                    allUserMeasurements.push({ index: 0, garmentType: selectedOrder.specific_data?.garmentType, measurements: dData.userMeasurements });
+                  }
+                }
+
+                if (allUserMeasurements.length === 0) return null;
+
+                const formatLabel = (key) => key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+
+                return (
+                  <div className="detail-row" style={{ marginTop: '20px', padding: '15px', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '1px solid #a5d6a7' }}>
+                    <div style={{ width: '100%' }}>
+                      <h5 style={{ margin: '0 0 10px 0', color: '#2e7d32', fontSize: '16px', fontWeight: '600' }}>
+                        📏 Customer-Provided Body Measurements
+                      </h5>
+                      <p style={{ fontSize: '12px', color: '#666', margin: '0 0 12px 0', fontStyle: 'italic' }}>
+                        These measurements were voluntarily provided by the customer. You can edit them via the "View/Edit Measurements" button above.
+                      </p>
+                      {allUserMeasurements.map((item, mIdx) => (
+                        <div key={mIdx} style={{ marginBottom: '12px', padding: '10px', background: '#fff', borderRadius: '8px', border: '1px solid #c8e6c9' }}>
+                          {allUserMeasurements.length > 1 && (
+                            <div style={{ marginBottom: '8px', fontWeight: '700', fontSize: '14px' }}>
+                              Garment #{item.index + 1} {item.garmentType ? `(${item.garmentType})` : ''}
+                            </div>
+                          )}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '14px' }}>
+                            {Object.entries(item.measurements).map(([key, value]) => (
+                              value ? (
+                                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: '#f1f8e9', borderRadius: '4px' }}>
+                                  <strong>{formatLabel(key)}:</strong>
+                                  <span>{value} inches</span>
+                                </div>
+                              ) : null
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
               })()}
 
             </div>
@@ -5331,6 +5623,150 @@ const Customize = () => {
 
               </button>
 
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+      {showSizeModal && (
+
+        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowSizeModal(false)}>
+
+          <div className="modal-content" style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
+
+            <div className="modal-header">
+
+              <h2>Add Sizes</h2>
+
+              <span className="close-modal" onClick={() => setShowSizeModal(false)}>×</span>
+
+            </div>
+
+            <div className="customize-modal-body">
+
+              <div className="customize-form-group">
+                <label>Garment Type *</label>
+                <select value={sizeModalGarmentId} onChange={(e) => onChangeSizeModalGarment(e.target.value)}>
+                  <option value="">Select Garment Type</option>
+                  {garmentTypes.map(g => (
+                    <option key={g.garment_id} value={g.garment_id}>{g.garment_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="customize-form-group" style={{ borderTop: '1px solid #e0e0e0', paddingTop: '16px' }}>
+                <label>Measurement Fields</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px', marginBottom: '10px' }}>
+                  {COMMON_MEASUREMENTS.map(m => {
+                    const active = sizeModalMeasurements.some(x => x.field === m.field);
+                    return (
+                      <button
+                        key={m.field}
+                        type="button"
+                        onClick={() => active ? removeMeasurementFromSizeModal(m.field) : addMeasurementToSizeModal(m)}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '14px',
+                          border: active ? '2px solid #4caf50' : '1px solid #ccc',
+                          backgroundColor: active ? '#e8f5e9' : '#fff',
+                          color: active ? '#2e7d32' : '#555',
+                          fontSize: '12px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {active ? '✓ ' : '+ '}{m.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1', minWidth: '150px' }}>
+                    <small>Custom Label</small>
+                    <input
+                      type="text"
+                      value={sizeModalCustomLabel}
+                      onChange={(e) => setSizeModalCustomLabel(e.target.value)}
+                      placeholder="e.g., Armhole"
+                    />
+                  </div>
+                  <div style={{ minWidth: '100px' }}>
+                    <small>Unit</small>
+                    <select value={sizeModalCustomUnit} onChange={(e) => setSizeModalCustomUnit(e.target.value)}>
+                      <option value="inches">inches</option>
+                      <option value="cm">cm</option>
+                      <option value="mm">mm</option>
+                    </select>
+                  </div>
+                  <button type="button" className="fabric-edit-btn" onClick={addCustomMeasurementToSizeModal}>Add</button>
+                </div>
+              </div>
+
+              <div className="customize-form-group" style={{ borderTop: '1px solid #e0e0e0', paddingTop: '16px' }}>
+                <label>Add Size</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    value={sizeModalNewSize}
+                    onChange={(e) => setSizeModalNewSize(e.target.value)}
+                    placeholder="e.g., Extra Small"
+                  />
+                  <button type="button" className="fabric-edit-btn" onClick={addSizeToSizeModal}>+ Add Size</button>
+                </div>
+              </div>
+
+              {sizeModalMeasurements.length > 0 && Object.keys(sizeModalSizeChart).length > 0 && (
+                <div className="customize-form-group">
+                  <label>Size Details</label>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '450px' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f5f5f5' }}>
+                          <th style={{ padding: '8px', borderBottom: '1px solid #ddd', textAlign: 'left' }}>Size</th>
+                          {sizeModalMeasurements.map(m => (
+                            <th key={m.field} style={{ padding: '8px', borderBottom: '1px solid #ddd', textAlign: 'center' }}>
+                              {m.label}
+                              <br />
+                              <small>({m.unit})</small>
+                            </th>
+                          ))}
+                          <th style={{ padding: '8px', borderBottom: '1px solid #ddd' }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.keys(sizeModalSizeChart).map(sizeKey => (
+                          <tr key={sizeKey} style={{ borderBottom: '1px solid #eee' }}>
+                            <td style={{ padding: '8px', fontWeight: '600' }}>{sizeKey.replace(/-/g, ' ')}</td>
+                            {sizeModalMeasurements.map(m => (
+                              <td key={m.field} style={{ padding: '6px' }}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.5"
+                                  value={sizeModalSizeChart?.[sizeKey]?.[m.field] ?? ''}
+                                  onChange={(e) => updateSizeModalValue(sizeKey, m.field, e.target.value)}
+                                  style={{ width: '100%', textAlign: 'center' }}
+                                />
+                              </td>
+                            ))}
+                            <td style={{ padding: '6px' }}>
+                              <button type="button" className="fabric-delete-btn" onClick={() => removeSizeFromSizeModal(sizeKey)}>Remove</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            <div className="customize-modal-footer">
+              <button className="customize-btn-cancel" onClick={() => setShowSizeModal(false)}>Cancel</button>
+              <button className="customize-btn-submit" onClick={handleSaveSizeModal} disabled={!sizeModalGarmentId}>Save</button>
             </div>
 
           </div>

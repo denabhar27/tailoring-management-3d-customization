@@ -26,18 +26,27 @@ const ensureTableExists = (callback) => {
       return callback(err);
     }
 
-    const addColumnSQL = `
-      ALTER TABLE garment_types 
-      ADD COLUMN IF NOT EXISTS garment_code VARCHAR(50) DEFAULT NULL AFTER garment_price
-    `;
-    
-    db.query(addColumnSQL, (alterErr) => {
-      
-      if (alterErr && !alterErr.message.includes('Duplicate column')) {
-        console.warn('Note: Could not add garment_code column (may already exist):', alterErr.message);
+    const schemaUpdates = [
+      `ALTER TABLE garment_types ADD COLUMN garment_code VARCHAR(50) DEFAULT NULL AFTER garment_price`,
+      `ALTER TABLE garment_types ADD COLUMN measurement_fields JSON NULL AFTER is_active`,
+      `ALTER TABLE garment_types ADD COLUMN size_chart JSON NULL AFTER measurement_fields`
+    ];
+
+    let index = 0;
+    const applyNext = () => {
+      if (index >= schemaUpdates.length) {
+        callback(null);
+        return;
       }
-      callback(null);
-    });
+      db.query(schemaUpdates[index], (alterErr) => {
+        index += 1;
+        if (alterErr && !String(alterErr.message).includes('Duplicate column')) {
+          console.warn('Garment table schema update note:', alterErr.message);
+        }
+        applyNext();
+      });
+    };
+    applyNext();
   });
 };
 
@@ -131,7 +140,7 @@ exports.createGarmentType = (req, res) => {
     });
   }
   
-  const { garment_name, garment_price, garment_code, description, is_active } = req.body;
+  const { garment_name, garment_price, garment_code, description, is_active, measurement_fields, size_chart } = req.body;
   
   if (!garment_name || !garment_name.trim()) {
     return res.status(400).json({
@@ -160,7 +169,9 @@ exports.createGarmentType = (req, res) => {
       garment_price: parseFloat(garment_price),
       garment_code: garment_code ? garment_code.trim().toLowerCase() : null,
       description: description || null,
-      is_active: is_active !== undefined ? is_active : 1
+      is_active: is_active !== undefined ? is_active : 1,
+      measurement_fields: Array.isArray(measurement_fields) ? measurement_fields : null,
+      size_chart: size_chart && typeof size_chart === 'object' ? size_chart : null
     };
     
     GarmentType.create(garmentData, (err, result) => {
@@ -201,7 +212,7 @@ exports.updateGarmentType = (req, res) => {
   }
   
   const garmentId = req.params.garmentId;
-  const { garment_name, garment_price, garment_code, description, is_active } = req.body;
+  const { garment_name, garment_price, garment_code, description, is_active, measurement_fields, size_chart } = req.body;
   
   if (!garment_name || !garment_name.trim()) {
     return res.status(400).json({
@@ -222,7 +233,9 @@ exports.updateGarmentType = (req, res) => {
     garment_price: parseFloat(garment_price),
     garment_code: garment_code ? garment_code.trim().toLowerCase() : null,
     description: description || null,
-    is_active: is_active !== undefined ? is_active : 1
+    is_active: is_active !== undefined ? is_active : 1,
+    measurement_fields: Array.isArray(measurement_fields) ? measurement_fields : null,
+    size_chart: size_chart && typeof size_chart === 'object' ? size_chart : null
   };
   
   GarmentType.update(garmentId, garmentData, (err, result) => {

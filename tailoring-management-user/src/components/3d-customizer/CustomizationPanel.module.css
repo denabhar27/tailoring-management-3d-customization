@@ -737,3 +737,52 @@
     font-size: 12px;
     line-height: 1.4;
 }
+
+/* User Measurements Toggle & Form */
+.measurementToggleContainer {
+    padding: 8px 0;
+}
+
+.measurementToggleLabel {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.05));
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.measurementToggleLabel:hover {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.1));
+    border-color: rgba(99, 102, 241, 0.4);
+}
+
+.measurementToggleCheckbox {
+    width: 18px;
+    height: 18px;
+    accent-color: #8B4513;
+    cursor: pointer;
+}
+
+.measurementToggleText {
+    font-size: 13px;
+    font-weight: 600;
+    color: #5D4E37;
+    font-family: 'Poppins', sans-serif;
+}
+
+.measurementToggleHint {
+    font-size: 11px;
+    color: #8B8178;
+    margin: 8px 0 0 0;
+    line-height: 1.5;
+    font-style: italic;
+}
+
+.userMeasurementsForm {
+    margin-top: 12px;
+    animation: slideDown 0.3s ease-out;
+}

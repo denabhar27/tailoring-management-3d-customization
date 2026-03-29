@@ -3267,7 +3267,11 @@ const Customize = () => {
 
                                   setSelectedOrder(item);
 
-                                  setPaymentAmount('');
+                                  const finalPrice = parseFloat(item.final_price || 0);
+
+                                  const halfPrice = (finalPrice * 0.5).toFixed(2);
+
+                                  setPaymentAmount(halfPrice);
 
                                   setCashReceived('');
 

@@ -1195,7 +1195,7 @@ function Rental() {
                                 </svg>
                               </button>
                                 )}
-                                {rental.approval_status !== 'cancelled' && rental.approval_status !== 'pending' && rental.approval_status !== 'pending_review' && rental.approval_status !== 'price_confirmation' && !isPending && (
+                                {rental.approval_status !== 'cancelled' && rental.approval_status !== 'pending' && rental.approval_status !== 'pending_review' && rental.approval_status !== 'price_confirmation' && rental.approval_status !== 'returned' && !isPending && (
                                 <button
                                     className="icon-btn"
                                     onClick={(e) => {

@@ -926,7 +926,14 @@ const DryCleaning = () => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedOrder(item);
-                                setPaymentAmount('');
+                                const pricingFactors = typeof item.pricing_factors === 'string'
+                                  ? JSON.parse(item.pricing_factors || '{}')
+                                  : (item.pricing_factors || {});
+                                const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
+                                const finalPrice = parseFloat(item.final_price || 0);
+                                const remainingBalance = Math.max(0, finalPrice - amountPaid);
+                                const halfPrice = (finalPrice * 0.5).toFixed(2);
+                                setPaymentAmount(halfPrice);
                                 setCashReceived('');
                                 setShowPaymentModal(true);
                               }}

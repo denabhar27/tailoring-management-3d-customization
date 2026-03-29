@@ -948,11 +948,6 @@ exports.updateDryCleaningOrderItem = (req, res) => {
     }
   });
 
-  // Dry cleaning no longer uses a separate price confirmation stage.
-  if (updateData.approvalStatus === 'price_confirmation') {
-    updateData.approvalStatus = 'accepted';
-  }
-
   if (Object.keys(updateData).length === 0) {
     return res.status(400).json({
       success: false,
@@ -971,6 +966,51 @@ exports.updateDryCleaningOrderItem = (req, res) => {
 
     const previousStatus = item.approval_status || 'pending';
     const previousPrice = item.final_price || null;
+
+    // Check if garment type is "Others" - only then allow price editing with confirmation
+    const hasIncomingFinalPrice = updateData.finalPrice !== undefined && updateData.finalPrice !== null && updateData.finalPrice !== '';
+    if (hasIncomingFinalPrice) {
+      const specificData = typeof item.specific_data === 'string' ? JSON.parse(item.specific_data || '{}') : (item.specific_data || {});
+      
+      // Check if any garment is "Others"
+      let isOthersGarment = false;
+      if (Array.isArray(specificData.garments) && specificData.garments.length > 0) {
+        isOthersGarment = specificData.garments.some(g => (g.garmentType || '').toLowerCase() === 'others');
+      } else {
+        isOthersGarment = (specificData.garmentType || '').toLowerCase() === 'others';
+      }
+
+      // Only allow price confirmation for "Others" garment type
+      if (isOthersGarment) {
+        const nextPrice = parseFloat(updateData.finalPrice);
+        const prevPrice = parseFloat(previousPrice || 0);
+        const isPriceChanged = !Number.isNaN(nextPrice) && Math.abs(nextPrice - prevPrice) > 0.01;
+        const hasReason = String(updateData.adminNotes || '').trim().length > 0;
+
+        // For "Others" garment, if price changed and no walk-in, send price confirmation
+        if (isPriceChanged) {
+          const db = require('../config/db');
+          const checkOrderSql = `SELECT order_type FROM orders WHERE order_id = ?`;
+          db.query(checkOrderSql, [item.order_id], (orderErr, orderResults) => {
+            if (!orderErr && orderResults && orderResults.length > 0) {
+              const isWalkIn = orderResults[0].order_type === 'walk_in';
+              
+              if (!isWalkIn && !hasReason) {
+                return res.status(400).json({
+                  success: false,
+                  message: "A reason is required when changing the price for 'Others' garment type"
+                });
+              }
+
+              // For online orders with "Others" garment, send price confirmation
+              if (!isWalkIn && (previousStatus === 'pending' || previousStatus === 'pending_review')) {
+                updateData.approvalStatus = 'price_confirmation';
+              }
+            }
+          });
+        }
+      }
+    }
 
     const db = require('../config/db');
     const checkOrderSql = `SELECT order_type FROM orders WHERE order_id = ?`;

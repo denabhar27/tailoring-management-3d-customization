@@ -49,6 +49,11 @@ const DryCleaning = () => {
 
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
+  const [showPriceConfirmationModal, setShowPriceConfirmationModal] = useState(false);
+  const [priceConfirmationItem, setPriceConfirmationItem] = useState(null);
+  const [priceConfirmationPrice, setPriceConfirmationPrice] = useState('');
+  const [priceConfirmationReason, setPriceConfirmationReason] = useState('');
+
   const [garmentTypes, setGarmentTypes] = useState([]);
   const [loadingGarmentTypes, setLoadingGarmentTypes] = useState(false);
   const [showGarmentTypeModal, setShowGarmentTypeModal] = useState(false);
@@ -200,7 +205,7 @@ const DryCleaning = () => {
       'pending_review': 'pending',
       'pending': 'pending',
       'accepted': 'accepted',
-      'price_confirmation': 'accepted',
+      'price_confirmation': 'pending',
       'confirmed': 'in-progress',
       'ready_for_pickup': 'to-pickup',
       'completed': 'completed',
@@ -215,7 +220,7 @@ const DryCleaning = () => {
       'pending_review': 'Pending',
       'pending': 'Pending',
       'accepted': 'Accepted',
-      'price_confirmation': 'Accepted',
+      'price_confirmation': 'Price Confirmation',
       'confirmed': 'In Progress',
       'ready_for_pickup': 'To Pick up',
       'completed': 'Completed',
@@ -318,6 +323,7 @@ const DryCleaning = () => {
   const pendingAppointments = allItems.filter(item =>
     item.approval_status === 'pending_review' ||
     item.approval_status === 'pending' ||
+    item.approval_status === 'price_confirmation' ||
     item.approval_status === null ||
     item.approval_status === undefined ||
     item.approval_status === ''
@@ -374,6 +380,7 @@ const DryCleaning = () => {
 
         let normalizedStatus = item.approval_status;
         if (item.approval_status === 'pending_review' ||
+            item.approval_status === 'price_confirmation' ||
             item.approval_status === null ||
             item.approval_status === undefined ||
             item.approval_status === '') {
@@ -384,8 +391,8 @@ const DryCleaning = () => {
     }
 
     items.sort((a, b) => {
-      const isPendingA = a.approval_status === 'pending' || a.approval_status === 'pending_review' || !a.approval_status;
-      const isPendingB = b.approval_status === 'pending' || b.approval_status === 'pending_review' || !b.approval_status;
+      const isPendingA = a.approval_status === 'pending' || a.approval_status === 'pending_review' || a.approval_status === 'price_confirmation' || !a.approval_status;
+      const isPendingB = b.approval_status === 'pending' || b.approval_status === 'pending_review' || b.approval_status === 'price_confirmation' || !b.approval_status;
 
       if (isPendingA && !isPendingB) return -1;
       if (!isPendingA && isPendingB) return 1;
@@ -402,31 +409,50 @@ const DryCleaning = () => {
       return;
     }
 
+    // Check if garment type is "Others" - requires price confirmation
+    const hasOthersGarment = (() => {
+      if (item.specific_data?.garments && item.specific_data.garments.length > 0) {
+        return item.specific_data.garments.some(g => g.isEstimated === true);
+      }
+      return false;
+    })();
+
+    // Walk-in orders skip price confirmation modal
+    if (item.order_type === 'walk_in') {
+      try {
+        const actualPrice = parseFloat(item.final_price || 0);
+        const priceToUse = actualPrice > 0 ? actualPrice : (getEstimatedPrice(item) || 0);
+        const result = await updateDryCleaningOrderItem(itemId, {
+          approvalStatus: 'accepted',
+          finalPrice: priceToUse
+        });
+        if (result.success) {
+          await loadDryCleaningOrders();
+          showToast("Walk-in order accepted (price confirmed in person)", "success");
+        } else {
+          showToast(result.message || "Failed to accept request", "error");
+        }
+      } catch (err) {
+        console.error("Accept error:", err);
+        showToast("Failed to accept request", "error");
+      }
+      return;
+    }
+
+    // If garment type is "Others", show price confirmation modal
+    if (hasOthersGarment) {
+      const estimatedPrice = getEstimatedPrice(item) || parseFloat(item.final_price || 0);
+      setPriceConfirmationItem(item);
+      setPriceConfirmationPrice(estimatedPrice.toFixed(2));
+      setPriceConfirmationReason(item.pricing_factors?.adminNotes || '');
+      setShowPriceConfirmationModal(true);
+      return;
+    }
+
+    // Standard garments with fixed prices - accept directly
     openConfirmModal(
       'Are you sure you want to accept this pending dry cleaning request?',
       async () => {
-        if (item.order_type === 'walk_in') {
-          try {
-            // Use actual final_price first, fall back to estimated
-            const actualPrice = parseFloat(item.final_price || 0);
-            const priceToUse = actualPrice > 0 ? actualPrice : (getEstimatedPrice(item) || 0);
-            const result = await updateDryCleaningOrderItem(itemId, {
-              approvalStatus: 'accepted',
-              finalPrice: priceToUse
-            });
-            if (result.success) {
-              await loadDryCleaningOrders();
-              showToast("Walk-in order accepted (price confirmed in person)", "success");
-            } else {
-              showToast(result.message || "Failed to accept request", "error");
-            }
-          } catch (err) {
-            console.error("Accept error:", err);
-            showToast("Failed to accept request", "error");
-          }
-          return;
-        }
-
         try {
           const actualPrice = parseFloat(item.final_price || 0);
           const priceToUse = actualPrice > 0 ? actualPrice : (getEstimatedPrice(item) || 0);
@@ -448,6 +474,42 @@ const DryCleaning = () => {
       'Accept',
       'blue'
     );
+  };
+
+  const handlePriceConfirmationSubmit = async () => {
+    if (!priceConfirmationItem) return;
+
+    const finalPrice = parseFloat(priceConfirmationPrice);
+    if (isNaN(finalPrice) || finalPrice <= 0) {
+      showToast("Please enter a valid price", "error");
+      return;
+    }
+
+    if (!priceConfirmationReason.trim()) {
+      showToast("Please provide a reason for the price", "error");
+      return;
+    }
+
+    try {
+      const result = await updateDryCleaningOrderItem(priceConfirmationItem.item_id, {
+        approvalStatus: 'price_confirmation',
+        finalPrice: finalPrice,
+        adminNotes: priceConfirmationReason.trim()
+      });
+      if (result.success) {
+        await loadDryCleaningOrders();
+        showToast("Dry cleaning request moved to price confirmation!", "success");
+        setShowPriceConfirmationModal(false);
+        setPriceConfirmationItem(null);
+        setPriceConfirmationPrice('');
+        setPriceConfirmationReason('');
+      } else {
+        showToast(result.message || "Failed to accept dry cleaning request", "error");
+      }
+    } catch (err) {
+      console.error("Accept error:", err);
+      showToast("Failed to accept dry cleaning request", "error");
+    }
   };
 
   const handleDecline = (itemId) => {
@@ -830,7 +892,7 @@ const DryCleaning = () => {
                       </span>
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      {item.approval_status === 'pending_review' || item.approval_status === 'pending' || item.approval_status === null || item.approval_status === undefined || item.approval_status === '' ? (
+                      {item.approval_status === 'pending_review' || item.approval_status === 'pending' || item.approval_status === 'price_confirmation' || item.approval_status === null || item.approval_status === undefined || item.approval_status === '' ? (
                         <div className="action-buttons">
                           <button className="icon-btn accept" onClick={() => handleAccept(item.item_id)} title="Accept">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -962,49 +1024,85 @@ const DryCleaning = () => {
 
               <div className="form-group" style={{ marginTop: '20px' }}>
                 <label>Final Price (₱)</label>
-                <input
-                  type="number"
-                  value={editForm.finalPrice}
-                  onChange={(e) => {
-                    const newPrice = e.target.value;
-                    const estimatedPrice = getEstimatedPrice(selectedOrder);
-                    const originalPrice = parseFloat(selectedOrder.final_price || 0);
-
-                    let newStatus = editForm.approvalStatus;
-                    const isWalkIn = selectedOrder.order_type === 'walk_in';
-
-                    if (newPrice && (editForm.approvalStatus === 'pending' || editForm.approvalStatus === 'accepted')) {
-                      const priceChanged = estimatedPrice ? Math.abs(parseFloat(newPrice) - estimatedPrice) > 0.01 :
-                                          Math.abs(parseFloat(newPrice) - originalPrice) > 0.01;
-                      if (priceChanged) {
-
-                        newStatus = 'accepted';
-                      }
-                    }
-
-                    setEditForm({...editForm, finalPrice: newPrice, approvalStatus: newStatus});
-                  }}
-                  placeholder="Enter final price"
-                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-                />
                 {(() => {
-                  const estimatedPrice = getEstimatedPrice(selectedOrder);
-                  const isWalkIn = selectedOrder.order_type === 'walk_in';
-                  if (estimatedPrice && editForm.finalPrice) {
-                    const priceDiff = parseFloat(editForm.finalPrice) - estimatedPrice;
-                    if (Math.abs(priceDiff) > 0.01) {
-                      return (
-                        <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#fff3cd', borderRadius: '4px', fontSize: '0.9em' }}>
-                          <strong>⚠️ Price Changed:</strong> Estimated: ₱{estimatedPrice.toFixed(2)} → New: ₱{parseFloat(editForm.finalPrice).toFixed(2)}
-                          <br />
-                          <span style={{ color: '#666', fontSize: '0.85em' }}>
-                            Status will be set to "Accepted".
-                          </span>
-                        </div>
+                  // Check if garment type is "Others" - only then price is editable
+                  const isOthersGarment = (() => {
+                    if (selectedOrder.specific_data?.garments && selectedOrder.specific_data.garments.length > 0) {
+                      return selectedOrder.specific_data.garments.some(g => 
+                        (g.garmentType || '').toLowerCase() === 'others'
                       );
                     }
+                    return (selectedOrder.specific_data?.garmentType || '').toLowerCase() === 'others';
+                  })();
+
+                  if (!isOthersGarment) {
+                    return (
+                      <>
+                        <input
+                          type="number"
+                          value={editForm.finalPrice}
+                          disabled
+                          style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                        />
+                        <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '0.9em', color: '#1976d2' }}>
+                          ℹ️ Price is fixed for standard garment types. Only "Others" garment type allows price editing.
+                        </div>
+                      </>
+                    );
                   }
-                  return null;
+
+                  return (
+                    <>
+                      <input
+                        type="number"
+                        value={editForm.finalPrice}
+                        onChange={(e) => {
+                          const newPrice = e.target.value;
+                          const estimatedPrice = getEstimatedPrice(selectedOrder);
+                          const originalPrice = parseFloat(selectedOrder.final_price || 0);
+
+                          let newStatus = editForm.approvalStatus;
+                          const isWalkIn = selectedOrder.order_type === 'walk_in';
+
+                          if (newPrice && (editForm.approvalStatus === 'pending' || editForm.approvalStatus === 'accepted')) {
+                            const priceChanged = estimatedPrice ? Math.abs(parseFloat(newPrice) - estimatedPrice) > 0.01 :
+                                                Math.abs(parseFloat(newPrice) - originalPrice) > 0.01;
+                            if (priceChanged) {
+                              newStatus = isWalkIn ? 'accepted' : 'price_confirmation';
+                            }
+                          }
+
+                          setEditForm({...editForm, finalPrice: newPrice, approvalStatus: newStatus});
+                        }}
+                        placeholder="Enter final price"
+                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                      />
+                      {(() => {
+                        const estimatedPrice = getEstimatedPrice(selectedOrder);
+                        const isWalkIn = selectedOrder.order_type === 'walk_in';
+                        if (estimatedPrice && editForm.finalPrice) {
+                          const priceDiff = parseFloat(editForm.finalPrice) - estimatedPrice;
+                          if (Math.abs(priceDiff) > 0.01) {
+                            return (
+                              <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#fff3cd', borderRadius: '4px', fontSize: '0.9em' }}>
+                                <strong>⚠️ Price Changed:</strong> Estimated: ₱{estimatedPrice.toFixed(2)} → New: ₱{parseFloat(editForm.finalPrice).toFixed(2)}
+                                <br />
+                                <span style={{ color: '#666', fontSize: '0.85em' }}>
+                                  {isWalkIn
+                                    ? 'Status will be set to "Accepted" (walk-in orders skip price confirmation).'
+                                    : 'Status will be set to "Price Confirmation" to notify customer.'}
+                                </span>
+                              </div>
+                            );
+                          }
+                        }
+                        return null;
+                      })()}
+                      <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#fff3cd', borderRadius: '4px', fontSize: '0.9em', color: '#856404' }}>
+                        ℹ️ Price is editable because garment type is "Others". System will send price confirmation to customer.
+                      </div>
+                    </>
+                  );
                 })()}
               </div>
 
@@ -1303,6 +1401,73 @@ const DryCleaning = () => {
     </div>
   </div>
 )}
+      {showPriceConfirmationModal && priceConfirmationItem && priceConfirmationItem.order_type !== 'walk_in' && (
+        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowPriceConfirmationModal(false)}>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2>Price Confirmation</h2>
+              <span className="close-modal" onClick={() => setShowPriceConfirmationModal(false)}>×</span>
+            </div>
+            <div className="modal-body">
+              <div className="detail-row"><strong>Order ID:</strong> #{priceConfirmationItem.order_id}</div>
+              <div className="detail-row">
+                <strong>Garments:</strong>
+                {priceConfirmationItem.specific_data?.garments && priceConfirmationItem.specific_data.garments.length > 0
+                  ? priceConfirmationItem.specific_data.garments.map(g => g.garmentType || 'Unknown').join(', ')
+                  : (priceConfirmationItem.specific_data?.garmentType || 'N/A')}
+              </div>
+
+              <div className="payment-form-group">
+                <label>Final Price (₱)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={priceConfirmationPrice}
+                  onChange={(e) => setPriceConfirmationPrice(e.target.value)}
+                  placeholder="Enter final price"
+                />
+                {(() => {
+                  const estimatedPrice = getEstimatedPrice(priceConfirmationItem);
+                  if (estimatedPrice && priceConfirmationPrice) {
+                    const priceDiff = parseFloat(priceConfirmationPrice) - estimatedPrice;
+                    if (Math.abs(priceDiff) > 0.01) {
+                      return (
+                        <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#fff3cd', borderRadius: '4px', fontSize: '0.9em' }}>
+                          <strong>⚠️ Price Changed:</strong> Estimated: ₱{estimatedPrice.toFixed(2)} → New: ₱{parseFloat(priceConfirmationPrice).toFixed(2)}
+                        </div>
+                      );
+                    }
+                  }
+                  return null;
+                })()}
+              </div>
+
+              <div className="payment-form-group" style={{ marginTop: '12px' }}>
+                <label>Reason for Price <span style={{ color: '#d32f2f' }}>*</span></label>
+                <textarea
+                  value={priceConfirmationReason}
+                  onChange={(e) => setPriceConfirmationReason(e.target.value)}
+                  placeholder="Explain the price for this garment (e.g., special fabric, delicate material, extra care required)..."
+                  rows={3}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+              </div>
+
+              <div style={{ marginTop: '15px', padding: '12px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '0.9em', color: '#1976d2' }}>
+                ℹ️ Customer will be notified to confirm the price before proceeding.
+              </div>
+            </div>
+            <div className="modal-footer-centered">
+              <button className="btn-cancel" onClick={() => {
+                setShowPriceConfirmationModal(false);
+                setPriceConfirmationReason('');
+              }}>Cancel</button>
+              <button className="btn-save" onClick={handlePriceConfirmationSubmit}>Confirm & Move to Price Confirmation</button>
+            </div>
+          </div>
+        </div>
+      )}
       {showPaymentModal && selectedOrder && (
         <div className="modal-overlay active" onClick={(e) => {
           if (e.target.classList.contains('modal-overlay')) setShowPaymentModal(false);

@@ -1511,13 +1511,6 @@ const Profile = () => {
     console.log('Item specific_data:', item.specific_data);
     console.log('Item service_type:', item.service_type);
 
-    const serviceType = String(item.service_type || '').toLowerCase();
-    const isDryCleaning = serviceType === 'dry_cleaning' || serviceType === 'dry-cleaning' || serviceType === 'drycleaning';
-    if (isDryCleaning) {
-      console.log('Dry cleaning detected - skipping price confirmation actions');
-      return false;
-    }
-
     const isPriceConfirmationStatus = item.status === 'price_confirmation';
     console.log('Is price confirmation status:', isPriceConfirmationStatus);
 

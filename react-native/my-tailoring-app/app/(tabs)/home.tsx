@@ -12,6 +12,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { Text } from "react-native-paper";
 import { useRouter } from "expo-router";
@@ -165,21 +166,43 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, zIndex: 1000 }}>
             <TouchableOpacity
-              style={styles.profileIcon}
-              onPress={() => router.push("/(tabs)/cart/Cart")}
+              style={[styles.profileIcon, { minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' }]}
+              onPress={() => {
+                console.log('Cart icon pressed - navigating to cart');
+                Alert.alert('Cart', 'Navigating to cart...');
+                try {
+                  router.push("/cart/Cart");
+                } catch (error) {
+                  console.error('Cart navigation error:', error);
+                  Alert.alert('Error', String(error));
+                }
+              }}
+              activeOpacity={0.7}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
             >
-              <Ionicons name="cart-outline" size={25} color="black" />
+              <Ionicons name="cart-outline" size={28} color="black" />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.profileIcon}
-              onPress={() => router.push("/notifications")}
+              style={[styles.profileIcon, { minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' }]}
+              onPress={() => {
+                console.log('Notification icon pressed - navigating to notifications');
+                Alert.alert('Notifications', 'Navigating to notifications...');
+                try {
+                  router.push("/notifications");
+                } catch (error) {
+                  console.error('Notification navigation error:', error);
+                  Alert.alert('Error', String(error));
+                }
+              }}
+              activeOpacity={0.7}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
             >
-              <Ionicons name="notifications-outline" size={25} color="black" />
+              <Ionicons name="notifications-outline" size={28} color="black" />
               {unreadCount > 0 && (
-                <View style={styles.badge}>
+                <View style={styles.badge} pointerEvents="none">
                   <Text style={styles.badgeText}>
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </Text>
@@ -394,12 +417,18 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderBottomWidth: 1,
     borderBottomColor: "#F5F5F4",
+    zIndex: 100,
   },
   greetingRow: { flexDirection: "row", alignItems: "center", flex: 1 },
   logo: { width: 44, height: 44, borderRadius: 22 },
   brandInfo: { marginLeft: 12 },
   headerTitle: { fontWeight: "700", fontSize: 16, color: "#0F172A" },
-  profileIcon: { padding: 4, position: "relative" },
+  profileIcon: { 
+    padding: 8, 
+    position: "relative", 
+    zIndex: 10,
+    backgroundColor: 'transparent',
+  },
   badge: {
     position: "absolute",
     top: 0,

@@ -288,7 +288,7 @@ export default function CustomizationService() {
           {
             text: 'View Cart',
             onPress: () => {
-              router.push('/(tabs)/cart/Cart');
+              router.push('/cart/Cart');
             },
           },
           {

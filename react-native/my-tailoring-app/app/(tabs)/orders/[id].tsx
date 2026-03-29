@@ -470,15 +470,19 @@ export default function OrderDetails() {
                       <View style={styles.detailRow}>
                         <Text style={styles.label}>Garments ({order.specific_data.garments.length})</Text>
                       </View>
-                      {order.specific_data.garments.map((garment: any, idx: number) => (
-                        <View key={idx} style={styles.garmentCard}>
-                          <Text style={styles.garmentTitle}>Garment {idx + 1}</Text>
-                          <Text style={styles.garmentDetail}>Type: {garment.garmentType}</Text>
-                          {garment.brand && <Text style={styles.garmentDetail}>Brand: {garment.brand}</Text>}
-                          <Text style={styles.garmentDetail}>Quantity: {garment.quantity}</Text>
-                          <Text style={styles.garmentDetail}>Price: ₱{(garment.pricePerItem || 0) * (garment.quantity || 1)}</Text>
-                        </View>
-                      ))}
+                      {order.specific_data.garments.map((garment: any, idx: number) => {
+                        const pricePerItem = garment.isEstimated ? 350 : (garment.pricePerItem || 0);
+                        const totalPrice = pricePerItem * (garment.quantity || 1);
+                        return (
+                          <View key={idx} style={styles.garmentCard}>
+                            <Text style={styles.garmentTitle}>Garment {idx + 1}</Text>
+                            <Text style={styles.garmentDetail}>Type: {garment.garmentType} {garment.brand ? `(${garment.brand})` : ''}</Text>
+                            {garment.brand && <Text style={styles.garmentDetail}>Brand: {garment.brand}</Text>}
+                            <Text style={styles.garmentDetail}>Quantity: {garment.quantity}</Text>
+                            <Text style={styles.garmentDetail}>Price: ₱{totalPrice}</Text>
+                          </View>
+                        );
+                      })}
                     </>
                   ) : (
                     <>

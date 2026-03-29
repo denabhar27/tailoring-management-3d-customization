@@ -356,7 +356,7 @@ export default function RentalDetail() {
       if (result.success) {
         setShowConfirmModal(false);
         Alert.alert("Success!", "Rental added to cart!", [
-          { text: "View Cart", onPress: () => router.push("/(tabs)/cart/Cart") },
+          { text: "View Cart", onPress: () => router.push("/cart/Cart") },
           { text: "Continue", onPress: () => router.push("/rental") },
         ]);
       } else {

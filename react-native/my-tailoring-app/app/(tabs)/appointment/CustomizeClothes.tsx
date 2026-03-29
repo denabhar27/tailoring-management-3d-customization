@@ -121,7 +121,7 @@ export default function CustomizeClothes() {
         Alert.alert("Success!", "Customize service added to cart!", [
           {
             text: "View Cart",
-            onPress: () => router.push("/(tabs)/cart/Cart"),
+            onPress: () => router.push("/cart/Cart"),
           },
           {
             text: "Continue Shopping",

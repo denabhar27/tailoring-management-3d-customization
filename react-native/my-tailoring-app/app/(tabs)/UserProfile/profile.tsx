@@ -332,6 +332,20 @@ export default function ProfileScreen() {
       return prices[damageLevel] || 0;
     } else if (serviceType === 'dry_cleaning') {
 
+      // Check if there are garments with isEstimated flag
+      if (specificData?.garments && Array.isArray(specificData.garments)) {
+        const hasEstimatedGarment = specificData.garments.some((g: any) => g.isEstimated === true);
+        if (hasEstimatedGarment) {
+          let total = 0;
+          specificData.garments.forEach((g: any) => {
+            const price = g.isEstimated ? 350 : (g.pricePerItem || 200);
+            const qty = g.quantity || 1;
+            total += price * qty;
+          });
+          return total;
+        }
+      }
+
       const serviceName = specificData?.serviceName || '';
       const quantity = specificData?.quantity || 1;
 

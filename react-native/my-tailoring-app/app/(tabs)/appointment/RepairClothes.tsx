@@ -577,7 +577,7 @@ export default function RepairClothes() {
           [
             {
               text: "View Cart",
-              onPress: () => router.push("/(tabs)/cart/Cart"),
+              onPress: () => router.push("/cart/Cart"),
             },
             {
               text: "Add More",

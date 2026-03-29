@@ -661,7 +661,7 @@ export default function Customizer3DScreen() {
         [
           {
             text: 'View Cart',
-            onPress: () => router.push('/(tabs)/cart/Cart'),
+            onPress: () => router.push('/cart/Cart'),
           },
           {
             text: 'Continue Shopping',

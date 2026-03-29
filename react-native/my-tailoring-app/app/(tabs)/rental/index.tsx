@@ -384,7 +384,7 @@ export default function RentalLanding() {
 
       if (result.success) {
         Alert.alert("Success!", `${itemsBundle.length} items added to cart as bundle!`, [
-          { text: "View Cart", onPress: () => router.push("/(tabs)/cart/Cart") },
+          { text: "View Cart", onPress: () => router.push("/cart/Cart") },
           { text: "Continue", onPress: () => {
             setSelectedItems([]);
             setCardSizeSelections({});
@@ -422,7 +422,11 @@ export default function RentalLanding() {
               <Text style={styles.headerTitle}>Jackman Tailor Deluxe</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.notificationButton}>
+          <TouchableOpacity 
+            style={styles.notificationButton}
+            onPress={() => router.push("/notifications")}
+            activeOpacity={0.7}
+          >
             <Ionicons name="notifications-outline" size={24} color="#78350F" />
           </TouchableOpacity>
         </View>

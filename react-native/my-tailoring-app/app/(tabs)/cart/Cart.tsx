@@ -342,7 +342,9 @@ export default function CartScreen() {
             rentalEndDate: item.rental_end_date || '',
 
             pricePerItem: item.specific_data?.garments?.[0]?.pricePerItem || item.specific_data?.pricePerItem || '',
-            isEstimatedPrice: item.specific_data?.isEstimatedPrice || false,
+            isEstimatedPrice: item.specific_data?.isEstimatedPrice || 
+              (item.specific_data?.garments && item.specific_data.garments.some((g: any) => g.isEstimated === true)) || 
+              false,
 
             preferredDate: item.specific_data?.preferredDate || '',
             preferredTime: item.specific_data?.preferredTime || '',

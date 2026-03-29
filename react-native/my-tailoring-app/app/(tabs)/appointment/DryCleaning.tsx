@@ -59,6 +59,7 @@ interface TimeSlot {
 interface GarmentItem {
   id: number;
   garmentType: string;
+  customGarmentType: string;
   brand: string;
   quantity: string;
 }
@@ -72,7 +73,7 @@ export default function DryCleaningClothes() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const [garments, setGarments] = useState<GarmentItem[]>([
-    { id: 1, garmentType: '', brand: '', quantity: '1' }
+    { id: 1, garmentType: '', customGarmentType: '', brand: '', quantity: '1' }
   ]);
 
   const [specialInstructions, setSpecialInstructions] = useState("");
@@ -87,7 +88,7 @@ export default function DryCleaningClothes() {
 
   const addGarment = () => {
     const newId = Math.max(...garments.map(g => g.id)) + 1;
-    setGarments([...garments, { id: newId, garmentType: '', brand: '', quantity: '1' }]);
+    setGarments([...garments, { id: newId, garmentType: '', customGarmentType: '', brand: '', quantity: '1' }]);
   };
 
   const removeGarment = (id: number) => {
@@ -97,18 +98,27 @@ export default function DryCleaningClothes() {
   };
 
   const updateGarment = (id: number, field: keyof GarmentItem, value: string) => {
-    setGarments(garments.map(g =>
-      g.id === id ? { ...g, [field]: value } : g
-    ));
+    console.log(`[DryCleaning] updateGarment called - id: ${id}, field: ${field}, value: ${value}`);
+    setGarments(prevGarments => {
+      const updated = prevGarments.map(g =>
+        g.id === id ? { ...g, [field]: value } : g
+      );
+      console.log('[DryCleaning] Updated garments:', JSON.stringify(updated, null, 2));
+      return updated;
+    });
   };
 
   const calculateTotalPrice = (): number => {
     return garments.reduce((total, garment) => {
       if (!garment.garmentType) return total;
-      const price = garmentPrices[garment.garmentType] || 200;
+      const price = garment.garmentType.toLowerCase() === 'others' ? 350 : (garmentPrices[garment.garmentType] || 0);
       const qty = parseInt(garment.quantity) || 1;
       return total + (price * qty);
     }, 0);
+  };
+
+  const hasOthersGarment = (): boolean => {
+    return garments.some(g => g.garmentType.toLowerCase() === 'others');
   };
 
   useEffect(() => {
@@ -119,8 +129,7 @@ export default function DryCleaningClothes() {
 
   useFocusEffect(
     useCallback(() => {
-      console.log('[DryCleaning] Screen focused, refreshing DC garment types...');
-      loadDCGarmentTypes();
+      console.log('[DryCleaning] Screen focused');
       if (pickupDate) {
         loadTimeSlots(pickupDate);
       }
@@ -150,19 +159,26 @@ export default function DryCleaningClothes() {
       if (response.ok) {
         const data = await response.json();
         console.log('[DryCleaning] API returned', data.data?.length || 0, 'items');
+        console.log('[DryCleaning] Raw API data:', JSON.stringify(data.data?.slice(0, 3), null, 2));
 
         if (data.success && data.data && data.data.length > 0) {
           const garmentTypesObj: { [key: string]: number } = {};
-          data.data
-            .filter((g: any) => g.is_active === 1 || g.is_active === true)
-            .forEach((garment: any) => {
-              garmentTypesObj[garment.garment_name] = parseFloat(garment.garment_price) || 0;
-            });
+          const activeGarments = data.data.filter((g: any) => g.is_active === 1 || g.is_active === true);
+          console.log('[DryCleaning] Active garments count:', activeGarments.length);
+          
+          activeGarments.forEach((garment: any) => {
+            garmentTypesObj[garment.garment_name] = parseFloat(garment.garment_price) || 0;
+            if (garment.garment_name.toLowerCase() === 'others') {
+              console.log('[DryCleaning] ✅ Found "Others" garment:', garment);
+            }
+          });
 
           if (Object.keys(garmentTypesObj).length > 0) {
             setGarmentPrices(garmentTypesObj);
             console.log('✅ [DryCleaning] SUCCESS - Loaded', Object.keys(garmentTypesObj).length, 'garment types from API');
             console.log('✅ [DryCleaning] Types:', Object.keys(garmentTypesObj).join(', '));
+            const hasOthers = Object.keys(garmentTypesObj).some(k => k.toLowerCase() === 'others');
+            console.log('✅ [DryCleaning] "Others" in final list:', hasOthers);
           } else {
             console.log('[DryCleaning] No active garment types found, using defaults');
           }
@@ -337,16 +353,22 @@ export default function DryCleaningClothes() {
   };
 
   const handleAddService = async () => {
-
-    const validGarments = garments.filter(g => g.garmentType && g.quantity);
-    if (validGarments.length === 0) {
+    console.log('[DryCleaning] handleAddService called');
+    console.log('[DryCleaning] Current garments state:', JSON.stringify(garments, null, 2));
+    
+    // Only validate garments that have a type selected
+    const garmentsWithType = garments.filter(g => g.garmentType);
+    console.log('[DryCleaning] Garments with type:', garmentsWithType.length);
+    
+    if (garmentsWithType.length === 0) {
       Alert.alert("Missing Information", "Please add at least one garment with type and quantity");
       return;
     }
 
-    for (const garment of garments) {
-      if (!garment.garmentType) {
-        Alert.alert("Missing Information", "Please select a garment type for all items");
+    // Validate only the garments that have been started
+    for (const garment of garmentsWithType) {
+      if (garment.garmentType.toLowerCase() === 'others' && !garment.customGarmentType.trim()) {
+        Alert.alert("Missing Information", "Please specify the garment type for 'Others' items");
         return;
       }
       const qty = parseInt(garment.quantity);
@@ -435,13 +457,17 @@ export default function DryCleaningClothes() {
 
       const pickupDateTime = `${dateStr}T${selectedTimeSlot}`;
 
-      const garmentsData = garments.map(garment => ({
-        garmentType: garment.garmentType,
-        brand: garment.brand,
-        quantity: parseInt(garment.quantity) || 1,
-        pricePerItem: getPriceForGarment(garment.garmentType),
-        isEstimated: false
-      }));
+      const garmentsData = garments
+        .filter(g => g.garmentType) // Only include garments with a type selected
+        .map(garment => ({
+          garmentType: garment.garmentType.toLowerCase() === 'others' && garment.customGarmentType.trim()
+            ? `Others (${garment.customGarmentType.trim()})`
+            : garment.garmentType,
+          brand: garment.brand,
+          quantity: parseInt(garment.quantity) || 1,
+          pricePerItem: garment.garmentType.toLowerCase() === 'others' ? 350 : getPriceForGarment(garment.garmentType),
+          isEstimated: garment.garmentType.toLowerCase() === 'others'
+        }));
 
       const dryCleaningData = {
         serviceType: 'dry_cleaning',
@@ -472,12 +498,12 @@ export default function DryCleaningClothes() {
         Alert.alert("Success!", "Dry cleaning service added to cart!", [
           {
             text: "View Cart",
-            onPress: () => router.push("/(tabs)/cart/Cart"),
+            onPress: () => router.push("/cart/Cart"),
           },
           {
             text: "Add More",
             onPress: () => {
-              setGarments([{ id: 1, garmentType: '', brand: '', quantity: '1' }]);
+              setGarments([{ id: 1, garmentType: '', customGarmentType: '', brand: '', quantity: '1' }]);
               setSpecialInstructions("");
               setImages([]);
               setCurrentImageIndex(0);
@@ -598,23 +624,51 @@ export default function DryCleaningClothes() {
                 ) : (
                   <View style={styles.pickerWrapper}>
                     <Picker
-                      selectedValue={garment.garmentType}
-                      onValueChange={(value) => updateGarment(garment.id, 'garmentType', value)}
+                      selectedValue={garment.garmentType || ""}
+                      onValueChange={(itemValue, itemIndex) => {
+                        console.log('[DryCleaning] Picker onValueChange - value:', itemValue, 'index:', itemIndex);
+                        if (itemValue && itemValue !== garment.garmentType) {
+                          updateGarment(garment.id, 'garmentType', itemValue);
+                          if (itemValue.toLowerCase() !== 'others') {
+                            updateGarment(garment.id, 'customGarmentType', '');
+                          }
+                        }
+                      }}
                       style={styles.picker}
                       dropdownIconColor="#8D6E63"
+                      mode="dropdown"
                     >
                       <Picker.Item label="Select garment type..." value="" color="#999" />
-                      {garmentTypes.map((item, idx) => (
-                        <Picker.Item
-                          label={`${item} - ₱${getPriceForGarment(item)}`}
-                          value={item}
-                          key={`${garment.id}-${item}-${idx}`}
-                        />
-                      ))}
+                      {garmentTypes.map((item, idx) => {
+                        const price = getPriceForGarment(item);
+                        const isOthers = item.toLowerCase() === 'others';
+                        const label = isOthers ? `${item} - ₱0 (Price TBD)` : `${item} - ₱${price}`;
+                        return (
+                          <Picker.Item
+                            label={label}
+                            value={item}
+                            key={`${garment.id}-${item}-${idx}`}
+                          />
+                        );
+                      })}
                     </Picker>
                   </View>
                 )}
               </View>
+
+              {garment.garmentType.toLowerCase() === 'others' && (
+                <View style={styles.fieldContainer}>
+                  <Text style={styles.label}>Specify Garment Type *</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g., Curtains, Pillow, Blanket, etc."
+                    placeholderTextColor="#94a3b8"
+                    value={garment.customGarmentType}
+                    onChangeText={(value) => updateGarment(garment.id, 'customGarmentType', value)}
+                  />
+                  <Text style={styles.helperText}>Please specify what type of garment this is</Text>
+                </View>
+              )}
 
               <View style={styles.fieldContainer}>
                 <Text style={styles.label}>Brand</Text>
@@ -647,9 +701,47 @@ export default function DryCleaningClothes() {
           </TouchableOpacity>
 
           {garments.some(g => g.garmentType && g.quantity) && (
-            <View style={styles.totalPriceRow}>
-              <Text style={styles.totalPriceLabel}>Total Price:</Text>
-              <Text style={styles.totalPriceValue}>₱{calculateTotalPrice()}</Text>
+            <View style={styles.totalPriceContainer}>
+              <Text style={styles.priceBreakdownTitle}>{hasOthersGarment() ? 'Estimated Price' : 'Final Price'}</Text>
+              
+              <View style={styles.priceBreakdownList}>
+                {garments.filter(g => g.garmentType).map((garment) => {
+                  const price = garment.garmentType.toLowerCase() === 'others' ? 350 : getPriceForGarment(garment.garmentType);
+                  const qty = parseInt(garment.quantity) || 1;
+                  const garmentName = garment.garmentType.toLowerCase() === 'others' 
+                    ? (garment.customGarmentType || 'Custom')
+                    : garment.garmentType;
+                  const isOthers = garment.garmentType.toLowerCase() === 'others';
+                  
+                  return (
+                    <Text key={garment.id} style={styles.priceBreakdownItem}>
+                      {garmentName}: {qty} × ₱{price} = ₱{price * qty}{isOthers ? ' (estimated)' : ''}
+                    </Text>
+                  );
+                })}
+              </View>
+
+              <View style={styles.totalPriceRow}>
+                <Text style={styles.totalPriceLabel}>Total:</Text>
+                <Text style={styles.totalPriceValue}>
+                  ₱{calculateTotalPrice()}{hasOthersGarment() ? ' (Estimated)' : ''}
+                </Text>
+              </View>
+
+              {hasOthersGarment() && (
+                <View style={styles.estimatedNotice}>
+                  <Ionicons name="information-circle" size={16} color="#ff9800" />
+                  <Text style={styles.estimatedNoticeText}>
+                    Final price will be confirmed by admin for "Others" items
+                  </Text>
+                </View>
+              )}
+
+              <Text style={styles.pickupDateText}>
+                Drop off item date: {pickupDate && selectedTimeSlot 
+                  ? `${pickupDate.toLocaleDateString()} ${selectedTimeSlot.substring(0, 5)}`
+                  : 'Not set'}
+              </Text>
             </View>
           )}
 
@@ -1310,24 +1402,77 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textDecorationLine: 'underline',
   },
+  totalPriceContainer: {
+    borderTopWidth: 1,
+    borderTopColor: '#D7CCC8',
+    paddingTop: 16,
+    marginBottom: 16,
+    backgroundColor: '#FFFEF9',
+    padding: 16,
+    borderRadius: 12,
+  },
+  priceBreakdownTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#5D4037',
+    marginBottom: 12,
+  },
+  priceBreakdownList: {
+    marginBottom: 12,
+  },
+  priceBreakdownItem: {
+    fontSize: 14,
+    color: '#5D4037',
+    marginBottom: 6,
+    lineHeight: 20,
+  },
   totalPriceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingHorizontal: 4,
     borderTopWidth: 1,
     borderTopColor: '#D7CCC8',
-    marginBottom: 16,
+    marginTop: 8,
+    paddingTop: 12,
   },
   totalPriceLabel: {
     color: '#5D4037',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '700',
   },
   totalPriceValue: {
     color: '#8D6E63',
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  pickupDateText: {
+    fontSize: 13,
+    color: '#8D6E63',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  estimatedNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3cd',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 8,
+  },
+  estimatedNoticeText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#856404',
+    lineHeight: 18,
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#8D6E63',
+    marginTop: 6,
+    marginLeft: 4,
+    fontStyle: 'italic',
   },
 });

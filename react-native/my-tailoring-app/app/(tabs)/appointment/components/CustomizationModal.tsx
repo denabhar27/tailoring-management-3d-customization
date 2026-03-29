@@ -231,7 +231,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
             text: 'View Cart',
             onPress: () => {
               handleClose();
-              router.push('/(tabs)/cart/Cart');
+              router.push('/cart/Cart');
             },
           },
           {

@@ -7,10 +7,12 @@ import { getAllDryCleaningOrders, updateDryCleaningOrderItem } from '../api/DryC
 import { getUserRole } from '../api/AuthApi';
 import { getAllDCGarmentTypesAdmin, createDCGarmentType, updateDCGarmentType, deleteDCGarmentType } from '../api/DryCleaningGarmentTypeApi';
 import { recordPayment } from '../api/PaymentApi';
-import { deleteOrderItem } from '../api/OrderApi';
+import { deleteOrderItem, updateOrderItemPrice } from '../api/OrderApi';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
 import { API_BASE_URL } from '../api/config';
+import PriceEditModal from '../components/admin/PriceEditModal';
+import PriceHistoryModal from '../components/admin/PriceHistoryModal';
 
 const isAuthenticated = () => {
   return !!localStorage.getItem('token');
@@ -42,6 +44,10 @@ const DryCleaning = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [cashReceived, setCashReceived] = useState('');
+
+  const [showPriceEditModal, setShowPriceEditModal] = useState(false);
+  const [showPriceHistoryModal, setShowPriceHistoryModal] = useState(false);
+  const [priceEditOrder, setPriceEditOrder] = useState(null);
 
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState('');
@@ -679,6 +685,21 @@ const DryCleaning = () => {
     }
   };
 
+  const handlePriceUpdate = async (itemId, newPrice, reason) => {
+    try {
+      const result = await updateOrderItemPrice(itemId, newPrice, reason);
+      if (result.success) {
+        showToast('Price updated successfully!', 'success');
+        loadDryCleaningOrders();
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      showToast(error.response?.data?.message || 'Failed to update price', 'error');
+      throw error;
+    }
+  };
+
   const getEstimatedPrice = (item) => {
     if (!item || !item.specific_data) return null;
     const serviceName = item.specific_data.serviceName || '';
@@ -921,27 +942,48 @@ const DryCleaning = () => {
                             </button>
                           )}
                           {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
-                            <button
-                              className="icon-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedOrder(item);
-                                const pricingFactors = typeof item.pricing_factors === 'string'
-                                  ? JSON.parse(item.pricing_factors || '{}')
-                                  : (item.pricing_factors || {});
-                                const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
-                                const finalPrice = parseFloat(item.final_price || 0);
-                                const remainingBalance = Math.max(0, finalPrice - amountPaid);
-                                const halfPrice = (finalPrice * 0.5).toFixed(2);
-                                setPaymentAmount(halfPrice);
-                                setCashReceived('');
-                                setShowPaymentModal(true);
-                              }}
-                              title="Record Payment"
-                              style={{ backgroundColor: '#2196F3', color: 'white' }}
-                            >
-                              💰
-                            </button>
+                            <>
+                              <button
+                                className="icon-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedOrder(item);
+                                  const pricingFactors = typeof item.pricing_factors === 'string'
+                                    ? JSON.parse(item.pricing_factors || '{}')
+                                    : (item.pricing_factors || {});
+                                  const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
+                                  const finalPrice = parseFloat(item.final_price || 0);
+                                  const remainingBalance = Math.max(0, finalPrice - amountPaid);
+                                  const halfPrice = (finalPrice * 0.5).toFixed(2);
+                                  setPaymentAmount(halfPrice);
+                                  setCashReceived('');
+                                  setShowPaymentModal(true);
+                                }}
+                                title="Record Payment"
+                                style={{ backgroundColor: '#2196F3', color: 'white' }}
+                              >
+                                💰
+                              </button>
+                              <button
+                                className="icon-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPriceEditOrder(item);
+                                  setShowPriceEditModal(true);
+                                }}
+                                title="Edit Price"
+                                style={{ backgroundColor: '#ff9800', color: 'white' }}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <circle cx="12" cy="12" r="10"></circle>
+                                  <line x1="12" y1="6" x2="12" y2="18"></line>
+                                  <line x1="9" y1="9" x2="9" y2="13"></line>
+                                  <line x1="15" y1="11" x2="15" y2="15"></line>
+                                  <path d="M9 13h6"></path>
+                                  <path d="M9 9h4a2 2 0 0 1 0 4H9"></path>
+                                </svg>
+                              </button>
+                            </>
                           )}
                           {(item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
                             <button
@@ -1589,6 +1631,25 @@ const DryCleaning = () => {
         imageUrl={previewImageUrl}
         altText={previewImageAlt}
       />
+      {showPriceEditModal && priceEditOrder && (
+        <PriceEditModal
+          order={priceEditOrder}
+          onClose={() => {
+            setShowPriceEditModal(false);
+            setPriceEditOrder(null);
+          }}
+          onSave={handlePriceUpdate}
+        />
+      )}
+      {showPriceHistoryModal && priceEditOrder && (
+        <PriceHistoryModal
+          itemId={priceEditOrder.item_id}
+          onClose={() => {
+            setShowPriceHistoryModal(false);
+            setPriceEditOrder(null);
+          }}
+        />
+      )}
     </div>
   );
 };

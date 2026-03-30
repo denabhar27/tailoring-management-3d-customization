@@ -2134,3 +2134,236 @@ exports.getOrderItemDetails = (req, res) => {
   });
 };
 
+
+exports.updateOrderItemPrice = (req, res) => {
+  const itemId = req.params.id;
+  const { newPrice, reason } = req.body;
+
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Admin only."
+    });
+  }
+
+  if (!newPrice || isNaN(parseFloat(newPrice)) || parseFloat(newPrice) <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid price. Price must be greater than 0."
+    });
+  }
+
+  const price = parseFloat(newPrice);
+  const MAX_PRICE = 100000;
+  if (price > MAX_PRICE) {
+    return res.status(400).json({
+      success: false,
+      message: `Price cannot exceed ₱${MAX_PRICE.toLocaleString()}`
+    });
+  }
+
+  Order.getOrderItemById(itemId, (getErr, item) => {
+    if (getErr || !item) {
+      return res.status(404).json({
+        success: false,
+        message: "Order item not found"
+      });
+    }
+
+    const serviceType = (item.service_type || '').toLowerCase().trim();
+    const allowedServices = ['customization', 'repair', 'dry_cleaning'];
+    
+    if (!allowedServices.includes(serviceType)) {
+      return res.status(400).json({
+        success: false,
+        message: `Price changes are only allowed for customization, repair, and dry cleaning services. Current service: ${item.service_type}`
+      });
+    }
+
+    const restrictedStatuses = ['cancelled', 'refunded'];
+    if (restrictedStatuses.includes(item.approval_status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot change price for ${item.approval_status} orders`
+      });
+    }
+
+    const oldPrice = parseFloat(item.final_price || 0);
+    
+    if (Math.abs(price - oldPrice) < 0.01) {
+      return res.status(400).json({
+        success: false,
+        message: "New price must be different from current price"
+      });
+    }
+
+    const updateSql = `UPDATE order_items SET final_price = ? WHERE item_id = ?`;
+
+    db.query(updateSql, [price, itemId], (updateErr, updateResult) => {
+      if (updateErr) {
+        return res.status(500).json({
+          success: false,
+          message: "Error updating price",
+          error: updateErr
+        });
+      }
+
+      const getCustomerSql = `
+        SELECT 
+          COALESCE(
+            NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
+            wc.name,
+            'Customer'
+          ) AS customer_name,
+          u.user_id,
+          u.email,
+          u.first_name,
+          u.last_name
+        FROM orders o
+        LEFT JOIN user u ON o.user_id = u.user_id
+        LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
+        WHERE o.order_id = ?
+        LIMIT 1
+      `;
+      
+      db.query(getCustomerSql, [item.order_id], (userErr, userResults) => {
+        const customerName = userResults && userResults.length > 0 && userResults[0].customer_name
+          ? userResults[0].customer_name
+          : 'Customer';
+        const customerUserId = userResults && userResults.length > 0 ? userResults[0].user_id : null;
+        const customerEmail = userResults && userResults.length > 0 ? userResults[0].email : null;
+        const customerFirstName = userResults && userResults.length > 0 ? userResults[0].first_name : null;
+        const customerLastName = userResults && userResults.length > 0 ? userResults[0].last_name : null;
+        
+        const logUserId = customerUserId || req.user?.id || null;
+        const actorName = req.user?.username || `${req.user?.first_name || ''} ${req.user?.last_name || ''}`.trim() || req.user?.role || 'admin';
+        const priceDifference = price - oldPrice;
+
+        if (logUserId) {
+          const ActionLog = require('../model/ActionLogModel');
+          const reasonText = reason ? `Reason: ${reason}` : 'No reason provided';
+          
+          ActionLog.create({
+            order_item_id: itemId,
+            user_id: logUserId,
+            action_type: 'price_change',
+            action_by: req.user?.role === 'clerk' ? 'clerk' : 'admin',
+            previous_status: null,
+            new_status: null,
+            reason: reason || null,
+            notes: `Price Change: ₱${oldPrice.toFixed(2)} → ₱${price.toFixed(2)} | Changed by: ${actorName} | ${reasonText} | Customer: ${customerName} | Order ID: ORD-${item.order_id}`
+          }, (logErr) => {
+            if (logErr) {
+              console.error('Error logging price change:', logErr);
+            }
+          });
+
+          const TransactionLog = require('../model/TransactionLogModel');
+          TransactionLog.create({
+            order_item_id: itemId,
+            user_id: logUserId,
+            transaction_type: 'price_change',
+            amount: priceDifference,
+            previous_payment_status: item.payment_status || 'pending',
+            new_payment_status: item.payment_status || 'pending',
+            payment_method: null,
+            notes: `Price Change: ₱${oldPrice.toFixed(2)} → ₱${price.toFixed(2)} | Changed by: ${actorName} | ${reasonText} | Customer: ${customerName} | Order ID: ORD-${item.order_id}`,
+            created_by: actorName
+          }, (transErr) => {
+            if (transErr) {
+              console.error('Error creating transaction log:', transErr);
+            }
+          });
+        }
+
+        if (customerUserId && customerEmail) {
+          const Notification = require('../model/NotificationModel');
+          Notification.createStatusUpdateNotification(
+            customerUserId,
+            itemId,
+            'price_change',
+            `Your order price has been updated from ₱${oldPrice.toFixed(2)} to ₱${price.toFixed(2)}. ${reason ? 'Reason: ' + reason : ''}`,
+            serviceType,
+            (notifErr) => {
+              if (notifErr) {
+                console.error('Error creating price change notification:', notifErr);
+              }
+            }
+          );
+
+          try {
+            const emailService = require('../services/emailService');
+            if (emailService && emailService.sendPriceChangeEmail) {
+              emailService.sendPriceChangeEmail({
+                userEmail: customerEmail,
+                userName: `${customerFirstName || ''} ${customerLastName || ''}`.trim() || customerName,
+                serviceName: serviceType.replace('_', ' '),
+                oldPrice: oldPrice,
+                newPrice: price,
+                reason: reason || 'Price adjustment',
+                orderId: itemId
+              }).catch(emailErr => {
+                console.error('Error sending price change email:', emailErr);
+              });
+            }
+          } catch (emailErr) {
+            console.error('Error sending price change email:', emailErr);
+          }
+        }
+
+        res.json({
+          success: true,
+          message: "Price updated successfully",
+          order: {
+            item_id: itemId,
+            old_price: oldPrice,
+            new_price: price,
+            price_difference: priceDifference
+          }
+        });
+      });
+    });
+  });
+};
+
+exports.getOrderItemPriceHistory = (req, res) => {
+  const itemId = req.params.id;
+
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Admin only."
+    });
+  }
+
+  const historySql = `
+    SELECT 
+      tl.log_id as id,
+      tl.transaction_type,
+      tl.amount,
+      tl.notes as details,
+      tl.created_at,
+      tl.user_id,
+      tl.created_by
+    FROM transaction_logs tl
+    WHERE tl.order_item_id = ? AND tl.transaction_type = 'price_change'
+    ORDER BY tl.created_at DESC
+  `;
+
+  db.query(historySql, [itemId], (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        success: false,
+        message: "Error fetching price history",
+        error: err
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Price history retrieved successfully",
+      history: results
+    });
+  });
+};
+

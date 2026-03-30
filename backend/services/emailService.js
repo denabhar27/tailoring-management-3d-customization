@@ -943,6 +943,145 @@ D'jackman Tailor Deluxe
   return sendEmail({ to: userEmail, subject, text, html });
 };
 
+const sendPriceChangeEmail = async ({ 
+  userEmail, 
+  userName, 
+  serviceName,
+  oldPrice,
+  newPrice,
+  reason,
+  orderId
+}) => {
+  const priceDifference = newPrice - oldPrice;
+  const isIncrease = priceDifference > 0;
+  
+  const subject = `💰 Price Update: Your order price has been ${isIncrease ? 'increased' : 'decreased'}`;
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+                  <h1 style="color: #ffffff; margin: 0; font-size: 28px;">D'jackman Tailor Deluxe</h1>
+                  <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">Price Update Notification</p>
+                </td>
+              </tr>
+              
+              <!-- Content -->
+              <tr>
+                <td style="padding: 40px 30px;">
+                  <h2 style="color: ${isIncrease ? '#fd7e14' : '#28a745'}; margin: 0 0 20px 0; font-size: 24px;">
+                    💰 Order Price ${isIncrease ? 'Increased' : 'Decreased'}
+                  </h2>
+                  
+                  <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                    Hello <strong>${userName}</strong>,
+                  </p>
+                  
+                  <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                    The price for your order has been updated. Please review the details below:
+                  </p>
+                  
+                  <!-- Order Details Box -->
+                  <div style="background-color: #f8f9fa; border-left: 4px solid ${isIncrease ? '#fd7e14' : '#28a745'}; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+                    <p style="margin: 0 0 10px 0; color: #333;">
+                      <strong>📋 Order ID:</strong> ORD-${orderId}
+                    </p>
+                    <p style="margin: 0 0 10px 0; color: #333;">
+                      <strong>🏷️ Service:</strong> ${serviceName}
+                    </p>
+                  </div>
+                  
+                  <!-- Price Comparison Box -->
+                  <div style="background-color: #e9ecef; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h3 style="margin: 0 0 15px 0; color: #333; font-size: 18px;">💳 Price Update</h3>
+                    <table width="100%" style="border-collapse: collapse;">
+                      <tr>
+                        <td style="padding: 8px 0; color: #555; border-bottom: 1px solid #dee2e6;">Previous Price</td>
+                        <td style="padding: 8px 0; color: #555; text-align: right; border-bottom: 1px solid #dee2e6; text-decoration: line-through;">₱${oldPrice.toFixed(2)}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #333; font-weight: bold; border-bottom: 1px solid #dee2e6;">New Price</td>
+                        <td style="padding: 8px 0; color: ${isIncrease ? '#fd7e14' : '#28a745'}; text-align: right; font-weight: bold; font-size: 20px; border-bottom: 1px solid #dee2e6;">₱${newPrice.toFixed(2)}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 12px 0; color: #333; font-weight: bold;">Difference</td>
+                        <td style="padding: 12px 0; color: ${isIncrease ? '#fd7e14' : '#28a745'}; text-align: right; font-weight: bold; font-size: 18px;">
+                          ${isIncrease ? '+' : ''}₱${Math.abs(priceDifference).toFixed(2)}
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+                  
+                  ${reason ? `
+                  <!-- Reason Box -->
+                  <div style="background-color: #e7f3ff; border: 1px solid #b3d7ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 0; color: #004085; font-size: 14px;">
+                      📝 <strong>Reason for price change:</strong> ${reason}
+                    </p>
+                  </div>
+                  ` : ''}
+                  
+                  <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 20px 0;">
+                    If you have any questions about this price change, please contact us or visit our store.
+                  </p>
+                </td>
+              </tr>
+              
+              <!-- Footer -->
+              <tr>
+                <td style="background-color: #f8f9fa; padding: 25px; border-radius: 0 0 10px 10px; text-align: center;">
+                  <p style="color: #888; font-size: 14px; margin: 0 0 10px 0;">
+                    D'jackman Tailor Deluxe
+                  </p>
+                  <p style="color: #aaa; font-size: 12px; margin: 0;">
+                    This is an automated notification. Please do not reply to this email.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  const text = `
+PRICE UPDATE NOTIFICATION - D'jackman Tailor Deluxe
+
+Hello ${userName},
+
+The price for your order has been updated.
+
+Order ID: ORD-${orderId}
+Service: ${serviceName}
+
+Previous Price: ₱${oldPrice.toFixed(2)}
+New Price: ₱${newPrice.toFixed(2)}
+Difference: ${isIncrease ? '+' : ''}₱${Math.abs(priceDifference).toFixed(2)}
+
+${reason ? `Reason for price change: ${reason}` : ''}
+
+If you have any questions about this price change, please contact us or visit our store.
+
+Thank you,
+D'jackman Tailor Deluxe
+  `;
+
+  return sendEmail({ to: userEmail, subject, text, html });
+};
+
 module.exports = {
   initializeSendGrid,
   isEmailServiceConfigured,
@@ -952,5 +1091,6 @@ module.exports = {
   sendPenaltyChargeEmail,
   sendRentalStatusEmail,
   sendServiceStatusEmail,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendPriceChangeEmail
 };

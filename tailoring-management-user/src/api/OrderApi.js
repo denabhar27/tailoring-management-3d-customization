@@ -50,3 +50,30 @@ export async function deleteOrderItem(itemId) {
     };
   }
 }
+
+export async function updateOrderItemPrice(itemId, newPrice, reason) {
+  try {
+    const response = await axios.put(
+      `${BASE_URL}/orders/items/${itemId}/price`,
+      { newPrice, reason },
+      { headers: getAuthHeaders() }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error updating order item price:', error);
+    throw error;
+  }
+}
+
+export async function getOrderItemPriceHistory(itemId) {
+  try {
+    const response = await axios.get(
+      `${BASE_URL}/orders/items/${itemId}/price-history`,
+      { headers: getAuthHeaders() }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching price history:', error);
+    throw error;
+  }
+}

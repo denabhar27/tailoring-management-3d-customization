@@ -43,4 +43,7 @@ router.get('/items/:itemId', orderController.getOrderItemDetails);
 
 router.delete('/items/:itemId', orderController.deleteOrderItem);
 
+router.put('/items/:id/price', orderController.updateOrderItemPrice);
+router.get('/items/:id/price-history', orderController.getOrderItemPriceHistory);
+
 module.exports = router;

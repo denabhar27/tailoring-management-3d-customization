@@ -119,6 +119,17 @@ export const updateCustomizationOrderItem = async (
   });
 };
 
+export const editOrderPrice = async (
+  itemId: number,
+  finalPrice: number,
+  adminNotes: string
+) => {
+  return apiCall(`/customization/${itemId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ finalPrice, adminNotes }),
+  });
+};
+
 export const getCustomizationStats = async () => {
   return apiCall('/customization/stats', {
     method: 'GET',

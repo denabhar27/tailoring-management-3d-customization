@@ -16,8 +16,10 @@ import {
   deleteRepairDamageLevel
 } from '../api/RepairGarmentTypeApi';
 import { recordPayment } from '../api/PaymentApi';
-import { deleteOrderItem } from '../api/OrderApi';
+import { deleteOrderItem, updateOrderItemPrice } from '../api/OrderApi';
 import { API_BASE_URL } from '../api/config';
+import PriceEditModal from '../components/admin/PriceEditModal';
+import PriceHistoryModal from '../components/admin/PriceHistoryModal';
 
 const Repair = () => {
   const { alert, confirm } = useAlert();
@@ -70,6 +72,10 @@ const Repair = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [cashReceived, setCashReceived] = useState('');
+
+  const [showPriceEditModal, setShowPriceEditModal] = useState(false);
+  const [showPriceHistoryModal, setShowPriceHistoryModal] = useState(false);
+  const [priceEditOrder, setPriceEditOrder] = useState(null);
 
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
@@ -804,6 +810,21 @@ const Repair = () => {
     }
   };
 
+  const handlePriceUpdate = async (itemId, newPrice, reason) => {
+    try {
+      const result = await updateOrderItemPrice(itemId, newPrice, reason);
+      if (result.success) {
+        await alert('Price updated successfully!', 'Success', 'success');
+        loadRepairOrders();
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      await alert(error.response?.data?.message || 'Failed to update price', 'Error', 'error');
+      throw error;
+    }
+  };
+
   return (
     <div className="dry-cleaning-management">
       <Sidebar />
@@ -1007,22 +1028,43 @@ const Repair = () => {
                               </button>
                             )}
                             {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && (
-                              <button
-                                className="icon-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedOrder(item);
-                                  const finalPrice = parseFloat(item.final_price || 0);
-                                  const halfPrice = (finalPrice * 0.5).toFixed(2);
-                                  setPaymentAmount(halfPrice);
-                                  setCashReceived('');
-                                  setShowPaymentModal(true);
-                                }}
-                                title="Record Payment"
-                                style={{ backgroundColor: '#2196F3', color: 'white' }}
-                              >
-                                💰
-                              </button>
+                              <>
+                                <button
+                                  className="icon-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedOrder(item);
+                                    const finalPrice = parseFloat(item.final_price || 0);
+                                    const halfPrice = (finalPrice * 0.5).toFixed(2);
+                                    setPaymentAmount(halfPrice);
+                                    setCashReceived('');
+                                    setShowPaymentModal(true);
+                                  }}
+                                  title="Record Payment"
+                                  style={{ backgroundColor: '#2196F3', color: 'white' }}
+                                >
+                                  💰
+                                </button>
+                                <button
+                                  className="icon-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPriceEditOrder(item);
+                                    setShowPriceEditModal(true);
+                                  }}
+                                  title="Edit Price"
+                                  style={{ backgroundColor: '#ff9800', color: 'white' }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="6" x2="12" y2="18"></line>
+                                    <line x1="9" y1="9" x2="9" y2="13"></line>
+                                    <line x1="15" y1="11" x2="15" y2="15"></line>
+                                    <path d="M9 13h6"></path>
+                                    <path d="M9 9h4a2 2 0 0 1 0 4H9"></path>
+                                  </svg>
+                                </button>
+                              </>
                             )}
                             {(item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
                               <button
@@ -1685,6 +1727,25 @@ const Repair = () => {
           )}
           <span>{toast.message}</span>
         </div>
+      )}
+      {showPriceEditModal && priceEditOrder && (
+        <PriceEditModal
+          order={priceEditOrder}
+          onClose={() => {
+            setShowPriceEditModal(false);
+            setPriceEditOrder(null);
+          }}
+          onSave={handlePriceUpdate}
+        />
+      )}
+      {showPriceHistoryModal && priceEditOrder && (
+        <PriceHistoryModal
+          itemId={priceEditOrder.item_id}
+          onClose={() => {
+            setShowPriceHistoryModal(false);
+            setPriceEditOrder(null);
+          }}
+        />
       )}
     </div>
   );

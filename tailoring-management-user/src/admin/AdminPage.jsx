@@ -569,6 +569,18 @@ function AdminPage() {
                                          activity.paymentInfo?.payment_status || 'Payment'}
                           </span>
                         </div>
+                      ) : activity.actionType === 'price_change' ? (
+                        <span style={{
+                          backgroundColor: '#e3f2fd',
+                          color: '#1976d2',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          display: 'inline-block'
+                        }}>
+                          PRICE CHANGE
+                        </span>
                       ) : (
                         <span className={`status ${activity.status}`}>
                           {activity.statusText}
@@ -626,6 +638,47 @@ function AdminPage() {
                               Method: {activity.paymentInfo.payment_method === 'system_auto' ? 'cash' : activity.paymentInfo.payment_method}
                             </div>
                           )}
+                        </div>
+                      ) : activity.actionType === 'price_change' ? (
+                        <div>
+                          {(() => {
+                            const notes = activity.notes || '';
+                            const priceMatch = notes.match(/Price Change:\s*₱([\d,]+\.?\d*)\s*→\s*₱([\d,]+\.?\d*)/);
+                            const reasonMatch = notes.match(/Reason:\s*([^|]+)/);
+                            const changedByMatch = notes.match(/Changed by:\s*([^|]+)/);
+                            const customerMatch = notes.match(/Customer:\s*([^|]+)/);
+                            const orderIdMatch = notes.match(/Order ID:\s*(ORD-\d+)/);
+                            
+                            return (
+                              <>
+                                {priceMatch && (
+                                  <div style={{ marginBottom: '4px' }}>
+                                    Price: ₱{priceMatch[1]} → ₱{priceMatch[2]}
+                                  </div>
+                                )}
+                                {reasonMatch && (
+                                  <div style={{ marginBottom: '4px' }}>
+                                    Reason: {reasonMatch[1].trim()}
+                                  </div>
+                                )}
+                                {changedByMatch && (
+                                  <div style={{ marginBottom: '4px' }}>
+                                    Changed by: {changedByMatch[1].trim()}
+                                  </div>
+                                )}
+                                {customerMatch && (
+                                  <div style={{ marginBottom: '4px' }}>
+                                    Customer: {customerMatch[1].trim()}
+                                  </div>
+                                )}
+                                {orderIdMatch && (
+                                  <div style={{ marginBottom: '4px' }}>
+                                    Order ID: {orderIdMatch[1]}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                       ) : (
                         <div>

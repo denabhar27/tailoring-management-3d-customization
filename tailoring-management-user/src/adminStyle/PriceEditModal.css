@@ -1,0 +1,116 @@
+.price-edit-modal {
+  max-width: 500px;
+  width: 90%;
+}
+
+.price-edit-modal .order-info {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border-left: 4px solid #667eea;
+}
+
+.price-edit-modal .order-info p {
+  margin: 8px 0;
+  color: #333;
+  font-size: 14px;
+}
+
+.price-edit-modal .form-group {
+  margin-bottom: 20px;
+}
+
+.price-edit-modal .form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.price-edit-modal .form-group input,
+.price-edit-modal .form-group textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.3s;
+}
+
+.price-edit-modal .form-group input:focus,
+.price-edit-modal .form-group textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.price-edit-modal .form-group small {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.price-edit-modal .form-group small.price-increase {
+  color: #fd7e14;
+}
+
+.price-edit-modal .form-group small.price-decrease {
+  color: #28a745;
+}
+
+.price-edit-modal .error-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  border: 1px solid #f5c6cb;
+  font-size: 14px;
+}
+
+.price-edit-modal .modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 25px;
+}
+
+.price-edit-modal .btn-primary,
+.price-edit-modal .btn-secondary {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.price-edit-modal .btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.price-edit-modal .btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.price-edit-modal .btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.price-edit-modal .btn-secondary:hover:not(:disabled) {
+  background-color: #5a6268;
+}
+
+.price-edit-modal .btn-primary:disabled,
+.price-edit-modal .btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

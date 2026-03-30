@@ -28,7 +28,9 @@ import { useAlert } from '../context/AlertContext';
 
 import { recordPayment } from '../api/PaymentApi';
 
-import { deleteOrderItem } from '../api/OrderApi';
+import { deleteOrderItem, updateOrderItemPrice } from '../api/OrderApi';
+
+import CustomizationPriceEditModal from '../components/admin/CustomizationPriceEditModal';
 
 const isAuthenticated = () => {
 
@@ -97,6 +99,10 @@ const Customize = () => {
   const [cashReceived, setCashReceived] = useState('');
 
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const [showPriceEditModal, setShowPriceEditModal] = useState(false);
+
+  const [priceEditOrder, setPriceEditOrder] = useState(null);
 
   const [showPriceConfirmationModal, setShowPriceConfirmationModal] = useState(false);
 
@@ -2573,6 +2579,34 @@ const Customize = () => {
 
   };
 
+  const handlePriceUpdate = async (itemId, newPrice, reason) => {
+
+    try {
+
+      const result = await updateOrderItemPrice(itemId, newPrice, reason);
+
+      if (result.success) {
+
+        await alert('Price updated successfully!', 'Success', 'success');
+
+        loadCustomizationOrders();
+
+      } else {
+
+        throw new Error(result.message);
+
+      }
+
+    } catch (error) {
+
+      await alert(error.response?.data?.message || 'Failed to update price', 'Error', 'error');
+
+      throw error;
+
+    }
+
+  };
+
   return (
 
     <div className="customization-management">
@@ -3248,6 +3282,48 @@ const Customize = () => {
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
 
                                   <polyline points="9 18 15 12 9 6"></polyline>
+
+                                </svg>
+
+                              </button>
+
+                            )}
+
+                            {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
+
+                              <button
+
+                                className="icon-btn"
+
+                                onClick={(e) => {
+
+                                  e.stopPropagation();
+
+                                  setPriceEditOrder(item);
+
+                                  setShowPriceEditModal(true);
+
+                                }}
+
+                                title="Edit Price"
+
+                                style={{ backgroundColor: '#ff9800', color: 'white' }}
+
+                              >
+
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+
+                                  <circle cx="12" cy="12" r="10"></circle>
+
+                                  <line x1="12" y1="6" x2="12" y2="18"></line>
+
+                                  <line x1="9" y1="9" x2="9" y2="13"></line>
+
+                                  <line x1="15" y1="11" x2="15" y2="15"></line>
+
+                                  <path d="M9 13h6"></path>
+
+                                  <path d="M9 9h4a2 2 0 0 1 0 4H9"></path>
 
                                 </svg>
 
@@ -6529,6 +6605,26 @@ const Customize = () => {
           </div>
 
         </div>
+
+      )}
+
+      {showPriceEditModal && priceEditOrder && (
+
+        <CustomizationPriceEditModal
+
+          order={priceEditOrder}
+
+          onClose={() => {
+
+            setShowPriceEditModal(false);
+
+            setPriceEditOrder(null);
+
+          }}
+
+          onSave={handlePriceUpdate}
+
+        />
 
       )}
 

@@ -51,7 +51,8 @@ const TransactionLogModal = ({ isOpen, onClose, orderItemId }) => {
       'final_payment': 'Final Payment',
       'partial_payment': 'Partial Payment',
       'refund': 'Refund',
-      'adjustment': 'Adjustment'
+      'adjustment': 'Adjustment',
+      'price_change': 'Price Change'
     };
     return typeMap[type] || type;
   };
@@ -104,6 +105,18 @@ const TransactionLogModal = ({ isOpen, onClose, orderItemId }) => {
                       <span className="detail-label">Date:</span>
                       <span className="detail-value">{formatDate(log.created_at)}</span>
                     </div>
+                    {log.notes && (
+                      <div className="transaction-detail-row">
+                        <span className="detail-label">Details:</span>
+                        <span className="detail-value">{log.notes}</span>
+                      </div>
+                    )}
+                    {log.created_by && (
+                      <div className="transaction-detail-row">
+                        <span className="detail-label">Handled By:</span>
+                        <span className="detail-value">{log.created_by}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

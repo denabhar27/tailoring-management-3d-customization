@@ -56,6 +56,34 @@ function Rental() {
     return [];
   };
 
+  const isToday = (dateStr) => {
+    if (!dateStr) return false;
+    try {
+      const today = new Date();
+      const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const raw = String(dateStr).trim();
+      const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (match?.[1]) return match[1] === todayKey;
+
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) return false;
+      const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      return dateKey === todayKey;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const getComputedStatus = (rental) => {
+    if (rental?.rental_start_date && isToday(rental.rental_start_date)) {
+      return 'appointment-today';
+    }
+    if (rental?.rental_end_date && isToday(rental.rental_end_date)) {
+      return 'due-today';
+    }
+    return null;
+  };
+
   const parseSizeEntriesFromSelections = (selectedSizes) => {
     if (!Array.isArray(selectedSizes) || selectedSizes.length === 0) return [];
     const byKey = new Map();
@@ -263,6 +291,7 @@ function Rental() {
       (rental.walk_in_customer_email && rental.walk_in_customer_email.toLowerCase().includes(searchTerm.toLowerCase())) ||
       rental.specific_data?.item_name?.toLowerCase().includes(searchTerm.toLowerCase());
 
+    const computedStatus = getComputedStatus(rental);
     let normalizedStatus = rental.approval_status;
     if (rental.approval_status === 'pending_review') {
       normalizedStatus = 'pending';
@@ -274,7 +303,7 @@ function Rental() {
       normalizedStatus = 'cancelled';
     }
 
-    const matchesStatus = !statusFilter || normalizedStatus === statusFilter;
+    const matchesStatus = !statusFilter || computedStatus === statusFilter || normalizedStatus === statusFilter;
 
     return matchesSearch && matchesStatus;
   }).sort((a, b) => {
@@ -917,6 +946,8 @@ function Rental() {
             <option value="returned">Returned</option>
             <option value="completed">Completed</option>
             <option value="cancelled">Rejected</option>
+            <option value="appointment-today">Appointment Today</option>
+            <option value="due-today">Due Today</option>
           </select>
         </div>
 

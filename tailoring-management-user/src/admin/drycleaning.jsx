@@ -294,6 +294,66 @@ const DryCleaning = () => {
     return nextStatus;
   };
 
+  const isToday = (dateStr) => {
+    if (!dateStr) return false;
+    try {
+      const today = new Date();
+      const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const raw = String(dateStr).trim();
+      const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (match?.[1]) return match[1] === todayKey;
+
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) return false;
+      const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      return dateKey === todayKey;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const parseMaybeObject = (value) => {
+    if (!value) return {};
+    if (typeof value === 'object') return value;
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch (e) {
+        return {};
+      }
+    }
+    return {};
+  };
+
+  const getComputedStatus = (item) => {
+    const specificData = parseMaybeObject(item?.specific_data);
+    const pricingFactors = parseMaybeObject(item?.pricing_factors);
+
+    const appointmentDate =
+      item?.appointment_date ||
+      item?.appointmentDate ||
+      specificData?.appointment_date ||
+      specificData?.appointmentDate ||
+      specificData?.pickupDate ||
+      specificData?.preferredDate ||
+      specificData?.date ||
+      ((item?.approval_status === 'accepted' || item?.approval_status === 'confirmed') ? item?.order_date : null);
+
+    const estimatedDate =
+      pricingFactors?.estimatedCompletionDate ||
+      pricingFactors?.estimated_completion_date ||
+      specificData?.estimatedCompletionDate ||
+      specificData?.estimated_completion_date;
+
+    if (appointmentDate && isToday(appointmentDate)) {
+      return 'appointment-today';
+    }
+    if (estimatedDate && isToday(estimatedDate)) {
+      return 'estimated-today';
+    }
+    return null;
+  };
+
   const getNextStatusLabel = (currentStatus, serviceType = 'dry_cleaning', item = null) => {
     const nextStatus = getNextStatus(currentStatus, serviceType, item);
     if (!nextStatus) return null;
@@ -393,7 +453,7 @@ const DryCleaning = () => {
 
     if (statusFilter && viewFilter === 'all') {
       items = items.filter(item => {
-
+        const computedStatus = getComputedStatus(item);
         let normalizedStatus = item.approval_status;
         if (item.approval_status === 'pending_review' ||
             item.approval_status === 'price_confirmation' ||
@@ -402,7 +462,7 @@ const DryCleaning = () => {
             item.approval_status === '') {
           normalizedStatus = 'pending';
         }
-        return normalizedStatus === statusFilter;
+        return computedStatus === statusFilter || normalizedStatus === statusFilter;
       });
     }
 
@@ -941,6 +1001,8 @@ const DryCleaning = () => {
             <option value="ready_for_pickup">To Pick up</option>
             <option value="completed">Completed</option>
             <option value="cancelled">Rejected</option>
+            <option value="appointment-today">Appointment Today</option>
+            <option value="estimated-today">Estimated Release Today</option>
           </select>
         </div>
         <div className="table-container">
@@ -1296,7 +1358,7 @@ const DryCleaning = () => {
                 )}
               </div>
 
-              {editForm.approvalStatus === 'accepted' && (
+              {(editForm.approvalStatus === 'accepted' || editForm.approvalStatus === 'confirmed') && (
                 <div className="form-group">
                   <label>Estimated Completion Date</label>
                   <input
@@ -1487,7 +1549,7 @@ const DryCleaning = () => {
                 return pricingFactors.estimatedTime || pricingFactors.estimated_time || specificData.estimatedTime || specificData.estimated_time || 'N/A';
               })()}</div>
 
-              {selectedOrder.approval_status === 'accepted' && (
+              {(selectedOrder.approval_status === 'accepted' || selectedOrder.approval_status === 'confirmed') && (
                 <div className="detail-row" style={{ alignItems: 'center', gap: '10px' }}>
                   <strong>Estimated Completion Date:</strong>
                   <input

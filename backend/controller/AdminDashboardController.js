@@ -255,6 +255,11 @@ exports.getDashboardOverview = async (req, res) => {
            oi.approval_status,
            o.status AS order_status,
            o.order_date,
+           oi.appointment_date,
+            oi.rental_start_date,
+           oi.rental_end_date,
+            oi.pricing_factors,
+            oi.specific_data,
            COALESCE(wc.name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) AS customer_name,
            u.first_name,
            u.last_name,
@@ -277,6 +282,7 @@ exports.getDashboardOverview = async (req, res) => {
     ]).then(([logs, paymentActivities, orderItems]) => {
       
       const activityMap = new Map();
+      const orderItemById = new Map();
 
       logs.forEach(log => {
         const key = `${log.order_item_id || 'null'}_${log.created_at}`;
@@ -284,7 +290,8 @@ exports.getDashboardOverview = async (req, res) => {
         const customerFirstName = walkInName || log.customer_first_name || log.first_name || log.actor_first_name;
         const customerLastName = walkInName ? '' : (log.customer_last_name || log.last_name || log.actor_last_name);
         activityMap.set(key, {
-          item_id: log.item_id || null,
+          item_id: log.item_id || log.order_item_id || null,
+          order_item_id: log.order_item_id || log.item_id || null,
           service_type: log.service_type || (log.action_type === 'add_measurements' ? 'Measurements' : 'N/A'),
           approval_status: log.new_status || log.previous_status || log.action_type,
           order_status: log.new_status || log.previous_status || log.action_type,
@@ -310,6 +317,7 @@ exports.getDashboardOverview = async (req, res) => {
       orderItems.forEach(item => {
         const timestamp = item.order_date;
         const key = `${item.item_id}_${timestamp}`;
+        orderItemById.set(String(item.item_id), item);
         const walkInName = (item.walk_in_customer_name || '').trim();
         const derivedCustomer = (item.customer_name || '').trim();
         const fallbackParts = String(derivedCustomer || '').split(/\s+/).filter(Boolean);
@@ -318,10 +326,16 @@ exports.getDashboardOverview = async (req, res) => {
         if (!activityMap.has(key)) {
           activityMap.set(key, {
             item_id: item.item_id,
+            order_item_id: item.item_id,
             service_type: item.service_type,
             approval_status: item.approval_status,
             order_status: item.order_status,
             order_date: timestamp,
+            appointment_date: item.appointment_date,
+            rental_start_date: item.rental_start_date,
+            rental_end_date: item.rental_end_date,
+            pricing_factors: item.pricing_factors,
+            specific_data: item.specific_data,
             first_name: walkInName || fallbackFirstName,
             last_name: walkInName ? '' : fallbackLastName,
             reason: item.reason,
@@ -330,6 +344,17 @@ exports.getDashboardOverview = async (req, res) => {
             notes: item.notes
           });
         }
+      });
+
+      activityMap.forEach((entry) => {
+        const refKey = entry.item_id || entry.order_item_id;
+        const ref = refKey ? orderItemById.get(String(refKey)) : null;
+        if (!ref) return;
+        entry.appointment_date = entry.appointment_date || ref.appointment_date || null;
+        entry.rental_start_date = entry.rental_start_date || ref.rental_start_date || null;
+        entry.rental_end_date = entry.rental_end_date || ref.rental_end_date || null;
+        entry.pricing_factors = entry.pricing_factors || ref.pricing_factors || null;
+        entry.specific_data = entry.specific_data || ref.specific_data || null;
       });
 
       const activities = Array.from(activityMap.values())
@@ -456,7 +481,12 @@ exports.getDashboardOverview = async (req, res) => {
         actionBy: row.action_by || null,
         notes: row.notes || null,
         isPayment: row.action_type === 'payment' || row.is_payment || false,
-        paymentInfo: paymentInfo
+        paymentInfo: paymentInfo,
+        appointmentDate: row.appointment_date || null,
+        rentalStartDate: row.rental_start_date || null,
+        rentalEndDate: row.rental_end_date || null,
+        pricingFactors: row.pricing_factors || null,
+        specificData: row.specific_data || null
       };
     });
 

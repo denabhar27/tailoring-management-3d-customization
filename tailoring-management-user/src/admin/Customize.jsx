@@ -494,6 +494,58 @@ const Customize = () => {
 
   };
 
+  const isToday = (dateStr) => {
+    if (!dateStr) return false;
+    try {
+      const today = new Date();
+      const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const raw = String(dateStr).trim();
+      const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (match?.[1]) return match[1] === todayKey;
+
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) return false;
+      const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      return dateKey === todayKey;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const parseMaybeObject = (value) => {
+    if (!value) return {};
+    if (typeof value === 'object') return value;
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch (e) {
+        return {};
+      }
+    }
+    return {};
+  };
+
+  const getComputedStatus = (item) => {
+    const specificData = parseMaybeObject(item?.specific_data);
+    const pricingFactors = parseMaybeObject(item?.pricing_factors);
+    const appointmentDate =
+      item?.appointment_date ||
+      item?.appointmentDate ||
+      specificData?.appointment_date ||
+      specificData?.appointmentDate ||
+      specificData?.preferredDate ||
+      specificData?.date;
+    const estimatedDate = pricingFactors?.estimatedCompletionDate || pricingFactors?.estimated_completion_date;
+
+    if (appointmentDate && isToday(appointmentDate)) {
+      return 'appointment-today';
+    }
+    if (estimatedDate && isToday(estimatedDate)) {
+      return 'estimated-today';
+    }
+    return null;
+  };
+
   const getNextStatusLabel = (currentStatus, serviceType = 'customization', item = null) => {
 
     const nextStatus = getNextStatus(currentStatus, serviceType, item);
@@ -1919,6 +1971,7 @@ const Customize = () => {
 
       items = items.filter(item => {
 
+        const computedStatus = getComputedStatus(item);
         let normalizedStatus = item.approval_status;
 
         if (item.approval_status === 'pending_review' ||
@@ -1933,7 +1986,7 @@ const Customize = () => {
 
         }
 
-        return normalizedStatus === statusFilter;
+        return computedStatus === statusFilter || normalizedStatus === statusFilter;
 
       });
 
@@ -3168,6 +3221,10 @@ const Customize = () => {
 
             <option value="completed">Completed</option>
 
+            <option value="appointment-today">Appointment Today</option>
+
+            <option value="estimated-today">Estimated Release Today</option>
+
             <option value="cancelled">Rejected</option>
 
           </select>
@@ -3804,7 +3861,7 @@ const Customize = () => {
 
               </div>
 
-              {editForm.approvalStatus === 'accepted' && (
+              {(editForm.approvalStatus === 'accepted' || editForm.approvalStatus === 'confirmed') && (
                 <div className="form-group">
                   <label>Estimated Completion Date</label>
                   <input
@@ -4068,7 +4125,7 @@ const Customize = () => {
                 return storedEstimatedTime || 'N/A';
               })()}</div>
 
-              {selectedOrder.approval_status === 'accepted' && (
+              {(selectedOrder.approval_status === 'accepted' || selectedOrder.approval_status === 'confirmed') && (
                 <div className="detail-row" style={{ alignItems: 'center', gap: '10px' }}>
                   <strong>Estimated Completion Date:</strong>
                   <input

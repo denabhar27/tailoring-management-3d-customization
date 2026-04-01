@@ -34,6 +34,78 @@ function AdminPage() {
 
   const normalizeFilterValue = (value) => String(value || '').toLowerCase().replace(/[_\s-]/g, '');
 
+  const isToday = (dateStr) => {
+    if (!dateStr) return false;
+    try {
+      const today = new Date();
+      const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const raw = String(dateStr).trim();
+      const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (match?.[1]) return match[1] === todayKey;
+
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) return false;
+      const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      return dateKey === todayKey;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const parseMaybeJson = (value) => {
+    if (!value) return {};
+    if (typeof value === 'object') return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return {};
+    }
+  };
+
+  const getEstimatedDateFromActivity = (activity) => {
+    const pricingFactors = parseMaybeJson(activity?.pricingFactors);
+    const specificData = parseMaybeJson(activity?.specificData);
+    return (
+      pricingFactors?.estimatedCompletionDate ||
+      pricingFactors?.estimated_completion_date ||
+      specificData?.estimatedCompletionDate ||
+      specificData?.estimated_completion_date ||
+      null
+    );
+  };
+
+  const getComputedStatus = (activity) => {
+    const service = (activity?.service || '').toLowerCase();
+    const isRental = service.includes('rental');
+    const isAppointment = service.includes('dry') || service.includes('repair') || service.includes('custom');
+    const specificData = parseMaybeJson(activity?.specificData);
+
+    const appointmentDate =
+      activity?.appointmentDate ||
+      specificData?.appointment_date ||
+      specificData?.appointmentDate ||
+      specificData?.pickupDate ||
+      specificData?.preferredDate ||
+      specificData?.date;
+
+    if (isRental && activity?.rentalStartDate && isToday(activity.rentalStartDate)) {
+      return 'appointment-today';
+    }
+    if (isRental && activity?.rentalEndDate && isToday(activity.rentalEndDate)) {
+      return 'due-today';
+    }
+    if (isAppointment && appointmentDate && isToday(appointmentDate)) {
+      return 'appointment-today';
+    }
+    if (isAppointment) {
+      const estimatedDate = getEstimatedDateFromActivity(activity);
+      if (estimatedDate && isToday(estimatedDate)) {
+        return 'estimated-today';
+      }
+    }
+    return null;
+  };
+
   const isAcceptedOrderActivity = (activity) => {
     const status = normalizeFilterValue(activity?.status);
     const statusText = normalizeFilterValue(activity?.statusText);
@@ -350,10 +422,12 @@ function AdminPage() {
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter(activity => {
+          const computedStatus = getComputedStatus(activity);
+          const computedStatusNormalized = normalizeFilterValue(computedStatus);
           const status = normalizeFilterValue(activity.status);
           const statusText = normalizeFilterValue(activity.statusText);
           const filter = normalizeFilterValue(statusFilter);
-          return status === filter || statusText.includes(filter);
+          return computedStatusNormalized === filter || status === filter || statusText.includes(filter);
       });
     }
 
@@ -513,6 +587,9 @@ function AdminPage() {
               <option value="pending">Pending</option>
               <option value="in-progress">In Progress</option>
               <option value="completed">Completed</option>
+              <option value="due-today">Due Today</option>
+              <option value="appointment-today">Appointment Today</option>
+              <option value="estimated-today">Estimated Release Today</option>
             </select>
           </div>
 
@@ -636,7 +713,13 @@ function AdminPage() {
                         </span>
                       ) : (
                         <span className={`status ${activity.status}`}>
-                          {activity.statusText}
+                          {(() => {
+                            const computedStatus = getComputedStatus(activity);
+                            if (computedStatus === 'due-today') return 'Due Today';
+                            if (computedStatus === 'appointment-today') return 'Appointment Today';
+                            if (computedStatus === 'estimated-today') return 'Estimated Release Today';
+                            return activity.statusText;
+                          })()}
                         </span>
                       )}
                     </td>

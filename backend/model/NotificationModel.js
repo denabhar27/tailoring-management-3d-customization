@@ -209,6 +209,51 @@ const Notification = {
     Notification.create(userId, orderItemId, 'price_confirmation', title, message, callback);
   },
 
+  createEstimatedCompletionDateNotification: (userId, orderItemId, estimatedCompletionDate, serviceType, callback) => {
+    const serviceTypeLabels = {
+      'repair': 'Repair',
+      'dry_cleaning': 'Dry Cleaning',
+      'rental': 'Rental',
+      'customize': 'Customization',
+      'customization': 'Customization'
+    };
+
+    const normalizedServiceType = String(serviceType || '').toLowerCase();
+    const serviceLabel = serviceTypeLabels[normalizedServiceType] || 'Service';
+    const formattedDate = estimatedCompletionDate
+      ? new Date(estimatedCompletionDate).toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric'
+        })
+      : 'soon';
+
+    const title = `Estimated Completion Date Updated`;
+    const message = `Your ${serviceLabel.toLowerCase()} order now has an estimated completion date of ${formattedDate}.`;
+    Notification.create(userId, orderItemId, 'date_reminder', title, message, callback);
+  },
+
+  createEnhancementNotification: (userId, orderItemId, serviceType, enhancementNotes, additionalCost, callback) => {
+    const serviceTypeLabels = {
+      'repair': 'Repair',
+      'dry_cleaning': 'Dry Cleaning',
+      'rental': 'Rental',
+      'customize': 'Customization',
+      'customization': 'Customization'
+    };
+
+    const normalizedServiceType = String(serviceType || '').toLowerCase();
+    const serviceLabel = serviceTypeLabels[normalizedServiceType] || 'Service';
+    const parsedAdditionalCost = parseFloat(additionalCost || 0);
+    const hasAdditionalCost = Number.isFinite(parsedAdditionalCost) && parsedAdditionalCost > 0;
+    const title = `Enhancement In Progress`;
+    const message = hasAdditionalCost
+      ? `Your ${serviceLabel.toLowerCase()} request has been enhanced and is now in progress. Additional cost: ₱${parsedAdditionalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.${enhancementNotes ? ` Notes: ${enhancementNotes}` : ''}`
+      : `Your ${serviceLabel.toLowerCase()} request has been enhanced and is now in progress.${enhancementNotes ? ` Notes: ${enhancementNotes}` : ''}`;
+
+    Notification.create(userId, orderItemId, 'status_update', title, message, callback);
+  },
+
   createAppointmentReminderNotification: (userId, orderItemId, appointmentDate, callback) => {
     const title = 'Appointment Reminder';
     const message = `Reminder: Your appointment is tomorrow (${appointmentDate}). Please don't forget!`;

@@ -5,7 +5,7 @@ import '../styles/Profile.css';
 import logo from "../assets/logo.png";
 import dp from "../assets/dp.png";
 import { getUser, updateProfile, uploadProfilePicture } from '../api/AuthApi';
-import { getUserOrderTracking, getStatusBadgeClass, getStatusLabel, cancelOrderItem } from '../api/OrderTrackingApi';
+import { getUserOrderTracking, getStatusBadgeClass, getStatusLabel, cancelOrderItem, requestEnhancement } from '../api/OrderTrackingApi';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import TransactionLogModal from './components/TransactionLogModal';
 import { useAlert } from '../context/AlertContext';
@@ -36,6 +36,11 @@ const Profile = () => {
   const [itemToCancel, setItemToCancel] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [enhanceModalOpen, setEnhanceModalOpen] = useState(false);
+  const [itemToEnhance, setItemToEnhance] = useState(null);
+  const [enhanceNotes, setEnhanceNotes] = useState('');
+  const [enhancePreferredDate, setEnhancePreferredDate] = useState('');
+  const [submittingEnhancement, setSubmittingEnhancement] = useState(false);
 
   const [transactionLogModalOpen, setTransactionLogModalOpen] = useState(false);
   const [selectedOrderItemId, setSelectedOrderItemId] = useState(null);
@@ -162,6 +167,34 @@ const Profile = () => {
     } catch (e) {
       return 'N/A';
     }
+  };
+
+  const renderEnhancementInfo = (specificData) => {
+    const hasEnhancement = Boolean(
+      specificData?.enhancementRequest ||
+      specificData?.enhancementNotes ||
+      specificData?.enhancementUpdatedAt
+    );
+
+    if (!hasEnhancement) return null;
+
+    const additionalCost = parseFloat(specificData?.enhancementAdditionalCost || 0);
+    const hasCost = Number.isFinite(additionalCost) && additionalCost > 0;
+
+    return (
+      <div style={{ marginTop: '10px', padding: '10px', border: '1px solid #e0d4ff', backgroundColor: '#faf7ff', borderRadius: '8px' }}>
+        <div className="detail-row">
+          <span className="detail-label">Enhancement:</span>
+          <span className="detail-value">{specificData?.enhancementNotes || 'Additional enhancement requested in-shop.'}</span>
+        </div>
+        {hasCost && (
+          <div className="detail-row">
+            <span className="detail-label">Additional Cost:</span>
+            <span className="detail-value">{formatCurrencyPHP(additionalCost)}</span>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const formatSize = (size) => {
@@ -480,6 +513,48 @@ const Profile = () => {
   const closeDetailsModal = () => {
     setSelectedItem(null);
     setDetailsModalOpen(false);
+  };
+
+  const openEnhancementModal = (item) => {
+    const serviceType = String(item?.service_type || '').toLowerCase();
+    const isEnhanceableService = ['repair', 'customization', 'customize', 'dry_cleaning', 'drycleaning', 'dry-cleaning'].includes(serviceType);
+    if (!isEnhanceableService || item?.status !== 'completed') {
+      alert('Enhancement request is only available for completed customization, repair, or dry cleaning orders.', 'Not Available', 'warning');
+      return;
+    }
+    setItemToEnhance(item);
+    setEnhanceNotes('');
+    setEnhancePreferredDate('');
+    setEnhanceModalOpen(true);
+  };
+
+  const handleSubmitEnhancement = async () => {
+    if (!itemToEnhance) return;
+    const notes = String(enhanceNotes || '').trim();
+    if (!notes) {
+      await alert('Please describe the issue or enhancement you want.', 'Notes Required', 'warning');
+      return;
+    }
+
+    try {
+      setSubmittingEnhancement(true);
+      const result = await requestEnhancement(itemToEnhance.order_item_id, notes, enhancePreferredDate || null);
+      if (result.success) {
+        await alert('Enhancement request submitted. Your order is now in progress.', 'Success', 'success');
+        const ordersResult = await getUserOrderTracking();
+        if (ordersResult.success) {
+          setOrders(ordersResult.data || []);
+        }
+        setEnhanceModalOpen(false);
+        setItemToEnhance(null);
+      } else {
+        await alert(result.message || 'Failed to submit enhancement request', 'Error', 'error');
+      }
+    } catch (error) {
+      await alert('Failed to submit enhancement request', 'Error', 'error');
+    } finally {
+      setSubmittingEnhancement(false);
+    }
   };
 
   const renderServiceDetails = (item) => {
@@ -900,9 +975,37 @@ const Profile = () => {
               <span className="detail-value">{formatDateTo12Hour(specific_data.pickupDate)}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">{item.status === 'pending' ? 'Estimated Price:' : 'Final Price:'}</span>
-              <span className="detail-value">{formatCurrencyPHP(item.status === 'pending' ? safeEstimatedPrice : item.final_price)}</span>
+              <span className="detail-label">Estimated Completion Date:</span>
+              <span className="detail-value">
+                {specific_data.estimatedCompletionDate || specific_data.estimated_completion_date
+                  ? formatDate(specific_data.estimatedCompletionDate || specific_data.estimated_completion_date)
+                  : 'N/A'}
+              </span>
             </div>
+            {item.status === 'price_confirmation' ? (
+              (() => {
+                const bp = parseFloat(item.base_price ?? item.basePrice ?? 0);
+                const prev = Number.isFinite(bp) && bp > 0 ? bp : safeEstimatedPrice;
+                return (
+                  <>
+                    <div className="detail-row">
+                      <span className="detail-label">Previous Price:</span>
+                      <span className="detail-value">{prev > 0 ? formatCurrencyPHP(prev) : 'N/A'}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-label">Final Price:</span>
+                      <span className="detail-value">{formatCurrencyPHP(item.final_price)}</span>
+                    </div>
+                  </>
+                );
+              })()
+            ) : (
+              <div className="detail-row">
+                <span className="detail-label">{item.status === 'pending' ? 'Estimated Price:' : 'Final Price:'}</span>
+                <span className="detail-value">{formatCurrencyPHP(item.status === 'pending' ? safeEstimatedPrice : item.final_price)}</span>
+              </div>
+            )}
+            {renderEnhancementInfo(specific_data)}
           </div>
         );
 
@@ -925,12 +1028,21 @@ const Profile = () => {
                   : specific_data.preferredDate || 'N/A'}
               </span>
             </div>
+            <div className="detail-row">
+              <span className="detail-label">Estimated Completion Date:</span>
+              <span className="detail-value">
+                {specific_data.estimatedCompletionDate || specific_data.estimated_completion_date
+                  ? formatDate(specific_data.estimatedCompletionDate || specific_data.estimated_completion_date)
+                  : 'N/A'}
+              </span>
+            </div>
             {specific_data.notes && (
               <div className="detail-row">
                 <span className="detail-label">Notes:</span>
                 <span className="detail-value">{specific_data.notes}</span>
               </div>
             )}
+            {renderEnhancementInfo(specific_data)}
 
             {garments.length > 0 ? (
               <>
@@ -1215,15 +1327,38 @@ const Profile = () => {
         const cleaningServiceName = specific_data.serviceName || 'N/A';
         const cleaningQuantity = specific_data.quantity || 1;
 
-        let dryCleaningPrice = parseFloat(item.final_price) || 0;
-        if (!dryCleaningPrice && specific_data?.pricePerItem) {
-          const pricePerItem = parseFloat(specific_data.pricePerItem) || 0;
-          const quantity = parseInt(cleaningQuantity) || 1;
-          dryCleaningPrice = pricePerItem * quantity;
-        }
-        if (!dryCleaningPrice) {
-          dryCleaningPrice = specific_data.finalPrice || getDryCleaningEstimatedPrice(cleaningServiceName, cleaningQuantity);
-        }
+        // Price confirmation flow:
+        // - previousDryCleaningPrice = customer's old/estimated price (pre-admin update)
+        // - finalDryCleaningPrice = admin-updated price (stored in `item.final_price` when available)
+        const previousDryCleaningPrice = (() => {
+          const bp = parseFloat(item.base_price ?? item.basePrice ?? 0);
+          if (Number.isFinite(bp) && bp > 0) return bp;
+
+          const fromSpecific = (
+            specific_data?.estimatedPrice !== undefined
+              ? parseFloat(specific_data.estimatedPrice) || 0
+              : (specific_data?.pricePerItem
+                ? (parseFloat(specific_data.pricePerItem) || 0) * (parseInt(cleaningQuantity) || 1)
+                : getDryCleaningEstimatedPrice(cleaningServiceName, cleaningQuantity))
+          );
+
+          if (fromSpecific > 0) return fromSpecific;
+
+          // Dry cleaning might store the pre-admin price in pricing_factors instead of specific_data.
+          const pf = item.pricing_factors || {};
+          const pricePerItem = parseFloat(pf.pricePerItem ?? pf.price_per_item ?? 0);
+          const qty = parseInt(pf.quantity ?? cleaningQuantity ?? 1, 10) || 1;
+          const computed = Number.isFinite(pricePerItem) && pricePerItem > 0 ? (pricePerItem * qty) : 0;
+          return computed > 0 ? computed : fromSpecific;
+        })();
+
+        const finalDryCleaningPrice = (
+          parseFloat(item.final_price) > 0
+            ? parseFloat(item.final_price)
+            : (specific_data?.finalPrice !== undefined
+              ? parseFloat(specific_data.finalPrice) || previousDryCleaningPrice
+              : previousDryCleaningPrice)
+        );
         const dryCleaningEstimatedTime = specific_data.estimatedTime || getDryCleaningEstimatedTime(cleaningServiceName);
 
         return (
@@ -1308,16 +1443,38 @@ const Profile = () => {
               <span className="detail-label">Special Instructions:</span>
               <span className="detail-value">{specific_data.notes || 'None'}</span>
             </div>
+            {renderEnhancementInfo(specific_data)}
             <div className="detail-row">
               <span className="detail-label">Drop Off Item Date:</span>
               <span className="detail-value">{formatDateTo12Hour(specific_data.pickupDate)}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">
-                {specific_data?.isEstimatedPrice === true ? 'Estimated Price:' : 'Final Price:'}
+              <span className="detail-label">Estimated Completion Date:</span>
+              <span className="detail-value">
+                {specific_data.estimatedCompletionDate || specific_data.estimated_completion_date
+                  ? formatDate(specific_data.estimatedCompletionDate || specific_data.estimated_completion_date)
+                  : 'N/A'}
               </span>
-              <span className="detail-value">₱{dryCleaningPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
             </div>
+            {item.status === 'price_confirmation' ? (
+              <>
+                <div className="detail-row">
+                  <span className="detail-label">Previous Price:</span>
+                  <span className="detail-value">₱{previousDryCleaningPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Final Price:</span>
+                  <span className="detail-value">₱{finalDryCleaningPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                </div>
+              </>
+            ) : (
+              <div className="detail-row">
+                <span className="detail-label">{item.status === 'pending' ? 'Estimated Price:' : 'Final Price:'}</span>
+                <span className="detail-value">
+                  ₱{(item.status === 'pending' ? previousDryCleaningPrice : finalDryCleaningPrice).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </span>
+              </div>
+            )}
           </div>
         );
 
@@ -1430,47 +1587,86 @@ const Profile = () => {
   };
 
   const getEstimatedPrice = (specificData, serviceType) => {
-    if (serviceType === 'repair') {
+    const normalizedService = String(serviceType || '')
+      .toLowerCase()
+      .replace(/-/g, '_')
+      .trim();
 
-      if (specificData?.estimatedPrice) {
-        return specificData.estimatedPrice;
+    if (!specificData) return 0;
+
+    if (normalizedService === 'repair') {
+      // Repair "previous price" may be stored as `estimatedPrice`,
+      // or derived from garments' base prices if `estimatedPrice` is missing.
+      const estimated = parseFloat(specificData.estimatedPrice ?? specificData.estimated_price ?? 0);
+      if (Number.isFinite(estimated) && estimated > 0) return estimated;
+
+      const garments = Array.isArray(specificData.garments) ? specificData.garments : [];
+      if (garments.length > 0) {
+        return garments.reduce((sum, garment) => {
+          const gp = parseFloat(garment?.basePrice ?? garment?.base_price ?? 0);
+          return sum + (Number.isFinite(gp) ? gp : 0);
+        }, 0);
       }
 
-      return specificData?.estimatedPrice || 0;
-    } else if (serviceType === 'dry_cleaning') {
+      const basePrice = parseFloat(specificData.basePrice ?? specificData.base_price ?? 0);
+      return Number.isFinite(basePrice) ? basePrice : 0;
+    }
 
-      if (specificData?.finalPrice) {
-        return parseFloat(specificData.finalPrice) || 0;
-      }
+    if (
+      normalizedService === 'dry_cleaning' ||
+      normalizedService === 'drycleaning' ||
+      normalizedService === 'dry_cleaning' ||
+      normalizedService === 'dry_cleaning'
+    ) {
+      // For dry cleaning, the pre-admin/update price is typically stored as `finalPrice`
+      // inside `specific_data`, while the admin-updated value is in `item.final_price`.
+      const prePrice = parseFloat(specificData.finalPrice ?? specificData.final_price ?? 0);
+      if (Number.isFinite(prePrice) && prePrice > 0) return prePrice;
 
-      if (specificData?.pricePerItem) {
-        const pricePerItem = parseFloat(specificData.pricePerItem) || 0;
-        const quantity = parseInt(specificData?.quantity) || 1;
-        return pricePerItem * quantity;
-      }
+      const pricePerItem = parseFloat(specificData.pricePerItem ?? specificData.price_per_item ?? 0);
+      const quantity = parseInt(specificData?.quantity ?? 1, 10) || 1;
+      if (Number.isFinite(pricePerItem) && pricePerItem > 0) return pricePerItem * quantity;
 
+      // Fallback to service name pricing (if stored).
       const serviceName = specificData?.serviceName || '';
-      const quantity = parseInt(specificData?.quantity) || 1;
-
+      const quantityFallback = parseInt(specificData?.quantity ?? 1, 10) || 1;
       const basePrices = {
         'Basic Dry Cleaning': 200,
         'Premium Dry Cleaning': 350,
         'Delicate Items': 450,
         'Express Service': 500
       };
-
-      const pricePerItem = {
+      const perItemPrices = {
         'Basic Dry Cleaning': 150,
         'Premium Dry Cleaning': 250,
         'Delicate Items': 350,
         'Express Service': 400
       };
-
       const basePrice = basePrices[serviceName] || 200;
-      const perItemPrice = pricePerItem[serviceName] || 150;
-
-      return basePrice + (perItemPrice * quantity);
+      const perItemPrice = perItemPrices[serviceName] || 150;
+      return basePrice + (perItemPrice * quantityFallback);
     }
+
+    if (normalizedService === 'customization' || normalizedService === 'customize') {
+      const estimated = parseFloat(specificData.estimatedPrice ?? specificData.estimated_price ?? 0);
+      if (Number.isFinite(estimated) && estimated > 0) return estimated;
+
+      const maybeFinal = parseFloat(specificData.finalPrice ?? specificData.final_price ?? 0);
+      if (Number.isFinite(maybeFinal) && maybeFinal > 0) return maybeFinal;
+
+      // Try summing garments if present.
+      const garments = Array.isArray(specificData.garments) ? specificData.garments : [];
+      if (garments.length > 0) {
+        const sum = garments.reduce((acc, garment) => {
+          const gp = parseFloat(garment?.basePrice ?? garment?.base_price ?? 0);
+          return acc + (Number.isFinite(gp) ? gp : 0);
+        }, 0);
+        if (sum > 0) return sum;
+      }
+
+      return 0;
+    }
+
     return 0;
   };
 
@@ -1563,6 +1759,7 @@ const Profile = () => {
             status: item.status,
             status_label: item.status_label,
             status_class: item.status_class,
+            base_price: item.base_price,
             final_price: item.final_price,
             order_date: order.order_date,
             status_updated_at: item.status_updated_at,
@@ -2112,12 +2309,31 @@ const Profile = () => {
                               </div>
                             ) : null;
                           })()
-                        ) : item.status === 'price_confirmation' && estimatedPrice > 0 ? (
+                        ) : item.status === 'price_confirmation' ? (
 
                           <>
                             <div className="price-row">
-                              <span className="price-label">Estimated Price:</span>
-                              <span className="price-value estimated">₱{estimatedPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                              <span className="price-label">Previous Price:</span>
+                              <span className="price-value estimated">
+                                ₱{(() => {
+                                  const bp = parseFloat(item.base_price ?? item.basePrice ?? 0);
+                                  const fallback = estimatedPrice;
+                                  let prev = Number.isFinite(bp) && bp > 0 ? bp : fallback;
+
+                                  // Dry cleaning may have `base_price = 0`, so fall back to pricing_factors.
+                                  if ((!Number.isFinite(prev) || prev <= 0) && (item.service_type === 'dry_cleaning' || item.service_type === 'drycleaning' || item.service_type === 'dry-cleaning')) {
+                                    const pf = item.pricing_factors || {};
+                                    const pricePerItem = parseFloat(pf.pricePerItem ?? pf.price_per_item ?? 0);
+                                    const qty = parseInt(pf.quantity ?? item.specific_data?.quantity ?? 1, 10) || 1;
+                                    const computed = Number.isFinite(pricePerItem) && pricePerItem > 0 ? (pricePerItem * qty) : 0;
+                                    if (computed > 0) prev = computed;
+                                  }
+
+                                  return prev > 0
+                                    ? prev.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                    : 'N/A';
+                                })()}
+                              </span>
                             </div>
                             <div className="price-row">
                               <span className="price-label">Final Price:</span>
@@ -2412,6 +2628,23 @@ const Profile = () => {
                             Cancel
                           </button>
                         )}
+                        {item.status === 'completed' && ['repair', 'customization', 'customize', 'dry_cleaning', 'drycleaning', 'dry-cleaning'].includes(String(item.service_type || '').toLowerCase()) && (
+                          <button
+                            onClick={() => openEnhancementModal(item)}
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#673ab7',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.9rem',
+                              fontWeight: '500'
+                            }}
+                          >
+                            ✨ Request Enhancement
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2565,6 +2798,23 @@ const Profile = () => {
                       Cancel Order
                     </button>
                 )}
+                  {selectedItem.status === 'completed' && ['repair', 'customization', 'customize', 'dry_cleaning', 'drycleaning', 'dry-cleaning'].includes(String(selectedItem.service_type || '').toLowerCase()) && (
+                    <button
+                      onClick={() => openEnhancementModal(selectedItem)}
+                      style={{
+                        padding: '10px 20px',
+                        backgroundColor: '#673ab7',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: '500'
+                      }}
+                    >
+                      ✨ Request Enhancement
+                    </button>
+                  )}
                 <button className="btn-secondary" onClick={closeDetailsModal}>
                   Close
                 </button>
@@ -3069,6 +3319,102 @@ const Profile = () => {
                 onMouseLeave={(e) => !savingProfile && (e.target.style.backgroundColor = '#8B4513')}
               >
                 {savingProfile ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {enhanceModalOpen && itemToEnhance && (
+        <div
+          className="details-modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setEnhanceModalOpen(false);
+              setItemToEnhance(null);
+              setEnhanceNotes('');
+              setEnhancePreferredDate('');
+            }
+          }}
+        >
+          <div className="details-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div className="details-modal-header">
+              <h3>Request Enhancement</h3>
+              <button className="details-modal-close" onClick={() => {
+                setEnhanceModalOpen(false);
+                setItemToEnhance(null);
+                setEnhanceNotes('');
+                setEnhancePreferredDate('');
+              }}>×</button>
+            </div>
+            <div className="details-modal-content">
+              <p style={{ marginBottom: '16px', color: '#666' }}>
+                Tell us what issue you found and how you want the order improved.
+              </p>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
+                  Enhancement Notes <span style={{ color: '#f44336' }}>*</span>
+                </label>
+                <textarea
+                  value={enhanceNotes}
+                  onChange={(e) => setEnhanceNotes(e.target.value)}
+                  placeholder="Describe the issue/enhancement request..."
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontFamily: 'inherit',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
+                  Preferred Completion Date (Optional)
+                </label>
+                <input
+                  type="date"
+                  value={enhancePreferredDate}
+                  onChange={(e) => setEnhancePreferredDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+            </div>
+            <div className="details-modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                className="btn-secondary"
+                onClick={() => {
+                  setEnhanceModalOpen(false);
+                  setItemToEnhance(null);
+                  setEnhanceNotes('');
+                  setEnhancePreferredDate('');
+                }}
+                disabled={submittingEnhancement}
+              >
+                Close
+              </button>
+              <button
+                onClick={handleSubmitEnhancement}
+                disabled={submittingEnhancement}
+                style={{
+                  padding: '10px 18px',
+                  backgroundColor: '#673ab7',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: submittingEnhancement ? 'not-allowed' : 'pointer',
+                  opacity: submittingEnhancement ? 0.7 : 1
+                }}
+              >
+                {submittingEnhancement ? 'Submitting...' : 'Submit Request'}
               </button>
             </div>
           </div>

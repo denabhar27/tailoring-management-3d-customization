@@ -32,6 +32,12 @@ function AdminPage() {
   const [endDate, setEndDate] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
 
+  const isAcceptedOrderActivity = (activity) => {
+    const status = activity?.status?.toLowerCase?.() || '';
+    const statusText = activity?.statusText?.toLowerCase?.() || '';
+    return status === 'accepted' || statusText === 'accepted';
+  };
+
   const extractPaymentMetaFromNotes = (notes = '') => {
     const text = String(notes || '');
     const handledByMatch = text.match(/^([^\n.]+?)\s+recorded payment/i);
@@ -285,7 +291,11 @@ function AdminPage() {
       return;
     }
 
-    let filtered = [...allActivities];
+    // Reports should only include accepted orders (and never pending ones).
+    let filtered = allActivities.filter((activity) => {
+      if (activity?.isPayment) return true;
+      return isAcceptedOrderActivity(activity);
+    });
 
     if (serviceFilter !== 'all') {
       filtered = filtered.filter(activity => {

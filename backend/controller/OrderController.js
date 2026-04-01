@@ -497,7 +497,7 @@ exports.getRepairOrdersByStatus = (req, res) => {
 
 exports.updateRepairOrderItem = (req, res) => {
   const itemId = req.params.id;
-  const { finalPrice, approvalStatus, adminNotes } = req.body;
+  const { finalPrice, approvalStatus, adminNotes, estimatedCompletionDate, pricingFactors } = req.body;
 
   if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
@@ -509,7 +509,9 @@ exports.updateRepairOrderItem = (req, res) => {
   const updateData = {
     finalPrice: finalPrice || undefined,
     approvalStatus: approvalStatus || undefined,
-    adminNotes: adminNotes || undefined
+    adminNotes: adminNotes || undefined,
+    estimatedCompletionDate: estimatedCompletionDate !== undefined ? (estimatedCompletionDate || null) : undefined,
+    pricingFactors: pricingFactors || undefined
   };
 
   console.log("Controller - Received update data for item:", itemId, req.body);
@@ -927,7 +929,7 @@ exports.getDryCleaningOrdersByStatus = (req, res) => {
 
 exports.updateDryCleaningOrderItem = (req, res) => {
   const itemId = req.params.id;
-  const { finalPrice, approvalStatus, adminNotes } = req.body;
+  const { finalPrice, approvalStatus, adminNotes, estimatedCompletionDate, pricingFactors } = req.body;
 
   if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
@@ -939,7 +941,9 @@ exports.updateDryCleaningOrderItem = (req, res) => {
   const updateData = {
     finalPrice: finalPrice || undefined,
     approvalStatus: approvalStatus || undefined,
-    adminNotes: adminNotes || undefined
+    adminNotes: adminNotes || undefined,
+    estimatedCompletionDate: estimatedCompletionDate !== undefined ? (estimatedCompletionDate || null) : undefined,
+    pricingFactors: pricingFactors || undefined
   };
 
   Object.keys(updateData).forEach(key => {

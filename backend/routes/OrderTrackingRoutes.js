@@ -11,4 +11,6 @@ router.get('/transitions/:id', verifyToken, requireAdmin, OrderTrackingControlle
 
 router.post('/update/:id', verifyToken, requireAdmin, OrderTrackingController.updateTrackingStatus);
 
+router.post('/request-enhancement/:id', verifyToken, OrderTrackingController.requestEnhancement);
+
 module.exports = router;

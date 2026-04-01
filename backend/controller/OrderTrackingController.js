@@ -199,6 +199,7 @@ exports.getUserOrderTracking = (req, res) => {
       orders[item.order_id].items.push({
         order_item_id: item.order_item_id,
         service_type: item.service_type,
+        base_price: item.base_price,
         final_price: item.final_price,
         specific_data: specificData,
         status: item.status || 'pending',
@@ -454,6 +455,105 @@ exports.updateTrackingStatus = (req, res) => {
             status_info: OrderTracking.getStatusInfo(status, orderItem.service_type)
           }
         });
+      });
+    });
+  });
+};
+
+exports.requestEnhancement = (req, res) => {
+  const userId = req.user.id;
+  const orderItemId = req.params.id;
+  const { notes, preferredCompletionDate } = req.body || {};
+
+  const enhancementNotes = String(notes || '').trim();
+  if (!enhancementNotes) {
+    return res.status(400).json({
+      success: false,
+      message: 'Enhancement notes are required'
+    });
+  }
+
+  Order.getOrderItemById(orderItemId, (itemErr, orderItem) => {
+    if (itemErr || !orderItem) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order item not found'
+      });
+    }
+
+    Order.getById(orderItem.order_id, (orderErr, orderRows) => {
+      const order = Array.isArray(orderRows) ? orderRows[0] : null;
+      if (orderErr || !order || order.user_id !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      const serviceType = String(orderItem.service_type || '').toLowerCase();
+      const allowedServices = ['customization', 'customize', 'repair', 'dry_cleaning', 'drycleaning', 'dry-cleaning'];
+      if (!allowedServices.includes(serviceType)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Enhancement is only available for customization, repair, and dry cleaning'
+        });
+      }
+
+      const currentStatus = String(orderItem.approval_status || '').toLowerCase();
+      if (currentStatus !== 'completed') {
+        return res.status(400).json({
+          success: false,
+          message: 'Enhancement request is only available for completed orders'
+        });
+      }
+
+      const normalizedService = serviceType === 'customize' ? 'customization' : serviceType;
+      const updateData = {
+        approvalStatus: 'confirmed',
+        adminNotes: `Customer requested enhancement: ${enhancementNotes}`,
+        estimatedCompletionDate: preferredCompletionDate || null,
+        pricingFactors: {
+          enhancementRequest: true,
+          enhancementRequestedBy: 'customer',
+          enhancementNotes,
+          enhancementUpdatedAt: new Date().toISOString(),
+          estimatedCompletionDate: preferredCompletionDate || null
+        }
+      };
+
+      const onUpdated = (updateErr) => {
+        if (updateErr) {
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to request enhancement'
+          });
+        }
+        return res.json({
+          success: true,
+          message: 'Enhancement request submitted. Your order is now in progress.'
+        });
+      };
+
+      if (normalizedService === 'customization') {
+        const Customization = require('../model/CustomizationModel');
+        return Customization.updateOrderItem(orderItemId, updateData, onUpdated);
+      }
+
+      const normalizedForOrderModel =
+        normalizedService === 'drycleaning' || normalizedService === 'dry-cleaning'
+          ? 'dry_cleaning'
+          : normalizedService;
+
+      if (normalizedForOrderModel === 'repair') {
+        return Order.updateRepairOrderItem(orderItemId, updateData, onUpdated);
+      }
+      if (normalizedForOrderModel === 'dry_cleaning') {
+        return Order.updateDryCleaningOrderItem(orderItemId, updateData, onUpdated);
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: 'Unsupported service type for enhancement request'
       });
     });
   });

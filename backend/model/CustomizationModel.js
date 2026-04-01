@@ -104,6 +104,7 @@ const Customization = {
 
   updateOrderItem: (itemId, updateData, callback) => {
     const { finalPrice, approvalStatus, adminNotes, pricingFactors } = updateData;
+    const estimatedCompletionDate = pricingFactors?.estimatedCompletionDate || pricingFactors?.estimated_completion_date;
     
     console.log("Customization Model - Updating item:", itemId, updateData);
 
@@ -181,6 +182,31 @@ const Customization = {
             Notification.createAcceptedNotification(userId, itemId, orderItem.service_type, (notifErr) => {
               if (notifErr) console.error('Failed to create accepted notification:', notifErr);
             });
+          }
+
+          if (estimatedCompletionDate) {
+            Notification.createEstimatedCompletionDateNotification(
+              userId,
+              itemId,
+              estimatedCompletionDate,
+              orderItem.service_type,
+              (notifErr) => {
+                if (notifErr) console.error('Failed to create estimated completion date notification:', notifErr);
+              }
+            );
+          }
+
+          if (pricingFactors?.enhancementUpdatedAt) {
+            Notification.createEnhancementNotification(
+              userId,
+              itemId,
+              orderItem.service_type,
+              pricingFactors?.enhancementNotes || '',
+              pricingFactors?.enhancementAdditionalCost || 0,
+              (notifErr) => {
+                if (notifErr) console.error('Failed to create enhancement notification:', notifErr);
+              }
+            );
           }
         }
 

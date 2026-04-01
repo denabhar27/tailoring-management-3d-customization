@@ -39,7 +39,9 @@ exports.getAllBillingRecords = (req, res) => {
     JOIN orders o ON oi.order_id = o.order_id
     LEFT JOIN user u ON o.user_id = u.user_id
     LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
-    WHERE oi.approval_status NOT IN ('cancelled', 'pending', 'pending_review')
+    -- Reports must exclude "pending orders" (including 'price_confirmation') and cancelled items.
+    -- This keeps all post-pending/accepted workflow states (e.g., accepted/confirmed/ready/completed).
+    WHERE oi.approval_status NOT IN ('cancelled', 'pending', 'pending_review', 'price_confirmation')
       AND oi.approval_status IS NOT NULL
       AND oi.approval_status != ''
     ORDER BY o.order_date DESC

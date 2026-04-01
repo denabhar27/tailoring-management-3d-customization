@@ -43,6 +43,7 @@ const OrderTracking = {
         oi.item_id as order_item_id,
         oi.order_id,
         oi.service_type,
+        oi.base_price,
         oi.final_price,
         oi.specific_data,
         oi.pricing_factors,

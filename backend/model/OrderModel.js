@@ -909,7 +909,7 @@ const Order = {
   },
 
   updateRepairOrderItem: (itemId, updateData, callback) => {
-    const { finalPrice, approvalStatus, adminNotes } = updateData;
+    const { finalPrice, approvalStatus, adminNotes, estimatedCompletionDate, pricingFactors } = updateData;
 
     console.log("Model - Updating item:", itemId, updateData);
 
@@ -932,6 +932,19 @@ const Order = {
       updates.push('pricing_factors = JSON_SET(pricing_factors, \'$.adminNotes\', ?)');
       values.push(adminNotes || '');
       console.log("Adding adminNotes update:", adminNotes);
+    }
+
+    if (estimatedCompletionDate !== undefined) {
+      // Store as a simple YYYY-MM-DD string (or NULL when cleared) inside pricing_factors.
+      updates.push('pricing_factors = JSON_SET(COALESCE(pricing_factors, \'{}\'), \'$.estimatedCompletionDate\', ?)');
+      values.push(estimatedCompletionDate || null);
+    }
+
+    if (pricingFactors) {
+      Object.keys(pricingFactors).forEach((key) => {
+        updates.push(`pricing_factors = JSON_SET(COALESCE(pricing_factors, '{}'), '$.${key}', ?)`);
+        values.push(pricingFactors[key]);
+      });
     }
 
     if (finalPrice !== undefined) {
@@ -979,6 +992,31 @@ const Order = {
             Notification.createAcceptedNotification(userId, itemId, orderItem.service_type, (notifErr) => {
               if (notifErr) console.error('Failed to create accepted notification:', notifErr);
             });
+          }
+
+          if (estimatedCompletionDate) {
+            Notification.createEstimatedCompletionDateNotification(
+              userId,
+              itemId,
+              estimatedCompletionDate,
+              orderItem.service_type,
+              (notifErr) => {
+                if (notifErr) console.error('Failed to create estimated completion date notification:', notifErr);
+              }
+            );
+          }
+
+          if (pricingFactors?.enhancementUpdatedAt) {
+            Notification.createEnhancementNotification(
+              userId,
+              itemId,
+              orderItem.service_type,
+              pricingFactors?.enhancementNotes || '',
+              pricingFactors?.enhancementAdditionalCost || 0,
+              (notifErr) => {
+                if (notifErr) console.error('Failed to create enhancement notification:', notifErr);
+              }
+            );
           }
 
           const statusNotificationStatuses = [

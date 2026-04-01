@@ -41,6 +41,16 @@ const Repair = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [detailEstimatedCompletionDate, setDetailEstimatedCompletionDate] = useState('');
+  const [savingEstimatedDate, setSavingEstimatedDate] = useState(false);
+  const [showEnhanceModal, setShowEnhanceModal] = useState(false);
+  const [enhanceOrder, setEnhanceOrder] = useState(null);
+  const [savingEnhancement, setSavingEnhancement] = useState(false);
+  const [enhanceForm, setEnhanceForm] = useState({
+    notes: '',
+    additionalCost: '',
+    estimatedCompletionDate: ''
+  });
   const [editForm, setEditForm] = useState({
     finalPrice: '',
     approvalStatus: '',
@@ -670,7 +680,41 @@ const Repair = () => {
 
   const handleViewDetails = (item) => {
     setSelectedOrder(item);
+    setDetailEstimatedCompletionDate(
+      item?.pricing_factors?.estimatedCompletionDate ||
+      item?.pricing_factors?.estimated_completion_date ||
+      ''
+    );
     setShowDetailModal(true);
+  };
+
+  const handleSaveEstimatedCompletionDateFromDetails = async () => {
+    if (!selectedOrder) return;
+    try {
+      setSavingEstimatedDate(true);
+      const result = await updateRepairOrderItem(selectedOrder.item_id, {
+        estimatedCompletionDate: detailEstimatedCompletionDate || null,
+        approvalStatus: selectedOrder.approval_status
+      });
+
+      if (result.success) {
+        setSelectedOrder((prev) => ({
+          ...prev,
+          pricing_factors: {
+            ...(prev?.pricing_factors || {}),
+            estimatedCompletionDate: detailEstimatedCompletionDate || null
+          }
+        }));
+        showToast('Estimated completion date saved.', 'success');
+        loadRepairOrders();
+      } else {
+        showToast(result.message || 'Failed to save estimated completion date', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to save estimated completion date', 'error');
+    } finally {
+      setSavingEstimatedDate(false);
+    }
   };
 
   const handleEditOrder = (item) => {
@@ -678,7 +722,8 @@ const Repair = () => {
     setEditForm({
       finalPrice: item.final_price || '',
       approvalStatus: item.approval_status || '',
-      adminNotes: item.pricing_factors?.adminNotes || ''
+      adminNotes: item.pricing_factors?.adminNotes || '',
+      estimatedCompletionDate: item.pricing_factors?.estimatedCompletionDate || item.pricing_factors?.estimated_completion_date || ''
     });
     setShowEditModal(true);
   };
@@ -705,6 +750,66 @@ const Repair = () => {
     } catch (error) {
       console.error('Error deleting order:', error);
       await alert('Error deleting order', 'Error', 'error');
+    }
+  };
+
+  const openEnhanceModal = (item) => {
+    const currentEstimatedDate = item?.pricing_factors?.estimatedCompletionDate || item?.pricing_factors?.estimated_completion_date || '';
+    setEnhanceOrder(item);
+    setEnhanceForm({
+      notes: '',
+      additionalCost: '',
+      estimatedCompletionDate: currentEstimatedDate
+    });
+    setShowEnhanceModal(true);
+  };
+
+  const handleSaveEnhancement = async () => {
+    if (!enhanceOrder) return;
+    const notes = String(enhanceForm.notes || '').trim();
+    if (!notes) {
+      showToast('Please add enhancement notes.', 'error');
+      return;
+    }
+
+    const additionalCost = parseFloat(enhanceForm.additionalCost || 0);
+    if (!Number.isFinite(additionalCost) || additionalCost < 0) {
+      showToast('Additional cost must be 0 or higher.', 'error');
+      return;
+    }
+
+    const currentFinal = parseFloat(enhanceOrder.final_price || 0);
+    const nextFinal = currentFinal + additionalCost;
+
+    try {
+      setSavingEnhancement(true);
+      const result = await updateRepairOrderItem(enhanceOrder.item_id, {
+        finalPrice: nextFinal,
+        approvalStatus: 'confirmed',
+        adminNotes: `Enhancement requested in-shop: ${notes}`,
+        estimatedCompletionDate: enhanceForm.estimatedCompletionDate || null,
+        pricingFactors: {
+          enhancementRequest: true,
+          enhancementNotes: notes,
+          enhancementAdditionalCost: additionalCost.toFixed(2),
+          enhancementBasePrice: currentFinal.toFixed(2),
+          enhancementUpdatedAt: new Date().toISOString(),
+          estimatedCompletionDate: enhanceForm.estimatedCompletionDate || null
+        }
+      });
+
+      if (result.success) {
+        setShowEnhanceModal(false);
+        setEnhanceOrder(null);
+        showToast('Enhancement applied. Order moved to In Progress.', 'success');
+        loadRepairOrders();
+      } else {
+        showToast(result.message || 'Failed to apply enhancement', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to apply enhancement', 'error');
+    } finally {
+      setSavingEnhancement(false);
     }
   };
 
@@ -1067,22 +1172,37 @@ const Repair = () => {
                               </>
                             )}
                             {(item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
-                              <button
-                                className="icon-btn delete"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteOrder(item);
-                                }}
-                                title="Delete Order"
-                                style={{ backgroundColor: '#f44336', color: 'white' }}
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <polyline points="3 6 5 6 21 6"></polyline>
-                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                  <line x1="10" y1="11" x2="10" y2="17"></line>
-                                  <line x1="14" y1="11" x2="14" y2="17"></line>
-                                </svg>
-                              </button>
+                              <>
+                                {item.approval_status === 'completed' && (
+                                  <button
+                                    className="icon-btn"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEnhanceModal(item);
+                                    }}
+                                    title="Enhance Order"
+                                    style={{ backgroundColor: '#673ab7', color: 'white' }}
+                                  >
+                                    ✨
+                                  </button>
+                                )}
+                                <button
+                                  className="icon-btn delete"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteOrder(item);
+                                  }}
+                                  title="Delete Order"
+                                  style={{ backgroundColor: '#f44336', color: 'white' }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                                  </svg>
+                                </button>
+                              </>
                             )}
                           </div>
                         )}
@@ -1228,6 +1348,18 @@ const Repair = () => {
                 )}
               </div>
 
+              {editForm.approvalStatus === 'accepted' && (
+                <div className="form-group">
+                  <label>Estimated Completion Date</label>
+                  <input
+                    type="date"
+                    value={editForm.estimatedCompletionDate || ''}
+                    onChange={(e) => setEditForm({ ...editForm, estimatedCompletionDate: e.target.value })}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  />
+                </div>
+              )}
+
               <div className="form-group">
                 <label>Admin Notes</label>
                 <textarea
@@ -1242,6 +1374,58 @@ const Repair = () => {
             <div className="modal-footer">
               <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
               <button className="btn-save" onClick={handleSaveEdit}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showEnhanceModal && enhanceOrder && (
+        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowEnhanceModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <h2>Enhance Completed Repair</h2>
+              <span className="close-modal" onClick={() => setShowEnhanceModal(false)}>×</span>
+            </div>
+            <div className="modal-body">
+              <div className="detail-row"><strong>Order ID:</strong> #{enhanceOrder.order_id}</div>
+              <div className="form-group" style={{ marginTop: '14px' }}>
+                <label>Enhancement Notes</label>
+                <textarea
+                  value={enhanceForm.notes}
+                  onChange={(e) => setEnhanceForm({ ...enhanceForm, notes: e.target.value })}
+                  rows={3}
+                  placeholder="Describe requested enhancement..."
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+              </div>
+              <div className="form-group">
+                <label>Additional Cost (PHP)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={enhanceForm.additionalCost}
+                  onChange={(e) => setEnhanceForm({ ...enhanceForm, additionalCost: e.target.value })}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+              </div>
+              <div className="form-group">
+                <label>New Estimated Completion Date</label>
+                <input
+                  type="date"
+                  value={enhanceForm.estimatedCompletionDate}
+                  onChange={(e) => setEnhanceForm({ ...enhanceForm, estimatedCompletionDate: e.target.value })}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+              </div>
+              <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
+                Saving will move this completed order back to <strong>In Progress</strong>.
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-cancel" onClick={() => setShowEnhanceModal(false)}>Cancel</button>
+              <button className="btn-save" onClick={handleSaveEnhancement} disabled={savingEnhancement}>
+                {savingEnhancement ? 'Applying...' : 'Apply Enhancement'}
+              </button>
             </div>
           </div>
         </div>
@@ -1341,7 +1525,37 @@ const Repair = () => {
 
               <div className="detail-row"><strong>Damage Description:</strong> {selectedOrder.specific_data?.damageDescription || 'N/A'}</div>
               <div className="detail-row"><strong>Date Received:</strong> {new Date(selectedOrder.order_date).toLocaleDateString()}</div>
+              <div className="detail-row"><strong>Selected Time:</strong> {(selectedOrder.specific_data?.pickupDate || selectedOrder.pricing_factors?.pickupDate) ? String(selectedOrder.specific_data?.pickupDate || selectedOrder.pricing_factors?.pickupDate).split('T')[1]?.slice(0, 5) || 'N/A' : 'N/A'}</div>
               <div className="detail-row"><strong>Estimated Time:</strong> {selectedOrder.pricing_factors?.estimatedTime || 'N/A'}</div>
+
+              {selectedOrder.approval_status === 'accepted' && (
+                <div className="detail-row" style={{ alignItems: 'center', gap: '10px' }}>
+                  <strong>Estimated Completion Date:</strong>
+                  <input
+                    type="date"
+                    value={detailEstimatedCompletionDate || ''}
+                    onChange={(e) => setDetailEstimatedCompletionDate(e.target.value)}
+                    style={{ padding: '6px 8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  />
+                  <button
+                    className="btn-secondary"
+                    onClick={handleSaveEstimatedCompletionDateFromDetails}
+                    disabled={savingEstimatedDate}
+                    style={{ padding: '6px 12px' }}
+                  >
+                    {savingEstimatedDate ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              )}
+
+              {selectedOrder.approval_status === 'price_confirmation' && (
+                <div className="detail-row"><strong>Previous Price:</strong> ₱{(() => {
+                  const base = parseFloat(selectedOrder.base_price ?? selectedOrder.basePrice ?? 0);
+                  const fallback = parseFloat(getEstimatedPrice(selectedOrder) || 0);
+                  const prev = base > 0 ? base : fallback;
+                  return prev > 0 ? prev.toLocaleString() : 'N/A';
+                })()}</div>
+              )}
               <div className="detail-row"><strong>Repair Cost:</strong> ₱{parseFloat(selectedOrder.final_price || 0).toLocaleString()}</div>
               <div className="detail-row"><strong>Status:</strong>
                 <span className={`status-badge ${getStatusClass(selectedOrder.approval_status || 'pending')}`}>

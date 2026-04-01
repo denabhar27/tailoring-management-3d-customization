@@ -137,3 +137,20 @@ export async function cancelOrderItem(orderItemId, reason) {
     };
   }
 }
+
+export async function requestEnhancement(orderItemId, notes, preferredCompletionDate = null) {
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/tracking/request-enhancement/${orderItemId}`,
+      { notes, preferredCompletionDate },
+      { headers: getAuthHeaders() }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Request enhancement error:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Error requesting enhancement"
+    };
+  }
+}

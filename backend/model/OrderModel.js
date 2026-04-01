@@ -910,6 +910,11 @@ const Order = {
 
   updateRepairOrderItem: (itemId, updateData, callback) => {
     const { finalPrice, approvalStatus, adminNotes, estimatedCompletionDate, pricingFactors } = updateData;
+    const normalizedEstimatedCompletionDate =
+      estimatedCompletionDate ||
+      pricingFactors?.estimatedCompletionDate ||
+      pricingFactors?.estimated_completion_date ||
+      null;
 
     console.log("Model - Updating item:", itemId, updateData);
 
@@ -994,11 +999,11 @@ const Order = {
             });
           }
 
-          if (estimatedCompletionDate) {
+          if (normalizedEstimatedCompletionDate) {
             Notification.createEstimatedCompletionDateNotification(
               userId,
               itemId,
-              estimatedCompletionDate,
+              normalizedEstimatedCompletionDate,
               orderItem.service_type,
               (notifErr) => {
                 if (notifErr) console.error('Failed to create estimated completion date notification:', notifErr);

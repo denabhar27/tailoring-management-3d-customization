@@ -45,6 +45,9 @@ function mapStatus(status, orderStatus) {
   if (raw === 'accepted' || raw.includes('accept')) {
     return { status: 'accepted', statusText: 'Accepted' };
   }
+  if (raw.includes('pending')) {
+    return { status: 'pending', statusText: 'Pending' };
+  }
   if (raw.includes('progress') || raw.includes('confirm') || raw.includes('pending')) {
     return { status: 'in-progress', statusText: 'In Progress' };
   }

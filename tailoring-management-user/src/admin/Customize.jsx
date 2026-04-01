@@ -4050,6 +4050,24 @@ const Customize = () => {
               <div className="detail-row"><strong>Preferred Date:</strong> {selectedOrder.specific_data?.preferredDate || 'N/A'}</div>
               <div className="detail-row"><strong>Preferred Time:</strong> {selectedOrder.specific_data?.preferredTime ? String(selectedOrder.specific_data.preferredTime).split('T')[1]?.slice(0, 5) || String(selectedOrder.specific_data.preferredTime).slice(0, 5) : 'N/A'}</div>
 
+              <div className="detail-row"><strong>Estimated Time:</strong> {(() => {
+                const pricingFactors = selectedOrder?.pricing_factors || {};
+                const specificData = selectedOrder?.specific_data || {};
+                const storedEstimatedTime = pricingFactors.estimatedTime || pricingFactors.estimated_time || specificData.estimatedTime || specificData.estimated_time;
+
+                const preferredDate = specificData.preferredDate || specificData.preferred_date;
+                const completionDate = detailEstimatedCompletionDate || pricingFactors.estimatedCompletionDate || pricingFactors.estimated_completion_date;
+
+                if (completionDate) {
+                  const parsedDate = new Date(completionDate);
+                  return Number.isNaN(parsedDate.getTime())
+                    ? completionDate
+                    : parsedDate.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+                }
+
+                return storedEstimatedTime || 'N/A';
+              })()}</div>
+
               {selectedOrder.approval_status === 'accepted' && (
                 <div className="detail-row" style={{ alignItems: 'center', gap: '10px' }}>
                   <strong>Estimated Completion Date:</strong>
@@ -4070,14 +4088,17 @@ const Customize = () => {
                 </div>
               )}
 
-              {selectedOrder.approval_status === 'price_confirmation' && (
-                <div className="detail-row"><strong>Previous Price:</strong> ₱{(() => {
-                  const base = parseFloat(selectedOrder.base_price ?? selectedOrder.basePrice ?? 0);
-                  const fallback = parseFloat(getEstimatedPrice(selectedOrder) || 0);
-                  const prev = base > 0 ? base : fallback;
-                  return prev > 0 ? prev.toLocaleString() : 'N/A';
-                })()}</div>
-              )}
+              {(() => {
+                const base = parseFloat(selectedOrder.base_price ?? selectedOrder.basePrice ?? 0);
+                const fallback = parseFloat(getEstimatedPrice(selectedOrder) || 0);
+                const previousPrice = base > 0 ? base : fallback;
+                const currentPrice = parseFloat(selectedOrder.final_price || 0);
+                const priceChanged = previousPrice > 0 && Math.abs(currentPrice - previousPrice) > 0.01;
+
+                return priceChanged ? (
+                  <div className="detail-row"><strong>Previous Price:</strong> ₱{previousPrice.toLocaleString()}</div>
+                ) : null;
+              })()}
 
               <div className="detail-row"><strong>Date Received:</strong> {new Date(selectedOrder.order_date).toLocaleDateString()}</div>
 

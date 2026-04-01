@@ -32,10 +32,14 @@ function AdminPage() {
   const [endDate, setEndDate] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
 
+  const normalizeFilterValue = (value) => String(value || '').toLowerCase().replace(/[_\s-]/g, '');
+
   const isAcceptedOrderActivity = (activity) => {
-    const status = activity?.status?.toLowerCase?.() || '';
-    const statusText = activity?.statusText?.toLowerCase?.() || '';
-    return status === 'accepted' || statusText === 'accepted';
+    const status = normalizeFilterValue(activity?.status);
+    const statusText = normalizeFilterValue(activity?.statusText);
+    const actionType = activity?.actionType || activity?.action_type || '';
+    if (actionType === 'price_change') return true;
+    return Boolean(status || statusText);
   };
 
   const extractPaymentMetaFromNotes = (notes = '') => {
@@ -63,12 +67,42 @@ function AdminPage() {
       .map((line) => line.trim())
       .filter(Boolean);
 
-    const hasCustomerLine = lines.some((line) => /^customer\s*:/i.test(line));
+    const normalizedLines = [];
+    let extractedActor = null;
+
+    lines.forEach((line) => {
+      const bySuffixMatch = line.match(/\s*\(by\s+([^\)]+)\)\s*$/i);
+      if (bySuffixMatch?.[1]) {
+        const cleanedLine = line.replace(/\s*\(by\s+([^\)]+)\)\s*$/i, '').trim();
+        if (cleanedLine) normalizedLines.push(cleanedLine);
+        extractedActor = extractedActor || bySuffixMatch[1].trim();
+      } else {
+        normalizedLines.push(line);
+      }
+    });
+
+    const hasCustomerLine = normalizedLines.some((line) => /^customer\s*:/i.test(line));
     if (activity?.customer && !hasCustomerLine) {
-      lines.push(`Customer: ${activity.customer}`);
+      normalizedLines.push(`Customer: ${activity.customer}`);
     }
 
-    return lines;
+    const hasActorLine = normalizedLines.some((line) => /^(changed|handled|updated|processed|recorded)\s+by\s*:/i.test(line));
+    if (extractedActor && !hasActorLine) {
+      normalizedLines.push(`Changed by: ${extractedActor}`);
+    }
+
+    return normalizedLines;
+  };
+
+  const extractActorFromNotes = (notes = '') => {
+    const text = String(notes || '');
+    const labeledMatch = text.match(/(?:Changed|Handled|Updated|Processed|Recorded)\s+by:\s*([^|.\n]+)/i);
+    if (labeledMatch?.[1]) return labeledMatch[1].trim();
+
+    const parentheticalMatch = text.match(/\(by\s+([^\)]+)\)/i);
+    if (parentheticalMatch?.[1]) return parentheticalMatch[1].trim();
+
+    return null;
   };
 
   useEffect(() => {
@@ -204,7 +238,11 @@ function AdminPage() {
             paymentActivities.sort((a, b) => new Date(b.time) - new Date(a.time));
 
             const fallbackPayments = (allActivities || []).filter((activity) => activity?.isPayment);
-            const mergedPayments = [...paymentActivities, ...fallbackPayments];
+            const priceChangeActivities = (allActivities || []).filter((activity) => {
+              const actionType = String(activity?.actionType || activity?.action_type || '').toLowerCase();
+              return actionType === 'price_change';
+            });
+            const mergedPayments = [...paymentActivities, ...fallbackPayments, ...priceChangeActivities];
             const seen = new Set();
             const dedupedPayments = mergedPayments.filter((entry) => {
               const key = [
@@ -212,7 +250,7 @@ function AdminPage() {
                 entry.customer || '',
                 entry.service || '',
                 Number(entry.paymentInfo?.amount || 0).toFixed(2),
-                (entry.paymentInfo?.payment_status || entry.status || '').toLowerCase()
+                (entry.paymentInfo?.payment_status || entry.status || entry.actionType || entry.action_type || '').toLowerCase()
               ].join('|');
               if (seen.has(key)) return false;
               seen.add(key);
@@ -273,6 +311,8 @@ function AdminPage() {
             return normalizedStatus === 'down_payment' || normalizedStatus === 'downpayment' || normalizedStatus === 'down-payment';
           } else if (filter === 'partial_payment') {
             return normalizedStatus === 'partial_payment' || normalizedStatus === 'partialpayment' || normalizedStatus === 'partial-payment';
+          } else if (filter === 'price_change') {
+            return (activity.actionType || activity.action_type || '').toLowerCase() === 'price_change';
           }
           return false;
         });
@@ -291,9 +331,10 @@ function AdminPage() {
       return;
     }
 
-    // Reports should only include accepted orders (and never pending ones).
+    // For dashboard status filters, start from all activity statuses.
     let filtered = allActivities.filter((activity) => {
       if (activity?.isPayment) return true;
+      if ((activity?.actionType || activity?.action_type) === 'price_change') return true;
       return isAcceptedOrderActivity(activity);
     });
 
@@ -309,10 +350,10 @@ function AdminPage() {
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter(activity => {
-        const status = activity.status?.toLowerCase() || '';
-        const statusText = activity.statusText?.toLowerCase() || '';
-        const filter = statusFilter.toLowerCase();
-        return status === filter || statusText.includes(filter);
+          const status = normalizeFilterValue(activity.status);
+          const statusText = normalizeFilterValue(activity.statusText);
+          const filter = normalizeFilterValue(statusFilter);
+          return status === filter || statusText.includes(filter);
       });
     }
 
@@ -499,8 +540,9 @@ function AdminPage() {
               <select value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value)} className="filter-select">
                 <option value="all">All Payments</option>
                 <option value="paid">Paid</option>
-              <option value="down-payment">Down Payment</option>
+                <option value="down-payment">Down Payment</option>
                 <option value="partial-payment">Partial Payment</option>
+                <option value="price-change">Price Change</option>
               </select>
             </div>
           )}
@@ -539,9 +581,10 @@ function AdminPage() {
                   <tr key={index}>
                     {(() => {
                       const parsed = extractPaymentMetaFromNotes(activity.notes || '');
-                      const handledBy = activity.actionBy || parsed.handledBy;
+                      const actorName = activity.actionBy || activity.action_by || parsed.handledBy || extractActorFromNotes(activity.notes || '');
                       const displayCustomer = parsed.customerName || activity.customer;
                       const statusLines = formatStatusDetails({ ...activity, customer: displayCustomer });
+                      const hasActorLine = statusLines.some((line) => /^(changed|handled|updated|processed|recorded)\s+by\s*:/i.test(line));
                       const cashReceived = activity.paymentInfo?.cash_received !== null && activity.paymentInfo?.cash_received !== undefined
                         ? parseFloat(activity.paymentInfo.cash_received)
                         : parsed.cashReceived;
@@ -607,8 +650,8 @@ function AdminPage() {
                     }}>
                       {activity.isPayment ? (
                         <div>
-                          {handledBy && (
-                            <div style={{ marginBottom: '4px' }}>Handled by: {handledBy}</div>
+                          {actorName && (
+                            <div style={{ marginBottom: '4px' }}>Changed by: {actorName}</div>
                           )}
                           {activity.paymentInfo?.amount !== undefined && activity.paymentInfo?.amount !== null && (
                             <div style={{ marginBottom: '4px' }}>
@@ -676,6 +719,11 @@ function AdminPage() {
                                     Changed by: {changedByMatch[1].trim()}
                                   </div>
                                 )}
+                                {!changedByMatch && actorName && (
+                                  <div style={{ marginBottom: '4px' }}>
+                                    Changed by: {actorName}
+                                  </div>
+                                )}
                                 {customerMatch && (
                                   <div style={{ marginBottom: '4px' }}>
                                     Customer: {customerMatch[1].trim()}
@@ -692,6 +740,11 @@ function AdminPage() {
                         </div>
                       ) : (
                         <div>
+                          {actorName && !hasActorLine && (
+                            <div style={{ marginBottom: '4px' }}>
+                              Changed by: {actorName}
+                            </div>
+                          )}
                           {statusLines.map((line, lineIndex) => (
                             <div key={`${index}-${lineIndex}`} style={{ marginBottom: lineIndex < statusLines.length - 1 ? '4px' : 0 }}>
                               {line}

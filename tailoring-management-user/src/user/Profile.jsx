@@ -977,9 +977,16 @@ const Profile = () => {
             <div className="detail-row">
               <span className="detail-label">Estimated Completion Date:</span>
               <span className="detail-value">
-                {specific_data.estimatedCompletionDate || specific_data.estimated_completion_date
-                  ? formatDate(specific_data.estimatedCompletionDate || specific_data.estimated_completion_date)
-                  : 'N/A'}
+                {(() => {
+                  const estimatedCompletionDate = item.estimated_completion_date || specific_data.estimatedCompletionDate || specific_data.estimated_completion_date;
+                  const estimatedCompletionTime = specific_data.estimatedTime || specific_data.estimated_time || item.pricing_factors?.estimatedTime || item.pricing_factors?.estimated_time || estimatedTime;
+
+                  if (estimatedCompletionDate) {
+                    return formatDate(estimatedCompletionDate);
+                  }
+
+                  return estimatedCompletionTime || 'N/A';
+                })()}
               </span>
             </div>
             {item.status === 'price_confirmation' ? (
@@ -1015,6 +1022,20 @@ const Profile = () => {
         const garments = Array.isArray(specific_data.garments) ? specific_data.garments : [];
         const topLevelDesignData = parseDesignData(specific_data.designData);
         const topLevelAngleImages = topLevelDesignData?.angleImageUrls || topLevelDesignData?.angleImages;
+        const preferredDate = specific_data.preferredDate || specific_data.preferred_date;
+        const estimatedCompletionDate = item.estimated_completion_date || specific_data.estimatedCompletionDate || specific_data.estimated_completion_date;
+        const storedEstimatedTime = specific_data.estimatedTime || specific_data.estimated_time || item.pricing_factors?.estimatedTime || item.pricing_factors?.estimated_time;
+
+        const estimatedTimeDisplay = (() => {
+          if (estimatedCompletionDate) {
+            const parsedDate = new Date(estimatedCompletionDate);
+            return Number.isNaN(parsedDate.getTime())
+              ? estimatedCompletionDate
+              : parsedDate.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+          }
+
+          return storedEstimatedTime || 'N/A';
+        })();
 
         return (
           <div className="service-details customize-details">
@@ -1031,9 +1052,13 @@ const Profile = () => {
             <div className="detail-row">
               <span className="detail-label">Estimated Completion Date:</span>
               <span className="detail-value">
-                {specific_data.estimatedCompletionDate || specific_data.estimated_completion_date
-                  ? formatDate(specific_data.estimatedCompletionDate || specific_data.estimated_completion_date)
-                  : 'N/A'}
+                {estimatedCompletionDate ? formatDate(estimatedCompletionDate) : 'N/A'}
+              </span>
+            </div>
+            <div className="detail-row">
+              <span className="detail-label">Estimated Time:</span>
+              <span className="detail-value">
+                {estimatedTimeDisplay}
               </span>
             </div>
             {specific_data.notes && (
@@ -1360,6 +1385,17 @@ const Profile = () => {
               : previousDryCleaningPrice)
         );
         const dryCleaningEstimatedTime = specific_data.estimatedTime || getDryCleaningEstimatedTime(cleaningServiceName);
+        const dryCleaningEstimatedCompletionDate = item.estimated_completion_date || specific_data.estimatedCompletionDate || specific_data.estimated_completion_date;
+        const dryCleaningEstimatedTimeDisplay = (() => {
+          if (dryCleaningEstimatedCompletionDate) {
+            const parsedDate = new Date(dryCleaningEstimatedCompletionDate);
+            return Number.isNaN(parsedDate.getTime())
+              ? dryCleaningEstimatedCompletionDate
+              : parsedDate.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+          }
+
+          return specific_data.estimatedTime || specific_data.estimated_time || item.pricing_factors?.estimatedTime || item.pricing_factors?.estimated_time || dryCleaningEstimatedTime || 'N/A';
+        })();
 
         return (
           <div className="service-details drycleaning-details">
@@ -1449,10 +1485,14 @@ const Profile = () => {
               <span className="detail-value">{formatDateTo12Hour(specific_data.pickupDate)}</span>
             </div>
             <div className="detail-row">
+              <span className="detail-label">Estimated Time:</span>
+              <span className="detail-value">{dryCleaningEstimatedTimeDisplay}</span>
+            </div>
+            <div className="detail-row">
               <span className="detail-label">Estimated Completion Date:</span>
               <span className="detail-value">
-                {specific_data.estimatedCompletionDate || specific_data.estimated_completion_date
-                  ? formatDate(specific_data.estimatedCompletionDate || specific_data.estimated_completion_date)
+                {dryCleaningEstimatedCompletionDate
+                  ? formatDate(dryCleaningEstimatedCompletionDate)
                   : 'N/A'}
               </span>
             </div>
@@ -2134,6 +2174,22 @@ const Profile = () => {
                 const remainingAmount = Math.max(0, finalPrice - totalPaid);
                 const hasPayment = totalPaid > 0 && (isRental || isRepair || isDryCleaning || isCustomization);
                 const adminPriceReason = (pricingFactors?.adminNotes || item.specific_data?.adminNotes || '').toString().trim();
+                const previousPriceValue = (() => {
+                  const bp = parseFloat(item.base_price ?? item.basePrice ?? 0);
+                  const fallback = estimatedPrice;
+                  let prev = Number.isFinite(bp) && bp > 0 ? bp : fallback;
+
+                  // Dry cleaning may have base_price=0, compute from pricing factors as fallback.
+                  if ((!Number.isFinite(prev) || prev <= 0) && (item.service_type === 'dry_cleaning' || item.service_type === 'drycleaning' || item.service_type === 'dry-cleaning')) {
+                    const pf = item.pricing_factors || {};
+                    const pricePerItem = parseFloat(pf.pricePerItem ?? pf.price_per_item ?? 0);
+                    const qty = parseInt(pf.quantity ?? item.specific_data?.quantity ?? 1, 10) || 1;
+                    const computed = Number.isFinite(pricePerItem) && pricePerItem > 0 ? (pricePerItem * qty) : 0;
+                    if (computed > 0) prev = computed;
+                  }
+
+                  return prev > 0 ? prev : null;
+                })();
 
                 const isUniform = isCustomization && (
                   item.specific_data?.garmentType?.toLowerCase() === 'uniform' ||
@@ -2347,24 +2403,9 @@ const Profile = () => {
                             <div className="price-row">
                               <span className="price-label">Previous Price:</span>
                               <span className="price-value estimated">
-                                ₱{(() => {
-                                  const bp = parseFloat(item.base_price ?? item.basePrice ?? 0);
-                                  const fallback = estimatedPrice;
-                                  let prev = Number.isFinite(bp) && bp > 0 ? bp : fallback;
-
-                                  // Dry cleaning may have `base_price = 0`, so fall back to pricing_factors.
-                                  if ((!Number.isFinite(prev) || prev <= 0) && (item.service_type === 'dry_cleaning' || item.service_type === 'drycleaning' || item.service_type === 'dry-cleaning')) {
-                                    const pf = item.pricing_factors || {};
-                                    const pricePerItem = parseFloat(pf.pricePerItem ?? pf.price_per_item ?? 0);
-                                    const qty = parseInt(pf.quantity ?? item.specific_data?.quantity ?? 1, 10) || 1;
-                                    const computed = Number.isFinite(pricePerItem) && pricePerItem > 0 ? (pricePerItem * qty) : 0;
-                                    if (computed > 0) prev = computed;
-                                  }
-
-                                  return prev > 0
-                                    ? prev.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                    : 'N/A';
-                                })()}
+                                {previousPriceValue !== null
+                                  ? `₱${previousPriceValue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                  : 'N/A'}
                               </span>
                             </div>
                             <div className="price-row">
@@ -2406,6 +2447,12 @@ const Profile = () => {
                             if (isDryCleaning && isEstimated) {
                               return (
                                 <>
+                                  {priceChanged && previousPriceValue !== null && (
+                                    <div className="price-row">
+                                      <span className="price-label">Previous Price:</span>
+                                      <span className="price-value estimated">₱{previousPriceValue.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    </div>
+                                  )}
                                   <div className="price-row">
                                     <span className="price-label">Estimated Price:</span>
                                     <span className="price-value estimated">₱{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
@@ -2432,6 +2479,12 @@ const Profile = () => {
 
                             return (
                               <>
+                                {priceChanged && previousPriceValue !== null && (
+                                  <div className="price-row">
+                                    <span className="price-label">Previous Price:</span>
+                                    <span className="price-value estimated">₱{previousPriceValue.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                  </div>
+                                )}
                                 <div className="price-row">
                                   <span className="price-label">Final Price:</span>
                                   <span className="price-value final">₱{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>

@@ -104,7 +104,11 @@ const Customization = {
 
   updateOrderItem: (itemId, updateData, callback) => {
     const { finalPrice, approvalStatus, adminNotes, pricingFactors } = updateData;
-    const estimatedCompletionDate = pricingFactors?.estimatedCompletionDate || pricingFactors?.estimated_completion_date;
+    const estimatedCompletionDate =
+      updateData?.estimatedCompletionDate ||
+      pricingFactors?.estimatedCompletionDate ||
+      pricingFactors?.estimated_completion_date ||
+      null;
     
     console.log("Customization Model - Updating item:", itemId, updateData);
 

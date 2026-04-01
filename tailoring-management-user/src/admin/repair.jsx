@@ -702,7 +702,8 @@ const Repair = () => {
           ...prev,
           pricing_factors: {
             ...(prev?.pricing_factors || {}),
-            estimatedCompletionDate: detailEstimatedCompletionDate || null
+            estimatedCompletionDate: detailEstimatedCompletionDate || null,
+            estimated_completion_date: detailEstimatedCompletionDate || null
           }
         }));
         showToast('Estimated completion date saved.', 'success');
@@ -1526,7 +1527,27 @@ const Repair = () => {
               <div className="detail-row"><strong>Damage Description:</strong> {selectedOrder.specific_data?.damageDescription || 'N/A'}</div>
               <div className="detail-row"><strong>Date Received:</strong> {new Date(selectedOrder.order_date).toLocaleDateString()}</div>
               <div className="detail-row"><strong>Selected Time:</strong> {(selectedOrder.specific_data?.pickupDate || selectedOrder.pricing_factors?.pickupDate) ? String(selectedOrder.specific_data?.pickupDate || selectedOrder.pricing_factors?.pickupDate).split('T')[1]?.slice(0, 5) || 'N/A' : 'N/A'}</div>
-              <div className="detail-row"><strong>Estimated Time:</strong> {selectedOrder.pricing_factors?.estimatedTime || 'N/A'}</div>
+              <div className="detail-row"><strong>Estimated Time:</strong> {(() => {
+                const pf = selectedOrder?.pricing_factors || {};
+                const sd = selectedOrder?.specific_data || {};
+
+                const savedEstimatedTime = pf.estimatedTime || pf.estimated_time || sd.estimatedTime || sd.estimated_time;
+                if (savedEstimatedTime) return savedEstimatedTime;
+
+                const completionDate =
+                  detailEstimatedCompletionDate ||
+                  pf.estimatedCompletionDate ||
+                  pf.estimated_completion_date ||
+                  sd.estimatedCompletionDate ||
+                  sd.estimated_completion_date;
+
+                if (!completionDate) return 'N/A';
+
+                const parsedDate = new Date(completionDate);
+                return Number.isNaN(parsedDate.getTime())
+                  ? completionDate
+                  : parsedDate.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+              })()}</div>
 
               {selectedOrder.approval_status === 'accepted' && (
                 <div className="detail-row" style={{ alignItems: 'center', gap: '10px' }}>
@@ -1548,14 +1569,17 @@ const Repair = () => {
                 </div>
               )}
 
-              {selectedOrder.approval_status === 'price_confirmation' && (
-                <div className="detail-row"><strong>Previous Price:</strong> ₱{(() => {
-                  const base = parseFloat(selectedOrder.base_price ?? selectedOrder.basePrice ?? 0);
-                  const fallback = parseFloat(getEstimatedPrice(selectedOrder) || 0);
-                  const prev = base > 0 ? base : fallback;
-                  return prev > 0 ? prev.toLocaleString() : 'N/A';
-                })()}</div>
-              )}
+              {(() => {
+                const base = parseFloat(selectedOrder.base_price ?? selectedOrder.basePrice ?? 0);
+                const fallback = parseFloat(getEstimatedPrice(selectedOrder) || 0);
+                const previousPrice = base > 0 ? base : fallback;
+                const currentPrice = parseFloat(selectedOrder.final_price || 0);
+                const priceChanged = previousPrice > 0 && Math.abs(currentPrice - previousPrice) > 0.01;
+
+                return priceChanged ? (
+                  <div className="detail-row"><strong>Previous Price:</strong> ₱{previousPrice.toLocaleString()}</div>
+                ) : null;
+              })()}
               <div className="detail-row"><strong>Repair Cost:</strong> ₱{parseFloat(selectedOrder.final_price || 0).toLocaleString()}</div>
               <div className="detail-row"><strong>Status:</strong>
                 <span className={`status-badge ${getStatusClass(selectedOrder.approval_status || 'pending')}`}>

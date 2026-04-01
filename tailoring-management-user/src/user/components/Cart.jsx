@@ -613,7 +613,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                       {item.service_type === 'rental' ? (
                         <>
                           <p>Rental Price: {formatPrice(item.final_price)}</p>
-                          <p>Downpayment: {formatPrice(item.pricing_factors?.downpayment || item.specific_data?.downpayment || 0)}</p>
+                          <p>Deposit: {formatPrice(item.pricing_factors?.downpayment || item.specific_data?.downpayment || 0)}</p>
                         </>
                       ) : item.service_type === 'dry_cleaning' && item.specific_data?.isEstimatedPrice ? (
                         <p>Estimated Price: {formatPrice(item.final_price)}</p>
@@ -999,11 +999,17 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                     cartItems
                       .filter(item => selectedItems.includes(item.cart_id))
                       .reduce((total, item) => {
-
                         const isBundleRental = item.service_type === 'rental' &&
                           (item.specific_data?.is_bundle || item.pricing_factors?.is_bundle);
                         if (isBundleRental) {
-                          return total + parseFloat(item.final_price || 0);
+                          const rentalPrice = parseFloat(item.final_price || 0);
+                          const deposit = parseFloat(item.pricing_factors?.downpayment || 0);
+                          return total + rentalPrice + deposit;
+                        }
+                        if (item.service_type === 'rental') {
+                          const rentalPrice = parseFloat(item.final_price || 0);
+                          const deposit = parseFloat(item.pricing_factors?.downpayment || 0);
+                          return total + rentalPrice + deposit;
                         }
                         return total + (parseFloat(item.final_price || 0) * (item.quantity || 1));
                       }, 0)
@@ -1218,7 +1224,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                 justifyContent: 'space-between',
                 alignItems: 'center'
               }}>
-                <span style={{ fontWeight: '500', color: '#856404' }}>Downpayment (50%)</span>
+                <span style={{ fontWeight: '500', color: '#856404' }}>Deposit</span>
                 <span style={{ fontWeight: '700', color: '#856404', fontSize: '18px' }}>
                   {formatPrice(parentBundleData.pricing_factors?.downpayment || 0)}
                 </span>
@@ -1490,7 +1496,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#fff3cd', borderRadius: '6px' }}>
-                <span style={{ fontWeight: '500', color: '#856404' }}>Downpayment (50%)</span>
+                <span style={{ fontWeight: '500', color: '#856404' }}>Deposit</span>
                 <span style={{ fontWeight: '700', color: '#856404', fontSize: '18px' }}>{formatPrice(selectedRentalItem.pricing_factors?.downpayment || selectedRentalItem.specific_data?.downpayment || 0)}</span>
               </div>
             </div>

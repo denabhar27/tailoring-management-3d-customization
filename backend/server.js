@@ -472,6 +472,20 @@ try {
   console.error('[SERVER] Error updating rental_inventory.size column:', err.message);
 }
 
+// Run rental deposit migration
+try {
+  const { runDepositMigration } = require('./migrations/runDepositMigration');
+  runDepositMigration()
+    .then(() => {
+      console.log('[SERVER] ✅ Rental deposit system migration completed');
+    })
+    .catch((err) => {
+      console.error('[SERVER] Error running deposit migration:', err.message);
+    });
+} catch (err) {
+  console.error('[SERVER] Error initializing deposit migration:', err.message);
+}
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

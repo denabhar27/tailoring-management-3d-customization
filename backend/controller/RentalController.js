@@ -1,7 +1,7 @@
 const RentalInventory = require('../model/RentalInventoryModel');
 
 exports.createRental = (req, res) => {
-  const { item_name, description, brand, size, color, category, price, downpayment, total_available, image_url, material, care_instructions, damage_notes } = req.body;
+  const { item_name, description, brand, size, color, category, price, deposit, downpayment, total_available, image_url, material, care_instructions, damage_notes } = req.body;
 
   let frontImage = null;
   let backImage = null;
@@ -43,6 +43,7 @@ exports.createRental = (req, res) => {
     color,
     category,
     price,
+    deposit,
     downpayment,
     total_available,
     image_url: mainImageUrl, 
@@ -155,7 +156,7 @@ exports.getRentalsByCategory = (req, res) => {
 
 exports.updateRental = (req, res) => {
   const { item_id } = req.params;
-  const { item_name, description, brand, size, color, category, price, downpayment, total_available, image_url, front_image, back_image, side_image, material, care_instructions, damage_notes, status } = req.body;
+  const { item_name, description, brand, size, color, category, price, deposit, downpayment, total_available, image_url, front_image, back_image, side_image, material, care_instructions, damage_notes, status } = req.body;
 
   let frontImageUrl = front_image || null;
   let backImageUrl = back_image || null;
@@ -222,6 +223,7 @@ exports.updateRental = (req, res) => {
       color,
       category,
       price,
+      deposit,
       downpayment,
       total_available,
       image_url: mainImageUrl,

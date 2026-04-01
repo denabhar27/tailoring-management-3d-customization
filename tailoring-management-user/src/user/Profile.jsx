@@ -2261,8 +2261,18 @@ const Profile = () => {
                         {isRental && item.status === 'rented' ? (
                           <>
                             <div className="price-row">
-                              <span className="price-label">Total Rental Price:</span>
+                              <span className="price-label">Rental Price:</span>
                               <span className="price-value final">₱{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                            </div>
+                            <div className="price-row">
+                              <span className="price-label">Deposit (Refundable):</span>
+                              <span className="price-value" style={{ color: '#ff9800' }}>₱{downpayment.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                            </div>
+                            <div className="price-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
+                              <span className="price-label" style={{ fontWeight: 'bold', fontSize: '16px' }}>Total Payment:</span>
+                              <span className="price-value" style={{ fontWeight: 'bold', fontSize: '18px', color: '#2d5a3d' }}>
+                                ₱{(finalPrice + downpayment).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                              </span>
                             </div>
                             <div className="price-row">
                               <span className="price-label">Amount Paid:</span>
@@ -2281,8 +2291,30 @@ const Profile = () => {
                         ) : item.status === 'pending' ? (
 
                           (() => {
+                            const isRentalService = item.service_type === 'rental';
                             const isDryCleaning = item.service_type === 'dry_cleaning' || item.service_type === 'drycleaning';
                             const isEstimated = item.specific_data?.isEstimatedPrice === true;
+
+                            if (isRentalService) {
+                              return (
+                                <>
+                                  <div className="price-row">
+                                    <span className="price-label">Rental Price:</span>
+                                    <span className="price-value final">₱{parseFloat(item.final_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                  </div>
+                                  <div className="price-row">
+                                    <span className="price-label">Deposit (Refundable):</span>
+                                    <span className="price-value" style={{ color: '#ff9800' }}>₱{downpayment.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                  </div>
+                                  <div className="price-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
+                                    <span className="price-label" style={{ fontWeight: 'bold', fontSize: '16px' }}>Total Payment:</span>
+                                    <span className="price-value" style={{ fontWeight: 'bold', fontSize: '18px', color: '#2d5a3d' }}>
+                                      ₱{(parseFloat(item.final_price || 0) + downpayment).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                    </span>
+                                  </div>
+                                </>
+                              );
+                            }
 
                             if (isDryCleaning) {
                               if (isEstimated) {
@@ -2442,13 +2474,13 @@ const Profile = () => {
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                           <span style={{ fontSize: '24px' }}>💰</span>
-                          <strong style={{ color: '#e65100', fontSize: '16px' }}>Downpayment Payment Required</strong>
+                          <strong style={{ color: '#e65100', fontSize: '16px' }}>Deposit Payment Required</strong>
                         </div>
                         <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>
-                          Please pay the downpayment amount when picking up your rental item from the store.
+                          Please pay the deposit amount when picking up your rental item from the store.
                         </div>
                         <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ff9800' }}>
-                          Downpayment Amount: ₱{parseFloat(item.pricing_factors?.downpayment || item.specific_data?.downpayment || 0).toLocaleString()}
+                          Deposit Amount: ₱{parseFloat(item.pricing_factors?.downpayment || item.specific_data?.downpayment || 0).toLocaleString()}
                         </div>
                       </div>
                     )}
@@ -2698,6 +2730,25 @@ const Profile = () => {
                         const totalPaid = amountPaid;
                         const remainingAmount = Math.max(0, finalPrice - totalPaid);
                         const hasPayment = totalPaid > 0 && (isRental || isRepair || isDryCleaning || isCustomization);
+
+                        if (isRental) {
+                          return (
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ marginBottom: '8px' }}>
+                                <div style={{ fontSize: '13px', color: '#666' }}>Rental Price:</div>
+                                <div style={{ fontSize: '16px', fontWeight: '600', color: '#333' }}>₱{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                              </div>
+                              <div style={{ marginBottom: '8px' }}>
+                                <div style={{ fontSize: '13px', color: '#666' }}>Deposit (Refundable):</div>
+                                <div style={{ fontSize: '16px', fontWeight: '600', color: '#ff9800' }}>₱{downpayment.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                              </div>
+                              <div style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
+                                <div style={{ fontSize: '13px', color: '#666' }}>Total Payment:</div>
+                                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2d5a3d' }}>₱{(finalPrice + downpayment).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                              </div>
+                            </div>
+                          );
+                        }
 
                         if (hasPayment && remainingAmount > 0) {
                           return (

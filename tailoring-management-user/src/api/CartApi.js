@@ -157,3 +157,29 @@ export async function getCartSummary() {
     };
   }
 }
+
+export function calculateCartTotalsWithDeposit(cartItems = []) {
+  let rentalPrice = 0;
+  let depositAmount = 0;
+  let otherServices = 0;
+
+  cartItems.forEach(item => {
+    if (item.service_type === 'rental') {
+      const specific = item.specific_data || {};
+      rentalPrice += parseFloat(specific.rental_price || item.base_price || 0);
+      depositAmount += parseFloat(specific.rental_deposit || 0);
+    } else {
+      otherServices += parseFloat(item.final_price || item.base_price || 0);
+    }
+  });
+
+  return {
+    rentalPrice,
+    depositAmount,
+    otherServices,
+    totalRental: rentalPrice + depositAmount,
+    grandTotal: rentalPrice + depositAmount + otherServices,
+    downpaymentDue: (rentalPrice * 0.5) + depositAmount,
+    balanceDue: rentalPrice * 0.5
+  };
+}

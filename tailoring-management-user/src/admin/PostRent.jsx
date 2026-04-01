@@ -34,6 +34,7 @@ const createDefaultSizeEntry = (sizeKey, extraId = '') => ({
   customLabel: '',
   quantity: '',
   price: '',
+  deposit: '',
   activeTab: 'top',
   isOpen: false,
   measurements: EMPTY_MEASUREMENTS()
@@ -57,6 +58,7 @@ const parseSizeEntriesFromPayload = (rawSize) => {
           customLabel: entry.customLabel || '',
           quantity: entry.quantity !== undefined ? String(entry.quantity) : '',
           price: entry.price !== undefined ? String(entry.price) : '',
+          deposit: entry.deposit !== undefined ? String(entry.deposit) : '',
           activeTab: 'top',
           isOpen: false,
           measurements
@@ -83,6 +85,7 @@ const parseSizeEntriesFromPayload = (rawSize) => {
         customLabel: '',
         quantity: opt.quantity !== undefined ? String(opt.quantity) : '',
         price: opt.price !== undefined ? String(opt.price) : '',
+        deposit: opt.deposit !== undefined ? String(opt.deposit) : '',
         activeTab: 'top',
         isOpen: false,
         measurements
@@ -534,6 +537,7 @@ const PostRent = () => {
       customLabel: entry.customLabel || '',
       quantity: Math.max(0, parseInt(entry.quantity, 10) || 0),
       price: parseFloat(entry.price) || 0,
+      deposit: parseFloat(entry.deposit) || 0,
       measurements: entry.measurements || {}
     }));
 
@@ -917,6 +921,16 @@ const PostRent = () => {
                             step="0.01"
                             value={entry.price}
                             onChange={(e) => handleEntryChange(entry.id, 'price', e.target.value)}
+                            placeholder="0.00"
+                            style={{ width: '90px', padding: '6px 8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000', fontSize: '13px' }}
+                          />
+                          <label style={{ fontSize: '12px', color: '#555', whiteSpace: 'nowrap', marginLeft: '10px' }}>Deposit:</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={entry.deposit}
+                            onChange={(e) => handleEntryChange(entry.id, 'deposit', e.target.value)}
                             placeholder="0.00"
                             style={{ width: '90px', padding: '6px 8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000', fontSize: '13px' }}
                           />

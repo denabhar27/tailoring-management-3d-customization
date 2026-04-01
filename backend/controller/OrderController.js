@@ -1881,14 +1881,16 @@ exports.recordRentalPayment = (req, res) => {
 
     const currentAmountPaid = parseFloat(pricingFactors.amount_paid || 0);
     const finalPrice = parseFloat(item.final_price || 0);
+    const depositAmount = parseFloat(pricingFactors.downpayment || 0);
+    const totalPaymentRequired = finalPrice + depositAmount;
     const newAmountPaid = currentAmountPaid + amount;
-    const remainingBalance = finalPrice - newAmountPaid;
+    const remainingBalance = totalPaymentRequired - newAmountPaid;
     const changeAmount = cashTendered - amount;
 
-    if (newAmountPaid > finalPrice) {
+    if (newAmountPaid > totalPaymentRequired) {
       return res.status(400).json({
         success: false,
-        message: `Payment amount exceeds remaining balance. Total: ₱${finalPrice.toFixed(2)}, Already paid: ₱${currentAmountPaid.toFixed(2)}, Remaining: ₱${(finalPrice - currentAmountPaid).toFixed(2)}`
+        message: `Payment amount exceeds total payment required. Rental: ₱${finalPrice.toFixed(2)}, Deposit: ₱${depositAmount.toFixed(2)}, Total: ₱${totalPaymentRequired.toFixed(2)}, Already paid: ₱${currentAmountPaid.toFixed(2)}, Remaining: ₱${(totalPaymentRequired - currentAmountPaid).toFixed(2)}`
       });
     }
 
@@ -1898,20 +1900,17 @@ exports.recordRentalPayment = (req, res) => {
     let newPaymentStatus = item.payment_status || 'unpaid';
     const serviceType = (item.service_type || '').toLowerCase().trim();
     
-    if (newAmountPaid >= finalPrice) {
-      
+    if (newAmountPaid >= totalPaymentRequired) {
       newPaymentStatus = serviceType === 'rental' ? 'fully_paid' : 'paid';
     } else if (newAmountPaid > 0) {
-      
       if (serviceType === 'rental') {
-        const downpaymentAmount = finalPrice * 0.5;
-        if (newAmountPaid >= downpaymentAmount) {
-          newPaymentStatus = 'down-payment';
+        const totalRequired = finalPrice + depositAmount;
+        if (newAmountPaid >= totalRequired) {
+          newPaymentStatus = 'fully_paid';
         } else {
           newPaymentStatus = 'partial_payment';
         }
       } else {
-        
         newPaymentStatus = 'partial_payment';
       }
     }

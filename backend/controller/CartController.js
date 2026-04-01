@@ -138,17 +138,6 @@ exports.addToCart = (req, res) => {
     });
   }
 
-  if (serviceType === 'rental' && pricingFactors) {
-    const totalPrice = parseFloat(finalPrice || 0);
-    const currentDownpayment = parseFloat(pricingFactors.downpayment || pricingFactors.down_payment || 0);
-    const expectedDownpayment = totalPrice * 0.5;
-
-    if (Math.abs(currentDownpayment - expectedDownpayment) > 0.01) {
-      pricingFactors.downpayment = expectedDownpayment.toString();
-      pricingFactors.down_payment = expectedDownpayment.toString();
-    }
-  }
-
   const ServiceIdGenerator = require('../model/ServiceIdGenerator');
 
   const needsIncrementalId = ['dry_cleaning', 'repair', 'customization'].includes(serviceType);

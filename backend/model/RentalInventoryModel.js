@@ -104,8 +104,8 @@ const RentalInventory = {
   create: (itemData, callback) => {
     const sql = `
       INSERT INTO rental_inventory 
-      (item_name, description, brand, size, color, category, price, downpayment, total_available, image_url, front_image, back_image, side_image, material, care_instructions, damage_notes) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (item_name, description, brand, size, color, category, price, deposit, downpayment, total_available, image_url, front_image, back_image, side_image, material, care_instructions, damage_notes) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const values = [
       itemData.item_name,
@@ -115,6 +115,7 @@ const RentalInventory = {
       itemData.color || null,
       itemData.category || null,
       itemData.price,
+      itemData.deposit || '0',
       itemData.downpayment || '0',
       itemData.total_available || 1,
       itemData.image_url || null,
@@ -418,7 +419,7 @@ const RentalInventory = {
     const sql = `
       UPDATE rental_inventory 
       SET item_name = ?, description = ?, brand = ?, size = ?, color = ?, category = ?, 
-          price = ?, downpayment = ?, total_available = ?, 
+          price = ?, deposit = ?, downpayment = ?, total_available = ?, 
           image_url = ?, front_image = ?, back_image = ?, side_image = ?, 
           material = ?, care_instructions = ?, damage_notes = ?, status = ?
       WHERE item_id = ?
@@ -431,6 +432,7 @@ const RentalInventory = {
       itemData.color || null,
       itemData.category || null,
       itemData.price,
+      itemData.deposit || '0',
       itemData.downpayment || '0',
       itemData.total_available,
       itemData.image_url || null,

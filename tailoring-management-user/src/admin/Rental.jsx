@@ -470,8 +470,9 @@ function Rental() {
         if (recordPayment) {
 
           setShowEditModal(false);
-          const halfPrice = (totalPrice * 0.5).toFixed(2);
-          setPaymentAmount(halfPrice);
+          const depositAmount = parseFloat(selectedRental.pricing_factors?.downpayment || selectedRental.specific_data?.downpayment || 0);
+          const totalPayment = (totalPrice + depositAmount).toFixed(2);
+          setPaymentAmount(totalPayment);
           setCashReceived('');
           setPendingRentedStatus(selectedRental.item_id);
           setShowPaymentModal(true);
@@ -534,8 +535,9 @@ function Rental() {
         if (recordPayment) {
 
           setSelectedRental(currentRental);
-          const halfPrice = (totalPrice * 0.5).toFixed(2);
-          setPaymentAmount(halfPrice);
+          const depositAmount = parseFloat(currentRental.pricing_factors?.downpayment || currentRental.specific_data?.downpayment || 0);
+          const totalPayment = (totalPrice + depositAmount).toFixed(2);
+          setPaymentAmount(totalPayment);
           setCashReceived('');
           setShowPaymentModal(true);
           setPendingRentedStatus(itemId);
@@ -678,14 +680,12 @@ function Rental() {
       return;
     }
 
-    const pricingFactors = typeof selectedRental.pricing_factors === 'string'
-      ? JSON.parse(selectedRental.pricing_factors || '{}')
-      : (selectedRental.pricing_factors || {});
-    const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
     const finalPrice = parseFloat(selectedRental.final_price || 0);
-    const remainingBalance = Math.max(0, finalPrice - amountPaid);
-    if (amount > remainingBalance) {
-      await alert(`Payment amount exceeds remaining balance (₱${remainingBalance.toFixed(2)})`, 'Error', 'error');
+    const depositAmount = parseFloat(selectedRental.pricing_factors?.downpayment || selectedRental.specific_data?.downpayment || 0);
+    const totalPayment = finalPrice + depositAmount;
+    
+    if (amount < totalPayment) {
+      await alert(`Payment amount must be at least ₱${totalPayment.toFixed(2)} (Rental: ₱${finalPrice.toFixed(2)} + Deposit: ₱${depositAmount.toFixed(2)})`, 'Error', 'error');
       return;
     }
 
@@ -1051,9 +1051,12 @@ function Rental() {
                         </td>
                         <td>
                           <div style={{ fontSize: '12px' }}>
-                            <div>Paid: ₱{amountPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-                            <div style={{ color: remainingBalance > 0 ? '#ff9800' : '#4caf50', fontWeight: 'bold' }}>
-                              Remaining: ₱{Math.max(0, remainingBalance).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                            <div>Rental: ₱{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                            <div style={{ color: '#ff9800', fontWeight: 'bold' }}>
+                              Deposit: ₱{downpaymentAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                            </div>
+                            <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '4px', marginTop: '4px', fontWeight: 'bold' }}>
+                              Total: ₱{(finalPrice + parseFloat(downpaymentAmount)).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                             </div>
                           </div>
                         </td>
@@ -1201,8 +1204,9 @@ function Rental() {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setSelectedRental(rental);
-                                      const halfPrice = (parseFloat(rental.final_price || 0) * 0.5).toFixed(2);
-                                      setPaymentAmount(halfPrice);
+                                      const depositAmount = parseFloat(rental.pricing_factors?.downpayment || rental.specific_data?.downpayment || 0);
+                                      const totalPayment = (parseFloat(rental.final_price || 0) + depositAmount).toFixed(2);
+                                      setPaymentAmount(totalPayment);
                                       setCashReceived('');
                                       setShowPaymentModal(true);
                                     }}
@@ -1425,62 +1429,34 @@ function Rental() {
               </div>
               <div className="detail-row">
                 <strong>Customer:</strong>
-                <span>{selectedRental.first_name} {selectedRental.last_name}</span>
+                <span>
+                  {selectedRental.order_type === 'walk_in'
+                    ? (selectedRental.walk_in_customer_name || 'Walk-in Customer')
+                    : `${selectedRental.first_name || ''} ${selectedRental.last_name || ''}`.trim() || 'N/A'}
+                </span>
               </div>
               <div className="detail-row">
                 <strong>Item:</strong>
                 <span>{selectedRental.specific_data?.item_name || 'N/A'}</span>
               </div>
               <div className="detail-row">
-                <strong>Total Price:</strong>
-                <span style={{
-                  textDecoration: selectedRental.approval_status === 'cancelled' ? 'line-through' : 'none',
-                  color: selectedRental.approval_status === 'cancelled' ? '#999' : 'inherit'
-                }}>
+                <strong>Rental Price:</strong>
+                <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>
                   ₱{parseFloat(selectedRental.final_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                 </span>
               </div>
-              {(() => {
-                const pricingFactors = typeof selectedRental.pricing_factors === 'string'
-                  ? JSON.parse(selectedRental.pricing_factors || '{}')
-                  : (selectedRental.pricing_factors || {});
-                const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
-                const finalPrice = parseFloat(selectedRental.final_price || 0);
-                const remaining = finalPrice - amountPaid;
-                const penalty = parseFloat(pricingFactors.penalty || 0);
-                const penaltyDays = parseInt(pricingFactors.penaltyDays || 0);
-
-                return (
-                  <>
-                    {penalty > 0 && penaltyDays > 0 && (
-                      <div className="detail-row" style={{
-                        backgroundColor: '#fff3cd',
-                        padding: '12px',
-                        borderRadius: '6px',
-                        border: '1px solid #ffc107',
-                        marginBottom: '10px'
-                      }}>
-                        <strong style={{ color: '#856404' }}>⚠️ Late Return Penalty:</strong>
-                        <span style={{ color: '#856404', fontWeight: 'bold' }}>
-                          ₱{penalty.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ({penaltyDays} day{penaltyDays > 1 ? 's' : ''} exceeded)
-                        </span>
-                      </div>
-                    )}
-                    <div className="detail-row">
-                      <strong>Amount Paid:</strong>
-                      <span style={{ color: '#4caf50', fontWeight: 'bold' }}>
-                        ₱{amountPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                      </span>
-                    </div>
-                    <div className="detail-row">
-                      <strong>Remaining Balance:</strong>
-                      <span style={{ color: remaining > 0 ? '#ff9800' : '#4caf50', fontWeight: 'bold' }}>
-                        ₱{Math.max(0, remaining).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                      </span>
-                    </div>
-                  </>
-                );
-              })()}
+              <div className="detail-row">
+                <strong>Deposit (Refundable):</strong>
+                <span style={{ color: '#ff9800', fontWeight: 'bold' }}>
+                  ₱{parseFloat(selectedRental.pricing_factors?.downpayment || selectedRental.specific_data?.downpayment || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </span>
+              </div>
+              <div className="detail-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
+                <strong>Total Payment:</strong>
+                <span style={{ color: '#2e7d32', fontWeight: 'bold', fontSize: '16px' }}>
+                  ₱{(parseFloat(selectedRental.final_price || 0) + parseFloat(selectedRental.pricing_factors?.downpayment || selectedRental.specific_data?.downpayment || 0)).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </span>
+              </div>
 
               <div className="payment-form-group">
                 <label>Payment Amount *</label>
@@ -1943,7 +1919,7 @@ function Rental() {
                 <span>{selectedRental.order_date || 'N/A'}</span>
               </div>
               <div className="detail-row">
-                <strong>Total Price:</strong>
+                <strong>Rental Price:</strong>
                 <span style={{
                   color: selectedRental.approval_status === 'cancelled' ? '#999' : '#2e7d32',
                   fontWeight: 'bold',
@@ -1952,48 +1928,18 @@ function Rental() {
                   ₱{parseFloat(selectedRental.final_price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                 </span>
               </div>
-              {(() => {
-                const pricingFactors = typeof selectedRental.pricing_factors === 'string'
-                  ? JSON.parse(selectedRental.pricing_factors || '{}')
-                  : (selectedRental.pricing_factors || {});
-                const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
-                const finalPrice = parseFloat(selectedRental.final_price || 0);
-                const remaining = finalPrice - amountPaid;
-                const penalty = parseFloat(pricingFactors.penalty || 0);
-                const penaltyDays = parseInt(pricingFactors.penaltyDays || 0);
-
-                return (
-                  <>
-                    {penalty > 0 && penaltyDays > 0 && (
-                      <div className="detail-row" style={{
-                        backgroundColor: '#fff3cd',
-                        padding: '12px',
-                        borderRadius: '6px',
-                        border: '1px solid #ffc107',
-                        marginBottom: '10px'
-                      }}>
-                        <strong style={{ color: '#856404' }}>⚠️ Late Return Penalty:</strong>
-                        <span style={{ color: '#856404', fontWeight: 'bold' }}>
-                          ₱{penalty.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ({penaltyDays} day{penaltyDays > 1 ? 's' : ''} exceeded)
-                        </span>
-                      </div>
-                    )}
               <div className="detail-row">
-                      <strong>Amount Paid:</strong>
-                      <span style={{ color: '#4caf50', fontWeight: 'bold' }}>
-                        ₱{amountPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                <strong>Deposit (Refundable):</strong>
+                <span style={{ color: '#ff9800', fontWeight: 'bold' }}>
+                  ₱{parseFloat(selectedRental.pricing_factors?.downpayment || selectedRental.specific_data?.downpayment || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                 </span>
               </div>
-                    <div className="detail-row">
-                      <strong>Remaining Balance:</strong>
-                      <span style={{ color: remaining > 0 ? '#ff9800' : '#4caf50', fontWeight: 'bold' }}>
-                        ₱{Math.max(0, remaining).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                        {remaining <= 0 && finalPrice > 0 && ' (Fully Paid)'}
-                      </span>
-                    </div>
-                  </>
-                );
-              })()}
+              <div className="detail-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
+                <strong>Total Payment:</strong>
+                <span style={{ color: '#2e7d32', fontWeight: 'bold', fontSize: '16px' }}>
+                  ₱{(parseFloat(selectedRental.final_price || 0) + parseFloat(selectedRental.pricing_factors?.downpayment || selectedRental.specific_data?.downpayment || 0)).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </span>
+              </div>
               <div className="detail-row">
                 <strong>Status:</strong>
                 <span className={`status-badge ${getStatusClass(selectedRental.approval_status)}`}>

@@ -96,12 +96,14 @@ const parseRentalSizeConfig = (rawSize) => {
           : (entry.customLabel || `Custom ${idx + 1}`);
         const qty = parseInt(entry.quantity, 10);
         const price = parseFloat(entry.price) || 0;
+        const deposit = parseFloat(entry.deposit) || 0;
         const normalizedMeasurements = normalizeMeasurementsObject(
           entry.measurements || entry.measurement_profile || entry.measurementProfile
         );
         sizeOptions[key] = {
           quantity: isNaN(qty) ? null : Math.max(0, qty),
           price,
+          deposit,
           measurements: normalizedMeasurements,
           label: SIZE_LABELS[key] || entry.customLabel || key
         };
@@ -448,6 +450,20 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
     const fallback = parseFloat(String(item.price || '').replace(/[^\d.]/g, ''));
     return !isNaN(fallback) && fallback > 0 ? fallback : 500;
+  };
+
+  const getDisplayDeposit = (item) => {
+    if (!item) return 0;
+    const deposits = getAvailableSizeKeys(item.sizeOptions || {})
+      .map((k) => parseFloat(item.sizeOptions?.[k]?.deposit))
+      .filter((d) => !isNaN(d) && d > 0);
+
+    if (deposits.length > 0) {
+      return Math.min(...deposits);
+    }
+
+    const fallback = parseFloat(String(item.deposit || '').replace(/[^\d.]/g, ''));
+    return !isNaN(fallback) && fallback > 0 ? fallback : 0;
   };
 
   const calculateEndDate = (start, duration) => {
@@ -935,6 +951,21 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
     return (validDuration / 3) * basePrice;
   };
 
+  const calculateTotalDeposit = (item) => {
+    if (!item) return 0;
+    const sizeOpts = item.sizeOptions || {};
+    if (Object.keys(sizeOpts).length === 0) {
+      return getDisplayDeposit(item);
+    }
+    let totalDeposit = 0;
+    Object.values(sizeOpts).forEach(opt => {
+      const deposit = parseFloat(opt.deposit) || 0;
+      const qty = parseInt(opt.quantity) || 0;
+      totalDeposit += deposit * qty;
+    });
+    return totalDeposit > 0 ? totalDeposit : getDisplayDeposit(item);
+  };
+
   const calculateTotalCostWithSelections = (selections, item, duration) => {
     if (!duration || !item || duration < 3) return 0;
     const validDuration = Math.floor(duration / 3) * 3;
@@ -955,6 +986,21 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
       if (isNaN(q) || q <= 0) return;
       const sizePrice = sizeOpts[sizeKey]?.price > 0 ? sizeOpts[sizeKey].price : fallbackPrice;
       total += q * sizePrice * (validDuration / 3);
+    });
+    return total;
+  };
+
+  const calculateTotalDepositWithSelections = (selections, item) => {
+    const sizeOpts = item.sizeOptions || {};
+    if (Object.keys(sizeOpts).length === 0) {
+      return getDisplayDeposit(item);
+    }
+    let total = 0;
+    Object.entries(selections).forEach(([sizeKey, qty]) => {
+      const q = parseInt(qty, 10);
+      if (isNaN(q) || q <= 0) return;
+      const sizeDeposit = parseFloat(sizeOpts[sizeKey]?.deposit) || 0;
+      total += q * sizeDeposit;
     });
     return total;
   };
@@ -992,7 +1038,8 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   const calculateMultiDownpayment = (items, duration) => {
     if (!items || items.length === 0 || !duration) return 0;
     const totalCost = calculateMultiTotalCost(duration, items);
-    return totalCost * 0.5;
+    const totalDeposit = items.reduce((sum, item) => sum + calculateTotalDeposit(item), 0);
+    return totalCost + totalDeposit;
   };
 
   const getItemId = (item) => item?.id || item?.item_id;
@@ -1186,12 +1233,14 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
     setAddingToCart(true);
     setCartMessage('');
     try {
-      const downpayment = totalCost * 0.5;
+      const downpayment = totalCost;
+      const totalDeposit = calculateTotalDepositWithSelections(sizeSelections, selectedItem);
       const selectedSizesData = selectedEntries.map(([sizeKey, qty]) => ({
         sizeKey,
         label: selectedItem.sizeOptions?.[sizeKey]?.label || SIZE_LABELS[sizeKey] || sizeKey,
         quantity: parseInt(qty, 10),
-        price: selectedItem.sizeOptions?.[sizeKey]?.price || 0
+        price: selectedItem.sizeOptions?.[sizeKey]?.price || 0,
+        deposit: selectedItem.sizeOptions?.[sizeKey]?.deposit || 0
       }));
       const primarySize = selectedSizesData[0];
       const rentalData = {
@@ -1203,7 +1252,9 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
         pricingFactors: {
           duration: rentalDuration,
           price: totalCost,
-          downpayment: downpayment.toString()
+          downpayment: totalDeposit.toString(),
+          deposit: totalDeposit.toString(),
+          total_due_on_pickup: (downpayment + totalDeposit).toString()
         },
         specificData: {
           item_name: selectedItem.item_name || selectedItem.name || 'Rental Item',
@@ -1277,7 +1328,11 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
     try {
       const total = calculateBundleTotalWithSelections(rentalDuration, selectedItems, cardSizeSelections);
-      const totalDownpayment = total * 0.5;
+      const totalDownpayment = total;
+      const bundleDeposit = selectedItems.reduce((sum, item) => {
+        const selections = cardSizeSelections[item.id || item.item_id] || {};
+        return sum + calculateTotalDepositWithSelections(selections, item);
+      }, 0);
 
       const itemsBundle = itemsWithSizes.map(({ item, selectedSizes }) => ({
         id: item.id || item.item_id,
@@ -1308,7 +1363,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
         pricingFactors: {
           duration: rentalDuration,
           price: total,
-          downpayment: totalDownpayment.toString(),
+          downpayment: bundleDeposit.toString(),
           is_bundle: true,
           item_count: itemsBundle.length
         },
@@ -1368,7 +1423,8 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   const bundlePreviewTotal = calculateBundleTotalWithSelections(3, selectedItems, cardSizeSelections);
   const selectedBundleQty = selectedItems.reduce((sum, item) => sum + getItemSelectedQuantity(item), 0);
   const modalLiveTotal = selectedItem ? calculateTotalCostWithSelections(sizeSelections, selectedItem, rentalDuration) : 0;
-  const modalLiveDownpayment = modalLiveTotal * 0.5;
+  const modalLiveDeposit = selectedItem ? calculateTotalDepositWithSelections(sizeSelections, selectedItem) : 0;
+  const modalLiveDownpayment = modalLiveTotal + modalLiveDeposit;
 
   if (loading) {
     return (
@@ -1585,7 +1641,12 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                     <span className="rc-item-badge">{formatLabel(item.category || 'Rental')}</span>
                     {item.color && <span className="rc-item-badge rc-item-badge-soft">{formatLabel(item.color)}</span>}
                   </div>
-                  <p className="rc-item-price">From ₱{parsePriceValue(item.price).toLocaleString('en-PH')}</p>
+                  <div className="rc-item-pricing">
+                    <p className="rc-item-price">From ₱{parsePriceValue(item.price).toLocaleString('en-PH')}</p>
+                    {getDisplayDeposit(item) > 0 && (
+                      <p className="rc-item-deposit">Deposit: ₱{getDisplayDeposit(item).toLocaleString('en-PH')}</p>
+                    )}
+                  </div>
                   {getAvailableSizeKeys(item.sizeOptions || {}).length > 0 && (
                     <div className="rc-card-sizes">
                       {getAvailableSizeKeys(item.sizeOptions || {}).map(key => {
@@ -1664,8 +1725,8 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
             <span>{selectedBundleQty > 0 ? `${selectedBundleQty} pcs total` : 'Set sizes & quantities in next step'}</span>
             <span>
               {bundlePreviewTotal > 0
-                ? `Est. downpayment: ₱${(bundlePreviewTotal * 0.5).toFixed(2)}`
-                : 'Est. downpayment: select size quantities'}
+                ? `Est. total due on pickup: ₱${(bundlePreviewTotal + selectedItems.reduce((sum, item) => sum + calculateTotalDepositWithSelections(cardSizeSelections[getItemId(item)] || {}, item), 0)).toFixed(2)}`
+                : 'Est. total due on pickup: select size quantities'}
             </span>
           </div>
 
@@ -1929,16 +1990,30 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                 </div>
 
                 <div className="cost-item">
-                  <span>Downpayment (Due Upon Pickup - 50%):</span>
-                  <span>₱{(totalCost * 0.5).toFixed(2)}</span>
-                </div>
-                <div className="cost-item">
                   <span>Rental Price ({rentalDuration} days):</span>
                   <span>₱{totalCost.toFixed(2)}</span>
                 </div>
+                {(() => {
+                  const bundleDeposit = selectedItems.reduce((sum, item) => {
+                    const selections = cardSizeSelections[item.id || item.item_id] || {};
+                    return sum + calculateTotalDepositWithSelections(selections, item);
+                  }, 0);
+                  return bundleDeposit > 0 && (
+                    <div className="cost-item deposit">
+                      <span>Deposit (Refundable - Due Upon Pickup):</span>
+                      <span>₱{bundleDeposit.toFixed(2)}</span>
+                    </div>
+                  );
+                })()}
                 <div className="cost-total">
-                  <span>Total Rental Cost (Due on Return):</span>
-                  <span>₱{(totalCost * 0.5).toFixed(2)}</span>
+                  <span>Total Due on Pickup:</span>
+                  <span>₱{(() => {
+                    const bundleDeposit = selectedItems.reduce((sum, item) => {
+                      const selections = cardSizeSelections[item.id || item.item_id] || {};
+                      return sum + calculateTotalDepositWithSelections(selections, item);
+                    }, 0);
+                    return (totalCost + bundleDeposit).toFixed(2);
+                  })()}</span>
                 </div>
                 <div style={{
                   marginTop: '15px',
@@ -1995,7 +2070,13 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                   fontWeight: '600'
                 }}
               >
-                {addingToCart ? 'Adding...' : `Add Bundle to Cart - ₱${(totalCost * 0.5).toFixed(2)}`}
+                {addingToCart ? 'Adding...' : `Add Bundle to Cart - ₱${(() => {
+                  const bundleDeposit = selectedItems.reduce((sum, item) => {
+                    const selections = cardSizeSelections[item.id || item.item_id] || {};
+                    return sum + calculateTotalDepositWithSelections(selections, item);
+                  }, 0);
+                  return (totalCost + bundleDeposit).toFixed(2);
+                })()}`}
               </button>
             </div>
           </div>
@@ -2032,8 +2113,10 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                   {selectedItem.material && <span className="rc-meta-tag rc-meta-tag-material">{formatTagText(selectedItem.material)}</span>}
                 </div>
                 <div className="rc-starting-price">
-                  Starting from <strong>₱{getDisplayPrice(selectedItem).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong>
-                  <span> - 3-day rental</span>
+                  <div>Rental Price: <strong>₱{getDisplayPrice(selectedItem).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong> <span>- 3-day rental</span></div>
+                  {getDisplayDeposit(selectedItem) > 0 && (
+                    <div style={{ marginTop: '8px', color: '#d9534f', fontWeight: '600' }}>Deposit (Refundable): ₱{getDisplayDeposit(selectedItem).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</div>
+                  )}
                 </div>
 
                 {/* Sizes + Measurements table */}
@@ -2223,9 +2306,16 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                     <div className="rc-cost-line total">
                       <span>Total</span><span>₱{totalCost.toFixed(2)}</span>
                     </div>
-                    <div className="rc-cost-line downpayment">
-                      <span>Downpayment (50%, due on pickup)</span><span>₱{(totalCost * 0.5).toFixed(2)}</span>
-                    </div>
+                    {modalLiveDeposit > 0 && (
+                      <div className="rc-cost-line deposit">
+                        <span>Deposit (Refundable, due on pickup)</span><span>₱{modalLiveDeposit.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {(totalCost + modalLiveDeposit) > 0 && (
+                      <div className="rc-cost-line total-due">
+                        <span><strong>Total Due on Pickup</strong></span><span><strong>₱{(totalCost + modalLiveDeposit).toFixed(2)}</strong></span>
+                      </div>
+                    )}
                     <div className="rc-late-warning">⚠️ ₱100/day penalty for late returns</div>
                   </div>
                 )}
@@ -2250,7 +2340,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                     {addingToCart ? 'Adding...' : (
                       <>
                         <span className="rc-btn-rent-main">Add to Cart</span>
-                        <span className="rc-btn-rent-price">₱{modalLiveDownpayment > 0 ? modalLiveDownpayment.toFixed(2) : '0.00'}</span>
+                        <span className="rc-btn-rent-price">₱{(modalLiveTotal + modalLiveDeposit).toFixed(2)}</span>
                       </>
                     )}
                   </button>

@@ -2279,7 +2279,14 @@ exports.recordRentalDepositReturn = (req, res) => {
       specificData = {};
     }
 
-    const depositAmount = Math.max(0, parseFloat(
+    // Calculate deposit from selected_sizes
+    const selectedSizes = specificData.selected_sizes || specificData.selectedSizes || [];
+    const depositFromSizes = selectedSizes.reduce((total, size) => {
+      const quantity = parseInt(size.quantity || 0, 10);
+      const deposit = parseFloat(size.deposit || 0);
+      return total + (quantity * deposit);
+    }, 0);
+    const depositAmount = Math.max(0, depositFromSizes > 0 ? depositFromSizes : parseFloat(
       pricingFactors.downpayment || pricingFactors.deposit_amount || specificData.downpayment || 0
     ));
     const currentAmountPaid = Math.max(0, parseFloat(pricingFactors.amount_paid || 0));

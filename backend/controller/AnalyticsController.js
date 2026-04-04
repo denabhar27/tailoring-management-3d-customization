@@ -53,16 +53,12 @@ const getRevenueActivityCondition = () => `(
 const getRevenueExpression = () => `
   CASE
     WHEN ${getHasPaidCompensationExpression()} THEN 0
-    ELSE
-      CASE
-        WHEN LOWER(oi.service_type) = 'rental' AND oi.approval_status = 'returned' THEN
-          ${getCollectedPaymentExpression()} - COALESCE(
-            CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.downpayment')) AS DECIMAL(10,2)),
-            0
-          )
-        ELSE
-          ${getCollectedPaymentExpression()}
-      END
+    ELSE (
+      ${getCollectedPaymentExpression()} - COALESCE(
+        CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.deposit_refunded_amount')) AS DECIMAL(10,2)),
+        0
+      )
+    )
   END
 `;
 
@@ -71,16 +67,12 @@ const getRevenueExpression = () => `
 const getOperationalRevenueExpression = () => `
   CASE
     WHEN ${getHasPaidCompensationExpression()} THEN 0
-    ELSE
-      CASE
-        WHEN LOWER(oi.service_type) = 'rental' AND oi.approval_status = 'returned' THEN
-          ${getCollectedPaymentExpression()} - COALESCE(
-            CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.downpayment')) AS DECIMAL(10,2)),
-            0
-          )
-        ELSE
-          ${getCollectedPaymentExpression()}
-      END
+    ELSE (
+      ${getCollectedPaymentExpression()} - COALESCE(
+        CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.deposit_refunded_amount')) AS DECIMAL(10,2)),
+        0
+      )
+    )
   END
 `;
 

@@ -2330,7 +2330,14 @@ const Profile = () => {
                   ? JSON.parse(item.pricing_factors || '{}')
                   : (item.pricing_factors || {});
                 const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
-                const downpayment = parseFloat(pricingFactors.downpayment || item.specific_data?.downpayment || 0);
+                // Calculate deposit from selected_sizes
+                const selectedSizes = item.specific_data?.selected_sizes || item.specific_data?.selectedSizes || [];
+                const depositFromSizes = selectedSizes.reduce((total, size) => {
+                  const quantity = parseInt(size.quantity || 0, 10);
+                  const deposit = parseFloat(size.deposit || 0);
+                  return total + (quantity * deposit);
+                }, 0);
+                const downpayment = depositFromSizes > 0 ? depositFromSizes : parseFloat(pricingFactors.downpayment || item.specific_data?.downpayment || 0);
                 const finalPrice = parseFloat(item.final_price || 0);
                 const rentalPaymentMode = String(pricingFactors.rental_payment_mode || 'regular').toLowerCase();
                 const rentalPaymentModeLabel = rentalPaymentMode === 'flat_rate' ? 'Flat Rate' : 'Regular';
@@ -2689,28 +2696,53 @@ const Profile = () => {
 
                             return (
                               <>
-                                {priceChanged && previousPriceValue !== null && (
-                                  <div className="price-row">
-                                    <span className="price-label">Previous Price:</span>
-                                    <span className="price-value estimated">₱{previousPriceValue.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                  </div>
-                                )}
-                                <div className="price-row">
-                                  <span className="price-label">Final Price:</span>
-                                  <span className="price-value final">₱{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                </div>
-                                {priceChanged && adminPriceReason && (
-                                  <div className="admin-notes">
-                                    <span className="notes-label">Price Change Reason:</span>
-                                    <span className="notes-text">{adminPriceReason}</span>
-                                  </div>
-                                )}
-                                {hasPayment && (
+                                {isRental && item.status === 'returned' ? (
                                   <>
                                     <div className="price-row">
-                                      <span className="price-label">Amount Paid:</span>
-                                      <span className="price-value" style={{ color: '#4caf50' }}>₱{totalPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                      <span className="price-label">Rental Price:</span>
+                                      <span className="price-value final">₱{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                     </div>
+                                    <div className="price-row">
+                                      <span className="price-label">Deposit (Refundable):</span>
+                                      <span className="price-value" style={{ color: '#ff9800' }}>₱{downpayment.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    </div>
+                                    <div className="price-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
+                                      <span className="price-label" style={{ fontWeight: 'bold', fontSize: '16px' }}>Total Payment:</span>
+                                      <span className="price-value" style={{ fontWeight: 'bold', fontSize: '18px', color: '#2d5a3d' }}>
+                                        ₱{(finalPrice + downpayment).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                      </span>
+                                    </div>
+                                    {hasPayment && (
+                                      <div className="price-row">
+                                        <span className="price-label">Amount Paid:</span>
+                                        <span className="price-value" style={{ color: '#4caf50' }}>₱{totalPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    {priceChanged && previousPriceValue !== null && (
+                                      <div className="price-row">
+                                        <span className="price-label">Previous Price:</span>
+                                        <span className="price-value estimated">₱{previousPriceValue.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                      </div>
+                                    )}
+                                    <div className="price-row">
+                                      <span className="price-label">Final Price:</span>
+                                      <span className="price-value final">₱{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    </div>
+                                    {priceChanged && adminPriceReason && (
+                                      <div className="admin-notes">
+                                        <span className="notes-label">Price Change Reason:</span>
+                                        <span className="notes-text">{adminPriceReason}</span>
+                                      </div>
+                                    )}
+                                    {hasPayment && (
+                                      <>
+                                        <div className="price-row">
+                                          <span className="price-label">Amount Paid:</span>
+                                          <span className="price-value" style={{ color: '#4caf50' }}>₱{totalPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                        </div>
                                     {remainingAmount > 0 && (
                                       <div className="price-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
                                         <span className="price-label" style={{ fontWeight: 'bold', fontSize: '16px' }}>Remaining Amount:</span>
@@ -2721,6 +2753,8 @@ const Profile = () => {
                                     )}
                                   </>
                                 )}
+                              </>
+                            )}
                               </>
                             );
                           })()
@@ -2743,7 +2777,16 @@ const Profile = () => {
                           Please pay the deposit amount when picking up your rental item from the store.
                         </div>
                         <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ff9800' }}>
-                          Deposit Amount: ₱{parseFloat(item.pricing_factors?.downpayment || item.specific_data?.downpayment || 0).toLocaleString()}
+                          Deposit Amount: ₱{(() => {
+                            const selectedSizes = item.specific_data?.selected_sizes || item.specific_data?.selectedSizes || [];
+                            const depositFromSizes = selectedSizes.reduce((total, size) => {
+                              const quantity = parseInt(size.quantity || 0, 10);
+                              const deposit = parseFloat(size.deposit || 0);
+                              return total + (quantity * deposit);
+                            }, 0);
+                            const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(item.pricing_factors?.downpayment || item.specific_data?.downpayment || 0);
+                            return depositAmount.toLocaleString();
+                          })()}
                         </div>
                       </div>
                     )}
@@ -2751,6 +2794,61 @@ const Profile = () => {
                     {item.service_type === 'rental' && (() => {
                       const refundedAmount = parseFloat(item.deposit_refunded || item.pricing_factors?.deposit_refunded_amount || 0);
                       const refundedDate = item.deposit_refund_date || item.pricing_factors?.deposit_refunded_at;
+
+                      if (item.status === 'returned') {
+                        const selectedSizes = item.specific_data?.selected_sizes || item.specific_data?.selectedSizes || [];
+                        const depositFromSizes = selectedSizes.reduce((total, size) => {
+                          const quantity = parseInt(size.quantity || 0, 10);
+                          const deposit = parseFloat(size.deposit || 0);
+                          return total + (quantity * deposit);
+                        }, 0);
+                        const totalDeposit = depositFromSizes > 0 ? depositFromSizes : parseFloat(item.pricing_factors?.downpayment || item.specific_data?.downpayment || 0);
+                        const remainingRefund = totalDeposit - refundedAmount;
+
+                        if (refundedAmount > 0) {
+                          return (
+                            <div style={{
+                              background: '#e8f5e9',
+                              border: '1px solid #2e7d32',
+                              borderRadius: '8px',
+                              padding: '12px 16px',
+                              marginBottom: '20px'
+                            }}>
+                              <div style={{ color: '#1b5e20', fontWeight: '700', marginBottom: '6px' }}>
+                                Deposit Returned: ₱{refundedAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div style={{ color: '#2e7d32', fontSize: '13px' }}>
+                                {refundedDate
+                                  ? `Recorded on ${new Date(refundedDate).toLocaleString()}`
+                                  : 'Recorded by admin'}
+                              </div>
+                            </div>
+                          );
+                        } else if (remainingRefund > 0) {
+                          return (
+                            <div style={{
+                              background: '#fff3e0',
+                              border: '1px solid #ff9800',
+                              borderRadius: '8px',
+                              padding: '12px 16px',
+                              marginBottom: '20px'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                                <span style={{ fontSize: '20px' }}>💰</span>
+                                <div style={{ color: '#e65100', fontWeight: '700' }}>
+                                  Collect Your Deposit Refund
+                                </div>
+                              </div>
+                              <div style={{ color: '#666', fontSize: '14px', marginBottom: '8px' }}>
+                                Please visit the store to collect your refundable deposit.
+                              </div>
+                              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#ff9800' }}>
+                                Refundable Amount: ₱{remainingRefund.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                            </div>
+                          );
+                        }
+                      }
 
                       if (refundedAmount <= 0) return null;
 
@@ -3030,7 +3128,14 @@ const Profile = () => {
                           ? JSON.parse(selectedItem.pricing_factors || '{}')
                           : (selectedItem.pricing_factors || {});
                         const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
-                        const downpayment = parseFloat(pricingFactors.downpayment || selectedItem.specific_data?.downpayment || 0);
+                        // Calculate deposit from selected_sizes
+                        const selectedSizes = selectedItem.specific_data?.selected_sizes || selectedItem.specific_data?.selectedSizes || [];
+                        const depositFromSizes = selectedSizes.reduce((total, size) => {
+                          const quantity = parseInt(size.quantity || 0, 10);
+                          const deposit = parseFloat(size.deposit || 0);
+                          return total + (quantity * deposit);
+                        }, 0);
+                        const downpayment = depositFromSizes > 0 ? depositFromSizes : parseFloat(pricingFactors.downpayment || selectedItem.specific_data?.downpayment || 0);
                         const finalPrice = parseFloat(selectedItem.final_price || 0);
                         const refundedAmount = parseFloat(selectedItem.deposit_refunded || pricingFactors.deposit_refunded_amount || 0);
                         const refundedDate = selectedItem.deposit_refund_date || pricingFactors.deposit_refunded_at;

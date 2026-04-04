@@ -199,6 +199,13 @@ function AdminPage() {
     return null;
   };
 
+  const extractDamagedByFromNotes = (notes = '') => {
+    const text = String(notes || '');
+    const damagedByMatch = text.match(/Damaged\s+by:\s*([^|.\n]+)/i);
+    if (damagedByMatch?.[1]) return damagedByMatch[1].trim();
+    return null;
+  };
+
   const fetchDashboard = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
@@ -877,6 +884,64 @@ function AdminPage() {
                                 {orderIdMatch && (
                                   <div style={{ marginBottom: '4px' }}>
                                     Order ID: {orderIdMatch[1]}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      ) : isDamageCompensationAction(activity) ? (
+                        <div>
+                          {(() => {
+                            const notes = activity.notes || '';
+                            const damagedBy = extractDamagedByFromNotes(notes);
+                            
+                            // Parse the notes to extract structured information
+                            const serviceMatch = notes.match(/Service:\s*([^\n]+)/i);
+                            const customerMatch = notes.match(/Customer:\s*([^\n.]+)/i);
+                            const damageTypeMatch = notes.match(/Damage type:\s*([^\n.]+)/i);
+                            const amountMatch = notes.match(/Amount:\s*₱([\d,]+\.?\d*)/i);
+                            const reportedByMatch = notes.match(/(?:reported|settled|liability\s+\w+)\s+by\s+([^\n.]+)/i);
+                            const statusMatch = notes.match(/liability\s+(approved|rejected|pending)/i);
+                            
+                            // Extract the actual actor name from notes instead of using the role
+                            const actualActorName = reportedByMatch ? reportedByMatch[1].trim() : actorName;
+                            
+                            return (
+                              <>
+                                {actualActorName && (
+                                  <div style={{ marginBottom: '4px' }}>
+                                    Changed by: {actualActorName}
+                                  </div>
+                                )}
+                                {serviceMatch && (
+                                  <div style={{ marginBottom: '4px' }}>
+                                    Service: {serviceMatch[1].trim()}
+                                  </div>
+                                )}
+                                {customerMatch && (
+                                  <div style={{ marginBottom: '4px' }}>
+                                    Customer: {customerMatch[1].trim()}
+                                  </div>
+                                )}
+                                {damageTypeMatch && (
+                                  <div style={{ marginBottom: '4px' }}>
+                                    Damage type: {damageTypeMatch[1].trim()}
+                                  </div>
+                                )}
+                                {damagedBy && (
+                                  <div style={{ marginBottom: '4px', color: '#d32f2f' }}>
+                                    Damaged by: {damagedBy}
+                                  </div>
+                                )}
+                                {amountMatch && (
+                                  <div style={{ marginBottom: '4px' }}>
+                                    Amount: ₱{amountMatch[1]}
+                                  </div>
+                                )}
+                                {statusMatch && (
+                                  <div style={{ marginBottom: '4px', fontWeight: '600', color: statusMatch[1] === 'approved' ? '#4caf50' : statusMatch[1] === 'rejected' ? '#f44336' : '#ff9800' }}>
+                                    Status: {statusMatch[1].charAt(0).toUpperCase() + statusMatch[1].slice(1)}
                                   </div>
                                 )}
                               </>

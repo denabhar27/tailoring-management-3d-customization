@@ -258,10 +258,14 @@ exports.getDashboardOverview = async (req, res) => {
            dcr.compensation_amount,
            dcr.compensation_status,
            dcr.responsible_party,
+           dcr.reported_by_role,
+           NULLIF(TRIM(CONCAT(COALESCE(reporter.first_name, ''), ' ', COALESCE(reporter.last_name, ''))), '') AS handled_by,
+           reporter.username AS handled_by_username,
            dcr.notes,
            dcr.created_at,
            dcr.updated_at
          FROM damage_compensation_records dcr
+         LEFT JOIN user reporter ON reporter.user_id = dcr.reported_by_user_id
          ORDER BY dcr.updated_at DESC
          LIMIT 200`
       ).catch(err => {
@@ -308,6 +312,7 @@ exports.getDashboardOverview = async (req, res) => {
       
       const activityMap = new Map();
       const orderItemById = new Map();
+      const compensationOrderItems = new Set(); // Track which order_items have compensation action logs
 
       logs.forEach(log => {
         const key = `${log.order_item_id || 'null'}_${log.created_at}`;
@@ -319,6 +324,14 @@ exports.getDashboardOverview = async (req, res) => {
         const serviceHint = String(serviceLineMatch?.[1] || '').trim();
         const normalizedServiceHint = serviceHint ? serviceHint.toLowerCase().replace(/\s+/g, '_') : '';
         const compensationFallbackService = normalizedServiceHint || (log.action_type === 'rental_damage_compensation' ? 'rental' : '');
+        
+        // Track order items that have damage compensation action logs
+        if (log.action_type === 'damage_compensation' || log.action_type === 'rental_damage_compensation') {
+          if (log.order_item_id) {
+            compensationOrderItems.add(log.order_item_id);
+          }
+        }
+        
         activityMap.set(key, {
           item_id: log.item_id || log.order_item_id || null,
           order_item_id: log.order_item_id || log.item_id || null,
@@ -347,6 +360,12 @@ exports.getDashboardOverview = async (req, res) => {
       (compensationActivities || []).forEach((incident) => {
         const eventDate = incident.updated_at || incident.created_at;
         const key = `comp_${incident.compensation_incident_id || incident.order_item_id || 'null'}_${eventDate}`;
+        
+        // Skip if there's already an action log for this order_item_id
+        if (incident.order_item_id && compensationOrderItems.has(incident.order_item_id)) {
+          return;
+        }
+        
         if (!activityMap.has(key)) {
           const serviceTypeRaw = String(incident.service_type || '').trim().toLowerCase();
           const actionType = serviceTypeRaw === 'rental' ? 'rental_damage_compensation' : 'damage_compensation';
@@ -354,12 +373,18 @@ exports.getDashboardOverview = async (req, res) => {
           const issueType = String(incident.damage_type || 'damage').replace(/_/g, ' ');
           const amount = parseFloat(incident.compensation_amount || 0) || 0;
           const baseServiceLine = `Service: ${serviceLabel}`;
+          const reportedByName = incident.handled_by
+            || incident.handled_by_username
+            || (incident.reported_by_role === 'clerk' ? 'Clerk' : (incident.reported_by_role === 'admin' ? 'Admin' : null))
+            || 'admin';
+          const damagedByName = incident.responsible_party || 'Unknown';
           let notes = String(incident.notes || '').trim();
           if (!notes) {
             notes = [
               baseServiceLine,
+              `Reported from ${serviceLabel} management`,
               `Customer: ${incident.customer_name || 'Customer'}`,
-              `Handled by: ${incident.responsible_party || 'admin'}`,
+              `Damaged by: ${damagedByName}`,
               `Damage type: ${issueType}`,
               `Amount to pay: ₱${amount.toFixed(2)}`,
               `Payment status: ${incident.compensation_status || 'unpaid'}`
@@ -379,7 +404,7 @@ exports.getDashboardOverview = async (req, res) => {
             last_name: '',
             reason: null,
             action_type: actionType,
-            action_by: incident.responsible_party || 'admin',
+            action_by: reportedByName,
             notes,
             is_payment: false,
             amount

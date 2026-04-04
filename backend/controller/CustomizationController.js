@@ -232,7 +232,7 @@ exports.updateCustomizationOrderItem = (req, res) => {
           order_item_id: itemId,
           user_id: adminUserId,
           action_type: 'status_update',
-          action_by: 'admin',
+          action_by: req.user?.role || 'admin',
           previous_status: previousStatus,
           new_status: newStatus,
           reason: null,
@@ -446,11 +446,11 @@ exports.updateApprovalStatus = (req, res) => {
           order_item_id: itemId,
           user_id: adminUserId,
           action_type: 'status_update',
-          action_by: 'admin',
+          action_by: req.user?.role || 'admin',
           previous_status: previousStatus,
           new_status: status,
           reason: null,
-          notes: `Admin updated customization approval status from ${previousStatus} to ${status}`
+          notes: `${req.user?.role === 'clerk' ? 'Clerk' : 'Admin'} updated customization approval status from ${previousStatus} to ${status}`
         }, (logErr, logResult) => {
           if (logErr) {
             console.error('Error logging customization approval status update:', logErr);

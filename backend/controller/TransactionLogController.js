@@ -303,7 +303,7 @@ exports.makePayment = (req, res) => {
             order_item_id: orderItemId,
             user_id: item.user_id,
             action_type: 'payment',
-            action_by: req.user.role === 'admin' ? 'admin' : 'user',
+            action_by: req.user.role === 'admin' ? 'admin' : req.user.role === 'clerk' ? 'clerk' : 'user',
             previous_status: item.payment_status || 'unpaid',
             new_status: newPaymentStatus,
             reason: null,

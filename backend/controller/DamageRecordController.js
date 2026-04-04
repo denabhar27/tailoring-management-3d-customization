@@ -169,13 +169,17 @@ exports.createCompensationIncident = (req, res) => {
 
   const amount = Number.isFinite(parseFloat(compensation_amount)) ? parseFloat(compensation_amount) : 0;
 
+  // Get the logged-in user info
+  const reportedByUserId = req.user?.id || req.user?.user_id || null;
+  const reportedByRole = req.user?.role || null;
+
   DamageRecord.createCompensationRecord({
     order_item_id,
     order_id: order_id || null,
     service_type,
     customer_name,
-    reported_by_user_id: req.user?.id || null,
-    reported_by_role: req.user?.role || null,
+    reported_by_user_id: reportedByUserId,
+    reported_by_role: reportedByRole,
     responsible_party: responsible_party || null,
     damage_type,
     damage_description: damage_description || null,
@@ -191,6 +195,28 @@ exports.createCompensationIncident = (req, res) => {
         error: err
       });
     }
+
+    // Create action log for the compensation incident creation
+    const ActionLog = require('../model/ActionLogModel');
+    const actorRole = req.user?.role || 'admin';
+    const actorName = req.user?.username || `${req.user?.first_name || ''} ${req.user?.last_name || ''}`.trim() || actorRole;
+    const serviceTypeLower = (service_type || '').toLowerCase();
+    const actionType = serviceTypeLower === 'rental' ? 'rental_damage_compensation' : 'damage_compensation';
+    
+    ActionLog.create({
+      order_item_id,
+      user_id: reportedByUserId,
+      action_type: actionType,
+      action_by: actorRole,
+      previous_status: null,
+      new_status: 'pending',
+      reason: null,
+      notes: `Damage compensation reported by ${actorName}. Customer: ${customer_name}. Damage type: ${damage_type}. Amount: ₱${amount}${responsible_party ? `. Damaged by: ${responsible_party}` : ''}`
+    }, (logErr) => {
+      if (logErr) {
+        console.error('Error logging damage compensation creation:', logErr);
+      }
+    });
 
     res.json({
       success: true,
@@ -235,6 +261,32 @@ exports.updateLiabilityDecision = (req, res) => {
         error: err
       });
     }
+
+    // Get the compensation record to log the action
+    DamageRecord.getCompensationById(id, (getErr, record) => {
+      if (!getErr && record && record.order_item_id) {
+        const ActionLog = require('../model/ActionLogModel');
+        const actorRole = req.user?.role || 'admin';
+        const actorName = req.user?.username || `${req.user?.first_name || ''} ${req.user?.last_name || ''}`.trim() || actorRole;
+        const serviceType = (record.service_type || '').toLowerCase();
+        const actionType = serviceType === 'rental' ? 'rental_damage_compensation' : 'damage_compensation';
+        
+        ActionLog.create({
+          order_item_id: record.order_item_id,
+          user_id: req.user?.id || null,
+          action_type: actionType,
+          action_by: actorRole,
+          previous_status: null,
+          new_status: liability_status,
+          reason: null,
+          notes: `Damage compensation liability ${liability_status} by ${actorName}. Customer: ${record.customer_name || 'Customer'}. Amount: ₱${amount || record.compensation_amount || 0}`
+        }, (logErr) => {
+          if (logErr) {
+            console.error('Error logging damage compensation action:', logErr);
+          }
+        });
+      }
+    });
 
     res.json({
       success: true,
@@ -281,6 +333,30 @@ exports.recordCompensationSettlement = (req, res) => {
           success: false,
           message: 'Error recording compensation settlement',
           error: updateErr
+        });
+      }
+
+      // Log the settlement action
+      if (record.order_item_id) {
+        const ActionLog = require('../model/ActionLogModel');
+        const actorRole = req.user?.role || 'admin';
+        const actorName = req.user?.username || `${req.user?.first_name || ''} ${req.user?.last_name || ''}`.trim() || actorRole;
+        const serviceType = (record.service_type || '').toLowerCase();
+        const actionType = serviceType === 'rental' ? 'rental_damage_compensation' : 'damage_compensation';
+        
+        ActionLog.create({
+          order_item_id: record.order_item_id,
+          user_id: req.user?.id || null,
+          action_type: actionType,
+          action_by: actorRole,
+          previous_status: 'unpaid',
+          new_status: 'paid',
+          reason: null,
+          notes: `Damage compensation settled by ${actorName}. Customer: ${record.customer_name || 'Customer'}. Amount: ₱${record.compensation_amount || 0}${payment_reference ? `. Ref: ${payment_reference}` : ''}`
+        }, (logErr) => {
+          if (logErr) {
+            console.error('Error logging damage compensation settlement:', logErr);
+          }
         });
       }
 

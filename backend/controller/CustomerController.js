@@ -273,7 +273,7 @@ exports.saveMeasurements = (req, res) => {
         order_item_id: itemId || null, 
         user_id: adminId,
         action_type: 'add_measurements',
-        action_by: 'admin',
+        action_by: req.user?.role || 'admin',
         previous_status: null,
         new_status: null,
         reason: null,

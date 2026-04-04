@@ -48,6 +48,7 @@ import {
   settleCompensationIncident,
   updateCompensationLiability
 } from '../api/DamageCompensationApi';
+import { getUserRole } from '../api/AuthApi';
 
 
 
@@ -206,6 +207,7 @@ const Repair = () => {
   const [settlementForm, setSettlementForm] = useState({
     paymentReference: ''
   });
+  const isAdminUser = getUserRole() === 'admin';
 
 
 
@@ -1727,6 +1729,11 @@ const Repair = () => {
 
   const handleDeleteOrder = async (item) => {
 
+    if (!isAdminUser) {
+      await alert('Only admin can delete orders', 'Access Denied', 'warning');
+      return;
+    }
+
     const statusText = item.approval_status === 'cancelled' ? 'rejected' : 'completed';
 
     const confirmed = await confirm(
@@ -2378,6 +2385,9 @@ const Repair = () => {
                 ).map(item => {
 
                   const incident = getIncidentForItem(item.item_id);
+                  const isCompensatedIncident = incident && incident.liability_status === 'approved' && incident.compensation_status === 'paid';
+                  const isDamagePendingIncident = incident && incident.liability_status === 'pending';
+                  const isForCompensationIncident = incident && incident.liability_status === 'approved' && incident.compensation_status !== 'paid';
 
 
 
@@ -2473,15 +2483,45 @@ const Repair = () => {
 
                       <td onClick={(e) => e.stopPropagation()}>
 
-                        <span className={`status-badge ${getStatusClass(item.approval_status || 'pending')}`}>
+                        <span
+                          className={`status-badge ${isCompensatedIncident ? 'completed' : isDamagePendingIncident ? 'rejected' : isForCompensationIncident ? 'price-confirmation' : getStatusClass(item.approval_status || 'pending')}`}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            whiteSpace: 'nowrap',
+                            fontSize: '11px',
+                            lineHeight: '1',
+                            padding: '3px 7px',
+                            fontWeight: 600,
+                            ...(isCompensatedIncident ? {
+                            backgroundColor: '#e8f5e9',
+                            color: '#1b5e20',
+                            border: '1px solid #a5d6a7'
+                          } : isDamagePendingIncident ? {
+                            backgroundColor: '#ffebee',
+                            color: '#c62828',
+                            border: '1px solid #ef9a9a'
+                          } : isForCompensationIncident ? {
+                            backgroundColor: '#fff8e1',
+                            color: '#ef6c00',
+                            border: '1px solid #ffcc80'
+                          } : {})
+                          }}
+                        >
 
-                          {getStatusText(item.approval_status || 'pending')}
+                          {isCompensatedIncident ? 'Compensated' : isDamagePendingIncident ? 'Damage Reported' : isForCompensationIncident ? 'For Compensation' : getStatusText(item.approval_status || 'pending')}
 
                         </span>
 
-                        {incident && (
+                        {incident && !isDamagePendingIncident && (
                           <div style={{ marginTop: '6px', fontSize: '11px', color: '#444' }}>
                             Damage: {incident.liability_status}/{incident.compensation_status}
+                          </div>
+                        )}
+
+                        {isDamagePendingIncident && (
+                          <div style={{ marginTop: '6px', fontSize: '11px', color: '#b71c1c', fontWeight: '600' }}>
+                            Awaiting liability decision
                           </div>
                         )}
 
@@ -2489,7 +2529,79 @@ const Repair = () => {
 
                       <td onClick={(e) => e.stopPropagation()}>
 
-                        {item.approval_status === 'pending_review' || item.approval_status === 'pending' || item.approval_status === null || item.approval_status === undefined || item.approval_status === '' ? (
+                        {isDamagePendingIncident ? (
+                          <div className="action-buttons">
+                            <button
+                              className="icon-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openLiabilityModal(incident, 'approved');
+                              }}
+                              title="Approve Liability"
+                              style={{ backgroundColor: '#2e7d32', color: 'white', border: '1px solid #1b5e20' }}
+                            >
+                              <i className="fas fa-circle-check"></i>
+                            </button>
+
+                            <button
+                              className="icon-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openLiabilityModal(incident, 'rejected');
+                              }}
+                              title="Reject Liability"
+                              style={{ backgroundColor: '#c62828', color: 'white', border: '1px solid #8e0000' }}
+                            >
+                              <i className="fas fa-circle-xmark"></i>
+                            </button>
+                          </div>
+                        ) : isForCompensationIncident ? (
+                          <div className="action-buttons">
+                            <button
+                              className="icon-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openSettlementModal(incident);
+                              }}
+                              title="Settle Compensation"
+                              style={{ backgroundColor: '#8e24aa', color: 'white' }}
+                            >
+                              <i className="fas fa-hand-holding-usd"></i>
+                            </button>
+                          </div>
+                        ) : isCompensatedIncident ? (
+                          <div className="action-buttons">
+                            <button
+                              className="icon-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openSettlementModal(incident);
+                              }}
+                              title="View Settlement Details"
+                              style={{ backgroundColor: '#1565c0', color: 'white', border: '1px solid #0d47a1' }}
+                            >
+                              <i className="fas fa-receipt"></i>
+                            </button>
+                            {isAdminUser && (
+                              <button
+                                className="icon-btn delete"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteOrder(item);
+                                }}
+                                title="Delete Order"
+                                style={{ backgroundColor: '#f44336', color: 'white' }}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="3 6 5 6 21 6"></polyline>
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        ) : item.approval_status === 'pending_review' || item.approval_status === 'pending' || item.approval_status === null || item.approval_status === undefined || item.approval_status === '' ? (
 
                           <div className="action-buttons">
 
@@ -2521,7 +2633,7 @@ const Repair = () => {
 
                           <div className="action-buttons">
 
-                            {getNextStatus(item.approval_status, 'repair', item) && (
+                            {!isDamagePendingIncident && !isForCompensationIncident && getNextStatus(item.approval_status, 'repair', item) && (
 
                               <button
 
@@ -2545,7 +2657,7 @@ const Repair = () => {
 
                             )}
 
-                            {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && (
+                            {!isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && (
 
                               <>
 
@@ -2623,31 +2735,7 @@ const Repair = () => {
 
                                 )}
 
-                                {incident && incident.liability_status === 'approved' && incident.compensation_status !== 'paid' && (
-
-                                  <button
-
-                                    className="icon-btn"
-
-                                    onClick={(e) => {
-
-                                      e.stopPropagation();
-
-                                      openSettlementModal(incident);
-
-                                    }}
-
-                                    title="Settle Compensation"
-
-                                    style={{ backgroundColor: '#8e24aa', color: 'white' }}
-
-                                  >
-
-                                    <i className="fas fa-hand-holding-usd"></i>
-
-                                  </button>
-
-                                )}
+                                
 
                                 {incident && incident.liability_status === 'rejected' && (
 
@@ -2775,7 +2863,7 @@ const Repair = () => {
 
                             )}
 
-                            {(item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
+                            {!isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && (item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
 
                               <>
 
@@ -2805,6 +2893,7 @@ const Repair = () => {
 
                                 )}
 
+                                {isAdminUser && (
                                 <button
 
                                   className="icon-btn delete"
@@ -2836,6 +2925,7 @@ const Repair = () => {
                                   </svg>
 
                                 </button>
+                                )}
 
                               </>
 

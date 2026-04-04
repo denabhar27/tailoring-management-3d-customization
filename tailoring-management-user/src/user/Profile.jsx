@@ -45,6 +45,7 @@ const Profile = () => {
   const [compensationIncident, setCompensationIncident] = useState(null);
   const [loadingCompensationIncident, setLoadingCompensationIncident] = useState(false);
   const [submittingLiabilityDecision, setSubmittingLiabilityDecision] = useState(false);
+  const [compensationIncidentsByItem, setCompensationIncidentsByItem] = useState({});
 
   const [transactionLogModalOpen, setTransactionLogModalOpen] = useState(false);
   const [selectedOrderItemId, setSelectedOrderItemId] = useState(null);
@@ -100,13 +101,48 @@ const Profile = () => {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const result = await getUserOrderTracking();
-        console.log("Orders fetched:", result);
-        if (result.success) {
-          setOrders(result.data);
-          console.log("Orders data:", result.data);
+        const [ordersResult, incidentsResult] = await Promise.all([
+          getUserOrderTracking(),
+          getCompensationIncidents({ my_only: true })
+        ]);
+
+        console.log("Orders fetched:", ordersResult);
+        if (ordersResult.success) {
+          setOrders(ordersResult.data);
+          console.log("Orders data:", ordersResult.data);
         } else {
-          setError(result.message || 'Failed to fetch orders');
+          setError(ordersResult.message || 'Failed to fetch orders');
+        }
+
+        if (incidentsResult?.success) {
+          const incidents = Array.isArray(incidentsResult.incidents) ? incidentsResult.incidents : [];
+          const mapped = incidents.reduce((acc, incident) => {
+            const key = Number(incident.order_item_id);
+            if (!key) return acc;
+
+            const existing = acc[key];
+            if (!existing) {
+              acc[key] = incident;
+              return acc;
+            }
+
+            const existingPaid = existing.compensation_status === 'paid';
+            const currentPaid = incident.compensation_status === 'paid';
+            if (!existingPaid && currentPaid) {
+              acc[key] = incident;
+              return acc;
+            }
+
+            const existingDate = new Date(existing.updated_at || existing.created_at || 0).getTime();
+            const currentDate = new Date(incident.updated_at || incident.created_at || 0).getTime();
+            if (currentDate > existingDate) {
+              acc[key] = incident;
+            }
+
+            return acc;
+          }, {});
+
+          setCompensationIncidentsByItem(mapped);
         }
       } catch (err) {
         console.error('Error fetching orders:', err);
@@ -2327,6 +2363,19 @@ const Profile = () => {
                   item.pricing_factors?.isUniform === true
                 );
 
+                const compensationIncidentForItem = compensationIncidentsByItem[Number(item.order_item_id)] || null;
+                const hasApprovedDamageCompensation = compensationIncidentForItem?.liability_status === 'approved';
+                const isCompensationPaid = hasApprovedDamageCompensation && compensationIncidentForItem?.compensation_status === 'paid';
+                const isCompensationPendingPayment = hasApprovedDamageCompensation && compensationIncidentForItem?.compensation_status !== 'paid';
+
+                const displayStatusLabel = hasApprovedDamageCompensation
+                  ? (isCompensationPaid ? 'Compensated' : 'For Compensation')
+                  : getStatusLabel(item.status);
+
+                const displayStatusClass = hasApprovedDamageCompensation
+                  ? (isCompensationPaid ? 'completed' : 'pending')
+                  : getStatusBadgeClass(item.status);
+
                 return (
                   <div key={`${item.order_id}-${item.order_item_id}-${item.service_type}-${item.status_updated_at || Date.now()}`} className="order-card">
                     <div className="order-header">
@@ -2344,8 +2393,15 @@ const Profile = () => {
                     </div>
 
                     <div className="order-status" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span className={`status-badge ${getStatusBadgeClass(item.status)}`}>
-                        {getStatusLabel(item.status)}
+                      <span
+                        className={`status-badge ${displayStatusClass}`}
+                        style={hasApprovedDamageCompensation ? {
+                          backgroundColor: isCompensationPaid ? '#e8f5e9' : '#ffebee',
+                          color: isCompensationPaid ? '#1b5e20' : '#c62828',
+                          border: `1px solid ${isCompensationPaid ? '#a5d6a7' : '#ef9a9a'}`
+                        } : undefined}
+                      >
+                        {displayStatusLabel}
                       </span>
                       {isRental && (
                         <span className="status-badge" style={{ backgroundColor: '#eef7ff', color: '#1f4f82' }}>
@@ -2363,6 +2419,20 @@ const Profile = () => {
                         </span>
                       )}
                     </div>
+                    {isCompensationPendingPayment && (
+                      <div style={{
+                        marginTop: '10px',
+                        backgroundColor: '#fff3e0',
+                        border: '1px solid #ffcc80',
+                        color: '#e65100',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: '600'
+                      }}>
+                        Compensation update: Please get your compensation payment at the shop.
+                      </div>
+                    )}
                     {isRental && (item.status === 'rented' || item.status === 'picked_up') && item.rental_end_date && (() => {
                       const today = new Date();
                       today.setHours(0, 0, 0, 0);
@@ -2704,6 +2774,22 @@ const Profile = () => {
                       );
                     })()}
 
+                    {hasApprovedDamageCompensation ? (
+                      <div style={{
+                        marginTop: '18px',
+                        backgroundColor: isCompensationPaid ? '#e8f5e9' : '#ffebee',
+                        border: `1px solid ${isCompensationPaid ? '#a5d6a7' : '#ef9a9a'}`,
+                        borderRadius: '10px',
+                        padding: '14px 16px'
+                      }}>
+                        <div style={{ fontWeight: '700', color: isCompensationPaid ? '#1b5e20' : '#c62828' }}>
+                          Service closed due to damage incident
+                        </div>
+                        <div style={{ marginTop: '6px', fontSize: '13px', color: '#555' }}>
+                          Liability: {compensationIncidentForItem?.liability_status || 'N/A'} / Compensation: {compensationIncidentForItem?.compensation_status || 'N/A'}
+                        </div>
+                      </div>
+                    ) : (
                     <div className="order-timeline">
                       <div className="timeline-container">
                         {item.service_type === 'rental' ? (
@@ -2793,6 +2879,7 @@ const Profile = () => {
                         )}
                       </div>
                     </div>
+                    )}
                     {(() => {
                       const showConfirmation = shouldShowPriceConfirmation(item);
                       console.log('=== RENDERING PRICE CONFIRMATION ACTIONS ===');

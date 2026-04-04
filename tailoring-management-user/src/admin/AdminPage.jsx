@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import '../adminStyle/admin.css';
@@ -177,37 +177,55 @@ function AdminPage() {
     return null;
   };
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const [data, billingData] = await Promise.all([
-          getAdminDashboardOverview(),
-          getBillingStats()
-        ]);
+  const fetchDashboard = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      setError(null);
+      const [data, billingData] = await Promise.all([
+        getAdminDashboardOverview(),
+        getBillingStats()
+      ]);
 
-        if (data?.success) {
-          setStats(data.stats || []);
-          setAllActivities(data.recentActivities || []);
-          setRecentActivities(data.recentActivities || []);
-        } else {
-          setError(data.message || 'Failed to load dashboard data');
-        }
-
-        if (billingData?.success) {
-          setBillingStats(billingData.stats || {});
-        }
-      } catch (err) {
-        console.error('Error loading admin dashboard:', err);
-        setError('An unexpected error occurred while loading dashboard data');
-      } finally {
-        setLoading(false);
+      if (data?.success) {
+        setStats(data.stats || []);
+        setAllActivities(data.recentActivities || []);
+        setRecentActivities(data.recentActivities || []);
+      } else {
+        setError(data.message || 'Failed to load dashboard data');
       }
+
+      if (billingData?.success) {
+        setBillingStats(billingData.stats || {});
+      }
+    } catch (err) {
+      console.error('Error loading admin dashboard:', err);
+      setError('An unexpected error occurred while loading dashboard data');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDashboard(false);
+
+    const intervalId = setInterval(() => {
+      fetchDashboard(true);
+    }, 30000);
+
+    const handleWindowFocus = () => fetchDashboard(true);
+    const handleVisibilityChange = () => {
+      if (!document.hidden) fetchDashboard(true);
     };
 
-    fetchDashboard();
-  }, []);
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchDashboard]);
 
   useEffect(() => {
     const fetchAllPayments = async () => {

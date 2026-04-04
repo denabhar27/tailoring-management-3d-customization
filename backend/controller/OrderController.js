@@ -2406,7 +2406,21 @@ exports.deleteOrderItem = (req, res) => {
     });
   }
 
-  const checkQuery = `SELECT item_id, approval_status, service_type FROM order_items WHERE item_id = ?`;
+  const checkQuery = `
+    SELECT
+      oi.item_id,
+      oi.approval_status,
+      oi.service_type,
+      EXISTS (
+        SELECT 1
+        FROM damage_compensation_records dcr
+        WHERE dcr.order_item_id = oi.item_id
+          AND dcr.liability_status = 'approved'
+          AND dcr.compensation_status = 'paid'
+      ) AS has_paid_compensation
+    FROM order_items oi
+    WHERE oi.item_id = ?
+  `;
   
   db.query(checkQuery, [itemId], (err, results) => {
     if (err) {
@@ -2426,10 +2440,17 @@ exports.deleteOrderItem = (req, res) => {
 
     const orderItem = results[0];
 
-    if (orderItem.approval_status !== 'completed' && orderItem.approval_status !== 'returned' && orderItem.approval_status !== 'cancelled') {
+    const hasPaidCompensation = Number(orderItem.has_paid_compensation) === 1;
+
+    if (
+      orderItem.approval_status !== 'completed' &&
+      orderItem.approval_status !== 'returned' &&
+      orderItem.approval_status !== 'cancelled' &&
+      !hasPaidCompensation
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Only completed, returned, or rejected orders can be deleted"
+        message: "Only completed/returned/cancelled or compensated orders can be deleted"
       });
     }
 

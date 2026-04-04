@@ -169,6 +169,8 @@ const DryCleaning = () => {
 
   const [priceConfirmationReason, setPriceConfirmationReason] = useState('');
 
+  const isAdminUser = getUserRole() === 'admin';
+
 
 
   const [garmentTypes, setGarmentTypes] = useState([]);
@@ -1711,6 +1713,11 @@ const DryCleaning = () => {
 
   const handleDeleteOrder = async (item) => {
 
+    if (!isAdminUser) {
+      showToast('Only admin can delete orders', 'error');
+      return;
+    }
+
     const statusText = item.approval_status === 'cancelled' ? 'rejected' : 'completed';
 
     openConfirmModal(
@@ -2218,6 +2225,9 @@ const DryCleaning = () => {
                 getFilteredItems().map(item => {
 
                   const incident = getIncidentForItem(item.item_id);
+                  const isCompensatedIncident = incident && incident.liability_status === 'approved' && incident.compensation_status === 'paid';
+                  const isDamagePendingIncident = incident && incident.liability_status === 'pending';
+                  const isForCompensationIncident = incident && incident.liability_status === 'approved' && incident.compensation_status !== 'paid';
 
 
 
@@ -2313,15 +2323,50 @@ const DryCleaning = () => {
 
                     <td onClick={(e) => e.stopPropagation()}>
 
-                      <span className={`status-badge ${getStatusClass(item.approval_status || 'pending')}`}>
+                      {(() => {
+                        const hasApprovedDamage = incident?.liability_status === 'approved';
+                        const isCompensationPaid = hasApprovedDamage && incident?.compensation_status === 'paid';
+                        const isDamagePending = incident?.liability_status === 'pending';
+                        return (
+                          <span
+                            className={`status-badge ${hasApprovedDamage ? (isCompensationPaid ? 'completed' : 'rejected') : isDamagePending ? 'rejected' : getStatusClass(item.approval_status || 'pending')}`}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              whiteSpace: 'nowrap',
+                              fontSize: '11px',
+                              lineHeight: '1',
+                              padding: '3px 7px',
+                              fontWeight: 600,
+                              ...(hasApprovedDamage ? {
+                              backgroundColor: isCompensationPaid ? '#e8f5e9' : '#ffebee',
+                              color: isCompensationPaid ? '#1b5e20' : '#c62828',
+                              border: `1px solid ${isCompensationPaid ? '#a5d6a7' : '#ef9a9a'}`
+                            } : isDamagePending ? {
+                              backgroundColor: '#ffebee',
+                              color: '#c62828',
+                              border: '1px solid #ef9a9a'
+                            } : {})
+                            }}
+                          >
+                            {hasApprovedDamage
+                              ? (isCompensationPaid ? 'Compensated' : 'For Compensation')
+                              : isDamagePending
+                              ? 'Damage Reported'
+                              : getStatusText(item.approval_status || 'pending')}
+                          </span>
+                        );
+                      })()}
 
-                        {getStatusText(item.approval_status || 'pending')}
-
-                      </span>
-
-                      {incident && (
+                      {incident && !isDamagePendingIncident && (
                         <div style={{ marginTop: '6px', fontSize: '11px', color: '#444' }}>
                           Damage: {incident.liability_status}/{incident.compensation_status}
+                        </div>
+                      )}
+
+                      {isDamagePendingIncident && (
+                        <div style={{ marginTop: '6px', fontSize: '11px', color: '#b71c1c', fontWeight: '600' }}>
+                          Awaiting liability decision
                         </div>
                       )}
 
@@ -2361,7 +2406,82 @@ const DryCleaning = () => {
 
                         <div className="action-buttons">
 
-                          {getNextStatus(item.approval_status, 'dry_cleaning', item) && (
+                          {isDamagePendingIncident ? (
+                            <div className="action-buttons">
+                              <button
+                                className="icon-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openLiabilityModal(incident, 'approved');
+                                }}
+                                title="Approve Liability"
+                                style={{ backgroundColor: '#2e7d32', color: 'white', border: '1px solid #1b5e20' }}
+                              >
+                                <i className="fas fa-circle-check"></i>
+                              </button>
+
+                              <button
+                                className="icon-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openLiabilityModal(incident, 'rejected');
+                                }}
+                                title="Reject Liability"
+                                style={{ backgroundColor: '#c62828', color: 'white', border: '1px solid #8e0000' }}
+                              >
+                                <i className="fas fa-circle-xmark"></i>
+                              </button>
+                            </div>
+                          ) : isForCompensationIncident ? (
+                            <div className="action-buttons">
+                              <button
+                                className="icon-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openSettlementModal(incident);
+                                }}
+                                title="Settle Compensation"
+                                style={{ backgroundColor: '#8e24aa', color: 'white' }}
+                              >
+                                <i className="fas fa-hand-holding-usd"></i>
+                              </button>
+                            </div>
+                          ) : isCompensatedIncident && (
+                            <>
+                              <button
+                                className="icon-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openSettlementModal(incident);
+                                }}
+                                title="View Settlement Details"
+                                style={{ backgroundColor: '#1565c0', color: 'white', border: '1px solid #0d47a1' }}
+                              >
+                                <i className="fas fa-receipt"></i>
+                              </button>
+
+                              {isAdminUser && (
+                                <button
+                                  className="icon-btn delete"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteOrder(item);
+                                  }}
+                                  title="Delete Order"
+                                  style={{ backgroundColor: '#f44336', color: 'white' }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                                  </svg>
+                                </button>
+                              )}
+                            </>
+                          )}
+
+                          {!isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && getNextStatus(item.approval_status, 'dry_cleaning', item) && (
 
                             <button
 
@@ -2385,7 +2505,7 @@ const DryCleaning = () => {
 
                           )}
 
-                          {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
+                          {!isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
 
                             <>
 
@@ -2463,31 +2583,7 @@ const DryCleaning = () => {
 
                               )}
 
-                              {incident && incident.liability_status === 'approved' && incident.compensation_status !== 'paid' && (
-
-                                <button
-
-                                  className="icon-btn"
-
-                                  onClick={(e) => {
-
-                                    e.stopPropagation();
-
-                                    openSettlementModal(incident);
-
-                                  }}
-
-                                  title="Settle Compensation"
-
-                                  style={{ backgroundColor: '#8e24aa', color: 'white' }}
-
-                                >
-
-                                  <i className="fas fa-hand-holding-usd"></i>
-
-                                </button>
-
-                              )}
+                                
 
                               {incident && incident.liability_status === 'rejected' && (
 
@@ -2625,7 +2721,7 @@ const DryCleaning = () => {
 
                           )}
 
-                          {(item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
+                          {!isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && (item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
 
                             <>
 
@@ -2655,6 +2751,7 @@ const DryCleaning = () => {
 
                               )}
 
+                              {isAdminUser && (
                               <button
 
                                 className="icon-btn delete"
@@ -2686,6 +2783,7 @@ const DryCleaning = () => {
                                 </svg>
 
                               </button>
+                              )}
 
                             </>
 

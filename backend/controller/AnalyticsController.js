@@ -48,11 +48,13 @@ const getRevenueActivityCondition = () => `(
   OR ${getHasPaidCompensationExpression()}
 )`;
 
-// Revenue gain excludes paid damage incidents.
+// Revenue gain excludes paid damage incidents for repair and dry cleaning.
+// For rental, withheld deposits become revenue (not a loss).
 // Compensation impact is handled separately in net loss analytics.
 const getRevenueExpression = () => `
   CASE
-    WHEN ${getHasPaidCompensationExpression()} THEN 0
+    WHEN LOWER(oi.service_type) IN ('repair', 'dry_cleaning', 'dry-cleaning', 'drycleaning', 'dry cleaning')
+      AND ${getHasPaidCompensationExpression()} THEN 0
     ELSE (
       ${getCollectedPaymentExpression()} - COALESCE(
         CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.deposit_refunded_amount')) AS DECIMAL(10,2)),
@@ -63,10 +65,12 @@ const getRevenueExpression = () => `
 `;
 
 // Operational revenue for service-distribution charts should not go negative.
-// Paid damage incidents are excluded from operational revenue (set to 0).
+// Paid damage incidents are excluded from operational revenue (set to 0) for repair and dry cleaning only.
+// For rental, withheld deposits are included as revenue.
 const getOperationalRevenueExpression = () => `
   CASE
-    WHEN ${getHasPaidCompensationExpression()} THEN 0
+    WHEN LOWER(oi.service_type) IN ('repair', 'dry_cleaning', 'dry-cleaning', 'drycleaning', 'dry cleaning')
+      AND ${getHasPaidCompensationExpression()} THEN 0
     ELSE (
       ${getCollectedPaymentExpression()} - COALESCE(
         CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.deposit_refunded_amount')) AS DECIMAL(10,2)),
@@ -78,9 +82,11 @@ const getOperationalRevenueExpression = () => `
 
 // Net compensation loss shown separately from operational revenue.
 // This excludes refunded/downpayment amounts and only counts paid compensation.
+// ONLY applies to repair and dry_cleaning services (rental compensation is different - customer pays shop)
 const getNetCompensationLossExpression = () => `
   CASE
-    WHEN ${getHasPaidCompensationExpression()} THEN
+    WHEN LOWER(oi.service_type) IN ('repair', 'dry_cleaning', 'dry-cleaning', 'drycleaning', 'dry cleaning')
+      AND ${getHasPaidCompensationExpression()} THEN
       ${getPaidCompensationAmountExpression()}
     ELSE 0
   END

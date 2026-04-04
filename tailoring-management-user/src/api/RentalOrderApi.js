@@ -140,10 +140,11 @@ export async function getSchedulerStatus() {
     }
 }
 
-export async function recordRentalDepositReturn(itemId, refundAmount) {
+export async function recordRentalDepositReturn(itemId, refundAmount, damagedSizes = []) {
     try {
         const response = await axios.post(`${BASE_URL}/orders/rental/items/${itemId}/deposit-return`, {
-            refundAmount
+            refundAmount,
+            damagedSizes
         }, {
             headers: getAuthHeaders()
         });

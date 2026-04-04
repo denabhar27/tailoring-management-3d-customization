@@ -139,13 +139,62 @@ function Rental() {
     const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(pricingFactors?.downpayment || pricingFactors?.deposit_amount || rental?.specific_data?.downpayment || 0);
     
     const refundedAmount = parseFloat(rental?.deposit_refunded || pricingFactors?.deposit_refunded_amount || 0);
-    const refundableRemaining = Math.max(0, depositAmount - refundedAmount);
+    
+    // Parse damage notes to get damaged sizes
+    let damagedSizes = [];
+    let damagedDepositAmount = 0;
+    let nonRefundableNotes = [];
+    
+    try {
+      const damageNotes = rental?.specific_data?.damageNotes;
+      if (damageNotes) {
+        const damageData = typeof damageNotes === 'string' ? JSON.parse(damageNotes) : damageNotes;
+        if (Array.isArray(damageData)) {
+          damageData.forEach(damage => {
+            const sizeKey = damage.size_key || damage.sizeKey;
+            const damagedQty = parseInt(damage.quantity || 0, 10);
+            
+            // Find matching size in selected sizes
+            const matchingSize = selectedSizes.find(s => 
+              (s.sizeKey || s.size_key) === sizeKey
+            );
+            
+            if (matchingSize && damagedQty > 0) {
+              const depositPerUnit = parseFloat(matchingSize.deposit || 0);
+              const damagedAmount = depositPerUnit * damagedQty;
+              damagedDepositAmount += damagedAmount;
+              
+              damagedSizes.push({
+                sizeKey: sizeKey,
+                label: matchingSize.label || damage.size_label,
+                quantity: damagedQty,
+                depositPerUnit: depositPerUnit,
+                totalDamaged: damagedAmount,
+                reason: `${damage.size_label} is damaged (${damage.damage_type || 'damage'}) - deposit cannot be returned`
+              });
+              
+              nonRefundableNotes.push(
+                `${matchingSize.label || damage.size_label} ×${damagedQty}: ₱${damagedAmount.toFixed(2)} (${damage.damage_type || 'damage'})`
+              );
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Error parsing damage notes:', e);
+    }
+    
+    // Calculate refundable amount (excluding damaged deposits)
+    const refundableRemaining = Math.max(0, depositAmount - refundedAmount - damagedDepositAmount);
 
     return {
       depositAmount,
       refundedAmount,
+      damagedDepositAmount,
       refundableRemaining,
-      refundedAt: rental?.deposit_refund_date || pricingFactors?.deposit_refunded_at || null
+      refundedAt: rental?.deposit_refund_date || pricingFactors?.deposit_refunded_at || null,
+      damagedSizes,
+      nonRefundableNotes
     };
   };
 
@@ -1827,7 +1876,7 @@ function Rental() {
     }
 
     try {
-      const result = await recordRentalDepositReturn(selectedRental.item_id, amount);
+      const result = await recordRentalDepositReturn(selectedRental.item_id, amount, snapshot.damagedSizes);
       if (result.success) {
         await alert(
           `Deposit return of ₱${amount.toFixed(2)} recorded successfully. Remaining refundable deposit: ₱${parseFloat(result.refund?.refundable_remaining || 0).toFixed(2)}.`,
@@ -3779,12 +3828,38 @@ function Rental() {
                       </span>
                     </div>
 
+                    {snapshot.damagedDepositAmount > 0 && (
+                      <div className="detail-row">
+                        <strong>Withheld for Damage:</strong>
+                        <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>
+                          ₱{snapshot.damagedDepositAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="detail-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
                       <strong>Refundable Remaining:</strong>
                       <span style={{ color: '#1565c0', fontWeight: 'bold', fontSize: '16px' }}>
                         ₱{snapshot.refundableRemaining.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
+
+                    {snapshot.nonRefundableNotes.length > 0 && (
+                      <div style={{
+                        backgroundColor: '#ffebee',
+                        padding: '12px',
+                        borderRadius: '6px',
+                        border: '1px solid #f44336',
+                        marginTop: '12px'
+                      }}>
+                        <strong style={{ color: '#c62828', display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>⚠️ Non-Refundable Deposits:</strong>
+                        <div style={{ fontSize: '0.85rem', color: '#555', lineHeight: '1.6' }}>
+                          {snapshot.nonRefundableNotes.map((note, idx) => (
+                            <div key={idx} style={{ marginBottom: '4px' }}>• {note}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </>
                 );
               })()}

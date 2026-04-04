@@ -358,6 +358,32 @@ exports.recordCompensationSettlement = (req, res) => {
             console.error('Error logging damage compensation settlement:', logErr);
           }
         });
+        
+        // For rental damage compensation, create a transaction log as revenue
+        if (serviceType === 'rental') {
+          const TransactionLog = require('../model/TransactionLogModel');
+          const compensationAmount = parseFloat(record.compensation_amount || 0);
+          
+          if (compensationAmount > 0) {
+            TransactionLog.create({
+              order_item_id: record.order_item_id,
+              user_id: req.user?.id || null,
+              transaction_type: 'revenue',
+              amount: compensationAmount,
+              previous_payment_status: null,
+              new_payment_status: null,
+              payment_method: 'rental_damage_compensation',
+              notes: `Rental damage compensation received from customer: ${record.customer_name || 'Customer'}. Damage type: ${record.damage_type || 'N/A'}. ${payment_reference ? `Ref: ${payment_reference}` : ''}`,
+              created_by: actorName
+            }, (transLogErr) => {
+              if (transLogErr) {
+                console.error('[RENTAL COMPENSATION] Failed to create transaction log:', transLogErr);
+              } else {
+                console.log(`[RENTAL COMPENSATION] Recorded ₱${compensationAmount.toFixed(2)} as revenue from rental damage compensation`);
+              }
+            });
+          }
+        }
       }
 
       res.json({

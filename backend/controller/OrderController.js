@@ -2335,6 +2335,7 @@ exports.recordRentalDepositReturn = (req, res) => {
           
           depositReturnDetails.push({
             sizeKey: sizeKey,
+            label: matchingSize.label || damagedSize.label,
             quantity: damagedQty,
             depositPerUnit: depositPerUnit,
             totalDamaged: damagedAmount
@@ -2376,7 +2377,7 @@ exports.recordRentalDepositReturn = (req, res) => {
           refundNotes += ` Damaged deposit withheld: ₱${damagedDepositAmount.toFixed(2)}.`;
           if (depositReturnDetails.length > 0) {
             const detailsStr = depositReturnDetails.map(d => 
-              `${d.sizeKey} (${d.quantity}x₱${d.depositPerUnit})`
+              `${d.label || d.sizeKey} (${d.quantity}x₱${d.depositPerUnit})`
             ).join(', ');
             refundNotes += ` Details: ${detailsStr}.`;
           }
@@ -2397,6 +2398,27 @@ exports.recordRentalDepositReturn = (req, res) => {
             console.error(`[RENTAL REFUND] Failed to create refund transaction log for item ${itemId}:`, refundLogErr);
           }
         });
+        
+        // Record withheld damaged deposit as revenue
+        if (damagedDepositAmount > 0) {
+          TransactionLog.create({
+            order_item_id: itemId,
+            user_id: logUserId,
+            transaction_type: 'revenue',
+            amount: damagedDepositAmount,
+            previous_payment_status: previousPaymentStatus,
+            new_payment_status: recalculatedPaymentStatus,
+            payment_method: 'deposit_withheld',
+            notes: `Deposit withheld for damage: ₱${damagedDepositAmount.toFixed(2)}. ${depositReturnDetails.map(d => `${d.label || d.sizeKey} (${d.quantity}x₱${d.depositPerUnit})`).join(', ')}`,
+            created_by: actorName
+          }, (revenueLogErr) => {
+            if (revenueLogErr) {
+              console.error(`[RENTAL REFUND] Failed to create revenue transaction log for withheld deposit:`, revenueLogErr);
+            } else {
+              console.log(`[RENTAL REFUND] Recorded ₱${damagedDepositAmount.toFixed(2)} as revenue from withheld damaged deposit`);
+            }
+          });
+        }
       }
 
       return res.json({

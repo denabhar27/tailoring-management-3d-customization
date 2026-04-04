@@ -106,8 +106,39 @@ exports.getAllBillingRecords = (req, res) => {
       const dbPaymentStatus = (item.payment_status || '').toLowerCase().trim();
       const hasPaidDamage = parseInt(item.has_paid_damage, 10) === 1;
 
-      const amountPaid = parseFloat(pricingFactors.amount_paid || pricingFactors.downpayment || 0);
-      const finalPrice = parseFloat(item.final_price || 0);
+      // For rentals, only use amount_paid (not downpayment which is actually the deposit)
+      const amountPaid = normalizedServiceType === 'rental' 
+        ? parseFloat(pricingFactors.amount_paid || 0)
+        : parseFloat(pricingFactors.amount_paid || pricingFactors.downpayment || 0);
+      let finalPrice = parseFloat(item.final_price || 0);
+      
+      // For rentals, include deposit in total price calculation
+      if (normalizedServiceType === 'rental') {
+        let depositAmount = 0;
+        
+        // Try to get deposit from selected_sizes first
+        if (specificData.selected_sizes || specificData.selectedSizes) {
+          const selectedSizes = specificData.selected_sizes || specificData.selectedSizes;
+          depositAmount = selectedSizes.reduce((total, size) => {
+            const quantity = parseInt(size.quantity || 0, 10);
+            const deposit = parseFloat(size.deposit || 0);
+            return total + (quantity * deposit);
+          }, 0);
+        }
+        
+        // Fallback to pricing factors if no deposit from sizes
+        if (depositAmount === 0) {
+          depositAmount = parseFloat(
+            pricingFactors.deposit_amount ||
+            pricingFactors.down_payment ||
+            pricingFactors.downPayment ||
+            specificData.downpayment || 0
+          );
+        }
+        
+        finalPrice = finalPrice + depositAmount;
+      }
+      
       const remainingBalance = finalPrice - amountPaid;
 
       if (hasPaidDamage) {
@@ -155,6 +186,26 @@ exports.getAllBillingRecords = (req, res) => {
           serviceTypeDisplay = item.service_type.charAt(0).toUpperCase() + item.service_type.slice(1);
       }
 
+      // For billing display, include deposit in the price for rentals (only if selected_sizes exists)
+      let displayPrice = parseFloat(item.final_price || 0);
+      let calculatedDeposit = 0;
+      
+      if (normalizedServiceType === 'rental') {
+        // Only add deposit if selected_sizes exists (new rental system)
+        if (specificData.selected_sizes || specificData.selectedSizes) {
+          const selectedSizes = specificData.selected_sizes || specificData.selectedSizes;
+          calculatedDeposit = selectedSizes.reduce((total, size) => {
+            const quantity = parseInt(size.quantity || 0, 10);
+            const deposit = parseFloat(size.deposit || 0);
+            return total + (quantity * deposit);
+          }, 0);
+          
+          if (calculatedDeposit > 0) {
+            displayPrice = displayPrice + calculatedDeposit;
+          }
+        }
+      }
+
       return {
         id: item.item_id,
         uniqueNo: uniqueNo,
@@ -165,7 +216,7 @@ exports.getAllBillingRecords = (req, res) => {
         serviceType: item.service_type,
         serviceTypeDisplay: serviceTypeDisplay,
         date: item.order_date ? new Date(item.order_date).toISOString().split('T')[0] : 'N/A',
-        price: parseFloat(item.final_price || 0),
+        price: displayPrice,
         basePrice: parseFloat(item.base_price || 0),
         status: paymentStatus,
         specificData: specificData,

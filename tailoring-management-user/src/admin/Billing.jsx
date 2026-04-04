@@ -346,12 +346,14 @@ const Billing = () => {
   };
 
   const getRentalPriceDisplay = (bill) => {
-    const fullPrice = parseFloat(bill.price || 0);
     const serviceType = (bill.serviceType || '').toLowerCase();
 
-    // For rental, show rental price and deposit (if not fully refunded)
+    // For rental, show rental price, deposit, and total
     if (serviceType === 'rental') {
-      // Calculate deposit from selected sizes or pricing factors
+      const totalPrice = parseFloat(bill.price || 0);
+      const isPaidOrCompleted = bill.status === 'Paid' || bill.status === 'Fully Paid';
+      
+      // Calculate deposit for breakdown display
       let depositAmount = 0;
       
       // Try to get deposit from selected_sizes first
@@ -367,28 +369,53 @@ const Billing = () => {
       // Fallback to pricing factors if no deposit from sizes
       if (depositAmount === 0) {
         depositAmount = parseFloat(
+          bill.pricingFactors?.deposit_amount ||
           bill.pricingFactors?.downpayment ||
           bill.pricingFactors?.down_payment ||
           bill.pricingFactors?.downPayment ||
-          bill.pricingFactors?.deposit_amount ||
           bill.specificData?.downpayment || 0
         );
       }
       
+      // If still no deposit and rental is paid, estimate 20% as deposit
+      if (depositAmount === 0 && isPaidOrCompleted && totalPrice > 0) {
+        depositAmount = totalPrice * 0.2;
+      }
+      
+      const rentalPrice = totalPrice - depositAmount;
       const refundedDeposit = parseFloat(bill.depositRefunded || bill.pricingFactors?.deposit_refunded_amount || 0);
       const isDepositFullyRefunded = depositAmount > 0 && refundedDeposit >= depositAmount;
       
+      // If rental is paid/completed OR deposit is fully refunded, show only rental price
+      if (isPaidOrCompleted || isDepositFullyRefunded) {
+        return (
+          <span style={{ fontSize: '14px', fontWeight: '600', color: 'blue' }}>
+            ₱{rentalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        );
+      }
+      
+      // If no deposit found, just show total price
+      if (depositAmount === 0) {
+        return (
+          <span style={{ fontSize: '14px', fontWeight: '600' }}>
+            ₱{totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        );
+      }
+      
+      // Show breakdown: rental price + deposit = total
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          <span style={{ fontSize: '14px', fontWeight: '600' }}>₱{fullPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-          {!isDepositFullyRefunded && depositAmount > 0 && (
-            <span style={{ fontSize: '12px', color: '#ff9800' }}>Deposit: ₱{depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-          )}
+          <span style={{ fontSize: '13px', color: '#666' }}>₱{rentalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span style={{ fontSize: '12px', color: '#ff9800' }}>Deposit: ₱{depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span style={{ fontSize: '14px', fontWeight: '600', borderTop: '1px solid #ddd', paddingTop: '2px', marginTop: '2px' }}>Total: ₱{totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
       );
     }
 
     // For other services (dry cleaning, repair, customization)
+    const fullPrice = parseFloat(bill.price || 0);
     const amountPaid = parseFloat(bill.pricingFactors?.amount_paid || 0);
     const remainingBalance = fullPrice - amountPaid;
     

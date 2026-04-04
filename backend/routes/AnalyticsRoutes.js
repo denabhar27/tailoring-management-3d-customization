@@ -13,6 +13,8 @@ router.get('/by-service', requireAdmin, AnalyticsController.getRevenueByService)
 
 router.get('/top-services', requireAdmin, AnalyticsController.getTopServices);
 
+router.get('/net-loss-by-service', requireAdmin, AnalyticsController.getNetLossByService);
+
 router.get('/comparison', requireAdmin, AnalyticsController.getRevenueComparison);
 
 router.get('/top-customers', requireAdmin, AnalyticsController.getTopCustomers);

@@ -1195,11 +1195,11 @@ function Rental() {
 
           setShowEditModal(false);
 
-          setPaymentAmount(paymentSnapshot.requiredDepositNow.toFixed(2));
+          setPaymentAmount(paymentSnapshot.totalPayment.toFixed(2));
 
           setCashReceived('');
 
-          setRequiredPaymentAmount(paymentSnapshot.requiredDepositNow);
+          setRequiredPaymentAmount(paymentSnapshot.totalPayment);
 
           setPendingRentedStatus(selectedRental.item_id);
 
@@ -1319,11 +1319,11 @@ function Rental() {
 
           setSelectedRental(currentRental);
 
-          setPaymentAmount(paymentSnapshot.requiredDepositNow.toFixed(2));
+          setPaymentAmount(paymentSnapshot.totalPayment.toFixed(2));
 
           setCashReceived('');
 
-          setRequiredPaymentAmount(paymentSnapshot.requiredDepositNow);
+          setRequiredPaymentAmount(paymentSnapshot.totalPayment);
 
           setShowPaymentModal(true);
 
@@ -2711,9 +2711,9 @@ function Rental() {
 
                                       const paymentSnapshot = getRentalPaymentSnapshot(rental);
 
-                                      setPaymentAmount(paymentSnapshot.requiredDepositNow > 0 ? paymentSnapshot.requiredDepositNow.toFixed(2) : '');
+                                      setPaymentAmount(paymentSnapshot.totalPayment > 0 ? paymentSnapshot.totalPayment.toFixed(2) : '');
 
-                                      setRequiredPaymentAmount(paymentSnapshot.requiredDepositNow);
+                                      setRequiredPaymentAmount(paymentSnapshot.totalPayment);
 
                                       setCashReceived('');
 

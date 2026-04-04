@@ -77,6 +77,23 @@ export const getTopServices = async (startDate = null, endDate = null, limit = 1
   }
 };
 
+export const getNetLossByService = async (startDate = null, endDate = null, serviceTypes = []) => {
+  try {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    if (serviceTypes && serviceTypes.length > 0) {
+      serviceTypes.forEach(type => params.append('serviceTypes', type));
+    }
+
+    const response = await axios.get(`${API_URL}/net-loss-by-service?${params.toString()}`, getAuthHeaders());
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching net loss by service:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to fetch net loss by service' };
+  }
+};
+
 export const getRevenueComparison = async (period = 'monthly') => {
   try {
     const response = await axios.get(`${API_URL}/comparison?period=${period}`, getAuthHeaders());

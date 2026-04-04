@@ -281,6 +281,8 @@ const OrdersInventory = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [imagePreview, setImagePreview] = useState({ isOpen: false, imageUrl: '', altText: '' });
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [selectedSettlementIncident, setSelectedSettlementIncident] = useState(null);
   
   // Rental Post states
   const [isRentalModalOpen, setIsRentalModalOpen] = useState(false);
@@ -1123,12 +1125,13 @@ const OrdersInventory = () => {
                     <th>Liability</th>
                     <th>Compensation</th>
                     <th>Status</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {compensationIncidents.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="empty-state">No damage incidents recorded</td>
+                      <td colSpan="8" className="empty-state">No damage incidents recorded</td>
                     </tr>
                   ) : (
                     compensationIncidents.map((incident) => (
@@ -1137,9 +1140,22 @@ const OrdersInventory = () => {
                         <td>#{incident.order_id || incident.order_item_id}</td>
                         <td>{incident.customer_name}</td>
                         <td>{incident.damage_type}</td>
-                        <td>{incident.liability_status}</td>
-                        <td>₱{parseFloat(incident.compensation_amount || 0).toLocaleString()}</td>
-                        <td>{incident.compensation_status}</td>
+                        <td><span className={`badge liability-${incident.liability_status}`}>{incident.liability_status}</span></td>
+                        <td style={{ color: '#c41c3b', fontWeight: 'bold' }}>₱{parseFloat(incident.compensation_amount || 0).toLocaleString()}</td>
+                        <td><span className={`badge status-${incident.compensation_status}`}>{incident.compensation_status}</span></td>
+                        <td>
+                          <button
+                            className="action-btn view-btn"
+                            onClick={() => {
+                              setSelectedSettlementIncident(incident);
+                              setShowSettlementModal(true);
+                            }}
+                            title="View Details"
+                            style={{ background: '#2196F3', color: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer' }}
+                          >
+                            <i className="fas fa-eye"></i>
+                          </button>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -1752,6 +1768,70 @@ const OrdersInventory = () => {
         altText={imagePreview.altText}
         onClose={closeImagePreview}
       />
+
+      {/* Settlement Details Modal */}
+      {showSettlementModal && selectedSettlementIncident && (
+        <div className="modal-overlay active" onClick={(e) => { if (e.target.classList.contains('modal-overlay')) setShowSettlementModal(false); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Settlement Details</h2>
+              <span className="close-modal" onClick={() => setShowSettlementModal(false)}>×</span>
+            </div>
+            <div className="modal-body">
+              <div className="detail-row">
+                <label>Incident:</label>
+                <span>{selectedSettlementIncident.damage_description || 'N/A'}</span>
+              </div>
+              <div className="detail-row">
+                <label>Responsible Clerk:</label>
+                <span>
+                  {selectedSettlementIncident.responsible_party
+                    || (selectedSettlementIncident.reported_by_role === 'clerk' ? 'Clerk' : null)
+                    || 'N/A'}
+                </span>
+              </div>
+              <div className="detail-row">
+                <label>Amount:</label>
+                <span style={{ color: '#c41c3b', fontWeight: 'bold', fontSize: '18px' }}>
+                  ₱{parseFloat(selectedSettlementIncident.compensation_amount || 0).toLocaleString()}
+                </span>
+              </div>
+              <div className="detail-row">
+                <label>Liability Status:</label>
+                <span className={`badge liability-${selectedSettlementIncident.liability_status}`}>
+                  {selectedSettlementIncident.liability_status}
+                </span>
+              </div>
+              <div className="detail-row">
+                <label>Payment Status:</label>
+                <span className={`badge status-${selectedSettlementIncident.compensation_status}`}>
+                  {selectedSettlementIncident.compensation_status}
+                </span>
+              </div>
+              <div className="detail-row">
+                <label>Paid At:</label>
+                <span>{selectedSettlementIncident.compensation_paid_at 
+                  ? new Date(selectedSettlementIncident.compensation_paid_at).toLocaleString() 
+                  : 'N/A'
+                }</span>
+              </div>
+              <div className="detail-row">
+                <label>Payment Reference:</label>
+                <span>{selectedSettlementIncident.payment_reference || 'N/A'}</span>
+              </div>
+              {selectedSettlementIncident.notes && (
+                <div className="detail-row">
+                  <label>Notes:</label>
+                  <span>{selectedSettlementIncident.notes}</span>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="cancel-btn" onClick={() => setShowSettlementModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

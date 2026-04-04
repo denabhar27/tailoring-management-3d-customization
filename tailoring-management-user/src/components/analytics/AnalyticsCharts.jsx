@@ -237,6 +237,66 @@ export const TopServicesBarChart = ({ data }) => {
   return <Bar data={chartData} options={options} />;
 };
 
+export const NetLossByServiceBarChart = ({ data }) => {
+  const chartData = {
+    labels: data?.map(d => d.serviceType) || [],
+    datasets: [
+      {
+        label: 'Net Loss (₱)',
+        data: data?.map(d => d.totalLoss) || [],
+        backgroundColor: data?.map(() => CHART_COLORS.danger) || [],
+        borderRadius: 8,
+        barThickness: 40
+      }
+    ]
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: 'y',
+    plugins: {
+      legend: {
+        display: false
+      },
+      title: {
+        display: true,
+        text: 'Net Loss from Compensation',
+        font: {
+          size: 16,
+          weight: '600',
+          family: 'Montserrat, Poppins, sans-serif'
+        },
+        color: '#2d3436'
+      },
+      tooltip: {
+        backgroundColor: 'rgba(45, 52, 54, 0.9)',
+        callbacks: {
+          label: (context) => `Loss: ₱${context.parsed.x.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+        }
+      }
+    },
+    scales: {
+      x: {
+        beginAtZero: true,
+        ticks: {
+          callback: (value) => `₱${value.toLocaleString()}`
+        },
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)'
+        }
+      },
+      y: {
+        grid: {
+          display: false
+        }
+      }
+    }
+  };
+
+  return <Bar data={chartData} options={options} />;
+};
+
 export const RevenueComparisonChart = ({ data, periodLabel }) => {
   const chartData = {
     labels: data?.map(d => d.serviceType) || [],

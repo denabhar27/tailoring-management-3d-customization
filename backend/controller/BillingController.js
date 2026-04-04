@@ -25,6 +25,8 @@ exports.getAllBillingRecords = (req, res) => {
       oi.deposit_refund_date,
       oi.rental_start_date,
       oi.rental_end_date,
+      COALESCE(dca.has_paid_damage, 0) AS has_paid_damage,
+      COALESCE(dca.paid_compensation_amount, 0) AS paid_compensation_amount,
       o.status as order_status,
       o.order_type,
       o.walk_in_customer_id,
@@ -39,6 +41,14 @@ exports.getAllBillingRecords = (req, res) => {
       wc.phone as walk_in_customer_phone
     FROM order_items oi
     JOIN orders o ON oi.order_id = o.order_id
+    LEFT JOIN (
+      SELECT
+        order_item_id,
+        MAX(CASE WHEN liability_status = 'approved' AND compensation_status = 'paid' THEN 1 ELSE 0 END) AS has_paid_damage,
+        SUM(CASE WHEN liability_status = 'approved' AND compensation_status = 'paid' THEN COALESCE(compensation_amount, 0) ELSE 0 END) AS paid_compensation_amount
+      FROM damage_compensation_records
+      GROUP BY order_item_id
+    ) dca ON dca.order_item_id = oi.item_id
     LEFT JOIN user u ON o.user_id = u.user_id
     LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
     -- Reports must exclude "pending orders" (including 'price_confirmation') and cancelled items.
@@ -94,12 +104,15 @@ exports.getAllBillingRecords = (req, res) => {
       let paymentStatus = 'Unpaid';
       const normalizedServiceType = (item.service_type || '').toLowerCase().trim();
       const dbPaymentStatus = (item.payment_status || '').toLowerCase().trim();
+      const hasPaidDamage = parseInt(item.has_paid_damage, 10) === 1;
 
       const amountPaid = parseFloat(pricingFactors.amount_paid || pricingFactors.downpayment || 0);
       const finalPrice = parseFloat(item.final_price || 0);
       const remainingBalance = finalPrice - amountPaid;
 
-      if (dbPaymentStatus === 'fully_paid' || dbPaymentStatus === 'paid') {
+      if (hasPaidDamage) {
+        paymentStatus = 'Damage';
+      } else if (dbPaymentStatus === 'fully_paid' || dbPaymentStatus === 'paid') {
         paymentStatus = 'Paid';
       } else if (remainingBalance <= 0 && finalPrice > 0 && amountPaid > 0) {
         paymentStatus = 'Paid';
@@ -157,6 +170,8 @@ exports.getAllBillingRecords = (req, res) => {
         status: paymentStatus,
         specificData: specificData,
         pricingFactors: pricingFactors,
+        hasPaidDamage,
+        paidCompensationAmount: parseFloat(item.paid_compensation_amount || 0),
         depositRefunded: Math.max(
           0,
           parseFloat(item.deposit_refunded || pricingFactors.deposit_refunded_amount || 0)
@@ -397,6 +412,7 @@ exports.getBillingStats = (req, res) => {
       COUNT(*) as total_records,
       SUM(
         CASE 
+          WHEN COALESCE(dca.has_paid_damage, 0) = 1 THEN 0
           WHEN oi.payment_status IN ('paid', 'fully_paid') THEN 1
           WHEN LOWER(oi.service_type) = 'rental' 
             AND COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0 
@@ -406,6 +422,7 @@ exports.getBillingStats = (req, res) => {
       ) as paid_count,
       SUM(
         CASE 
+          WHEN COALESCE(dca.has_paid_damage, 0) = 1 THEN 0
           WHEN oi.payment_status IN ('down-payment', 'downpayment') THEN 1
           WHEN LOWER(oi.service_type) = 'rental' 
             AND COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0 
@@ -415,6 +432,7 @@ exports.getBillingStats = (req, res) => {
       ) as downpayment_count,
       SUM(
         CASE 
+          WHEN COALESCE(dca.has_paid_damage, 0) = 1 THEN 0
           WHEN oi.payment_status IN ('partial_payment', 'partial') THEN 1
           WHEN LOWER(oi.service_type) = 'rental' 
             AND COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) >= (oi.final_price * 0.5)
@@ -424,10 +442,17 @@ exports.getBillingStats = (req, res) => {
       ) as partial_payment_count,
       SUM(
         CASE 
+          WHEN COALESCE(dca.has_paid_damage, 0) = 1 THEN 0
           WHEN oi.payment_status IN ('unpaid', 'pending', '') OR oi.payment_status IS NULL THEN 1
           ELSE 0 
         END
       ) as unpaid_count,
+      SUM(
+        CASE
+          WHEN COALESCE(dca.has_paid_damage, 0) = 1 THEN 1
+          ELSE 0
+        END
+      ) as damage_count,
       SUM(
         COALESCE(
           CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
@@ -436,16 +461,37 @@ exports.getBillingStats = (req, res) => {
             ELSE 0
           END
         )
+        - CASE
+            WHEN COALESCE(dca.has_paid_damage, 0) = 1 THEN (
+              COALESCE(
+                CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
+                CASE 
+                  WHEN oi.payment_status IN ('paid', 'fully_paid') THEN oi.final_price
+                  ELSE 0
+                END
+              ) + COALESCE(dca.paid_compensation_amount, 0)
+            )
+            ELSE 0
+          END
       ) as total_revenue,
       SUM(
         CASE 
+          WHEN COALESCE(dca.has_paid_damage, 0) = 1 THEN 0
           WHEN oi.payment_status NOT IN ('paid', 'fully_paid') OR oi.payment_status IS NULL THEN 
-            oi.final_price - COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0)
+            GREATEST(0, oi.final_price - COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0))
           ELSE 0
         END
       ) as pending_revenue
     FROM order_items oi
     JOIN orders o ON oi.order_id = o.order_id
+    LEFT JOIN (
+      SELECT
+        order_item_id,
+        MAX(CASE WHEN liability_status = 'approved' AND compensation_status = 'paid' THEN 1 ELSE 0 END) AS has_paid_damage,
+        SUM(CASE WHEN liability_status = 'approved' AND compensation_status = 'paid' THEN COALESCE(compensation_amount, 0) ELSE 0 END) AS paid_compensation_amount
+      FROM damage_compensation_records
+      GROUP BY order_item_id
+    ) dca ON dca.order_item_id = oi.item_id
     WHERE oi.approval_status NOT IN ('cancelled', 'pending', 'pending_review')
       AND oi.approval_status IS NOT NULL
       AND oi.approval_status != ''
@@ -470,6 +516,7 @@ exports.getBillingStats = (req, res) => {
         paid: parseInt(stats.paid_count) || 0,
         downpayment: parseInt(stats.downpayment_count) || 0,
         partialPayment: parseInt(stats.partial_payment_count) || 0,
+        damage: parseInt(stats.damage_count) || 0,
         unpaid: parseInt(stats.unpaid_count) || 0,
         totalRevenue: parseFloat(stats.total_revenue) || 0,
         pendingRevenue: parseFloat(stats.pending_revenue) || 0

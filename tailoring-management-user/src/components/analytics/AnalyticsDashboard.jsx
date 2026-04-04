@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { format, subDays, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import {
   ServiceRevenuePieChart,
-  TopServicesBarChart
+  TopServicesBarChart,
+  NetLossByServiceBarChart
 } from './AnalyticsCharts';
 import {
   getRevenueByService,
-  getTopServices
+  getTopServices,
+  getNetLossByService
 } from '../../api/AnalyticsApi';
 import {
   exportFullAnalytics
@@ -17,6 +19,7 @@ const AnalyticsDashboard = () => {
 
   const [serviceData, setServiceData] = useState([]);
   const [topServices, setTopServices] = useState([]);
+  const [netLossByService, setNetLossByService] = useState([]);
 
   const [dateRange, setDateRange] = useState({
     startDate: format(subMonths(new Date(), 1), 'yyyy-MM-dd'),
@@ -60,13 +63,15 @@ const AnalyticsDashboard = () => {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const [serviceRes, topRes] = await Promise.all([
+      const [serviceRes, topRes, netLossRes] = await Promise.all([
         getRevenueByService(dateRange.startDate, dateRange.endDate, 'paid', selectedServices),
-        getTopServices(dateRange.startDate, dateRange.endDate, 10, selectedServices)
+        getTopServices(dateRange.startDate, dateRange.endDate, 10, selectedServices),
+        getNetLossByService(dateRange.startDate, dateRange.endDate, selectedServices)
       ]);
 
       if (serviceRes.success) setServiceData(serviceRes.data);
       if (topRes.success) setTopServices(topRes.data);
+      if (netLossRes.success) setNetLossByService(netLossRes.data || []);
     } catch (error) {
       console.error('Error fetching analytics data:', error);
     } finally {
@@ -224,6 +229,15 @@ const AnalyticsDashboard = () => {
           </div>
           <div className="chart-body">
             <TopServicesBarChart data={topServices} />
+          </div>
+        </div>
+
+        <div className="chart-container bar-chart">
+          <div className="chart-header">
+            <h3>Compensation Net Loss</h3>
+          </div>
+          <div className="chart-body">
+            <NetLossByServiceBarChart data={netLossByService} />
           </div>
         </div>
 

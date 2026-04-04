@@ -8,6 +8,8 @@ import Sidebar from './Sidebar';
 
 import { getAllBillingRecords, getBillingStats, updateBillingRecordStatus } from '../api/BillingApi';
 
+import { getCompensationIncidents } from '../api/DamageCompensationApi';
+
 import { useAlert } from '../context/AlertContext';
 
 import ImagePreviewModal from '../components/ImagePreviewModal';
@@ -51,6 +53,10 @@ const Billing = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
 
   const [selectedBill, setSelectedBill] = useState(null);
+
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
+
+  const [selectedSettlement, setSelectedSettlement] = useState(null);
 
   const [imagePreview, setImagePreview] = useState({ isOpen: false, imageUrl: '', altText: '' });
 
@@ -226,6 +232,44 @@ const Billing = () => {
 
   };
 
+  const handleViewSettlement = async (billId) => {
+
+    try {
+
+      const result = await getCompensationIncidents({ order_item_id: billId });
+
+      if (result.success && result.incidents && result.incidents.length > 0) {
+
+        const paidIncident = result.incidents.find(inc => inc.compensation_status === 'paid');
+
+        if (paidIncident) {
+
+          setSelectedSettlement(paidIncident);
+
+          setShowSettlementModal(true);
+
+        } else {
+
+          await alert('No settled compensation found for this order', 'Info', 'info');
+
+        }
+
+      } else {
+
+        await alert('No compensation incidents found', 'Info', 'info');
+
+      }
+
+    } catch (error) {
+
+      console.error('Error fetching settlement details:', error);
+
+      await alert('Error fetching settlement details', 'Error', 'error');
+
+    }
+
+  };
+
   const openImagePreview = (imageUrl, altText) => {
 
     setImagePreview({ isOpen: true, imageUrl, altText });
@@ -386,7 +430,9 @@ const Billing = () => {
 
       'Unpaid': { backgroundColor: '#ffebee', color: '#d32f2f' },
 
-      'Down-payment': { backgroundColor: '#fff3e0', color: '#e65100' }
+      'Down-payment': { backgroundColor: '#fff3e0', color: '#e65100' },
+
+      'Damage': { backgroundColor: '#fce4ec', color: '#ad1457' }
 
     };
 
@@ -440,6 +486,8 @@ const Billing = () => {
             <option value="Unpaid">Unpaid</option>
 
             <option value="Down-payment">Down-payment</option>
+
+            <option value="Damage">Damage</option>
 
           </select>
 
@@ -574,7 +622,41 @@ const Billing = () => {
 
                           <div className="action-buttons">
 
-                            {bill.status !== 'Paid' && bill.status !== 'Fully Paid' && (bill.serviceType || '').toLowerCase() !== 'rental' && (
+                            {bill.status === 'Damage' && bill.hasPaidDamage && (
+                            <button
+
+                              className="icon-btn settlement-view"
+
+                              onClick={(e) => {
+
+                                e.stopPropagation();
+
+                                handleViewSettlement(bill.id);
+
+                              }}
+
+                              title="View Settlement Details"
+
+                              style={{ backgroundColor: '#1565c0', color: 'white' }}
+
+                            >
+
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10z"></path>
+
+                                <polyline points="14 2 14 10 22 10"></polyline>
+
+                                <line x1="12" y1="19" x2="12" y2="13"></line>
+
+                                <line x1="9" y1="16" x2="15" y2="16"></line>
+
+                              </svg>
+
+                            </button>
+                            )}
+
+                            {bill.status !== 'Paid' && bill.status !== 'Fully Paid' && bill.status !== 'Damage' && (bill.serviceType || '').toLowerCase() !== 'rental' && (
                             <button
 
                               className="icon-btn next-status"
@@ -623,6 +705,156 @@ const Billing = () => {
         </div>
 
       </div>
+      {showSettlementModal && selectedSettlement && (
+
+        <div
+
+          className="modal-overlay active"
+
+          onClick={(e) => {
+
+            if (e.target.classList.contains('modal-overlay')) setShowSettlementModal(false);
+
+          }}
+
+        >
+
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto' }}>
+
+            <div className="modal-header">
+
+              <h2>Settlement Details</h2>
+
+              <span className="close-modal" onClick={() => setShowSettlementModal(false)}>×</span>
+
+            </div>
+
+            <div className="modal-body">
+
+              <div className="detail-row">
+
+                <strong>Service Type:</strong>
+
+                <span>{selectedSettlement.service_type || 'N/A'}</span>
+
+              </div>
+
+              <div className="detail-row">
+
+                <strong>Damage Type:</strong>
+
+                <span>{selectedSettlement.damage_type || 'N/A'}</span>
+
+              </div>
+
+              <div className="detail-row">
+
+                <strong>Description:</strong>
+
+                <span>{selectedSettlement.damage_description || 'No description provided'}</span>
+
+              </div>
+
+              <div className="detail-row">
+
+                <strong>Liability Status:</strong>
+
+                <span style={{
+
+                  padding: '4px 8px',
+
+                  borderRadius: '4px',
+
+                  backgroundColor: selectedSettlement.liability_status === 'approved' ? '#c8e6c9' : selectedSettlement.liability_status === 'rejected' ? '#ffcdd2' : '#fff9c4',
+
+                  color: selectedSettlement.liability_status === 'approved' ? '#1b5e20' : selectedSettlement.liability_status === 'rejected' ? '#b71c1c' : '#f57f17',
+
+                  fontWeight: '600'
+
+                }}>
+
+                  {selectedSettlement.liability_status?.charAt(0).toUpperCase() + selectedSettlement.liability_status?.slice(1) || 'N/A'}
+
+                </span>
+
+              </div>
+
+              <div className="detail-row">
+
+                <strong>Compensation Amount:</strong>
+
+                <span style={{ color: '#d32f2f', fontWeight: 'bold', fontSize: '16px' }}>₱{parseFloat(selectedSettlement.compensation_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+
+              </div>
+
+              <div className="detail-row">
+
+                <strong>Settlement Status:</strong>
+
+                <span style={{
+
+                  padding: '4px 8px',
+
+                  borderRadius: '4px',
+
+                  backgroundColor: selectedSettlement.compensation_status === 'paid' ? '#c8e6c9' : '#ffebee',
+
+                  color: selectedSettlement.compensation_status === 'paid' ? '#1b5e20' : '#d32f2f',
+
+                  fontWeight: '600'
+
+                }}>
+
+                  {selectedSettlement.compensation_status?.charAt(0).toUpperCase() + selectedSettlement.compensation_status?.slice(1) || 'N/A'}
+
+                </span>
+
+              </div>
+
+              {selectedSettlement.compensation_paid_at && (
+
+                <div className="detail-row">
+
+                  <strong>Settlement Date:</strong>
+
+                  <span>{new Date(selectedSettlement.compensation_paid_at).toLocaleDateString()}</span>
+
+                </div>
+
+              )}
+
+              {selectedSettlement.payment_reference && (
+
+                <div className="detail-row">
+
+                  <strong>Payment Reference:</strong>
+
+                  <span>{selectedSettlement.payment_reference}</span>
+
+                </div>
+
+              )}
+
+              {selectedSettlement.notes && (
+
+                <div className="detail-row">
+
+                  <strong>Notes:</strong>
+
+                  <span style={{ whiteSpace: 'pre-wrap' }}>{selectedSettlement.notes}</span>
+
+                </div>
+
+              )}
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
       {showDetailModal && selectedBill && (
 
         <div

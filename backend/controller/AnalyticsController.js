@@ -9,30 +9,88 @@ function query(sql, params = []) {
   });
 }
 
-// Revenue = actual amount paid (from pricing_factors.amount_paid)
-// For rentals that are returned, subtract the deposit since it's refunded
-// This includes partial payments for all services
+const getCollectedPaymentExpression = () => `
+  COALESCE(
+    CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
+    CASE
+      WHEN oi.payment_status IN ('paid', 'fully_paid') THEN oi.final_price
+      ELSE 0
+    END
+  )
+`;
+
+const getHasPaidCompensationExpression = () => `
+  EXISTS (
+    SELECT 1
+    FROM damage_compensation_records dcr
+    WHERE dcr.order_item_id = oi.item_id
+      AND dcr.liability_status = 'approved'
+      AND dcr.compensation_status = 'paid'
+  )
+`;
+
+const getPaidCompensationAmountExpression = () => `
+  COALESCE(
+    (
+      SELECT SUM(COALESCE(dcr.compensation_amount, 0))
+      FROM damage_compensation_records dcr
+      WHERE dcr.order_item_id = oi.item_id
+        AND dcr.liability_status = 'approved'
+        AND dcr.compensation_status = 'paid'
+    ),
+    0
+  )
+`;
+
+const getRevenueActivityCondition = () => `(
+  oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
+  OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
+  OR ${getHasPaidCompensationExpression()}
+)`;
+
+// Revenue gain excludes paid damage incidents.
+// Compensation impact is handled separately in net loss analytics.
 const getRevenueExpression = () => `
   CASE
-    WHEN LOWER(oi.service_type) = 'rental' AND oi.approval_status = 'returned' THEN
-      COALESCE(
-        CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
-        CASE 
-          WHEN oi.payment_status IN ('paid', 'fully_paid') THEN oi.final_price
-          ELSE 0
-        END
-      ) - COALESCE(
-        CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.downpayment')) AS DECIMAL(10,2)),
-        0
-      )
+    WHEN ${getHasPaidCompensationExpression()} THEN 0
     ELSE
-      COALESCE(
-        CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
-        CASE 
-          WHEN oi.payment_status IN ('paid', 'fully_paid') THEN oi.final_price
-          ELSE 0
-        END
-      )
+      CASE
+        WHEN LOWER(oi.service_type) = 'rental' AND oi.approval_status = 'returned' THEN
+          ${getCollectedPaymentExpression()} - COALESCE(
+            CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.downpayment')) AS DECIMAL(10,2)),
+            0
+          )
+        ELSE
+          ${getCollectedPaymentExpression()}
+      END
+  END
+`;
+
+// Operational revenue for service-distribution charts should not go negative.
+// Paid damage incidents are excluded from operational revenue (set to 0).
+const getOperationalRevenueExpression = () => `
+  CASE
+    WHEN ${getHasPaidCompensationExpression()} THEN 0
+    ELSE
+      CASE
+        WHEN LOWER(oi.service_type) = 'rental' AND oi.approval_status = 'returned' THEN
+          ${getCollectedPaymentExpression()} - COALESCE(
+            CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.downpayment')) AS DECIMAL(10,2)),
+            0
+          )
+        ELSE
+          ${getCollectedPaymentExpression()}
+      END
+  END
+`;
+
+// Net compensation loss shown separately from operational revenue.
+// This excludes refunded/downpayment amounts and only counts paid compensation.
+const getNetCompensationLossExpression = () => `
+  CASE
+    WHEN ${getHasPaidCompensationExpression()} THEN
+      ${getPaidCompensationAmountExpression()}
+    ELSE 0
   END
 `;
 
@@ -44,11 +102,8 @@ exports.getRevenueOverview = async (req, res) => {
     });
   }
 
-  // Include all orders that have any payment (partial or full)
-  const paidCondition = `(
-    oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
-    OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
-  )`;
+  // Include paid/partial orders and incidents with paid compensation.
+  const paidCondition = getRevenueActivityCondition();
   const revenueExpr = getRevenueExpression();
 
   try {
@@ -228,7 +283,9 @@ exports.getRevenueTrend = async (req, res) => {
       serviceCondition = `AND LOWER(oi.service_type) IN (${normalizedTypes.join(', ')})`;
     }
 
-    const revenueExpr = getRevenueExpression();
+    const revenueExpr = getOperationalRevenueExpression();
+
+    const paidCondition = getRevenueActivityCondition();
 
     const trendData = await query(`
       SELECT 
@@ -238,10 +295,7 @@ exports.getRevenueTrend = async (req, res) => {
         COUNT(*) AS order_count
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
-      WHERE (
-        oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
-        OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
-      )
+      WHERE ${paidCondition}
         ${dateCondition}
         ${serviceCondition}
       GROUP BY period, period_group
@@ -283,17 +337,11 @@ exports.getRevenueByService = async (req, res) => {
       dateCondition = `AND DATE(o.order_date) BETWEEN '${startDate}' AND '${endDate}'`;
     }
 
-    // Include all orders with any payment (partial or full)
-    let paymentCondition = `AND (
-      oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
-      OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
-    )`;
+    // Include paid/partial orders and incidents with paid compensation.
+    let paymentCondition = `AND ${getRevenueActivityCondition()}`;
     if (paymentStatus && paymentStatus !== 'all') {
       if (paymentStatus === 'paid') {
-        paymentCondition = `AND (
-          oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
-          OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
-        )`;
+        paymentCondition = `AND ${getRevenueActivityCondition()}`;
       } else {
         paymentCondition = `AND oi.payment_status = '${paymentStatus}'`;
       }
@@ -315,7 +363,7 @@ exports.getRevenueByService = async (req, res) => {
       }
     }
 
-    const revenueExpr = getRevenueExpression();
+    const revenueExpr = getOperationalRevenueExpression();
 
     const serviceData = await query(`
       SELECT 
@@ -401,13 +449,10 @@ exports.getTopServices = async (req, res) => {
       }
     }
 
-    const revenueExpr = getRevenueExpression();
+    const revenueExpr = getOperationalRevenueExpression();
 
-    // Use consistent payment condition - include all orders with any payment
-    const paidCondition = `(
-      oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
-      OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
-    )`;
+    // Use consistent activity condition including paid compensation incidents.
+    const paidCondition = getRevenueActivityCondition();
 
     const topServices = await query(`
       SELECT 
@@ -452,6 +497,86 @@ exports.getTopServices = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching top services',
+      error: error.message
+    });
+  }
+};
+
+exports.getNetLossByService = async (req, res) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin only.'
+    });
+  }
+
+  const { startDate, endDate, serviceTypes } = req.query;
+
+  try {
+    let dateCondition = '';
+    if (startDate && endDate) {
+      dateCondition = `AND DATE(o.order_date) BETWEEN '${startDate}' AND '${endDate}'`;
+    }
+
+    let serviceTypeCondition = '';
+    if (serviceTypes) {
+      const types = Array.isArray(serviceTypes) ? serviceTypes : [serviceTypes];
+      if (types.length > 0) {
+        const mappedTypes = types.map(t => {
+          const lower = t.toLowerCase();
+          if (lower === 'customization') return "'customize', 'customization'";
+          if (lower === 'dry cleaning') return "'dry_cleaning', 'dry-cleaning', 'drycleaning', 'dry cleaning'";
+          if (lower === 'repair') return "'repair'";
+          if (lower === 'rental') return "'rental'";
+          return `'${lower}'`;
+        });
+        serviceTypeCondition = `AND LOWER(oi.service_type) IN (${mappedTypes.join(', ')})`;
+      }
+    }
+
+    const lossExpr = getNetCompensationLossExpression();
+
+    const lossData = await query(`
+      SELECT
+        CASE
+          WHEN LOWER(oi.service_type) IN ('customize', 'customization') THEN 'Customization'
+          WHEN LOWER(oi.service_type) IN ('dry_cleaning', 'dry-cleaning', 'drycleaning', 'dry cleaning') THEN 'Dry Cleaning'
+          WHEN LOWER(oi.service_type) = 'repair' THEN 'Repair'
+          WHEN LOWER(oi.service_type) = 'rental' THEN 'Rental'
+          ELSE 'Other'
+        END AS service_type,
+        COALESCE(SUM(${lossExpr}), 0) AS total_loss,
+        SUM(CASE WHEN ${getHasPaidCompensationExpression()} THEN 1 ELSE 0 END) AS incident_count
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      WHERE 1=1
+        ${dateCondition}
+        ${serviceTypeCondition}
+      GROUP BY
+        CASE
+          WHEN LOWER(oi.service_type) IN ('customize', 'customization') THEN 'Customization'
+          WHEN LOWER(oi.service_type) IN ('dry_cleaning', 'dry-cleaning', 'drycleaning', 'dry cleaning') THEN 'Dry Cleaning'
+          WHEN LOWER(oi.service_type) = 'repair' THEN 'Repair'
+          WHEN LOWER(oi.service_type) = 'rental' THEN 'Rental'
+          ELSE 'Other'
+        END
+      HAVING total_loss > 0
+      ORDER BY total_loss DESC
+    `);
+
+    res.json({
+      success: true,
+      data: lossData.map(row => ({
+        serviceType: row.service_type,
+        totalLoss: parseFloat(row.total_loss),
+        incidentCount: parseInt(row.incident_count)
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching net loss by service:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching net loss by service',
       error: error.message
     });
   }
@@ -508,7 +633,7 @@ exports.getRevenueComparison = async (req, res) => {
         COALESCE(SUM(${revenueExpr}), 0) AS revenue
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
-      WHERE (oi.payment_status = 'paid' OR (LOWER(oi.service_type) = 'rental' AND oi.payment_status NOT IN ('unpaid', 'pending', 'cancelled')))
+      WHERE ${getRevenueActivityCondition()}
         AND ${currentPeriodCondition}
       GROUP BY 
         CASE 
@@ -532,7 +657,7 @@ exports.getRevenueComparison = async (req, res) => {
         COALESCE(SUM(${revenueExpr}), 0) AS revenue
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
-      WHERE (oi.payment_status = 'paid' OR (LOWER(oi.service_type) = 'rental' AND oi.payment_status NOT IN ('unpaid', 'pending', 'cancelled')))
+      WHERE ${getRevenueActivityCondition()}
         AND ${previousPeriodCondition}
       GROUP BY 
         CASE 
@@ -602,7 +727,7 @@ exports.getTopCustomers = async (req, res) => {
       JOIN orders o ON oi.order_id = o.order_id
       LEFT JOIN user u ON o.user_id = u.user_id
       LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
-      WHERE (oi.payment_status = 'paid' OR (LOWER(oi.service_type) = 'rental' AND oi.payment_status NOT IN ('unpaid', 'pending', 'cancelled')))
+      WHERE ${getRevenueActivityCondition()}
         ${dateCondition}
       GROUP BY 
         COALESCE(u.user_id, CONCAT('walkin_', o.walk_in_customer_id)),
@@ -646,7 +771,7 @@ exports.getDetailedAnalytics = async (req, res) => {
   const { startDate, endDate, serviceTypes, paymentStatus, orderType } = req.query;
 
   try {
-    let conditions = ["(oi.payment_status = 'paid' OR (LOWER(oi.service_type) = 'rental' AND oi.payment_status NOT IN ('unpaid', 'pending', 'cancelled')))"];
+    let conditions = [getRevenueActivityCondition()];
     
     if (startDate && endDate) {
       conditions.push(`DATE(o.order_date) BETWEEN '${startDate}' AND '${endDate}'`);

@@ -36,6 +36,8 @@ const CustomerList = () => {
 
     first_name: '',
 
+    middle_name: '',
+
     last_name: '',
 
     email: '',
@@ -116,6 +118,8 @@ const CustomerList = () => {
       setEditForm({
 
         first_name: result.customer.first_name || result.customer.full_name || '',
+
+        middle_name: result.customer.middle_name || '',
 
         last_name: result.customer.last_name || '',
 
@@ -222,7 +226,7 @@ const CustomerList = () => {
 
           const customerName = isWalkIn
             ? selectedCustomer.full_name
-            : `${selectedCustomer.first_name || ''} ${selectedCustomer.last_name || ''}`.trim() || editForm.first_name;
+            : `${selectedCustomer.first_name || ''} ${selectedCustomer.middle_name || ''} ${selectedCustomer.last_name || ''}`.replace(/\s+/g, ' ').trim() || editForm.first_name;
 
           const measurementsData = {
             ...measurements,
@@ -301,7 +305,7 @@ const CustomerList = () => {
 
         ? (customer.full_name || customer.name || '').toLowerCase()
 
-        : `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
+        : `${customer.first_name || ''} ${customer.middle_name || ''} ${customer.last_name || ''}`.replace(/\s+/g, ' ').toLowerCase();
 
       const matchesSearch =
 
@@ -405,7 +409,7 @@ const CustomerList = () => {
         </div>
         <div className="table-container">
 
-          <div className="table-scroll-viewport">
+          <div className="table-scroll-viewport" style={{ maxHeight: '500px' }}>
           <table>
 
             <thead>
@@ -448,7 +452,7 @@ const CustomerList = () => {
 
                   const customerId = isWalkIn ? customer.customer_id : customer.user_id;
 
-                  const fullName = isWalkIn ? customer.full_name : `${customer.first_name || ''} ${customer.last_name || ''}`.trim();
+                  const fullName = isWalkIn ? customer.full_name : `${customer.first_name || ''} ${customer.middle_name || ''} ${customer.last_name || ''}`.replace(/\s+/g, ' ').trim();
 
                   const email = isWalkIn ? customer.email : customer.email;
 
@@ -532,7 +536,7 @@ const CustomerList = () => {
 
                                 e.stopPropagation();
 
-                                const customerName = isWalkIn ? fullName : `${customer.first_name} ${customer.last_name}`;
+                                const customerName = isWalkIn ? fullName : `${customer.first_name || ''} ${customer.middle_name || ''} ${customer.last_name || ''}`.replace(/\s+/g, ' ').trim();
 
                                 const confirmed = await confirm(`Are you sure you want to deactivate ${customerName}?`, 'Confirm Deactivation', 'warning');
 
@@ -576,7 +580,7 @@ const CustomerList = () => {
 
                                 e.stopPropagation();
 
-                                const customerName = isWalkIn ? fullName : `${customer.first_name} ${customer.last_name}`;
+                                const customerName = isWalkIn ? fullName : `${customer.first_name || ''} ${customer.middle_name || ''} ${customer.last_name || ''}`.replace(/\s+/g, ' ').trim();
 
                                 const confirmed = await confirm(`Are you sure you want to activate ${customerName}?`, 'Confirm Activation', 'warning');
 
@@ -667,6 +671,22 @@ const CustomerList = () => {
 
     <div className="form-group">
 
+      <label>Middle Name</label>
+
+      <input
+
+        type="text"
+
+        value={editForm.middle_name}
+
+        onChange={(e) => setEditForm({ ...editForm, middle_name: e.target.value })}
+
+      />
+
+    </div>
+
+    <div className="form-group">
+
       <label>Last Name *</label>
 
       <input
@@ -703,7 +723,7 @@ const CustomerList = () => {
 
     <div className="form-group">
 
-      <label>Phone Number</label>
+      <label>Phone Number *</label>
 
       <input
 
@@ -712,6 +732,8 @@ const CustomerList = () => {
         value={editForm.phone_number || ''}
 
         onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })}
+
+        required
 
       />
 

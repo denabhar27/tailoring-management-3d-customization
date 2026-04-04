@@ -1221,7 +1221,7 @@ Order.getRentalOrdersByStatus = (status, callback) => {
 };
 
 Order.updateRentalOrderItem = (itemId, updateData, callback) => {
-  const { finalPrice, approvalStatus, adminNotes, penaltyData, damageNotes } = updateData;
+  const { finalPrice, approvalStatus, adminNotes, penaltyData, damageNotes, paymentMode, flatRateUntilDate } = updateData;
 
   console.log("Model - Updating rental item:", itemId, updateData);
 
@@ -1238,6 +1238,25 @@ Order.updateRentalOrderItem = (itemId, updateData, callback) => {
     updates.push('pricing_factors = JSON_SET(COALESCE(pricing_factors, \'{}\'), \'$.adminNotes\', ?)');
     values.push(adminNotes || '');
     console.log("Adding adminNotes update:", adminNotes);
+  }
+
+  if (paymentMode !== undefined) {
+    updates.push('pricing_factors = JSON_SET(COALESCE(pricing_factors, \'{}\'), \'$.rental_payment_mode\', ?)');
+    values.push(paymentMode);
+    updates.push('pricing_factors = JSON_SET(pricing_factors, \'$.flat_rate_locked\', IF(? = \'flat_rate\', true, false))');
+    values.push(paymentMode);
+    console.log("Adding paymentMode update:", paymentMode);
+  }
+
+  if (flatRateUntilDate !== undefined) {
+    if (flatRateUntilDate === null || flatRateUntilDate === '') {
+      updates.push('pricing_factors = JSON_REMOVE(COALESCE(pricing_factors, \'{}\'), \'$.flat_rate_until_date\')');
+      console.log("Clearing flat_rate_until_date");
+    } else {
+      updates.push('pricing_factors = JSON_SET(COALESCE(pricing_factors, \'{}\'), \'$.flat_rate_until_date\', ?)');
+      values.push(flatRateUntilDate);
+      console.log("Adding flatRateUntilDate update:", flatRateUntilDate);
+    }
   }
 
   if (damageNotes !== undefined) {

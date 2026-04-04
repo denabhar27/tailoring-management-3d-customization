@@ -57,9 +57,18 @@ const PriceEditModal = ({ order, onClose, onSave }) => {
         
         <div className="modal-body">
           <div className="order-info">
-            <p><strong>Order ID:</strong> #{order.order_id || order.item_id}</p>
-            <p><strong>Service:</strong> {order.service_type?.replace('_', ' ')}</p>
-            <p><strong>Current Price:</strong> ₱{parseFloat(order.final_price || 0).toFixed(2)}</p>
+            <div className="order-info-item">
+              <div className="order-info-label">Order ID</div>
+              <div className="order-info-value">#{order.order_id || order.item_id}</div>
+            </div>
+            <div className="order-info-item">
+              <div className="order-info-label">Service</div>
+              <div className="order-info-value">{order.service_type?.replace('_', ' ')}</div>
+            </div>
+            <div className="order-info-item">
+              <div className="order-info-label">Current Price</div>
+              <div className="order-info-value">₱{parseFloat(order.final_price || 0).toFixed(2)}</div>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit}>
@@ -98,11 +107,11 @@ const PriceEditModal = ({ order, onClose, onSave }) => {
 
             {error && <div className="error-message">{error}</div>}
 
-            <div className="modal-actions">
-              <button type="button" className="btn-secondary" onClick={onClose} disabled={loading}>
+            <div className="modal-actions price-edit-actions">
+              <button type="button" className="btn-secondary price-edit-btn-secondary" onClick={onClose} disabled={loading}>
                 Cancel
               </button>
-              <button type="submit" className="btn-primary" disabled={loading}>
+              <button type="submit" className="btn-primary price-edit-btn-primary" disabled={loading}>
                 {loading ? 'Updating...' : 'Update Price'}
               </button>
             </div>

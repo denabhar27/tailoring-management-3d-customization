@@ -139,3 +139,20 @@ export async function getSchedulerStatus() {
         };
     }
 }
+
+export async function recordRentalDepositReturn(itemId, refundAmount) {
+    try {
+        const response = await axios.post(`${BASE_URL}/orders/rental/items/${itemId}/deposit-return`, {
+            refundAmount
+        }, {
+            headers: getAuthHeaders()
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Record rental deposit return error:", error);
+        return {
+            success: false,
+            message: error.response?.data?.message || "Error recording deposit return"
+        };
+    }
+}

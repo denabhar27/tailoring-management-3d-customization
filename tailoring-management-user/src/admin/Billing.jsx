@@ -307,17 +307,28 @@ const Billing = () => {
     const remainingBalance = fullPrice - amountPaid;
     const serviceType = (bill.serviceType || '').toLowerCase();
 
-    // For rental, show downpayment info
+    // For rental, show payment progress and deposit refund details separately.
     if (serviceType === 'rental') {
-      const downPayment = amountPaid || parseFloat(bill.pricingFactors?.downpayment ||
-                         bill.pricingFactors?.down_payment ||
-                         bill.pricingFactors?.downPayment ||
-                         bill.specificData?.downpayment || 0);
+      const depositAmount = parseFloat(
+        bill.pricingFactors?.downpayment ||
+        bill.pricingFactors?.down_payment ||
+        bill.pricingFactors?.downPayment ||
+        bill.specificData?.downpayment || 0
+      );
+      const refundedDeposit = parseFloat(bill.depositRefunded || bill.pricingFactors?.deposit_refunded_amount || 0);
+      const refundedDate = bill.depositRefundDate || bill.pricingFactors?.deposit_refunded_at;
       
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{ fontSize: '14px' }}>Paid: ₱{parseFloat(downPayment).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-          <span style={{ fontSize: '14px' }}>Full Price: ₱{fullPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span style={{ fontSize: '14px' }}>Paid: ₱{amountPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span style={{ fontSize: '14px' }}>Rental Price: ₱{fullPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span style={{ fontSize: '12px', color: '#6d4c41' }}>Deposit: ₱{depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          {refundedDeposit > 0 && (
+            <>
+              <span style={{ fontSize: '12px', color: '#2e7d32' }}>Deposit Refunded: ₱{refundedDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              {refundedDate && <span style={{ fontSize: '11px', color: '#2e7d32' }}>Refund Date: {new Date(refundedDate).toLocaleDateString()}</span>}
+            </>
+          )}
           {remainingBalance > 0 && (
             <span style={{ fontSize: '12px', color: '#f44336' }}>Balance: ₱{remainingBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           )}
@@ -563,7 +574,7 @@ const Billing = () => {
 
                           <div className="action-buttons">
 
-                            {bill.status !== 'Paid' && bill.status !== 'Fully Paid' && (
+                            {bill.status !== 'Paid' && bill.status !== 'Fully Paid' && (bill.serviceType || '').toLowerCase() !== 'rental' && (
                             <button
 
                               className="icon-btn next-status"
@@ -793,6 +804,34 @@ const Billing = () => {
 
                 <>
 
+                  {parseFloat(selectedBill.depositRefunded || 0) > 0 && (
+
+                    <div className="detail-row">
+
+                      <strong>Deposit Refunded:</strong>
+
+                      <span style={{ color: '#2e7d32', fontWeight: '600' }}>
+
+                        ₱{parseFloat(selectedBill.depositRefunded || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+                      </span>
+
+                    </div>
+
+                  )}
+
+                  {selectedBill.depositRefundDate && (
+
+                    <div className="detail-row">
+
+                      <strong>Deposit Refund Date:</strong>
+
+                      <span>{new Date(selectedBill.depositRefundDate).toLocaleString()}</span>
+
+                    </div>
+
+                  )}
+
                   {selectedBill.rentalStartDate && (
 
                     <div className="detail-row">
@@ -830,7 +869,7 @@ const Billing = () => {
               >
                 Close
               </button>
-              {selectedBill.status !== 'Paid' && selectedBill.status !== 'Fully Paid' && (
+              {selectedBill.status !== 'Paid' && selectedBill.status !== 'Fully Paid' && (selectedBill.serviceType || '').toLowerCase() !== 'rental' && (
               <button
                 className="btn-save-list"
                 onClick={async () => {

@@ -162,6 +162,7 @@ export const authService = {
 
   register: async (userData: {
     first_name: string;
+    middle_name?: string | null;
     last_name: string;
     username: string;
     email: string;
@@ -198,6 +199,7 @@ export const authService = {
         user: {
           id: decoded.id,
           first_name: decoded.first_name || '',
+          middle_name: decoded.middle_name || '',
           last_name: decoded.last_name || '',
           email: decoded.email || '',
           phone_number: decoded.phone_number || ''

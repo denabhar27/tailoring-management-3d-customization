@@ -29,6 +29,7 @@ const App = ({ setIsLoggedIn }) => {
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [signupFirstName, setSignupFirstName] = useState('');
+  const [signupMiddleName, setSignupMiddleName] = useState('');
   const [signupLastName, setSignupLastName] = useState('');
   const [signupUsername, setSignupUsername] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
@@ -122,7 +123,7 @@ const App = ({ setIsLoggedIn }) => {
         }
       } else {
 
-        if (!signupFirstName || !signupLastName || !signupUsername || !signupEmail || !signupPassword) {
+        if (!signupFirstName || !signupLastName || !signupUsername || !signupEmail || !signupPassword || !signupPhone) {
           setAuthError('Please fill in all required fields');
           setIsLoading(false);
           return;
@@ -144,11 +145,12 @@ const App = ({ setIsLoggedIn }) => {
         try {
           const result = await registerUser({
             first_name: signupFirstName.trim(),
+            middle_name: signupMiddleName.trim() || null,
             last_name: signupLastName.trim(),
             username: signupUsername.trim(),
             email: signupEmail.trim(),
             password: signupPassword,
-            phone_number: signupPhone ? signupPhone.trim() : ''
+            phone_number: signupPhone.trim()
           });
 
           console.log('Registration result:', result);
@@ -161,6 +163,7 @@ const App = ({ setIsLoggedIn }) => {
             setIsAuthModalOpen(false);
 
             setSignupFirstName('');
+            setSignupMiddleName('');
             setSignupLastName('');
             setSignupUsername('');
             setSignupEmail('');
@@ -540,6 +543,15 @@ const App = ({ setIsLoggedIn }) => {
               <div className="input-group">
                 <input
                   type="text"
+                  placeholder="Middle Name (Optional)"
+                  autoComplete="additional-name"
+                  value={signupMiddleName}
+                  onChange={(e) => setSignupMiddleName(e.target.value)}
+                />
+              </div>
+              <div className="input-group">
+                <input
+                  type="text"
                   placeholder="Last Name"
                   required
                   autoComplete="family-name"
@@ -648,7 +660,8 @@ const App = ({ setIsLoggedIn }) => {
               <div className="input-group">
                 <input
                   type="tel"
-                  placeholder="Phone Number (Optional)"
+                  placeholder="Phone Number"
+                  required
                   autoComplete="tel"
                   value={signupPhone}
                   onChange={(e) => setSignupPhone(e.target.value)}

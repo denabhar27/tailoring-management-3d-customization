@@ -20,7 +20,7 @@
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
 }
 
 .transaction-log-modal-header {
@@ -28,23 +28,23 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 2px solid #e0e0e0;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
   border-radius: 12px 12px 0 0;
 }
 
 .transaction-log-modal-header h3 {
   margin: 0;
-  color: white;
-  font-size: 1.5rem;
-  font-weight: 600;
+  color: #111827;
+  font-size: 1.3rem;
+  font-weight: 700;
 }
 
 .transaction-log-modal-close {
   background: none;
   border: none;
   font-size: 28px;
-  color: white;
+  color: #6b7280;
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -57,7 +57,7 @@
 }
 
 .transaction-log-modal-close:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: #f3f4f6;
 }
 
 .transaction-log-modal-content {
@@ -86,24 +86,19 @@
 }
 
 .transaction-log-item {
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
   padding: 16px;
-  background: #fafafa;
-  transition: box-shadow 0.2s ease;
-}
-
-.transaction-log-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: #ffffff;
 }
 
 .transaction-log-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #f0f2f5;
 }
 
 .transaction-log-type {
@@ -112,12 +107,12 @@
 
 .transaction-type-badge {
   display: inline-block;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 0.85rem;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.35px;
 }
 
 .transaction-type-badge.payment,
@@ -151,47 +146,64 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
+  gap: 2px;
 }
 
 .amount-label {
-  font-size: 0.75rem;
-  color: #666;
+  font-size: 0.72rem;
+  color: #6b7280;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
 }
 
 .amount-value {
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   font-weight: 700;
-  color: #8B4513;
+  color: #111827;
 }
 
 .transaction-log-details {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
-.transaction-detail-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+.transaction-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
 }
 
 .detail-label {
+  display: block;
   font-weight: 600;
-  color: #333;
-  font-size: 0.9rem;
-  min-width: 120px;
+  color: #6b7280;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+  margin-bottom: 4px;
 }
 
 .detail-value {
-  color: #666;
-  font-size: 0.9rem;
-  text-align: right;
-  flex: 1;
+  display: block;
+  color: #111827;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.transaction-notes-block {
+  border: 1px solid #eef1f4;
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.transaction-notes-text {
+  margin: 0;
+  color: #374151;
+  font-size: 0.92rem;
+  line-height: 1.55;
 }
 
 .transaction-log-modal-footer {

@@ -370,6 +370,8 @@ CREATE TABLE rental_inventory (
   price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   downpayment VARCHAR(50) DEFAULT '0',
   total_available INT DEFAULT 1,
+  times_rented INT NOT NULL DEFAULT 0,
+  size_rental_counts LONGTEXT,
   image_url VARCHAR(500),
   material VARCHAR(100),
   care_instructions TEXT,

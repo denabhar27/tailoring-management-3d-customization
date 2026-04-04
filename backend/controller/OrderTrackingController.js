@@ -210,6 +210,8 @@ exports.getUserOrderTracking = (req, res) => {
         rental_start_date: item.rental_start_date || null,
         rental_end_date: item.rental_end_date || null,
         pricing_factors: pricingFactors,
+        deposit_refunded: item.deposit_refunded || null,
+        deposit_refund_date: item.deposit_refund_date || null,
         payment_status: item.payment_status || 'unpaid',
         payment_status_display: paymentStatusDisplay
       });

@@ -104,7 +104,7 @@ exports.getCustomerById = (req, res) => {
 
 exports.updateCustomer = (req, res) => {
   const { id } = req.params;
-  const { first_name, last_name, email, phone_number, status, customer_type } = req.body;
+  const { first_name, middle_name = null, last_name, email, phone_number, status, customer_type } = req.body;
 
   // Handle walk-in customer update
   if (customer_type === 'walk_in') {
@@ -142,14 +142,14 @@ exports.updateCustomer = (req, res) => {
   }
 
   // Handle regular user update
-  if (!first_name || !last_name || !email) {
+  if (!first_name || !last_name || !email || !phone_number) {
     return res.status(400).json({
       success: false,
-      message: "First name, last name, and email are required"
+      message: "First name, last name, email, and phone number are required"
     });
   }
 
-  User.updateCustomer(id, first_name, last_name, email, phone_number, status || 'active', (err, result) => {
+  User.updateCustomer(id, first_name, middle_name, last_name, email, phone_number, status || 'active', (err, result) => {
     if (err) {
       return res.status(500).json({
         success: false,

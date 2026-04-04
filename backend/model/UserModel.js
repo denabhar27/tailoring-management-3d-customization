@@ -49,8 +49,9 @@ const User = {
       SELECT 
         u.user_id as customer_id,
         u.first_name,
+        u.middle_name,
         u.last_name,
-        CONCAT(u.first_name, ' ', u.last_name) as full_name,
+        TRIM(CONCAT(u.first_name, ' ', COALESCE(u.middle_name, ''), ' ', u.last_name)) as full_name,
         u.email,
         u.phone_number,
         COALESCE(u.status, 'active') as status,
@@ -59,13 +60,14 @@ const User = {
         'online' as customer_type
       FROM user u
       LEFT JOIN orders o ON u.user_id = o.user_id
-      GROUP BY u.user_id, u.first_name, u.last_name, u.email, u.phone_number, u.status, u.created_at
+      GROUP BY u.user_id, u.first_name, u.middle_name, u.last_name, u.email, u.phone_number, u.status, u.created_at
       
       UNION ALL
       
       SELECT 
         wc.id as customer_id,
         SUBSTRING_INDEX(wc.name, ' ', 1) as first_name,
+        NULL as middle_name,
         IF(LOCATE(' ', wc.name) > 0, SUBSTRING(wc.name, LOCATE(' ', wc.name) + 1), '') as last_name,
         wc.name as full_name,
         wc.email,
@@ -101,13 +103,13 @@ const User = {
     db.query(sql, [status, userId], callback);
   },
 
-  updateCustomer: (userId, first_name, last_name, email, phone_number, status, callback) => {
+  updateCustomer: (userId, first_name, middle_name, last_name, email, phone_number, status, callback) => {
     const sql = `
       UPDATE user 
-      SET first_name = ?, last_name = ?, email = ?, phone_number = ?, status = ?
+      SET first_name = ?, middle_name = ?, last_name = ?, email = ?, phone_number = ?, status = ?
       WHERE user_id = ?
     `;
-    db.query(sql, [first_name, last_name, email, phone_number, status, userId], callback);
+    db.query(sql, [first_name, middle_name, last_name, email, phone_number, status, userId], callback);
   },
 
   // Password Reset Methods

@@ -27,6 +27,7 @@ export default function SignupScreen() {
   const router = useRouter();
 
   const [firstName, setFirstName] = useState("");
+  const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -46,8 +47,13 @@ export default function SignupScreen() {
 
   const handleSignup = async () => {
 
-    if (!firstName || !lastName || !username || !email || !password || !confirmPassword) {
+    if (!firstName || !lastName || !username || !email || !password || !confirmPassword || !phoneNumber) {
       Alert.alert("Error", "Please fill in all required fields");
+      return;
+    }
+
+    if (phoneNumber.replace(/\D/g, '').length !== 11) {
+      Alert.alert("Error", "Phone number must be exactly 11 digits");
       return;
     }
 
@@ -65,11 +71,12 @@ export default function SignupScreen() {
     try {
       const response = await authService.register({
         first_name: firstName,
+        middle_name: middleName || null,
         last_name: lastName,
         username: username,
         email: email,
         password: password,
-        phone_number: phoneNumber
+        phone_number: phoneNumber.replace(/\D/g, '')
       });
 
       if (response.token) {
@@ -139,6 +146,16 @@ export default function SignupScreen() {
                   autoCapitalize="words"
                   value={firstName}
                   onChangeText={setFirstName}
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Middle Name (Optional)"
+                  placeholderTextColor="#999"
+                  autoCapitalize="words"
+                  value={middleName}
+                  onChangeText={setMiddleName}
                 />
               </View>
               <View style={styles.inputGroup}>
@@ -217,11 +234,11 @@ export default function SignupScreen() {
               <View style={styles.inputGroup}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Phone Number (Optional)"
+                  placeholder="Phone Number"
                   placeholderTextColor="#999"
                   keyboardType="phone-pad"
                   value={phoneNumber}
-                  onChangeText={setPhoneNumber}
+                  onChangeText={(text) => setPhoneNumber(text.replace(/\D/g, ''))}
                 />
               </View>
               <TouchableOpacity

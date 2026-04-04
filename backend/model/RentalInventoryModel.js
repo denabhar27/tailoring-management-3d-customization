@@ -470,6 +470,87 @@ const RentalInventory = {
     }
   },
 
+  incrementTimesRented: (item_id, incrementBy = 1, callback) => {
+    const numericItemId = parseInt(item_id, 10);
+    const qty = Math.max(1, parseInt(incrementBy, 10) || 1);
+
+    if (!numericItemId) {
+      const err = new Error('Invalid rental item id for times_rented increment');
+      if (typeof callback === 'function') return callback(err);
+      return;
+    }
+
+    const sql = `
+      UPDATE rental_inventory
+      SET times_rented = COALESCE(times_rented, 0) + ?
+      WHERE item_id = ?
+    `;
+    db.query(sql, [qty, numericItemId], callback);
+  },
+
+  incrementSizeRentalCounts: (item_id, selectedSizes = [], callback) => {
+    const numericItemId = parseInt(item_id, 10);
+
+    if (!numericItemId || !Array.isArray(selectedSizes) || selectedSizes.length === 0) {
+      if (typeof callback === 'function') callback(null, { updated: false });
+      return;
+    }
+
+    const getSql = `SELECT item_id, size, size_rental_counts FROM rental_inventory WHERE item_id = ? LIMIT 1`;
+    db.query(getSql, [numericItemId], (getErr, rows) => {
+      if (getErr) return callback(getErr);
+      if (!rows || rows.length === 0) {
+        const err = new Error('Rental item not found.');
+        err.statusCode = 404;
+        return callback(err);
+      }
+
+      const sizePayload = parseJsonSafely(rows[0].size);
+      const sizeEntries = Array.isArray(sizePayload?.size_entries) ? sizePayload.size_entries : [];
+
+      const normalizeSelectionKey = (entry = {}) => {
+        const direct = String(entry?.sizeKey || entry?.size_key || entry?.size || entry?.size_label || '').trim();
+        if (direct) return mapSizeInputToKey(direct, sizeEntries);
+
+        const rawLabel = String(entry?.label || '').trim();
+        if (!rawLabel) return '';
+        return mapSizeInputToKey(rawLabel, sizeEntries);
+      };
+
+      const normalizedSelections = selectedSizes
+        .map((entry) => ({
+          sizeKey: normalizeSelectionKey(entry),
+          quantity: Math.max(1, parseInt(entry?.quantity, 10) || 1)
+        }))
+        .filter((entry) => !!entry.sizeKey);
+
+      if (normalizedSelections.length === 0) {
+        if (typeof callback === 'function') callback(null, { updated: false });
+        return;
+      }
+
+      let currentCounts = {};
+      const raw = rows[0].size_rental_counts;
+      if (raw) {
+        try {
+          currentCounts = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        } catch {
+          currentCounts = {};
+        }
+      }
+      if (!currentCounts || typeof currentCounts !== 'object' || Array.isArray(currentCounts)) {
+        currentCounts = {};
+      }
+
+      normalizedSelections.forEach((entry) => {
+        currentCounts[entry.sizeKey] = Math.max(0, parseInt(currentCounts[entry.sizeKey], 10) || 0) + entry.quantity;
+      });
+
+      const updateSql = `UPDATE rental_inventory SET size_rental_counts = ? WHERE item_id = ?`;
+      db.query(updateSql, [JSON.stringify(currentCounts), numericItemId], callback);
+    });
+  },
+
   restockReturnedSizes: (itemId, selectedSizes = [], callback) => {
     const numericItemId = parseInt(itemId, 10);
     const normalizedSelections = Array.isArray(selectedSizes)

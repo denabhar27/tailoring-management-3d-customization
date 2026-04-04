@@ -1384,7 +1384,7 @@ exports.getRentalOrdersByStatus = (req, res) => {
 
 exports.updateRentalOrderItem = (req, res) => {
   const itemId = req.params.id;
-  const { approvalStatus, adminNotes, damageNotes } = req.body;
+  const { approvalStatus, adminNotes, damageNotes, finalPrice, paymentMode, flatRateUntilDate } = req.body;
 
   console.log("Controller - Updating rental order item:", itemId, req.body);
 
@@ -1398,8 +1398,57 @@ exports.updateRentalOrderItem = (req, res) => {
   const updateData = {
     approvalStatus: approvalStatus || undefined,
     adminNotes: adminNotes || undefined,
-    damageNotes: damageNotes !== undefined ? damageNotes : undefined
+    damageNotes: damageNotes !== undefined ? damageNotes : undefined,
+    finalPrice: finalPrice !== undefined && finalPrice !== null && finalPrice !== '' ? parseFloat(finalPrice) : undefined,
+    paymentMode: paymentMode || undefined,
+    flatRateUntilDate: flatRateUntilDate || undefined
   };
+
+  if (updateData.finalPrice !== undefined && (Number.isNaN(updateData.finalPrice) || updateData.finalPrice <= 0)) {
+    return res.status(400).json({
+      success: false,
+      message: "Final price must be a valid amount greater than 0"
+    });
+  }
+
+  if (updateData.paymentMode !== undefined && !['regular', 'flat_rate'].includes(updateData.paymentMode)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid payment mode. Allowed values: regular, flat_rate"
+    });
+  }
+
+  if (updateData.paymentMode === 'flat_rate') {
+    if (!updateData.flatRateUntilDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Flat rate until date is required when payment mode is flat_rate"
+      });
+    }
+
+    const parsed = new Date(updateData.flatRateUntilDate);
+    const dateOnly = String(updateData.flatRateUntilDate);
+    if (Number.isNaN(parsed.getTime()) || !/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
+      return res.status(400).json({
+        success: false,
+        message: "Flat rate until date must be a valid calendar date"
+      });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    parsed.setHours(0, 0, 0, 0);
+    if (parsed < today) {
+      return res.status(400).json({
+        success: false,
+        message: "Flat rate until date cannot be in the past"
+      });
+    }
+  }
+
+  if (updateData.paymentMode === 'regular') {
+    updateData.flatRateUntilDate = null;
+  }
 
   console.log("Controller - Processed updateData:", updateData);
 
@@ -1428,6 +1477,17 @@ exports.updateRentalOrderItem = (req, res) => {
     }
 
     const previousStatus = item.approval_status || 'pending';
+    const previousPrice = parseFloat(item.final_price || 0);
+    let previousPricingFactors = {};
+    try {
+      previousPricingFactors = item.pricing_factors
+        ? (typeof item.pricing_factors === 'string' ? JSON.parse(item.pricing_factors) : item.pricing_factors)
+        : {};
+    } catch (e) {
+      previousPricingFactors = {};
+    }
+    const previousPaymentMode = String(previousPricingFactors.rental_payment_mode || 'regular').toLowerCase();
+    const previousFlatRateUntilDate = previousPricingFactors.flat_rate_until_date || null;
 
     let penaltyAmount = 0;
     let penaltyDays = 0;
@@ -1535,6 +1595,15 @@ exports.updateRentalOrderItem = (req, res) => {
       
       if (updateData.approvalStatus && updateData.approvalStatus !== previousStatus) {
         actionNotes.push(formatStatus(updateData.approvalStatus));
+      }
+      if (updateData.finalPrice !== undefined && Math.abs(updateData.finalPrice - previousPrice) > 0.01) {
+        actionNotes.push(`Price: ₱${previousPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} → ₱${updateData.finalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+      }
+      if (updateData.paymentMode && updateData.paymentMode !== previousPaymentMode) {
+        actionNotes.push(`Payment Mode: ${updateData.paymentMode === 'flat_rate' ? 'Flat Rate' : 'Regular'}`);
+      }
+      if (updateData.flatRateUntilDate !== undefined && updateData.flatRateUntilDate !== previousFlatRateUntilDate) {
+        actionNotes.push(`Flat Rate Until: ${updateData.flatRateUntilDate || 'Cleared'}`);
       }
       if (penaltyAmount > 0 && penaltyDays > 0) {
         actionNotes.push(`Penalty: ₱${penaltyAmount} (${penaltyDays} day${penaltyDays > 1 ? 's' : ''})`);
@@ -1659,6 +1728,109 @@ exports.updateRentalOrderItem = (req, res) => {
         }
       }
 
+      const shouldIncrementRentalCounts = updateData.approvalStatus === 'returned' && updateData.approvalStatus !== previousStatus;
+
+      if (shouldIncrementRentalCounts) {
+        const RentalInventory = require('../model/RentalInventoryModel');
+        const rentalItemId = item.service_id;
+
+        let specificData = {};
+        try {
+          specificData = item.specific_data ? (typeof item.specific_data === 'string' ? JSON.parse(item.specific_data) : item.specific_data) : {};
+        } catch (e) {
+          console.warn('Error parsing specific_data:', e);
+        }
+
+        const isBundle = specificData.is_bundle === true || specificData.category === 'rental_bundle';
+
+        const getSelectionQty = (selectedSizes, fallbackQty = 1) => {
+          const normalized = Array.isArray(selectedSizes) ? selectedSizes : [];
+          const fromSizes = normalized.reduce((sum, entry) => {
+            return sum + Math.max(0, parseInt(entry?.quantity, 10) || 0);
+          }, 0);
+          return fromSizes > 0 ? fromSizes : Math.max(1, parseInt(fallbackQty, 10) || 1);
+        };
+
+        const normalizeSelectionKey = (entry = {}) => {
+          const directKey = String(entry?.sizeKey || entry?.size_key || entry?.size || entry?.size_label || '').trim();
+          if (directKey) return directKey;
+
+          const rawLabel = String(entry?.label || '').trim().toLowerCase();
+          if (!rawLabel) return '';
+          if (rawLabel === 's' || rawLabel.includes('small')) return 'small';
+          if (rawLabel === 'm' || rawLabel.includes('medium')) return 'medium';
+          if (rawLabel === 'l' || rawLabel.includes('large')) return 'large';
+          if (rawLabel === 'xl' || rawLabel.includes('extra')) return 'extra_large';
+          return rawLabel;
+        };
+
+        const getNormalizedSelectedSizes = (selectedSizes) => {
+          const normalized = Array.isArray(selectedSizes) ? selectedSizes : [];
+          return normalized
+            .map((entry) => ({
+              sizeKey: normalizeSelectionKey(entry),
+              quantity: Math.max(1, parseInt(entry?.quantity, 10) || 1)
+            }))
+            .filter((entry) => !!entry.sizeKey);
+        };
+
+        if (isBundle) {
+          const bundleItems = Array.isArray(specificData.bundle_items) ? specificData.bundle_items : [];
+          bundleItems.forEach((bundleItem) => {
+            const bundleItemId = parseInt(bundleItem?.item_id || bundleItem?.id, 10);
+            if (!bundleItemId) return;
+
+            const qty = getSelectionQty(
+              bundleItem?.selected_sizes || bundleItem?.selectedSizes,
+              bundleItem?.quantity
+            );
+
+            RentalInventory.incrementTimesRented(bundleItemId, qty, (countErr) => {
+              if (countErr) {
+                console.error(`[RENTAL COUNT] Failed to increment times_rented for bundle item ${bundleItemId}:`, countErr);
+              } else {
+                console.log(`[RENTAL COUNT] Incremented times_rented by ${qty} for bundle item ${bundleItemId}`);
+              }
+            });
+
+            const selectedSizes = getNormalizedSelectedSizes(bundleItem?.selected_sizes || bundleItem?.selectedSizes);
+            if (selectedSizes.length > 0) {
+              RentalInventory.incrementSizeRentalCounts(bundleItemId, selectedSizes, (sizeCountErr) => {
+                if (sizeCountErr) {
+                  console.error(`[RENTAL COUNT] Failed to increment size_rental_counts for bundle item ${bundleItemId}:`, sizeCountErr);
+                } else {
+                  console.log(`[RENTAL COUNT] Incremented size_rental_counts for bundle item ${bundleItemId}`);
+                }
+              });
+            }
+          });
+        } else if (rentalItemId) {
+          const qty = getSelectionQty(
+            specificData?.selected_sizes || specificData?.selectedSizes,
+            item.quantity
+          );
+
+          RentalInventory.incrementTimesRented(rentalItemId, qty, (countErr) => {
+            if (countErr) {
+              console.error(`[RENTAL COUNT] Failed to increment times_rented for item ${rentalItemId}:`, countErr);
+            } else {
+              console.log(`[RENTAL COUNT] Incremented times_rented by ${qty} for item ${rentalItemId}`);
+            }
+          });
+
+          const selectedSizes = getNormalizedSelectedSizes(specificData?.selected_sizes || specificData?.selectedSizes);
+          if (selectedSizes.length > 0) {
+            RentalInventory.incrementSizeRentalCounts(rentalItemId, selectedSizes, (sizeCountErr) => {
+              if (sizeCountErr) {
+                console.error(`[RENTAL COUNT] Failed to increment size_rental_counts for item ${rentalItemId}:`, sizeCountErr);
+              } else {
+                console.log(`[RENTAL COUNT] Incremented size_rental_counts for item ${rentalItemId}`);
+              }
+            });
+          }
+        }
+      }
+
       const isStatusChangedToReturned = updateData.approvalStatus === 'returned' && updateData.approvalStatus !== previousStatus;
       const isReturnedAndDamageNotesUpdated = previousStatus === 'returned' && damageNotes !== undefined;
       
@@ -1674,6 +1846,10 @@ exports.updateRentalOrderItem = (req, res) => {
         }
         
         const isBundle = specificData.is_bundle === true || specificData.category === 'rental_bundle';
+
+        if (isStatusChangedToReturned) {
+          console.log(`[RENTAL REFUND] Item ${itemId} marked as returned. Deposit return must be recorded manually from Rental Orders.`);
+        }
         
         if (isBundle) {
           console.log('Skipping rental_inventory update for bundled rental - frontend will handle individual items');
@@ -1959,7 +2135,6 @@ exports.recordRentalPayment = (req, res) => {
       const ActionLog = require('../model/ActionLogModel');
       const previousPaymentStatus = item.payment_status || 'unpaid';
       const actorName = req.user?.username || `${req.user?.first_name || ''} ${req.user?.last_name || ''}`.trim() || req.user?.role || 'admin';
-      const methodLabel = paymentMethod || 'cash';
       if (logUserId) {
         ActionLog.create({
           order_item_id: itemId,
@@ -1969,7 +2144,7 @@ exports.recordRentalPayment = (req, res) => {
           previous_status: previousPaymentStatus,
           new_status: newPaymentStatus,
           reason: null,
-          notes: `${actorName} recorded payment of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}. Cash received: ₱${cashTendered.toFixed(2)}. Change: ₱${changeAmount.toFixed(2)}. Customer: ${customerName}. Method: ${methodLabel}`
+          notes: `${actorName} recorded payment of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}.`
         }, (actionLogErr) => {
           if (actionLogErr) {
             console.error('Error creating payment action log:', actionLogErr);
@@ -1992,7 +2167,7 @@ exports.recordRentalPayment = (req, res) => {
           previous_payment_status: previousPaymentStatus,
           new_payment_status: newPaymentStatus,
           payment_method: paymentMethod || 'cash',
-          notes: `${actorName} recorded payment of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}. Cash received: ₱${cashTendered.toFixed(2)}. Change: ₱${changeAmount.toFixed(2)}. Customer: ${customerName}. Method: ${methodLabel}`,
+          notes: `${actorName} recorded payment of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}.`,
           created_by: actorName
         }, (transLogErr, transLogResult) => {
           if (transLogErr) {
@@ -2036,6 +2211,187 @@ exports.recordRentalPayment = (req, res) => {
         }
       });
     });
+  });
+};
+
+exports.recordRentalDepositReturn = (req, res) => {
+  const itemId = req.params.id;
+  const { refundAmount } = req.body;
+
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Admin only."
+    });
+  }
+
+  const amount = parseFloat(refundAmount);
+  if (!amount || amount <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid refund amount. Amount must be greater than 0."
+    });
+  }
+
+  Order.getOrderItemById(itemId, (getErr, item) => {
+    if (getErr || !item) {
+      return res.status(404).json({
+        success: false,
+        message: "Order item not found"
+      });
+    }
+
+    if ((item.service_type || '').toLowerCase().trim() !== 'rental') {
+      return res.status(400).json({
+        success: false,
+        message: "Deposit return can only be recorded for rental orders."
+      });
+    }
+
+    let pricingFactors = {};
+    let specificData = {};
+    try {
+      pricingFactors = item.pricing_factors ? JSON.parse(item.pricing_factors) : {};
+    } catch (e) {
+      console.error('Error parsing pricing_factors:', e);
+      pricingFactors = {};
+    }
+
+    try {
+      specificData = item.specific_data ? JSON.parse(item.specific_data) : {};
+    } catch (e) {
+      console.error('Error parsing specific_data:', e);
+      specificData = {};
+    }
+
+    const depositAmount = Math.max(0, parseFloat(
+      pricingFactors.downpayment || pricingFactors.deposit_amount || specificData.downpayment || 0
+    ));
+    const currentAmountPaid = Math.max(0, parseFloat(pricingFactors.amount_paid || 0));
+    const currentRefunded = Math.max(0, parseFloat(item.deposit_refunded || pricingFactors.deposit_refunded_amount || 0));
+    const maxRefundable = Math.max(0, depositAmount - currentRefunded);
+
+    if (depositAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No refundable deposit found for this rental order."
+      });
+    }
+
+    if (maxRefundable <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Deposit has already been fully refunded for this rental order."
+      });
+    }
+
+    if (amount > maxRefundable) {
+      return res.status(400).json({
+        success: false,
+        message: `Refund amount exceeds refundable deposit. Remaining refundable amount: ₱${maxRefundable.toFixed(2)}.`
+      });
+    }
+
+    const finalPriceAmount = Math.max(0, parseFloat(item.final_price || 0));
+    const updatedRefundedTotal = currentRefunded + amount;
+    const adjustedAmountPaid = Math.max(0, currentAmountPaid - amount);
+    const remainingBalanceAfterRefund = Math.max(0, finalPriceAmount - adjustedAmountPaid);
+
+    pricingFactors.amount_paid = adjustedAmountPaid.toFixed(2);
+    pricingFactors.remaining_balance = remainingBalanceAfterRefund.toFixed(2);
+    pricingFactors.deposit_refunded = updatedRefundedTotal >= depositAmount;
+    pricingFactors.deposit_refunded_amount = updatedRefundedTotal.toFixed(2);
+    pricingFactors.deposit_refunded_at = new Date().toISOString().split('T')[0];
+
+    const previousPaymentStatus = item.payment_status || 'unpaid';
+    let recalculatedPaymentStatus = previousPaymentStatus;
+    if (adjustedAmountPaid <= 0) {
+      recalculatedPaymentStatus = 'unpaid';
+    } else if (adjustedAmountPaid >= finalPriceAmount) {
+      recalculatedPaymentStatus = 'fully_paid';
+    } else {
+      recalculatedPaymentStatus = 'partial_payment';
+    }
+
+    const refundTimestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const actorName = req.user?.username || `${req.user?.first_name || ''} ${req.user?.last_name || ''}`.trim() || req.user?.role || 'admin';
+    const logUserId = item.user_id || req.user?.id || null;
+    const dbConn = require('../config/db');
+
+    const applyLogs = () => {
+      const TransactionLog = require('../model/TransactionLogModel');
+
+      if (logUserId) {
+        TransactionLog.create({
+          order_item_id: itemId,
+          user_id: logUserId,
+          transaction_type: 'refund',
+          amount: amount,
+          previous_payment_status: previousPaymentStatus,
+          new_payment_status: recalculatedPaymentStatus,
+          payment_method: 'manual_refund',
+          notes: `${actorName} recorded rental deposit return of ₱${amount.toFixed(2)}.`,
+          created_by: actorName
+        }, (refundLogErr) => {
+          if (refundLogErr) {
+            console.error(`[RENTAL REFUND] Failed to create refund transaction log for item ${itemId}:`, refundLogErr);
+          }
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Deposit return recorded successfully',
+        refund: {
+          refunded_amount: amount,
+          total_refunded: updatedRefundedTotal,
+          refundable_remaining: Math.max(0, depositAmount - updatedRefundedTotal),
+          refund_date: refundTimestamp,
+          payment_status: recalculatedPaymentStatus
+        }
+      });
+    };
+
+    const updateSql = `
+      UPDATE order_items
+      SET pricing_factors = ?, payment_status = ?, deposit_refunded = ?, deposit_refund_date = ?
+      WHERE item_id = ?
+    `;
+
+    dbConn.query(
+      updateSql,
+      [JSON.stringify(pricingFactors), recalculatedPaymentStatus, updatedRefundedTotal, refundTimestamp, itemId],
+      (updateErr) => {
+        if (updateErr && updateErr.code === 'ER_BAD_FIELD_ERROR') {
+          const fallbackSql = `
+            UPDATE order_items
+            SET pricing_factors = ?, payment_status = ?
+            WHERE item_id = ?
+          `;
+          dbConn.query(fallbackSql, [JSON.stringify(pricingFactors), recalculatedPaymentStatus, itemId], (fallbackErr) => {
+            if (fallbackErr) {
+              return res.status(500).json({
+                success: false,
+                message: 'Error recording deposit return',
+                error: fallbackErr
+              });
+            }
+            applyLogs();
+          });
+          return;
+        }
+
+        if (updateErr) {
+          return res.status(500).json({
+            success: false,
+            message: 'Error recording deposit return',
+            error: updateErr
+          });
+        }
+
+        applyLogs();
+      }
+    );
   });
 };
 

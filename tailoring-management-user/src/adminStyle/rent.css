@@ -231,8 +231,8 @@ tbody {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   z-index: 1000;
   justify-content: center;
   align-items: center;
@@ -443,6 +443,199 @@ tbody {
 .status-badge.overdue {
   background: #ffebee;
   color: #d32f2f;
+}
+
+.pricing-setup-modal {
+  width: min(560px, 92vw);
+  max-width: min(560px, 92vw);
+  max-height: 88vh;
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.pricing-setup-modal-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: calc(88vh - 150px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.pricing-setup-modal .detail-row,
+.pricing-setup-modal .detail-row span,
+.pricing-setup-modal .detail-row strong {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.pricing-setup-modal .modal-footer .btn-cancel,
+.pricing-setup-modal .modal-footer .btn-save {
+  min-width: 150px;
+  width: 100%;
+}
+
+.pricing-setup-modal .modal-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pricing-setup-header {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.pricing-setup-header h2 {
+  font-size: clamp(1rem, 2.3vw, 1.25rem);
+  line-height: 1.2;
+  margin-right: 8px;
+}
+
+.pricing-meta-card {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background-color: #faf7f4;
+}
+
+.pricing-form-group {
+  margin: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.pricing-form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.pricing-input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  display: block;
+  padding: 12px 14px;
+  border: 1.5px solid #ddd;
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: 'Poppins', sans-serif;
+  color: #2D3436;
+  background-color: #FFFFFF;
+  box-sizing: border-box;
+}
+
+.pricing-input:focus {
+  outline: none;
+  border-color: #8B4513;
+  box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.1);
+}
+
+.pricing-option-row {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.pricing-option-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.pricing-modal-note {
+  color: #666;
+  margin-top: 8px;
+  display: block;
+  line-height: 1.35;
+}
+
+.pricing-modal-actions {
+  padding: 16px 24px 24px;
+  display: flex;
+  gap: 10px;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.pricing-modal-actions .pricing-cancel-btn,
+.pricing-modal-actions .pricing-save-btn {
+  width: auto;
+  min-width: 150px;
+  padding: 10px 16px;
+  font-size: 13px;
+  line-height: 1.2;
+  border-radius: 8px;
+}
+
+.pricing-modal-actions .pricing-cancel-btn {
+  background: #6c757d;
+  color: #fff;
+  border: none;
+}
+
+.pricing-modal-actions .pricing-cancel-btn:hover {
+  background: #5a6268;
+}
+
+.pricing-modal-actions .pricing-save-btn {
+  background: #6f3f1c;
+  color: #fff;
+  border: none;
+  min-width: 120px;
+}
+
+.pricing-modal-actions .pricing-save-btn:hover {
+  background: #5a3215;
+}
+
+@media (max-width: 640px) {
+  .pricing-setup-modal {
+    width: 94vw;
+    max-width: 94vw;
+  }
+
+  .pricing-setup-modal-body,
+  .pricing-modal-actions {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .pricing-modal-actions {
+    gap: 8px;
+  }
+
+  .pricing-modal-actions .pricing-cancel-btn,
+  .pricing-modal-actions .pricing-save-btn {
+    min-width: 0;
+    flex: 1 1 0;
+  }
+
+  .pricing-option-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .pricing-option-label {
+    flex: 1 1 auto;
+  }
 }
 
 .status-badge.pending {

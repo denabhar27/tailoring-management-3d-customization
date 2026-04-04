@@ -132,9 +132,12 @@ const WalkInOrders = () => {
 
   const [selectedRentalItems, setSelectedRentalItems] = useState([]);
   const [rentalSizeSelections, setRentalSizeSelections] = useState({});
+  const [expandedSizeMeasurements, setExpandedSizeMeasurements] = useState({});
   const [rentalDuration, setRentalDuration] = useState(3);
   const [eventDate, setEventDate] = useState('');
   const [damageDeposit, setDamageDeposit] = useState('');
+  const [rentalPaymentMode, setRentalPaymentMode] = useState('regular');
+  const [flatRateUntilDate, setFlatRateUntilDate] = useState('');
   const [availableRentals, setAvailableRentals] = useState([]);
 
   const [notes, setNotes] = useState('');
@@ -306,6 +309,78 @@ const WalkInOrders = () => {
     }, 0);
   };
 
+  const prettifyMeasurementLabel = (key) => {
+    const text = String(key || '').replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim();
+    return text ? text.charAt(0).toUpperCase() + text.slice(1).toLowerCase() : '';
+  };
+
+  const formatMeasurementValue = (rawValue) => {
+    if (rawValue === null || rawValue === undefined) return null;
+
+    if (typeof rawValue === 'object') {
+      const inchRaw = rawValue?.inch;
+      const cmRaw = rawValue?.cm;
+      if ((inchRaw === undefined || inchRaw === '' || inchRaw === '0') && (cmRaw === undefined || cmRaw === '' || cmRaw === '0')) {
+        return null;
+      }
+
+      const inchValue = inchRaw !== undefined && inchRaw !== '' ? String(inchRaw) : '';
+      const parsedInch = parseFloat(inchValue);
+      const cmValue = cmRaw !== undefined && cmRaw !== ''
+        ? String(cmRaw)
+        : (Number.isNaN(parsedInch) ? '' : (parsedInch * 2.54).toFixed(2));
+
+      if (inchValue && cmValue) return `${inchValue}" (${cmValue} cm)`;
+      if (inchValue) return `${inchValue}"`;
+      if (cmValue) return `${cmValue} cm`;
+      return null;
+    }
+
+    const scalar = String(rawValue).trim();
+    if (!scalar || scalar === '0') return null;
+
+    const parsed = parseFloat(scalar);
+    if (!Number.isNaN(parsed)) {
+      return `${scalar}" (${(parsed * 2.54).toFixed(2)} cm)`;
+    }
+
+    return scalar;
+  };
+
+  const getSizeMeasurementRows = (item, sizeKey) => {
+    if (!item?.size || !sizeKey) return [];
+
+    try {
+      const parsed = typeof item.size === 'string' ? JSON.parse(item.size) : item.size;
+      if (!parsed || typeof parsed !== 'object') return [];
+
+      if (parsed.format === 'rental_size_v2' && Array.isArray(parsed.size_entries)) {
+        const matchedEntry = parsed.size_entries.find((entry) => {
+          const entryKey = String(entry?.sizeKey || entry?.size_key || '').trim();
+          return entryKey === String(sizeKey).trim();
+        });
+
+        const measurements = matchedEntry?.measurements || matchedEntry?.measurement_profile || matchedEntry?.measurementProfile;
+        if (!measurements || typeof measurements !== 'object' || Array.isArray(measurements)) return [];
+
+        return Object.entries(measurements)
+          .map(([mKey, mValue]) => {
+            const displayValue = formatMeasurementValue(mValue);
+            if (!displayValue) return null;
+            return {
+              label: prettifyMeasurementLabel(mKey),
+              value: displayValue
+            };
+          })
+          .filter(Boolean);
+      }
+
+      return [];
+    } catch {
+      return [];
+    }
+  };
+
   const formatMeasurements = (item) => {
     if (!item || !item.size) return null;
 
@@ -325,28 +400,32 @@ const WalkInOrders = () => {
         return null;
       }
 
+      if (measurements.format === 'rental_size_v2' && Array.isArray(measurements.size_entries)) {
+        const rows = measurements.size_entries.flatMap((entry) => {
+          const sizeLabel = entry?.label || entry?.sizeKey || entry?.size_key || 'Size';
+          const entryMeasurements = entry?.measurements || entry?.measurement_profile || entry?.measurementProfile || null;
+          if (!entryMeasurements || typeof entryMeasurements !== 'object' || Array.isArray(entryMeasurements)) return [];
+
+          return Object.entries(entryMeasurements)
+            .map(([mKey, mValue]) => {
+              const displayValue = formatMeasurementValue(mValue);
+              if (!displayValue) return null;
+              return {
+                label: `${sizeLabel} - ${prettifyMeasurementLabel(mKey)}`,
+                value: displayValue
+              };
+            })
+            .filter(Boolean);
+        });
+
+        return rows.length > 0 ? rows : null;
+      }
+
       const measurementRows = Object.entries(measurements)
-        .filter(([key, value]) => {
-          if (typeof value === 'object' && value !== null) {
-            return (value.inch && value.inch !== '' && value.inch !== '0') ||
-                   (value.cm && value.cm !== '' && value.cm !== '0');
-          }
-          return value && value !== '' && value !== '0';
-        })
+        .filter(([key]) => !['format', 'size_entries', 'size_options', 'sizeOptions'].includes(String(key)))
         .map(([key, value]) => {
-
-          let label = key.replace(/([A-Z])/g, ' $1');
-          label = label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
-
-          let displayValue = '';
-          if (typeof value === 'object' && value !== null && value.inch !== undefined) {
-            displayValue = `${value.inch}" (${value.cm} cm)`;
-          } else if (value) {
-            const inchValue = String(value);
-            const cmValue = (parseFloat(inchValue) * 2.54).toFixed(2);
-            displayValue = `${inchValue}" (${cmValue} cm)`;
-          }
-
+          const label = prettifyMeasurementLabel(key);
+          const displayValue = formatMeasurementValue(value);
           return displayValue ? { label, value: displayValue } : null;
         })
         .filter(row => row !== null && row.value);
@@ -438,6 +517,14 @@ const WalkInOrders = () => {
           delete next[item.item_id];
           return next;
         });
+        setExpandedSizeMeasurements((prevExpanded) => {
+          const nextExpanded = { ...prevExpanded };
+          const prefix = `${item.item_id}:`;
+          Object.keys(nextExpanded).forEach((key) => {
+            if (key.startsWith(prefix)) delete nextExpanded[key];
+          });
+          return nextExpanded;
+        });
         return prev.filter(i => i.item_id !== item.item_id);
       } else {
         return [...prev, item];
@@ -500,6 +587,11 @@ const WalkInOrders = () => {
     } else if (serviceType === 'rental') {
       if (selectedRentalItems.length === 0 || !rentalDuration) {
         alert('Please select at least one rental item and duration');
+        return;
+      }
+
+      if (rentalPaymentMode === 'flat_rate' && !flatRateUntilDate) {
+        alert('Please select a Flat Rate Until date');
         return;
       }
 
@@ -616,6 +708,8 @@ const WalkInOrders = () => {
           rentalDuration: parseInt(rentalDuration),
           eventDate,
           damageDeposit: damageDeposit || totalDownpayment.toString(),
+          paymentMode: rentalPaymentMode,
+          flatRateUntilDate: rentalPaymentMode === 'flat_rate' ? flatRateUntilDate : null,
           isBundle: selectedRentalItems.length > 1,
           notes
         });
@@ -638,6 +732,8 @@ const WalkInOrders = () => {
         setRentalDuration(3);
         setEventDate('');
         setDamageDeposit('');
+        setRentalPaymentMode('regular');
+        setFlatRateUntilDate('');
         setNotes('');
 
         setCustomGarmentType('');
@@ -1226,36 +1322,67 @@ const WalkInOrders = () => {
                                   const opt = item.sizeOptions?.[sizeKey] || {};
                                   const currentQty = Math.max(0, parseInt(rentalSizeSelections[item.item_id]?.[sizeKey], 10) || 0);
                                   const maxQty = Math.max(0, parseInt(opt.quantity, 10) || 0);
+                                  const measurementRows = getSizeMeasurementRows(item, sizeKey);
+                                  const measurementToggleKey = `${item.item_id}:${sizeKey}`;
+                                  const showMeasurements = !!expandedSizeMeasurements[measurementToggleKey];
                                   return (
-                                    <div key={`${item.item_id}-${sizeKey}`} className={`walkin-size-row ${currentQty > 0 ? 'active' : ''}`}>
-                                      <div className="walkin-size-label-wrap">
-                                        <span className="walkin-size-key">{(opt.label || SIZE_LABELS[sizeKey] || sizeKey).charAt(0).toUpperCase()}</span>
-                                        <span className="walkin-size-label">{opt.label || SIZE_LABELS[sizeKey] || sizeKey}</span>
+                                    <div key={`${item.item_id}-${sizeKey}`} className="walkin-size-entry">
+                                      <div className={`walkin-size-row ${currentQty > 0 ? 'active' : ''}`}>
+                                        <div className="walkin-size-label-wrap">
+                                          <span className="walkin-size-key">{(opt.label || SIZE_LABELS[sizeKey] || sizeKey).charAt(0).toUpperCase()}</span>
+                                          <span className="walkin-size-label">{opt.label || SIZE_LABELS[sizeKey] || sizeKey}</span>
+                                        </div>
+                                        <div className="walkin-size-controls">
+                                          <div className="walkin-size-qty-control">
+                                            <button
+                                              type="button"
+                                              onClick={() => updateRentalSizeQuantity(item, sizeKey, -1)}
+                                              disabled={currentQty <= 0}
+                                            >
+                                              -
+                                            </button>
+                                            <span>{currentQty}</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => updateRentalSizeQuantity(item, sizeKey, 1)}
+                                              disabled={currentQty >= maxQty}
+                                            >
+                                              +
+                                            </button>
+                                          </div>
+                                          {measurementRows.length > 0 && (
+                                            <button
+                                              type="button"
+                                              className="walkin-view-measurements-btn"
+                                              onClick={() => {
+                                                setExpandedSizeMeasurements((prevExpanded) => ({
+                                                  ...prevExpanded,
+                                                  [measurementToggleKey]: !prevExpanded[measurementToggleKey]
+                                                }));
+                                              }}
+                                            >
+                                              {showMeasurements ? 'Hide Measurements' : 'View Measurements'}
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
-                                      <div className="walkin-size-qty-control">
-                                        <button
-                                          type="button"
-                                          onClick={() => updateRentalSizeQuantity(item, sizeKey, -1)}
-                                          disabled={currentQty <= 0}
-                                        >
-                                          -
-                                        </button>
-                                        <span>{currentQty}</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => updateRentalSizeQuantity(item, sizeKey, 1)}
-                                          disabled={currentQty >= maxQty}
-                                        >
-                                          +
-                                        </button>
-                                      </div>
+                                      {showMeasurements && measurementRows.length > 0 && (
+                                        <div className="walkin-size-measurements-panel">
+                                          {measurementRows.map((row, rowIndex) => (
+                                            <div key={`${measurementToggleKey}-${rowIndex}`} className="walkin-size-measurement-row">
+                                              <span className="walkin-size-measurement-label">{row.label}:</span>
+                                              <span className="walkin-size-measurement-value">{row.value}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
                               </div>
                             </div>
                           )}
-                          {measurements && measurements.length > 0 && (
+                          {sizeKeys.length === 0 && measurements && measurements.length > 0 && (
                             <div className="measurements-display">
                               <strong>Measurements:</strong>
                               <div className="measurements-grid">
@@ -1309,6 +1436,49 @@ const WalkInOrders = () => {
                   min={new Date().toISOString().split('T')[0]}
                 />
               </div>
+
+              <div className="form-group">
+                <label>Payment Mode *</label>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: 0 }}>
+                    <input
+                      type="radio"
+                      name="walkin-rental-payment-mode"
+                      value="regular"
+                      checked={rentalPaymentMode === 'regular'}
+                      onChange={() => {
+                        setRentalPaymentMode('regular');
+                        setFlatRateUntilDate('');
+                      }}
+                    />
+                    <span>Regular</span>
+                  </label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: 0 }}>
+                    <input
+                      type="radio"
+                      name="walkin-rental-payment-mode"
+                      value="flat_rate"
+                      checked={rentalPaymentMode === 'flat_rate'}
+                      onChange={() => setRentalPaymentMode('flat_rate')}
+                    />
+                    <span>Flat Rate</span>
+                  </label>
+                </div>
+              </div>
+
+              {rentalPaymentMode === 'flat_rate' && (
+                <div className="form-group">
+                  <label>Flat Rate Until Date *</label>
+                  <input
+                    type="date"
+                    value={flatRateUntilDate}
+                    onChange={(e) => setFlatRateUntilDate(e.target.value)}
+                    className="form-control"
+                    min={new Date().toISOString().split('T')[0]}
+                    required
+                  />
+                </div>
+              )}
 
               <div className="price-display">
                 <strong>Total Price: ₱{calculateRentalPrice().toFixed(2)}</strong>
@@ -1625,6 +1795,11 @@ const WalkInOrders = () => {
           flex-direction: column;
           gap: 8px;
         }
+        .walkin-size-entry {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
         .walkin-size-row {
           display: flex;
           align-items: center;
@@ -1694,6 +1869,56 @@ const WalkInOrders = () => {
           text-align: center;
           font-weight: 700;
           color: #0f172a;
+        }
+        .walkin-size-controls {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+        .walkin-view-measurements-btn {
+          border: 1px solid #cdb8a6;
+          background: #fff;
+          color: #5b3a21;
+          border-radius: 999px;
+          padding: 6px 12px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .walkin-view-measurements-btn:hover {
+          background: #f5ede6;
+          border-color: #8b5e34;
+        }
+        .walkin-size-measurements-panel {
+          border: 1px solid #e6dbcf;
+          background: #faf7f3;
+          border-radius: 10px;
+          padding: 10px 12px;
+          margin-left: 6px;
+        }
+        .walkin-size-measurement-row {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 8px;
+          padding: 4px 0;
+          border-bottom: 1px dashed #e5ddd4;
+        }
+        .walkin-size-measurement-row:last-child {
+          border-bottom: none;
+        }
+        .walkin-size-measurement-label {
+          color: #5e5348;
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .walkin-size-measurement-value {
+          color: #2c2218;
+          font-size: 12px;
+          font-weight: 700;
+          text-align: right;
         }
         .rental-item-measurements {
           display: flex;

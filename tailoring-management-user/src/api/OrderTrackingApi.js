@@ -116,7 +116,7 @@ export function getServiceStatusFlow(serviceType) {
     'repair': ['pending', 'accepted', 'in_progress', 'ready_to_pickup'],
     'customize': ['pending', 'accepted', 'in_progress', 'ready_to_pickup'],
     'dry_cleaning': ['pending', 'accepted', 'in_progress', 'ready_to_pickup'],
-    'rental': ['pending', 'picked_up', 'rented', 'returned']
+    'rental': ['pending', 'picked_up', 'rented', 'returned', 'completed']
   };
   return flows[serviceType] || flows['repair'];
 }

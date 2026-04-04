@@ -12,6 +12,7 @@ import { API_BASE_URL } from '../api/config';
 import { getUserRole, getUser } from '../api/AuthApi';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { exportToExcel } from '../utils/excelExport';
+import { getCompensationIncidents, getCompensationStats } from '../api/DamageCompensationApi';
 
 const SIZE_LABELS = {
   small: 'Small (S)',
@@ -240,6 +241,7 @@ const OrdersInventory = () => {
   const [inventoryItems, setInventoryItems] = useState([]);
   const [rentalItems, setRentalItems] = useState([]);
   const [combinedData, setCombinedData] = useState([]);
+  const [compensationIncidents, setCompensationIncidents] = useState([]);
   
   // Statistics states
   const [billingStats, setBillingStats] = useState({
@@ -255,6 +257,16 @@ const OrdersInventory = () => {
     dryCleaning: 0,
     repair: 0,
     totalValue: 0
+  });
+  const [compensationStats, setCompensationStats] = useState({
+    total_incidents: 0,
+    approved_incidents: 0,
+    pending_incidents: 0,
+    paid_incidents: 0,
+    unpaid_incidents: 0,
+    approved_compensation: 0,
+    paid_compensation: 0,
+    outstanding_compensation: 0
   });
   
   // UI states
@@ -328,12 +340,14 @@ const OrdersInventory = () => {
       setLoading(true);
       
       // Fetch all data in parallel
-      const [billingResponse, billingStatsResponse, inventoryResponse, inventoryStatsResponse, rentalResponse] = await Promise.all([
+      const [billingResponse, billingStatsResponse, inventoryResponse, inventoryStatsResponse, rentalResponse, compensationIncidentsResponse, compensationStatsResponse] = await Promise.all([
         getAllBillingRecords(),
         getBillingStats(),
         getCompletedItems(),
         getInventoryStats(),
-        getAllRentals()
+        getAllRentals(),
+        getCompensationIncidents(),
+        getCompensationStats()
       ]);
       
       if (billingResponse.success) {
@@ -356,6 +370,14 @@ const OrdersInventory = () => {
         setRentalItems(rentalResponse.items);
       } else if (Array.isArray(rentalResponse)) {
         setRentalItems(rentalResponse);
+      }
+
+      if (compensationIncidentsResponse.success) {
+        setCompensationIncidents(compensationIncidentsResponse.incidents || []);
+      }
+
+      if (compensationStatsResponse.success) {
+        setCompensationStats(compensationStatsResponse.stats || {});
       }
       
     } catch (error) {
@@ -918,6 +940,30 @@ const OrdersInventory = () => {
             </div>
             <div className="stat-number">{combinedStats.unpaidBills}</div>
           </div>
+
+          <div className="stat-card">
+            <div className="stat-header">
+              <span>Damage Incidents</span>
+              <div className="stat-icon" style={{ background: '#fff8e1', color: '#f57c00' }}>⚠</div>
+            </div>
+            <div className="stat-number">{compensationStats.total_incidents || 0}</div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-header">
+              <span>Outstanding Compensation</span>
+              <div className="stat-icon" style={{ background: '#ffebee', color: '#e53935' }}>₱</div>
+            </div>
+            <div className="stat-number">₱{parseFloat(compensationStats.outstanding_compensation || 0).toLocaleString()}</div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-header">
+              <span>Paid Compensation</span>
+              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#2e7d32' }}>✓</div>
+            </div>
+            <div className="stat-number">₱{parseFloat(compensationStats.paid_compensation || 0).toLocaleString()}</div>
+          </div>
         </div>
 
         {/* Search and Filter Section */}
@@ -1045,6 +1091,57 @@ const OrdersInventory = () => {
                         </tr>
                       );
                     })
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        <div className="combined-table-section" style={{ marginTop: '20px' }}>
+          <div className="combined-table-header">
+            <h3 className="section-title">
+              <i className="fas fa-triangle-exclamation"></i> Damage Compensation Incidents
+              <span className="item-count">({compensationIncidents.length} items)</span>
+            </h3>
+          </div>
+
+          <div className="table-container scrollable-table">
+            {loading ? (
+              <div className="loading-state">
+                <i className="fas fa-spinner fa-spin"></i>
+                Loading incidents...
+              </div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Service</th>
+                    <th>Order ID</th>
+                    <th>Customer</th>
+                    <th>Damage Type</th>
+                    <th>Liability</th>
+                    <th>Compensation</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {compensationIncidents.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="empty-state">No damage incidents recorded</td>
+                    </tr>
+                  ) : (
+                    compensationIncidents.map((incident) => (
+                      <tr key={incident.id}>
+                        <td>{incident.service_type === 'dry_cleaning' ? 'Dry Cleaning' : 'Repair'}</td>
+                        <td>#{incident.order_id || incident.order_item_id}</td>
+                        <td>{incident.customer_name}</td>
+                        <td>{incident.damage_type}</td>
+                        <td>{incident.liability_status}</td>
+                        <td>₱{parseFloat(incident.compensation_amount || 0).toLocaleString()}</td>
+                        <td>{incident.compensation_status}</td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>

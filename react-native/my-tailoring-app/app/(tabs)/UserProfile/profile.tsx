@@ -28,7 +28,9 @@ import { authService, orderTrackingService, notificationService, measurementsSer
 const { width, height } = Dimensions.get("window");
 
 interface UserData {
-  name: string;
+  first_name: string;
+  middle_name: string;
+  last_name: string;
   email: string;
   phone: string;
 }
@@ -44,7 +46,9 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
 
   const [user, setUser] = useState<UserData>({
-    name: "Loading...",
+    first_name: "Loading...",
+    middle_name: "",
+    last_name: "",
     email: "Loading...",
     phone: "Loading...",
   });
@@ -168,10 +172,10 @@ export default function ProfileScreen() {
       if (response && response.user) {
         const userData = response.user;
 
-        const fullName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || "User";
-
         setUser({
-          name: fullName,
+          first_name: userData.first_name || "",
+          middle_name: userData.middle_name || "",
+          last_name: userData.last_name || "",
           email: userData.email || "",
           phone: userData.phone_number || "",
         });
@@ -185,7 +189,9 @@ export default function ProfileScreen() {
       } else {
 
         setUser({
-          name: "User",
+          first_name: "User",
+          middle_name: "",
+          last_name: "",
           email: "user@example.com",
           phone: "",
         });
@@ -195,7 +201,9 @@ export default function ProfileScreen() {
       Alert.alert("Error", "Failed to load profile data");
 
       setUser({
-        name: "User",
+        first_name: "User",
+        middle_name: "",
+        last_name: "",
         email: "user@example.com",
         phone: "",
       });
@@ -505,8 +513,8 @@ export default function ProfileScreen() {
   };
 
   const saveProfile = async () => {
-    if (!editedUser.name.trim()) {
-      alert("Name cannot be empty");
+    if (!editedUser.first_name.trim() || !editedUser.last_name.trim()) {
+      alert("First name and last name are required");
       return;
     }
     if (!editedUser.email.trim()) {
@@ -518,8 +526,15 @@ export default function ProfileScreen() {
       return;
     }
 
+    if (editedUser.phone.replace(/\D/g, '').length !== 11) {
+      alert("Phone number must be exactly 11 digits");
+      return;
+    }
+
     const hasProfileChanges = !(
-      editedUser.name.trim() === user.name.trim() &&
+      editedUser.first_name.trim() === user.first_name.trim() &&
+      editedUser.middle_name.trim() === user.middle_name.trim() &&
+      editedUser.last_name.trim() === user.last_name.trim() &&
       editedUser.email.trim() === user.email.trim() &&
       editedUser.phone.trim() === user.phone.trim()
     );
@@ -540,21 +555,23 @@ export default function ProfileScreen() {
 
       // Update profile info if changed
       if (hasProfileChanges) {
-        const nameParts = editedUser.name.trim().split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
-
         const updateData = {
-          first_name: firstName,
-          last_name: lastName,
+          first_name: editedUser.first_name.trim(),
+          middle_name: editedUser.middle_name.trim() || null,
+          last_name: editedUser.last_name.trim(),
           email: editedUser.email,
-          phone_number: editedUser.phone
+          phone_number: editedUser.phone.replace(/\D/g, '')
         };
 
         const response = await authService.updateProfile(updateData);
 
         if (response.success) {
-          setUser(editedUser);
+          const updatedUser = {
+            ...editedUser,
+            phone: editedUser.phone.replace(/\D/g, '')
+          };
+          setUser(updatedUser);
+          await AsyncStorage.setItem('userData', JSON.stringify(response.user || updatedUser));
         } else {
           alert(response.message || "Failed to update profile");
           return;
@@ -627,7 +644,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.userName}>{user.name}</Text>
+          <Text style={styles.userName}>{`${user.first_name || ''} ${user.middle_name || ''} ${user.last_name || ''}`.replace(/\s+/g, ' ').trim() || 'User'}</Text>
           <Text style={styles.userEmail}>{user.email}</Text>
 
           <View style={styles.profileButtonsRow}>
@@ -1143,7 +1160,7 @@ export default function ProfileScreen() {
                   </Text>
 
                   <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Full Name *</Text>
+                    <Text style={styles.inputLabel}>First Name *</Text>
                     <View style={styles.inputContainer}>
                       <Ionicons
                         name="person-outline"
@@ -1152,11 +1169,51 @@ export default function ProfileScreen() {
                       />
                       <TextInput
                         style={styles.input}
-                        value={editedUser.name}
+                        value={editedUser.first_name}
                         onChangeText={(text) =>
-                          setEditedUser({ ...editedUser, name: text })
+                          setEditedUser({ ...editedUser, first_name: text })
                         }
-                        placeholder="Enter your full name"
+                        placeholder="Enter your first name"
+                        placeholderTextColor="#9CA3AF"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Middle Name (Optional)</Text>
+                    <View style={styles.inputContainer}>
+                      <Ionicons
+                        name="person-outline"
+                        size={20}
+                        color="#94665B"
+                      />
+                      <TextInput
+                        style={styles.input}
+                        value={editedUser.middle_name}
+                        onChangeText={(text) =>
+                          setEditedUser({ ...editedUser, middle_name: text })
+                        }
+                        placeholder="Enter your middle name"
+                        placeholderTextColor="#9CA3AF"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Last Name *</Text>
+                    <View style={styles.inputContainer}>
+                      <Ionicons
+                        name="person-outline"
+                        size={20}
+                        color="#94665B"
+                      />
+                      <TextInput
+                        style={styles.input}
+                        value={editedUser.last_name}
+                        onChangeText={(text) =>
+                          setEditedUser({ ...editedUser, last_name: text })
+                        }
+                        placeholder="Enter your last name"
                         placeholderTextColor="#9CA3AF"
                       />
                     </View>
@@ -1193,7 +1250,7 @@ export default function ProfileScreen() {
                         style={styles.input}
                         value={editedUser.phone}
                         onChangeText={(text) =>
-                          setEditedUser({ ...editedUser, phone: text })
+                          setEditedUser({ ...editedUser, phone: text.replace(/\D/g, '') })
                         }
                         placeholder="Enter your phone number"
                         placeholderTextColor="#9CA3AF"

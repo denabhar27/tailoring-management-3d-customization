@@ -7,6 +7,12 @@ const axios = require('axios');
 exports.register = (req, res) => {
   const { first_name, middle_name = null, last_name, username, email, password, phone_number } = req.body;
 
+  if (!first_name || !last_name || !username || !email || !password || !phone_number) {
+    return res.status(400).json({
+      message: "First name, last name, username, email, password, and contact number are required"
+    });
+  }
+
   // Check if username exists
   User.findByUsername(username, (err, results) => {
     if (err) return res.status(500).json({ message: "Database error", error: err });
@@ -30,7 +36,7 @@ exports.register = (req, res) => {
 
         const role = 'user';
         const token = jwt.sign(
-          { id: result.insertId, role },
+          { id: result.insertId, role, first_name, middle_name, last_name, email, phone_number },
           process.env.JWT_SECRET || "secret",
           { expiresIn: '24h' }
         );
@@ -104,7 +110,7 @@ exports.login = async (req, res) => {
 
       const userRole = user.role || 'user';
       const token = jwt.sign(
-        { id: user.user_id, role: userRole, username: user.username, first_name: user.first_name, last_name: user.last_name, email: user.email, phone_number: user.phone_number },
+        { id: user.user_id, role: userRole, username: user.username, first_name: user.first_name, middle_name: user.middle_name, last_name: user.last_name, email: user.email, phone_number: user.phone_number },
         process.env.JWT_SECRET || "secret",
         { expiresIn: '24h' }
       );
@@ -367,8 +373,8 @@ exports.updateProfile = (req, res) => {
   const user_id = req.user.id;
   const { first_name, middle_name = null, last_name, email, phone_number, profile_picture } = req.body;
 
-  if (!first_name || !last_name || !email) {
-    return res.status(400).json({ message: "First name, last name, and email are required" });
+  if (!first_name || !last_name || !email || !phone_number) {
+    return res.status(400).json({ message: "First name, last name, email, and contact number are required" });
   }
 
   User.findByEmail(email, (err, results) => {

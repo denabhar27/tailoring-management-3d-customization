@@ -48,6 +48,8 @@ const OrderTracking = {
         oi.specific_data,
         oi.pricing_factors,
         oi.payment_status,
+        oi.deposit_refunded,
+        oi.deposit_refund_date,
         DATE_FORMAT(oi.rental_start_date, '%Y-%m-%d') as rental_start_date,
         DATE_FORMAT(oi.rental_end_date, '%Y-%m-%d') as rental_end_date,
         DATEDIFF(oi.rental_end_date, oi.rental_start_date) as rental_period,

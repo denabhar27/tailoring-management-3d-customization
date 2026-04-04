@@ -33,6 +33,7 @@ router.get('/rental/orders', orderController.getRentalOrders);
 router.get('/rental/orders/status/:status', orderController.getRentalOrdersByStatus);
 router.put('/rental/items/:id', orderController.updateRentalOrderItem);
 router.post('/rental/items/:id/payment', orderController.recordRentalPayment); 
+router.post('/rental/items/:id/deposit-return', orderController.recordRentalDepositReturn);
 
 router.post('/items/:id/payment', orderController.recordRentalPayment); 
 

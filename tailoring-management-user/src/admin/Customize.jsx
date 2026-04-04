@@ -3547,7 +3547,7 @@ const Customize = () => {
                                     title="Enhance Order"
                                     style={{ backgroundColor: '#673ab7', color: 'white' }}
                                   >
-                                    ✨
+                                    <i className="fas fa-wand-magic-sparkles"></i>
                                   </button>
                                 )}
 
@@ -3610,24 +3610,28 @@ const Customize = () => {
       </div>
       {showEnhanceModal && enhanceOrder && (
         <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowEnhanceModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '520px' }}>
+          <div className="modal-content enhance-order-modal" style={{ maxWidth: '640px', width: '95vw' }}>
             <div className="modal-header">
-              <h2>Enhance Completed Customization</h2>
+              <h2><i className="fas fa-tools" style={{ marginRight: '8px', color: '#8b4513' }}></i>Enhance Completed Customization</h2>
               <span className="close-modal" onClick={() => setShowEnhanceModal(false)}>×</span>
             </div>
-            <div className="modal-body">
-              <div className="detail-row"><strong>Order ID:</strong> #{enhanceOrder.order_id}</div>
-              <div className="form-group" style={{ marginTop: '14px' }}>
+            <div className="modal-body enhance-order-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '10px', textAlign: 'left' }}>
+              <div className="form-group enhance-order-field" style={{ width: '100%' }}>
+                <label>Order ID</label>
+                <div style={{ width: '100%', boxSizing: 'border-box', color: '#333', fontWeight: 600 }}>#{enhanceOrder.order_id}</div>
+              </div>
+
+              <div className="form-group enhance-order-field" style={{ marginTop: '14px', width: '100%' }}>
                 <label>Enhancement Notes</label>
                 <textarea
                   value={enhanceForm.notes}
                   onChange={(e) => setEnhanceForm({ ...enhanceForm, notes: e.target.value })}
                   rows={3}
                   placeholder="Describe requested enhancement..."
-                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }}
                 />
               </div>
-              <div className="form-group">
+              <div className="form-group enhance-order-field" style={{ width: '100%' }}>
                 <label>Additional Cost (PHP)</label>
                 <input
                   type="number"
@@ -3635,25 +3639,31 @@ const Customize = () => {
                   step="0.01"
                   value={enhanceForm.additionalCost}
                   onChange={(e) => setEnhanceForm({ ...enhanceForm, additionalCost: e.target.value })}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }}
                 />
               </div>
-              <div className="form-group">
+              <div className="form-group enhance-order-field" style={{ width: '100%' }}>
                 <label>New Estimated Completion Date</label>
                 <input
                   type="date"
                   value={enhanceForm.estimatedCompletionDate}
                   onChange={(e) => setEnhanceForm({ ...enhanceForm, estimatedCompletionDate: e.target.value })}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }}
                 />
               </div>
-              <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
+              <div className="form-group enhance-order-field" style={{ width: '100%', marginTop: '8px', fontSize: '12px', color: '#666' }}>
                 Saving will move this completed order back to <strong>In Progress</strong>.
               </div>
             </div>
             <div className="modal-footer">
               <button className="btn-cancel" onClick={() => setShowEnhanceModal(false)}>Cancel</button>
-              <button className="btn-save" onClick={handleSaveEnhancement} disabled={savingEnhancement}>
+              <button
+                className="btn-save enhance-apply-btn"
+                style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
+                onClick={handleSaveEnhancement}
+                disabled={savingEnhancement}
+              >
+                <i className={`fas ${savingEnhancement ? 'fa-spinner fa-spin' : 'fa-check-circle'}`} style={{ marginRight: '8px' }}></i>
                 {savingEnhancement ? 'Applying...' : 'Apply Enhancement'}
               </button>
             </div>

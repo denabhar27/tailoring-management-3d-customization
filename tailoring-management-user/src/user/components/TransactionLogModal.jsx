@@ -68,6 +68,17 @@ const TransactionLogModal = ({ isOpen, onClose, orderItemId }) => {
     return statusMap[status] || status;
   };
 
+  const sanitizeLogNotes = (notes) => {
+    if (!notes) return '';
+    return String(notes)
+      .replace(/\s*Cash received:\s*[^.]*\.?/gi, '')
+      .replace(/\s*Change:\s*[^.]*\.?/gi, '')
+      .replace(/\s*Customer:\s*[^.]*\.?/gi, '')
+      .replace(/\s*Method:\s*[^.]*\.?/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -96,25 +107,29 @@ const TransactionLogModal = ({ isOpen, onClose, orderItemId }) => {
                       </span>
                     </div>
                     <div className="transaction-log-amount">
+                      <span className="amount-label">Amount</span>
                       <span className="amount-value">₱{parseFloat(log.amount || 0).toLocaleString()}</span>
                     </div>
                   </div>
 
                   <div className="transaction-log-details">
-                    <div className="transaction-detail-row">
-                      <span className="detail-label">Date:</span>
-                      <span className="detail-value">{formatDate(log.created_at)}</span>
-                    </div>
-                    {log.notes && (
-                      <div className="transaction-detail-row">
-                        <span className="detail-label">Details:</span>
-                        <span className="detail-value">{log.notes}</span>
+                    <div className="transaction-meta-grid">
+                      <div className="transaction-detail-block">
+                        <span className="detail-label">Date</span>
+                        <span className="detail-value">{formatDate(log.created_at)}</span>
                       </div>
-                    )}
-                    {log.created_by && (
-                      <div className="transaction-detail-row">
-                        <span className="detail-label">Handled By:</span>
-                        <span className="detail-value">{log.created_by}</span>
+                      {log.created_by && (
+                        <div className="transaction-detail-block">
+                          <span className="detail-label">Handled By</span>
+                          <span className="detail-value">{log.created_by}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {log.notes && (
+                      <div className="transaction-notes-block">
+                        <span className="detail-label">Details</span>
+                        <p className="transaction-notes-text">{sanitizeLogNotes(log.notes)}</p>
                       </div>
                     )}
                   </div>

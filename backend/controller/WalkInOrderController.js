@@ -116,9 +116,38 @@ exports.createRentalOrder = async (req, res) => {
       rentalDuration,
       eventDate,
       damageDeposit,
+      paymentMode,
+      flatRateUntilDate,
       isBundle,
       notes
     } = req.body;
+
+    const normalizedPaymentMode = String(paymentMode || 'regular').toLowerCase();
+    if (!['regular', 'flat_rate'].includes(normalizedPaymentMode)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment mode. Use regular or flat_rate.'
+      });
+    }
+
+    let normalizedFlatRateUntilDate = null;
+    if (normalizedPaymentMode === 'flat_rate') {
+      if (!flatRateUntilDate) {
+        return res.status(400).json({
+          success: false,
+          message: 'Flat rate until date is required for flat rate mode'
+        });
+      }
+
+      const parsedFlatRateDate = new Date(flatRateUntilDate);
+      if (Number.isNaN(parsedFlatRateDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid flat rate until date'
+        });
+      }
+      normalizedFlatRateUntilDate = String(flatRateUntilDate).slice(0, 10);
+    }
 
     const itemIds = rentalItemIds && Array.isArray(rentalItemIds) ? rentalItemIds : 
                     (rentalItemId ? [rentalItemId] : []);
@@ -331,7 +360,9 @@ exports.createRentalOrder = async (req, res) => {
               base_price_per_3_days: basePrice.toString(),
               duration_multiplier: durationMultiplier.toString(),
               deposit_amount: itemDownpayment.toString(),
-              downpayment: itemDownpayment.toString()
+              downpayment: itemDownpayment.toString(),
+              rental_payment_mode: normalizedPaymentMode,
+              ...(normalizedFlatRateUntilDate ? { flat_rate_until_date: normalizedFlatRateUntilDate } : {})
             }),
             specific_data: JSON.stringify({
               item_name: rentalItem.item_name,

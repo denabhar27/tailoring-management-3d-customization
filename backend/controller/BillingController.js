@@ -21,6 +21,8 @@ exports.getAllBillingRecords = (req, res) => {
       oi.payment_status,
       oi.specific_data,
       oi.pricing_factors,
+      oi.deposit_refunded,
+      oi.deposit_refund_date,
       oi.rental_start_date,
       oi.rental_end_date,
       o.status as order_status,
@@ -155,6 +157,11 @@ exports.getAllBillingRecords = (req, res) => {
         status: paymentStatus,
         specificData: specificData,
         pricingFactors: pricingFactors,
+        depositRefunded: Math.max(
+          0,
+          parseFloat(item.deposit_refunded || pricingFactors.deposit_refunded_amount || 0)
+        ),
+        depositRefundDate: item.deposit_refund_date || pricingFactors.deposit_refunded_at || null,
         rentalStartDate: item.rental_start_date,
         rentalEndDate: item.rental_end_date
       };
@@ -196,6 +203,8 @@ exports.getBillingRecordsByStatus = (req, res) => {
       oi.payment_status,
       oi.specific_data,
       oi.pricing_factors,
+      oi.deposit_refunded,
+      oi.deposit_refund_date,
       oi.rental_start_date,
       oi.rental_end_date,
       o.status as order_status,
@@ -302,6 +311,11 @@ exports.getBillingRecordsByStatus = (req, res) => {
         status: paymentStatus,
         specificData: specificData,
         pricingFactors: pricingFactors,
+        depositRefunded: Math.max(
+          0,
+          parseFloat(item.deposit_refunded || pricingFactors.deposit_refunded_amount || 0)
+        ),
+        depositRefundDate: item.deposit_refund_date || pricingFactors.deposit_refunded_at || null,
         rentalStartDate: item.rental_start_date,
         rentalEndDate: item.rental_end_date
       };

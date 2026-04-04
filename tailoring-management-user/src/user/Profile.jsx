@@ -12,6 +12,7 @@ import { useAlert } from '../context/AlertContext';
 import { getMyMeasurements } from '../api/CustomerApi';
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
 import { API_BASE_URL, API_URL } from '../api/config';
+import { getCompensationIncidents, submitCustomerLiabilityDecision } from '../api/DamageCompensationApi';
 
 const Profile = () => {
   const { alert, confirm } = useAlert();
@@ -41,6 +42,9 @@ const Profile = () => {
   const [enhanceNotes, setEnhanceNotes] = useState('');
   const [enhancePreferredDate, setEnhancePreferredDate] = useState('');
   const [submittingEnhancement, setSubmittingEnhancement] = useState(false);
+  const [compensationIncident, setCompensationIncident] = useState(null);
+  const [loadingCompensationIncident, setLoadingCompensationIncident] = useState(false);
+  const [submittingLiabilityDecision, setSubmittingLiabilityDecision] = useState(false);
 
   const [transactionLogModalOpen, setTransactionLogModalOpen] = useState(false);
   const [selectedOrderItemId, setSelectedOrderItemId] = useState(null);
@@ -48,6 +52,7 @@ const Profile = () => {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileData, setProfileData] = useState({
     first_name: '',
+    middle_name: '',
     last_name: '',
     email: '',
     phone_number: ''
@@ -78,6 +83,7 @@ const Profile = () => {
       setUser(userData);
       setProfileData({
         first_name: userData.first_name || '',
+        middle_name: userData.middle_name || '',
         last_name: userData.last_name || '',
         email: userData.email || '',
         phone_number: userData.phone_number || ''
@@ -424,6 +430,88 @@ const Profile = () => {
     setDetailsModalOpen(true);
   };
 
+  useEffect(() => {
+    const loadCompensationIncidentForItem = async () => {
+      if (!detailsModalOpen || !selectedItem?.order_item_id) {
+        setCompensationIncident(null);
+        return;
+      }
+
+      try {
+        setLoadingCompensationIncident(true);
+        const result = await getCompensationIncidents({
+          order_item_id: selectedItem.order_item_id,
+          my_only: true
+        });
+
+        if (result.success) {
+          const incidents = Array.isArray(result.incidents) ? result.incidents : [];
+          setCompensationIncident(incidents.length > 0 ? incidents[0] : null);
+        } else {
+          setCompensationIncident(null);
+        }
+      } catch (err) {
+        setCompensationIncident(null);
+      } finally {
+        setLoadingCompensationIncident(false);
+      }
+    };
+
+    loadCompensationIncidentForItem();
+  }, [detailsModalOpen, selectedItem]);
+
+  const handleCustomerLiabilityDecision = async (decision) => {
+    if (!compensationIncident?.id || !selectedItem?.order_item_id) return;
+
+    const isApprove = decision === 'approved';
+    const proceed = await confirm(
+      isApprove
+        ? 'Do you agree with the reported liability and compensation amount?'
+        : 'Do you want to reject this liability decision?',
+      isApprove ? 'Approve Liability' : 'Reject Liability',
+      isApprove ? 'question' : 'warning',
+      {
+        confirmText: isApprove ? 'Approve' : 'Reject',
+        cancelText: 'Cancel'
+      }
+    );
+
+    if (!proceed) return;
+
+    try {
+      setSubmittingLiabilityDecision(true);
+      const result = await submitCustomerLiabilityDecision(compensationIncident.id, {
+        liability_status: decision
+      });
+
+      if (!result.success) {
+        await alert(result.message || 'Failed to submit liability decision', 'Error', 'error');
+        return;
+      }
+
+      await alert(
+        decision === 'approved'
+          ? 'Liability approved. Our team will proceed with settlement handling.'
+          : 'Liability rejected. The team will review your decision.',
+        'Decision Submitted',
+        'success'
+      );
+
+      const refreshed = await getCompensationIncidents({
+        order_item_id: selectedItem.order_item_id,
+        my_only: true
+      });
+      if (refreshed.success) {
+        const incidents = Array.isArray(refreshed.incidents) ? refreshed.incidents : [];
+        setCompensationIncident(incidents.length > 0 ? incidents[0] : null);
+      }
+    } catch (error) {
+      await alert('Failed to submit liability decision', 'Error', 'error');
+    } finally {
+      setSubmittingLiabilityDecision(false);
+    }
+  };
+
   const handleAcceptPrice = async (item) => {
     try {
       const isConfirmed = await confirm(
@@ -513,6 +601,7 @@ const Profile = () => {
   const closeDetailsModal = () => {
     setSelectedItem(null);
     setDetailsModalOpen(false);
+    setCompensationIncident(null);
   };
 
   const openEnhancementModal = (item) => {
@@ -600,7 +689,7 @@ const Profile = () => {
                           <SimpleImageCarousel
                             images={itemImages}
                             itemName={bundleItem.item_name}
-                            height="180px"
+                            height="300px"
                           />
                         )}
                       </div>
@@ -626,7 +715,7 @@ const Profile = () => {
                         <SimpleImageCarousel
                           images={singleItemImages}
                           itemName={specific_data.item_name}
-                          height="200px"
+                          height="340px"
                         />
                       </div>
                     </div>
@@ -668,7 +757,7 @@ const Profile = () => {
                           borderRadius: '6px',
                           border: '1px solid #e0e0e0',
                           width: '100%',
-                          maxWidth: '350px'
+                          maxWidth: '100%'
                         }}>
                           <strong style={{ color: '#333', display: 'block', marginBottom: '10px', borderBottom: '1px solid #ddd', paddingBottom: '8px', textAlign: 'center' }}>
                             {item.item_name || `Item ${idx + 1}`}:
@@ -734,7 +823,7 @@ const Profile = () => {
                         borderRadius: '6px',
                         border: '1px solid #e0e0e0',
                         width: '100%',
-                        maxWidth: '350px'
+                        maxWidth: '100%'
                       }}>
                         {(() => {
                           const selectedSizes = specific_data.selected_sizes || specific_data.selectedSizes || [];
@@ -825,6 +914,36 @@ const Profile = () => {
                 })()}
               </span>
             </div>
+            {(() => {
+              const pricingFactors = typeof item.pricing_factors === 'string'
+                ? JSON.parse(item.pricing_factors || '{}')
+                : (item.pricing_factors || {});
+              const paymentMode = String(pricingFactors.rental_payment_mode || 'regular').toLowerCase();
+              const paymentModeLabel = paymentMode === 'flat_rate' ? 'Flat Rate' : 'Regular';
+              const flatRateUntilDate = pricingFactors.flat_rate_until_date || null;
+
+              return (
+                <>
+                  <div className="detail-row">
+                    <span className="detail-label">Payment Option:</span>
+                    <span className="detail-value">{paymentModeLabel}</span>
+                  </div>
+                  {paymentMode === 'flat_rate' && flatRateUntilDate && (
+                    <div className="detail-row">
+                      <span className="detail-label">Flat Rate Until:</span>
+                      <span className="detail-value">{flatRateUntilDate}</span>
+                    </div>
+                  )}
+                  {paymentMode === 'flat_rate' && (
+                    <div className="detail-row" style={{ backgroundColor: '#eef7ff', padding: '10px', borderRadius: '6px' }}>
+                      <span className="detail-value" style={{ color: '#1f4f82' }}>
+                        Flat-rate rental is active for this order. The rental amount stays fixed while the item is with you.
+                      </span>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
             {(() => {
               const pricingFactors = typeof item.pricing_factors === 'string'
                 ? JSON.parse(item.pricing_factors || '{}')
@@ -1538,13 +1657,15 @@ const Profile = () => {
 
   const getStatusDotClass = (currentStatus, stepStatus, serviceType = null) => {
 
-    const rentalFlow = ['pending', 'ready_to_pickup', 'ready_for_pickup', 'rented', 'returned'];
+    const rentalFlow = ['pending', 'ready_to_pickup', 'ready_for_pickup', 'rented', 'returned', 'completed'];
 
     const defaultFlow = ['pending', 'price_confirmation', 'accepted', 'in_progress', 'ready_to_pickup', 'completed'];
 
     const statusFlow = serviceType === 'rental' ? rentalFlow : defaultFlow;
 
-    const normalizedCurrent = currentStatus === 'ready_for_pickup' ? 'ready_to_pickup' : currentStatus;
+    const normalizedCurrent = serviceType === 'rental' && currentStatus === 'completed'
+      ? 'returned'
+      : (currentStatus === 'ready_for_pickup' ? 'ready_to_pickup' : currentStatus);
     const normalizedStep = stepStatus === 'ready_for_pickup' ? 'ready_to_pickup' : stepStatus;
 
     const currentIndex = statusFlow.indexOf(normalizedCurrent);
@@ -1564,13 +1685,15 @@ const Profile = () => {
 
   const getTimelineDate = (updatedAt, currentStatus, stepStatus, serviceType = null) => {
 
-    const rentalFlow = ['pending', 'ready_to_pickup', 'ready_for_pickup', 'rented', 'returned'];
+    const rentalFlow = ['pending', 'ready_to_pickup', 'ready_for_pickup', 'rented', 'returned', 'completed'];
 
     const defaultFlow = ['pending', 'price_confirmation', 'accepted', 'in_progress', 'ready_to_pickup', 'completed'];
 
     const statusFlow = serviceType === 'rental' ? rentalFlow : defaultFlow;
 
-    const normalizedCurrent = currentStatus === 'ready_for_pickup' ? 'ready_to_pickup' : currentStatus;
+    const normalizedCurrent = serviceType === 'rental' && currentStatus === 'completed'
+      ? 'returned'
+      : (currentStatus === 'ready_for_pickup' ? 'ready_to_pickup' : currentStatus);
     const normalizedStep = stepStatus === 'ready_for_pickup' ? 'ready_to_pickup' : stepStatus;
 
     const currentIndex = statusFlow.indexOf(normalizedCurrent);
@@ -1596,13 +1719,15 @@ const Profile = () => {
 
   const getTimelineItemClass = (currentStatus, stepStatus, serviceType = null) => {
 
-    const rentalFlow = ['pending', 'ready_to_pickup', 'ready_for_pickup', 'rented', 'returned'];
+    const rentalFlow = ['pending', 'ready_to_pickup', 'ready_for_pickup', 'rented', 'returned', 'completed'];
 
     const defaultFlow = ['pending', 'price_confirmation', 'accepted', 'in_progress', 'ready_to_pickup', 'completed'];
 
     const statusFlow = serviceType === 'rental' ? rentalFlow : defaultFlow;
 
-    const normalizedCurrent = currentStatus === 'ready_for_pickup' ? 'ready_to_pickup' : currentStatus;
+    const normalizedCurrent = serviceType === 'rental' && currentStatus === 'completed'
+      ? 'returned'
+      : (currentStatus === 'ready_for_pickup' ? 'ready_to_pickup' : currentStatus);
     const normalizedStep = stepStatus === 'ready_for_pickup' ? 'ready_to_pickup' : stepStatus;
 
     const currentIndex = statusFlow.indexOf(normalizedCurrent);
@@ -1943,7 +2068,9 @@ const Profile = () => {
             <div style={{ flex: 1, width: '100%' }}>
               <>
                 <div className="user-name">
-                  {(user && (user.first_name || user.name)) ? `${user.first_name || user.name || ''} ${user.last_name || ''}`.trim() : 'User'}
+                  {(user && (user.first_name || user.middle_name || user.last_name || user.name))
+                    ? [user.first_name || user.name, user.middle_name, user.last_name].filter(Boolean).join(' ')
+                    : 'User'}
                 </div>
                 <div style={{ marginTop: '12px', fontSize: '14px', color: '#666' }}>
                   <div style={{ marginBottom: '8px' }}>
@@ -2169,6 +2296,9 @@ const Profile = () => {
                 const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
                 const downpayment = parseFloat(pricingFactors.downpayment || item.specific_data?.downpayment || 0);
                 const finalPrice = parseFloat(item.final_price || 0);
+                const rentalPaymentMode = String(pricingFactors.rental_payment_mode || 'regular').toLowerCase();
+                const rentalPaymentModeLabel = rentalPaymentMode === 'flat_rate' ? 'Flat Rate' : 'Regular';
+                const rentalFlatRateUntilDate = pricingFactors.flat_rate_until_date || null;
 
                 const totalPaid = amountPaid;
                 const remainingAmount = Math.max(0, finalPrice - totalPaid);
@@ -2217,6 +2347,16 @@ const Profile = () => {
                       <span className={`status-badge ${getStatusBadgeClass(item.status)}`}>
                         {getStatusLabel(item.status)}
                       </span>
+                      {isRental && (
+                        <span className="status-badge" style={{ backgroundColor: '#eef7ff', color: '#1f4f82' }}>
+                          {rentalPaymentModeLabel}
+                        </span>
+                      )}
+                      {isRental && rentalPaymentMode === 'flat_rate' && rentalFlatRateUntilDate && (
+                        <span className="status-badge" style={{ backgroundColor: '#fff5ec', color: '#8b4513' }}>
+                          Until {rentalFlatRateUntilDate}
+                        </span>
+                      )}
                       {item.payment_status_display && (
                         <span className={`status-badge ${getPaymentStatusBadgeClass(item.payment_status)}`}>
                           💳 {item.payment_status_display}
@@ -2538,6 +2678,32 @@ const Profile = () => {
                       </div>
                     )}
 
+                    {item.service_type === 'rental' && (() => {
+                      const refundedAmount = parseFloat(item.deposit_refunded || item.pricing_factors?.deposit_refunded_amount || 0);
+                      const refundedDate = item.deposit_refund_date || item.pricing_factors?.deposit_refunded_at;
+
+                      if (refundedAmount <= 0) return null;
+
+                      return (
+                        <div style={{
+                          background: '#e8f5e9',
+                          border: '1px solid #2e7d32',
+                          borderRadius: '8px',
+                          padding: '12px 16px',
+                          marginBottom: '20px'
+                        }}>
+                          <div style={{ color: '#1b5e20', fontWeight: '700', marginBottom: '6px' }}>
+                            Deposit Returned: ₱{refundedAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                          <div style={{ color: '#2e7d32', fontSize: '13px' }}>
+                            {refundedDate
+                              ? `Recorded on ${new Date(refundedDate).toLocaleString()}`
+                              : 'Recorded by admin'}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     <div className="order-timeline">
                       <div className="timeline-container">
                         {item.service_type === 'rental' ? (
@@ -2744,14 +2910,14 @@ const Profile = () => {
       {
         detailsModalOpen && selectedItem && (
           <div className="details-modal-overlay" onClick={closeDetailsModal}>
-            <div className="details-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="details-modal order-details-modal" onClick={(e) => e.stopPropagation()}>
               <div className="details-modal-header">
                 <h3 className="modal-title-black">Order Details - ORD-{selectedItem.order_id}</h3>
                 <button className="details-modal-close" onClick={closeDetailsModal}>×</button>
               </div>
 
               <div className="details-modal-content">
-                <div className="order-summary">
+                <div className="order-summary order-summary-clean">
                   <div className="summary-item">
                     <span className="summary-label">Service Type:</span>
                     <span className="summary-value">
@@ -2764,9 +2930,9 @@ const Profile = () => {
                       {getStatusLabel(selectedItem.status)}
                     </span>
                   </div>
-                  <div className="summary-item">
+                  <div className="summary-item summary-item-price">
                     <span className="summary-label">Price:</span>
-                  <span className="order-price" style={{ textAlign: 'right', display: 'block' }}>
+                  <span className="order-price order-price-clean" style={{ textAlign: 'right', display: 'block' }}>
                       {(() => {
                         const isRental = selectedItem.service_type === 'rental';
                         const isRepair = selectedItem.service_type === 'repair';
@@ -2779,6 +2945,8 @@ const Profile = () => {
                         const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
                         const downpayment = parseFloat(pricingFactors.downpayment || selectedItem.specific_data?.downpayment || 0);
                         const finalPrice = parseFloat(selectedItem.final_price || 0);
+                        const refundedAmount = parseFloat(selectedItem.deposit_refunded || pricingFactors.deposit_refunded_amount || 0);
+                        const refundedDate = selectedItem.deposit_refund_date || pricingFactors.deposit_refunded_at;
 
                         const totalPaid = amountPaid;
                         const remainingAmount = Math.max(0, finalPrice - totalPaid);
@@ -2799,6 +2967,19 @@ const Profile = () => {
                                 <div style={{ fontSize: '13px', color: '#666' }}>Total Payment:</div>
                                 <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2d5a3d' }}>₱{(finalPrice + downpayment).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
                               </div>
+                              {refundedAmount > 0 && (
+                                <div style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
+                                  <div style={{ fontSize: '13px', color: '#2e7d32' }}>Deposit Refunded:</div>
+                                  <div style={{ fontSize: '16px', fontWeight: '700', color: '#1b5e20' }}>
+                                    ₱{refundedAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </div>
+                                  {refundedDate && (
+                                    <div style={{ fontSize: '12px', color: '#2e7d32', marginTop: '2px' }}>
+                                      {new Date(refundedDate).toLocaleString()}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           );
                         }
@@ -2851,6 +3032,60 @@ const Profile = () => {
                 </div>
 
                 {renderServiceDetails(selectedItem)}
+
+                {loadingCompensationIncident && (
+                  <div style={{ marginTop: '16px', padding: '12px 14px', borderRadius: '8px', background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+                    Loading liability notice...
+                  </div>
+                )}
+
+                {!loadingCompensationIncident && compensationIncident && (
+                  <div style={{ marginTop: '16px', padding: '14px', borderRadius: '10px', background: '#fff8e1', border: '1px solid #f0d58c' }}>
+                    <div style={{ fontWeight: 700, marginBottom: '8px', color: '#6d4c00' }}>Damage Liability Notice</div>
+                    <div style={{ display: 'grid', gap: '6px', marginBottom: '10px' }}>
+                      <div><strong>Damage Type:</strong> {compensationIncident.damage_type || 'N/A'}</div>
+                      <div><strong>Description:</strong> {compensationIncident.damage_description || 'N/A'}</div>
+                      <div><strong>Compensation Amount:</strong> {formatCurrencyPHP(compensationIncident.compensation_amount || 0)}</div>
+                      <div><strong>Liability Status:</strong> {String(compensationIncident.liability_status || 'pending').replace(/_/g, ' ')}</div>
+                      <div><strong>Compensation Status:</strong> {String(compensationIncident.compensation_status || 'unpaid').replace(/_/g, ' ')}</div>
+                      {compensationIncident.payment_reference && (
+                        <div><strong>Payment Reference:</strong> {compensationIncident.payment_reference}</div>
+                      )}
+                      {compensationIncident.compensation_paid_at && (
+                        <div><strong>Paid At:</strong> {formatDateTo12Hour(compensationIncident.compensation_paid_at)}</div>
+                      )}
+                    </div>
+
+                    {String(compensationIncident.compensation_status).toLowerCase() === 'paid' && (
+                      <div style={{ marginBottom: '10px', padding: '10px 12px', borderRadius: '8px', background: '#e8f5e9', border: '1px solid #a5d6a7', color: '#1b5e20', fontWeight: 600 }}>
+                        Compensation has been marked as paid.
+                      </div>
+                    )}
+
+                    {compensationIncident.liability_status === 'pending' ? (
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => handleCustomerLiabilityDecision('approved')}
+                          disabled={submittingLiabilityDecision}
+                          style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
+                        >
+                          {submittingLiabilityDecision ? 'Submitting...' : 'Approve Liability'}
+                        </button>
+                        <button
+                          onClick={() => handleCustomerLiabilityDecision('rejected')}
+                          disabled={submittingLiabilityDecision}
+                          style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#c62828', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
+                        >
+                          {submittingLiabilityDecision ? 'Submitting...' : 'Reject Liability'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ color: '#6b7280', fontSize: '0.92rem' }}>
+                        You have already submitted your liability decision for this incident.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="details-modal-footer">
@@ -3073,6 +3308,7 @@ const Profile = () => {
               if (currentUser) {
                 setProfileData({
                   first_name: currentUser.first_name || '',
+                  middle_name: currentUser.middle_name || '',
                   last_name: currentUser.last_name || '',
                   email: currentUser.email || '',
                   phone_number: currentUser.phone_number || ''
@@ -3093,6 +3329,7 @@ const Profile = () => {
                 if (currentUser) {
                   setProfileData({
                     first_name: currentUser.first_name || '',
+                    middle_name: currentUser.middle_name || '',
                     last_name: currentUser.last_name || '',
                     email: currentUser.email || '',
                     phone_number: currentUser.phone_number || ''
@@ -3215,6 +3452,30 @@ const Profile = () => {
                 </div>
                 <div style={{ marginBottom: '15px' }}>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#374151', fontSize: '14px' }}>
+                    Middle Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={profileData.middle_name}
+                    onChange={(e) => setProfileData({ ...profileData, middle_name: e.target.value })}
+                    placeholder="Enter your middle name"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      color: '#1F2937',
+                      backgroundColor: '#F9FAFB',
+                      outline: 'none',
+                      transition: 'border-color 0.2s ease'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#8B4513'}
+                    onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+                  />
+                </div>
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#374151', fontSize: '14px' }}>
                     Last Name <span style={{ color: '#dc3545' }}>*</span>
                   </label>
                   <input
@@ -3269,7 +3530,7 @@ const Profile = () => {
                 <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937', marginBottom: '16px' }}>Contact Information</h4>
                 <div style={{ marginBottom: '15px' }}>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#374151', fontSize: '14px' }}>
-                    Contact Number
+                    Contact Number <span style={{ color: '#dc3545' }}>*</span>
                   </label>
                   <input
                     type="tel"
@@ -3336,7 +3597,7 @@ const Profile = () => {
                     return;
                   }
 
-                  if (profileData.phone_number && profileData.phone_number.replace(/\D/g, '').length !== 11) {
+                  if (!profileData.phone_number || profileData.phone_number.replace(/\D/g, '').length !== 11) {
                     await alert('Contact number must be exactly 11 digits', 'Validation Error', 'error');
                     return;
                   }
@@ -3344,6 +3605,7 @@ const Profile = () => {
                   const currentUser = getUser();
                   const hasProfileChanges = currentUser && (
                     profileData.first_name !== (currentUser.first_name || '') ||
+                    profileData.middle_name !== (currentUser.middle_name || '') ||
                     profileData.last_name !== (currentUser.last_name || '') ||
                     profileData.email !== (currentUser.email || '') ||
                     profileData.phone_number !== (currentUser.phone_number || '')
@@ -3378,9 +3640,10 @@ const Profile = () => {
                     if (hasProfileChanges) {
                       const result = await updateProfile({
                         first_name: profileData.first_name,
+                        middle_name: profileData.middle_name || null,
                         last_name: profileData.last_name,
                         email: profileData.email,
-                        phone_number: profileData.phone_number || null
+                        phone_number: profileData.phone_number
                       });
 
                       if (result.success) {

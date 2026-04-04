@@ -596,6 +596,21 @@ html {
   margin-bottom: 8px;
 }
 
+.compact-price-block {
+  margin-bottom: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f8f6f3;
+}
+
+.compact-rent-stats-block {
+  margin-bottom: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #eee4d9;
+  background: #fcfaf7;
+}
+
 .compact-actions {
   display: flex;
   gap: 6px;
@@ -662,14 +677,15 @@ html {
 
 .detail-modal-body {
   display: flex;
-  gap: 30px;
+  flex-direction: column;
+  gap: 20px;
   padding: 32px;
   background: #FFFFFF;
 }
 
 .detail-image-section {
-  flex: 1;
-  max-width: 300px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .detail-image {
@@ -745,7 +761,22 @@ html {
   border-left: 4px solid #8B4513;
 }
 
+.detail-rent-stats {
+  margin-bottom: 25px;
+  padding: 20px;
+  background: linear-gradient(135deg, #fff8ef 0%, #f9eee1 100%);
+  border-radius: 8px;
+  border-left: 4px solid #a4682f;
+}
+
 .detail-pricing h4 {
+  margin: 0 0 15px 0;
+  color: #2D3436;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.detail-rent-stats h4 {
   margin: 0 0 15px 0;
   color: #2D3436;
   font-size: 16px;

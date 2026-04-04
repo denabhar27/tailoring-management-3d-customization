@@ -533,6 +533,46 @@ tbody td {
   }
 }
 
+/* Keep enhancement modal fields in a strict single column and avoid right-side clipping. */
+.modal-content.enhance-order-modal {
+  width: min(520px, 92vw) !important;
+  max-width: 92vw !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.modal-content.enhance-order-modal .enhance-order-body {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
+}
+
+.modal-content.enhance-order-modal .enhance-order-field {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  flex: 0 0 100% !important;
+  float: none !important;
+  clear: both !important;
+  margin-right: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.modal-content.enhance-order-modal .enhance-order-field label,
+.modal-content.enhance-order-modal .enhance-order-field input,
+.modal-content.enhance-order-modal .enhance-order-field textarea,
+.modal-content.enhance-order-modal .enhance-order-field select {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  text-align: left !important;
+}
+
 @media (max-width: 768px) {
   .sidebar {
     transform: translateX(-100%);
@@ -836,4 +876,86 @@ tbody td {
   font-size: 12px;
   font-weight: 600;
   text-transform: none;
+}
+
+/* Final enhancement modal overflow fix (placed at end to win cascade). */
+.modal-content.enhance-order-modal {
+  width: min(640px, 95vw) !important;
+  max-width: 95vw !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
+.modal-content.enhance-order-modal .enhance-order-body {
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
+.modal-content.enhance-order-modal .enhance-order-body > * {
+  min-width: 0 !important;
+}
+
+.modal-content.enhance-order-modal .enhance-order-field,
+.modal-content.enhance-order-modal .enhance-order-field label,
+.modal-content.enhance-order-modal .enhance-order-field input,
+.modal-content.enhance-order-modal .enhance-order-field textarea,
+.modal-content.enhance-order-modal .enhance-order-field select {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.modal-content.enhance-order-modal .detail-row.enhance-order-field {
+  display: block !important;
+  text-align: left !important;
+  align-items: flex-start !important;
+}
+
+/* Final hard override: keep all enhancement modal content visible in one column. */
+.modal-overlay.active .modal-content.enhance-order-modal {
+  width: min(680px, 95vw) !important;
+  max-width: 95vw !important;
+  overflow-x: visible !important;
+}
+
+.modal-overlay.active .modal-content.enhance-order-modal .modal-body.enhance-order-body {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow-x: visible !important;
+  overflow-y: auto !important;
+}
+
+.modal-overlay.active .modal-content.enhance-order-modal .enhance-order-field,
+.modal-overlay.active .modal-content.enhance-order-modal .detail-row.enhance-order-field,
+.modal-overlay.active .modal-content.enhance-order-modal .enhance-order-body > div {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  float: none !important;
+  clear: both !important;
+  box-sizing: border-box !important;
+}
+
+.modal-overlay.active .modal-content.enhance-order-modal input,
+.modal-overlay.active .modal-content.enhance-order-modal textarea,
+.modal-overlay.active .modal-content.enhance-order-modal select {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.modal-overlay.active .modal-content.enhance-order-modal,
+.modal-overlay.active .modal-content.enhance-order-modal .modal-body.enhance-order-body {
+  overflow-x: hidden !important;
+}
+
+.modal-overlay.active .modal-content.enhance-order-modal .enhance-order-body > * {
+  word-break: break-word !important;
 }

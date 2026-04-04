@@ -2046,7 +2046,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
     });
 
-    return total;
+    return total > 0 ? total : 0;
 
   };
 
@@ -4040,13 +4040,55 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                   return bundleDeposit > 0 && (
 
-                    <div className="cost-item deposit">
+                    <>
 
-                      <span>Deposit (Refundable - Due Upon Pickup):</span>
+                      <div style={{ borderTop: '1px solid #e0e0e0', margin: '10px 0' }} />
 
-                      <span>₱{bundleDeposit.toFixed(2)}</span>
+                      {selectedItems.map((item) => {
 
-                    </div>
+                        const itemId = getItemId(item);
+
+                        const selections = cardSizeSelections[itemId] || {};
+
+                        return Object.entries(selections)
+
+                          .filter(([, qty]) => parseInt(qty, 10) > 0)
+
+                          .map(([sizeKey, qty]) => {
+
+                            const opt = item.sizeOptions?.[sizeKey] || {};
+
+                            const deposit = parseFloat(opt.deposit) || 0;
+
+                            const lineDeposit = parseInt(qty, 10) * deposit;
+
+                            if (lineDeposit <= 0) return null;
+
+                            return (
+
+                              <div key={`${itemId}-${sizeKey}-dep`} className="cost-item deposit">
+
+                                <span>{item.item_name || item.name} ({opt.label || SIZE_LABELS[sizeKey] || sizeKey} x{qty}) Deposit:</span>
+
+                                <span>₱{lineDeposit.toFixed(2)}</span>
+
+                              </div>
+
+                            );
+
+                          });
+
+                      })}
+
+                      <div className="cost-item deposit">
+
+                        <span>Total Deposit (Refundable - Due Upon Pickup):</span>
+
+                        <span>₱{bundleDeposit.toFixed(2)}</span>
+
+                      </div>
+
+                    </>
 
                   );
 
@@ -4636,6 +4678,10 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                       const lineCost = parseInt(qty, 10) * price * (Math.floor(rentalDuration / 3));
 
+                      const deposit = parseFloat(opt.deposit) || 0;
+
+                      const lineDeposit = parseInt(qty, 10) * deposit;
+
                       return (
 
                         <div key={sizeKey} className="rc-cost-line">
@@ -4660,11 +4706,41 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                     {modalLiveDeposit > 0 && (
 
-                      <div className="rc-cost-line deposit">
+                      <>
 
-                        <span>Deposit (Refundable, due on pickup)</span><span>₱{modalLiveDeposit.toFixed(2)}</span>
+                        <div className="rc-cost-divider" />
 
-                      </div>
+                        {Object.entries(sizeSelections).filter(([, q]) => parseInt(q, 10) > 0).map(([sizeKey, qty]) => {
+
+                          const opt = selectedItem.sizeOptions?.[sizeKey] || {};
+
+                          const deposit = parseFloat(opt.deposit) || 0;
+
+                          const lineDeposit = parseInt(qty, 10) * deposit;
+
+                          if (lineDeposit <= 0) return null;
+
+                          return (
+
+                            <div key={`dep-${sizeKey}`} className="rc-cost-line deposit">
+
+                              <span>{opt.label || SIZE_LABELS[sizeKey] || sizeKey} ×{qty} Deposit</span>
+
+                              <span>₱{lineDeposit.toFixed(2)}</span>
+
+                            </div>
+
+                          );
+
+                        })}
+
+                        <div className="rc-cost-line deposit">
+
+                          <span>Total Deposit (Refundable, due on pickup)</span><span>₱{modalLiveDeposit.toFixed(2)}</span>
+
+                        </div>
+
+                      </>
 
                     )}
 

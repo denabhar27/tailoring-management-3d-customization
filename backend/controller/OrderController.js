@@ -2231,7 +2231,7 @@ exports.recordRentalPayment = (req, res) => {
 
 exports.recordRentalDepositReturn = (req, res) => {
   const itemId = req.params.id;
-  const { refundAmount } = req.body;
+  const { refundAmount, damagedSizes } = req.body;
 
   if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
@@ -2314,14 +2314,49 @@ exports.recordRentalDepositReturn = (req, res) => {
       });
     }
 
+    // Handle partial deposit return for damaged sizes
+    let depositReturnDetails = [];
+    let damagedDepositAmount = 0;
+    
+    if (Array.isArray(damagedSizes) && damagedSizes.length > 0) {
+      // Calculate damaged deposit amount
+      damagedSizes.forEach(damagedSize => {
+        const sizeKey = damagedSize.sizeKey || damagedSize.size_key;
+        const damagedQty = parseInt(damagedSize.quantity || 0, 10);
+        
+        const matchingSize = selectedSizes.find(s => 
+          (s.sizeKey || s.size_key || s.label?.toLowerCase()) === sizeKey
+        );
+        
+        if (matchingSize && damagedQty > 0) {
+          const depositPerUnit = parseFloat(matchingSize.deposit || 0);
+          const damagedAmount = depositPerUnit * damagedQty;
+          damagedDepositAmount += damagedAmount;
+          
+          depositReturnDetails.push({
+            sizeKey: sizeKey,
+            quantity: damagedQty,
+            depositPerUnit: depositPerUnit,
+            totalDamaged: damagedAmount
+          });
+        }
+      });
+      
+      console.log(`[DEPOSIT RETURN] Item ${itemId}: Total deposit: ₱${depositAmount}, Damaged deposit: ₱${damagedDepositAmount}, Refundable: ₱${amount}`);
+    }
+
     const finalPriceAmount = Math.max(0, parseFloat(item.final_price || 0));
     const updatedRefundedTotal = currentRefunded + amount;
     
-    // Don't subtract deposit from amount_paid - deposit is separate from revenue
-    // Only track the refunded amount separately
+    // Store deposit return details in pricing_factors
     pricingFactors.deposit_refunded = updatedRefundedTotal >= depositAmount;
     pricingFactors.deposit_refunded_amount = updatedRefundedTotal.toFixed(2);
     pricingFactors.deposit_refunded_at = new Date().toISOString().split('T')[0];
+    
+    if (damagedDepositAmount > 0) {
+      pricingFactors.deposit_damaged_amount = damagedDepositAmount.toFixed(2);
+      pricingFactors.deposit_return_details = depositReturnDetails;
+    }
 
     // Payment status remains unchanged - deposit refund doesn't affect rental payment
     const previousPaymentStatus = item.payment_status || 'unpaid';
@@ -2336,6 +2371,17 @@ exports.recordRentalDepositReturn = (req, res) => {
       const TransactionLog = require('../model/TransactionLogModel');
 
       if (logUserId) {
+        let refundNotes = `${actorName} recorded rental deposit return of ₱${amount.toFixed(2)}.`;
+        if (damagedDepositAmount > 0) {
+          refundNotes += ` Damaged deposit withheld: ₱${damagedDepositAmount.toFixed(2)}.`;
+          if (depositReturnDetails.length > 0) {
+            const detailsStr = depositReturnDetails.map(d => 
+              `${d.sizeKey} (${d.quantity}x₱${d.depositPerUnit})`
+            ).join(', ');
+            refundNotes += ` Details: ${detailsStr}.`;
+          }
+        }
+        
         TransactionLog.create({
           order_item_id: itemId,
           user_id: logUserId,
@@ -2344,7 +2390,7 @@ exports.recordRentalDepositReturn = (req, res) => {
           previous_payment_status: previousPaymentStatus,
           new_payment_status: recalculatedPaymentStatus,
           payment_method: 'manual_refund',
-          notes: `${actorName} recorded rental deposit return of ₱${amount.toFixed(2)}.`,
+          notes: refundNotes,
           created_by: actorName
         }, (refundLogErr) => {
           if (refundLogErr) {
@@ -2359,9 +2405,11 @@ exports.recordRentalDepositReturn = (req, res) => {
         refund: {
           refunded_amount: amount,
           total_refunded: updatedRefundedTotal,
-          refundable_remaining: Math.max(0, depositAmount - updatedRefundedTotal),
+          damaged_deposit_withheld: damagedDepositAmount,
+          refundable_remaining: Math.max(0, depositAmount - updatedRefundedTotal - damagedDepositAmount),
           refund_date: refundTimestamp,
-          payment_status: recalculatedPaymentStatus
+          payment_status: recalculatedPaymentStatus,
+          deposit_return_details: depositReturnDetails
         }
       });
     };

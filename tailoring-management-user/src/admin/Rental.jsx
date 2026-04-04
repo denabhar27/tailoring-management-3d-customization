@@ -4667,24 +4667,48 @@ function Rental() {
 
               </div>
 
-              <div className="detail-row">
+              <div className="detail-row" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
 
-                <strong>Deposit (Refundable):</strong>
+                <strong style={{ marginBottom: '8px' }}>Deposit (Refundable):</strong>
 
-                <span style={{ color: '#ff9800', fontWeight: 'bold' }}>
+                {(() => {
+                  const selectedSizes = selectedRental?.specific_data?.selected_sizes || selectedRental?.specific_data?.selectedSizes || [];
+                  const depositFromSizes = selectedSizes.reduce((total, size) => {
+                    const quantity = parseInt(size.quantity || 0, 10);
+                    const deposit = parseFloat(size.deposit || 0);
+                    return total + (quantity * deposit);
+                  }, 0);
+                  const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(selectedRental.pricing_factors?.downpayment || selectedRental.specific_data?.downpayment || 0);
 
-                  ₱{(() => {
-                    const selectedSizes = selectedRental?.specific_data?.selected_sizes || selectedRental?.specific_data?.selectedSizes || [];
-                    const depositFromSizes = selectedSizes.reduce((total, size) => {
-                      const quantity = parseInt(size.quantity || 0, 10);
-                      const deposit = parseFloat(size.deposit || 0);
-                      return total + (quantity * deposit);
-                    }, 0);
-                    const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(selectedRental.pricing_factors?.downpayment || selectedRental.specific_data?.downpayment || 0);
-                    return depositAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                  })()}
+                  if (selectedSizes.length > 0 && depositFromSizes > 0) {
+                    return (
+                      <div style={{ width: '100%' }}>
+                        {selectedSizes.map((size, idx) => {
+                          const qty = parseInt(size.quantity || 0, 10);
+                          const dep = parseFloat(size.deposit || 0);
+                          const lineDeposit = qty * dep;
+                          if (lineDeposit <= 0) return null;
+                          return (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '14px', color: '#666' }}>
+                              <span>{size.label || size.sizeKey} ×{qty} Deposit:</span>
+                              <span style={{ color: '#ff9800', fontWeight: '600' }}>₱{lineDeposit.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                            </div>
+                          );
+                        })}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '1px solid #e0e0e0', marginTop: '4px' }}>
+                          <span style={{ fontWeight: 'bold' }}>Total Deposit:</span>
+                          <span style={{ color: '#ff9800', fontWeight: 'bold' }}>₱{depositAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                        </div>
+                      </div>
+                    );
+                  }
 
-                </span>
+                  return (
+                    <span style={{ color: '#ff9800', fontWeight: 'bold' }}>
+                      ₱{depositAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                    </span>
+                  );
+                })()}
 
               </div>
 

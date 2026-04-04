@@ -308,9 +308,11 @@ exports.updateRentalStatus = (req, res) => {
 exports.markRentalItemDamaged = (req, res) => {
   const { item_id } = req.params;
   const {
+    order_item_id,
     size_key,
     size_label,
     quantity,
+    damage_type,
     damage_level,
     damage_note,
     damaged_customer_name
@@ -321,14 +323,17 @@ exports.markRentalItemDamaged = (req, res) => {
   }
 
   RentalInventory.markSizeDamaged(item_id, {
+    order_item_id: order_item_id || null,
     size_key: size_key || null,
     size_label: size_label || null,
     quantity,
+    damage_type,
     damage_level,
     damage_note,
     damaged_customer_name,
     processed_by_user_id: req.user?.id || null,
-    processed_by_role: req.user?.role || 'admin'
+    processed_by_role: req.user?.role || 'admin',
+    processed_by_name: req.user?.username || null
   }, (err, result) => {
     if (err) {
       return res.status(err.statusCode || 500).json({
@@ -340,6 +345,49 @@ exports.markRentalItemDamaged = (req, res) => {
     res.json({
       success: true,
       message: 'Damage logged and inventory updated successfully',
+      data: result
+    });
+  });
+};
+
+exports.updateDamageCompensation = (req, res) => {
+  const { item_id, log_id } = req.params;
+  const { compensation_amount, payment_status } = req.body;
+
+  const amount = parseFloat(compensation_amount);
+  if (!Number.isFinite(amount) || amount < 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Compensation amount must be a valid non-negative number.'
+    });
+  }
+
+  const normalizedStatus = String(payment_status || 'unpaid').trim().toLowerCase();
+  if (!['paid', 'unpaid'].includes(normalizedStatus)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Payment status must be either "paid" or "unpaid".'
+    });
+  }
+
+  RentalInventory.updateDamageCompensation(item_id, log_id, {
+    compensation_amount: amount,
+    payment_status: normalizedStatus,
+    updated_by_user_id: req.user?.id || null,
+    updated_by_role: req.user?.role || 'admin',
+    updated_by_name: req.user?.username || null
+  }, (err, result) => {
+    if (err) {
+      return res.status(err.statusCode || 500).json({
+        success: false,
+        message: err.message || 'Error updating damage compensation',
+        error: err
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Damage compensation updated successfully',
       data: result
     });
   });

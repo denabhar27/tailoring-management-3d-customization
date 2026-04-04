@@ -388,9 +388,12 @@ function Rental() {
 
       quantity: 1,
 
+      damage_choice: 'damage',
+
       damage_level: 'minor',
 
-      damage_note: ''
+
+      comment_text: ''
 
     })));
 
@@ -446,7 +449,33 @@ function Rental() {
 
     setDamageFormRows((prev) => prev.map((row) => (
 
-      row.size_key === sizeKey ? { ...row, ...updates } : row
+      row.size_key === sizeKey
+
+        ? (() => {
+
+          const nextRow = { ...row, ...updates };
+
+          if (Object.prototype.hasOwnProperty.call(updates, 'is_damaged') && !updates.is_damaged) {
+
+            nextRow.damage_choice = 'damage';
+
+            nextRow.damage_level = 'minor';
+
+            nextRow.comment_text = '';
+
+          }
+
+          if (Object.prototype.hasOwnProperty.call(updates, 'damage_choice') && updates.damage_choice !== 'damage') {
+
+            nextRow.damage_level = 'minor';
+
+          }
+
+          return nextRow;
+
+        })()
+
+        : row
 
     )));
 
@@ -484,19 +513,33 @@ function Rental() {
 
       }
 
-      const level = String(row.damage_level || '').trim().toLowerCase();
+      const damageChoice = String(row.damage_choice || 'damage').trim().toLowerCase();
 
-      if (!['minor', 'moderate', 'severe'].includes(level)) {
+      if (!['damage', 'lost', 'replaced'].includes(damageChoice)) {
 
-        await alert(`Invalid damage level for ${row.size_label}.`, 'Warning', 'warning');
+        await alert(`Invalid issue choice for ${row.size_label}.`, 'Warning', 'warning');
 
         return;
 
       }
 
-      if (!String(row.damage_note || '').trim()) {
+      if (damageChoice === 'damage') {
 
-        await alert(`Damage note is required for ${row.size_label}.`, 'Warning', 'warning');
+        const level = String(row.damage_level || '').trim().toLowerCase();
+
+        if (!['minor', 'moderate', 'severe'].includes(level)) {
+
+          await alert(`Invalid damage level for ${row.size_label}.`, 'Warning', 'warning');
+
+          return;
+
+        }
+
+      }
+
+      if (!String(row.comment_text || '').trim()) {
+
+        await alert(`Comment text is required for ${row.size_label}.`, 'Warning', 'warning');
 
         return;
 
@@ -508,15 +551,21 @@ function Rental() {
 
     const payload = selectedRows.map((row) => ({
 
+      damage_type: String(row.damage_choice || 'damage').trim().toLowerCase(),
+
       size_key: row.size_key,
 
       size_label: row.size_label,
 
       quantity: Math.max(0, parseInt(row.quantity, 10) || 0),
 
-      damage_level: String(row.damage_level || '').trim().toLowerCase(),
+      damage_level: String(row.damage_choice || 'damage').trim().toLowerCase() === 'damage'
 
-      damage_note: String(row.damage_note || '').trim()
+        ? String(row.damage_level || '').trim().toLowerCase()
+
+        : 'minor',
+
+      damage_note: String(row.comment_text || '').trim()
 
     }));
 
@@ -1401,6 +1450,8 @@ function Rental() {
 
                   item_id: bundleItem.item_id || bundleItem.id,
 
+                  order_item_id: rental?.item_id || null,
+
                   item_name: bundleItem.item_name,
 
                   damaged_customer_name: `${String(rental?.first_name || '').trim()} ${String(rental?.last_name || '').trim()}`.trim() || String(rental?.walk_in_customer_name || '').trim() || 'Customer',
@@ -1446,6 +1497,8 @@ function Rental() {
               damageRequests.push({
 
                 item_id: rental?.service_id,
+
+                order_item_id: rental?.item_id || null,
 
                 item_name: rental?.specific_data?.item_name || 'Rental Item',
 
@@ -1527,11 +1580,15 @@ function Rental() {
 
               const damageResult = await markRentalItemDamaged(request.item_id, {
 
+                order_item_id: request.order_item_id,
+
                 size_key: request.size_key,
 
                 size_label: request.size_label,
 
                 quantity: request.quantity,
+
+                damage_type: request.damage_type,
 
                 damage_level: request.damage_level,
 
@@ -3219,7 +3276,7 @@ function Rental() {
 
         }}>
 
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '820px' }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ width: '98vw', maxWidth: '1240px' }}>
 
             <div className="modal-header">
 
@@ -3233,29 +3290,31 @@ function Rental() {
 
               <p style={{ marginBottom: '10px', color: '#555' }}>
 
-                Fill out only sizes that are damaged. Unchecked sizes are treated as no damage.
+                Fill out only sizes with an issue. Unchecked sizes are treated as no issue.
 
               </p>
 
               <div style={{ border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden' }}>
 
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
 
                   <thead>
 
                     <tr style={{ background: '#fafafa' }}>
 
-                      <th style={{ textAlign: 'center', padding: '8px' }}>Damaged?</th>
+                      <th style={{ textAlign: 'center', padding: '8px', width: '70px' }}>Damaged?</th>
 
-                      <th style={{ textAlign: 'left', padding: '8px' }}>Size</th>
+                      <th style={{ textAlign: 'left', padding: '8px', width: '16%' }}>Size</th>
 
-                      <th style={{ textAlign: 'center', padding: '8px' }}>Returned Qty</th>
+                      <th style={{ textAlign: 'center', padding: '8px', width: '110px' }}>Returned Qty</th>
 
-                      <th style={{ textAlign: 'center', padding: '8px' }}>Damaged Qty</th>
+                      <th style={{ textAlign: 'center', padding: '8px', width: '110px' }}>Damaged Qty</th>
 
-                      <th style={{ textAlign: 'left', padding: '8px' }}>Level</th>
+                      <th style={{ textAlign: 'left', padding: '8px', width: '130px' }}>Choice</th>
 
-                      <th style={{ textAlign: 'left', padding: '8px' }}>Damage Note</th>
+                      <th style={{ textAlign: 'left', padding: '8px', width: '130px' }}>Level</th>
+
+                      <th style={{ textAlign: 'left', padding: '8px', width: '34%' }}>Comment Text</th>
 
                     </tr>
 
@@ -3313,6 +3372,28 @@ function Rental() {
 
                             disabled={!row.is_damaged}
 
+                            value={row.damage_choice || 'damage'}
+
+                            onChange={(e) => updateDamageFormRow(row.size_key, { damage_choice: e.target.value })}
+
+                          >
+
+                            <option value="damage">Damage</option>
+
+                            <option value="lost">Lost</option>
+
+                            <option value="replaced">Replaced</option>
+
+                          </select>
+
+                        </td>
+
+                        <td style={{ padding: '8px' }}>
+
+                          <select
+
+                            disabled={!row.is_damaged || (row.damage_choice || 'damage') !== 'damage'}
+
                             value={row.damage_level}
 
                             onChange={(e) => updateDamageFormRow(row.size_key, { damage_level: e.target.value })}
@@ -3329,21 +3410,21 @@ function Rental() {
 
                         </td>
 
-                        <td style={{ padding: '8px' }}>
+                        <td style={{ padding: '8px', width: '34%' }}>
 
-                          <input
-
-                            type="text"
+                          <textarea
 
                             disabled={!row.is_damaged}
 
-                            value={row.damage_note}
+                            value={row.comment_text || ''}
 
-                            onChange={(e) => updateDamageFormRow(row.size_key, { damage_note: e.target.value })}
+                            onChange={(e) => updateDamageFormRow(row.size_key, { comment_text: e.target.value })}
 
-                            placeholder="Describe the damage"
+                            placeholder="Write a comment"
 
-                            style={{ width: '100%' }}
+                            rows={3}
+
+                            style={{ width: '100%', minHeight: '84px', padding: '8px 10px', resize: 'vertical', fontFamily: 'inherit' }}
 
                           />
 
@@ -4677,11 +4758,19 @@ function Rental() {
 
                           <div style={{ fontSize: '0.9rem', color: '#555', lineHeight: '1.6' }}>
 
+                            <div><strong>Issue Type:</strong> <span style={{ textTransform: 'capitalize' }}>{String(damage.damage_type || 'damage')}</span></div>
+
                             <div><strong>Quantity:</strong> {damage.quantity}</div>
 
-                            <div><strong>Damage Level:</strong> <span style={{ textTransform: 'capitalize', color: damage.damage_level === 'severe' ? '#d32f2f' : damage.damage_level === 'moderate' ? '#f57c00' : '#fbc02d' }}>{damage.damage_level}</span></div>
 
-                            <div><strong>Note:</strong> {damage.damage_note}</div>
+                            {String(damage.damage_type || 'damage').toLowerCase() === 'damage' && (
+
+                              <div><strong>Damage Level:</strong> <span style={{ textTransform: 'capitalize', color: damage.damage_level === 'severe' ? '#d32f2f' : damage.damage_level === 'moderate' ? '#f57c00' : '#fbc02d' }}>{damage.damage_level}</span></div>
+
+                            )}
+
+
+                            <div><strong>Comment:</strong> {damage.damage_note}</div>
 
                             {damage.damaged_customer_name && (
 

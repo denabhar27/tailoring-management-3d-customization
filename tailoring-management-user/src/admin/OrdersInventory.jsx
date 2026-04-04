@@ -4,7 +4,7 @@ import AdminHeader from './AdminHeader';
 import Sidebar from './Sidebar';
 import { getAllBillingRecords, getBillingStats, updateBillingRecordStatus } from '../api/BillingApi';
 import { getCompletedItems, getInventoryStats } from '../api/InventoryApi';
-import { getAllRentals, createRental, updateRental, deleteRental, getRentalImageUrl, getRentalSizeActivity, resolveMaintenance } from '../api/RentalApi';
+import { getAllRentals, createRental, updateRental, deleteRental, getRentalImageUrl, getRentalSizeActivity, resolveMaintenance, updateRentalDamagePayment } from '../api/RentalApi';
 import { useAlert } from '../context/AlertContext';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
@@ -108,6 +108,16 @@ const normalizeSizeKey = (key = '') => {
   if (alias[simplified]) return alias[simplified];
   if (alias[raw]) return alias[raw];
   return simplified || raw;
+};
+
+const formatServiceTypeLabel = (serviceType = '') => {
+  const normalized = String(serviceType || '').trim().toLowerCase();
+  if (normalized === 'dry_cleaning' || normalized === 'dry-cleaning' || normalized === 'drycleaning') return 'Dry Cleaning';
+  if (normalized === 'repair') return 'Repair';
+  if (normalized === 'customization' || normalized === 'customize') return 'Customization';
+  if (normalized === 'rental') return 'Rental';
+  if (!normalized) return 'N/A';
+  return String(serviceType);
 };
 
 // ImageCarousel component for rental items
@@ -233,7 +243,7 @@ const ImageCarousel = ({ images, itemName, getRentalImageUrl }) => {
 const OrdersInventory = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { alert, confirm } = useAlert();
+  const { alert, confirm, prompt } = useAlert();
   const isRentalInventoryPage = location.pathname === '/rental-inventory';
   
   // Combined data states
@@ -567,6 +577,27 @@ const OrdersInventory = () => {
     return styles[normalizedStatus] || { backgroundColor: '#f5f5f5', color: '#666' };
   };
 
+  const getIncidentCustomerName = (incident) => {
+    return incident?.customer_name_display || incident?.customer_name || 'N/A';
+  };
+
+  const getIncidentHandledBy = (incident) => {
+    return incident?.handled_by
+      || incident?.responsible_party
+      || incident?.handled_by_username
+      || (incident?.reported_by_role === 'clerk' ? 'Clerk' : incident?.reported_by_role)
+      || 'N/A';
+  };
+
+  const getIncidentDetailLines = (incident) => {
+    const notes = String(incident?.notes || '').trim();
+    if (!notes) return [];
+    return notes
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+  };
+
   const getRentalPriceDisplay = (item) => {
     const fullPrice = parseFloat(item.price || 0);
     const amountPaid = parseFloat(item.pricingFactors?.amount_paid || 0);
@@ -802,6 +833,109 @@ const OrdersInventory = () => {
     }));
   };
 
+  const refreshSizeActivityRows = async (itemId, sizeKey) => {
+    const refreshResult = await getRentalSizeActivity(itemId, sizeKey);
+    const rows = Array.isArray(refreshResult?.data?.activities) ? refreshResult.data.activities : [];
+    setSizeActivityRows(rows);
+  };
+
+  const handleSetDamageCharge = async (entry) => {
+    if (!entry?.log_id || !sizeActivityContext.itemId) return;
+
+    const issueType = String(entry.damage_type || 'damage').replace(/_/g, ' ');
+    const currentAmount = parseFloat(entry.compensation_amount || 0) || 0;
+    const input = await prompt(
+      `Enter the amount the customer must pay for this ${issueType} issue.`,
+      'Set Charge Amount',
+      'e.g. 500.00',
+      currentAmount > 0 ? currentAmount.toFixed(2) : ''
+    );
+
+    if (input === null) return;
+
+    const amount = parseFloat(String(input).replace(/,/g, '').trim());
+    if (!Number.isFinite(amount) || amount < 0) {
+      await alert('Please enter a valid non-negative amount.', 'Invalid Amount', 'warning');
+      return;
+    }
+
+    const normalizedAmount = Math.max(0, amount);
+    const nextPaymentStatus = normalizedAmount <= 0
+      ? 'unpaid'
+      : (String(entry.payment_status || 'unpaid').toLowerCase() === 'paid' ? 'paid' : 'unpaid');
+
+    try {
+      const result = await updateRentalDamagePayment(
+        sizeActivityContext.itemId,
+        entry.log_id,
+        normalizedAmount,
+        nextPaymentStatus
+      );
+
+      if (result?.success) {
+        await alert(
+          `Charge amount set to ₱${normalizedAmount.toFixed(2)}.`,
+          'Success',
+          'success'
+        );
+        await refreshSizeActivityRows(sizeActivityContext.itemId, sizeActivityContext.sizeKey);
+        await fetchAllData();
+      } else {
+        await alert(result?.message || 'Failed to update charge amount.', 'Error', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating damage charge amount:', error);
+      await alert('Error updating charge amount.', 'Error', 'error');
+    }
+  };
+
+  const handleDamagePaymentStatusChange = async (entry, nextStatus) => {
+    if (!entry?.log_id || !sizeActivityContext.itemId) return;
+
+    const amount = parseFloat(entry.compensation_amount || 0) || 0;
+    const normalizedStatus = String(nextStatus || '').toLowerCase() === 'paid' ? 'paid' : 'unpaid';
+
+    if (normalizedStatus === 'paid' && amount <= 0) {
+      await alert('Set the charge amount first before marking this as paid.', 'Amount Required', 'warning');
+      return;
+    }
+
+    const confirmed = await confirm(
+      normalizedStatus === 'paid'
+        ? `Mark this issue as paid (₱${amount.toFixed(2)})?`
+        : 'Mark this issue as unpaid?',
+      'Update Payment Status',
+      'question',
+      { confirmText: 'Yes', cancelText: 'No' }
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const result = await updateRentalDamagePayment(
+        sizeActivityContext.itemId,
+        entry.log_id,
+        amount,
+        normalizedStatus
+      );
+
+      if (result?.success) {
+        await alert(
+          `Payment status updated to ${normalizedStatus}.`,
+          'Success',
+          'success'
+        );
+        await refreshSizeActivityRows(sizeActivityContext.itemId, sizeActivityContext.sizeKey);
+        await fetchAllData();
+      } else {
+        await alert(result?.message || 'Failed to update payment status.', 'Error', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating damage payment status:', error);
+      await alert('Error updating payment status.', 'Error', 'error');
+    }
+  };
+
   const handleResolveMaintenance = async (logId, maxQuantity) => {
     const update = maintenanceUpdates[logId] || {};
     const quantity = parseInt(update.quantity || maxQuantity, 10);
@@ -835,9 +969,7 @@ const OrdersInventory = () => {
         );
         
         // Refresh the activity log
-        const refreshResult = await getRentalSizeActivity(sizeActivityContext.itemId, sizeActivityContext.sizeKey);
-        const rows = Array.isArray(refreshResult?.data?.activities) ? refreshResult.data.activities : [];
-        setSizeActivityRows(rows);
+        await refreshSizeActivityRows(sizeActivityContext.itemId, sizeActivityContext.sizeKey);
         setMaintenanceUpdates({});
         
         // Refresh the main rental items list
@@ -1136,10 +1268,10 @@ const OrdersInventory = () => {
                   ) : (
                     compensationIncidents.map((incident) => (
                       <tr key={incident.id}>
-                        <td>{incident.service_type === 'dry_cleaning' ? 'Dry Cleaning' : 'Repair'}</td>
+                        <td>{formatServiceTypeLabel(incident.service_type)}</td>
                         <td>#{incident.order_id || incident.order_item_id}</td>
-                        <td>{incident.customer_name}</td>
-                        <td>{incident.damage_type}</td>
+                        <td>{getIncidentCustomerName(incident)}</td>
+                        <td style={{ textTransform: 'capitalize' }}>{String(incident.damage_type || 'N/A').replace(/_/g, ' ')}</td>
                         <td><span className={`badge liability-${incident.liability_status}`}>{incident.liability_status}</span></td>
                         <td style={{ color: '#c41c3b', fontWeight: 'bold' }}>₱{parseFloat(incident.compensation_amount || 0).toLocaleString()}</td>
                         <td><span className={`badge status-${incident.compensation_status}`}>{incident.compensation_status}</span></td>
@@ -1502,7 +1634,7 @@ const OrdersInventory = () => {
 
       {isSizeActivityModalOpen && (
         <div className="modal-overlay active" onClick={(e) => { if (e.target.classList.contains('modal-overlay')) setIsSizeActivityModalOpen(false); }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ width: '96vw', maxWidth: '1320px', maxHeight: '90vh' }}>
             <div className="modal-header">
               <h2>Size Activity Log</h2>
               <span className="close-modal" onClick={() => setIsSizeActivityModalOpen(false)}>×</span>
@@ -1517,15 +1649,18 @@ const OrdersInventory = () => {
                 <div style={{ padding: '10px 0', color: '#666' }}>No renter/maintenance records for this size.</div>
               ) : (
                 <div style={{ border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: '#fafafa' }}>
-                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px' }}>Name</th>
-                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px' }}>Status</th>
-                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px' }}>Damage Level</th>
-                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px' }}>Damage Note</th>
-                        <th style={{ textAlign: 'center', padding: '8px 10px', fontSize: '12px' }}>Qty</th>
-                        <th style={{ textAlign: 'center', padding: '8px 10px', fontSize: '12px' }}>Actions</th>
+                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px', width: '140px' }}>Name</th>
+                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px', width: '120px' }}>Activity</th>
+                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px', width: '110px' }}>Issue Type</th>
+                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px', width: '110px' }}>Damage Level</th>
+                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '12px', width: '220px' }}>Comment</th>
+                        <th style={{ textAlign: 'center', padding: '8px 10px', fontSize: '12px', width: '70px' }}>Qty</th>
+                        <th style={{ textAlign: 'right', padding: '8px 10px', fontSize: '12px', width: '120px' }}>Amount To Pay</th>
+                        <th style={{ textAlign: 'center', padding: '8px 10px', fontSize: '12px', width: '120px' }}>Payment Status</th>
+                        <th style={{ textAlign: 'center', padding: '8px 10px', fontSize: '12px', width: '260px' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1533,13 +1668,18 @@ const OrdersInventory = () => {
                         const isMaintenance = entry.activity_type === 'maintenance';
                         const update = maintenanceUpdates[entry.log_id] || {};
                         const resolveQty = update.quantity || entry.quantity;
-                        
+                        const issueType = String(entry.damage_type || 'damage').toLowerCase();
+                        const issueTypeLabel = issueType ? `${issueType.charAt(0).toUpperCase()}${issueType.slice(1)}` : 'Damage';
+                        const compensationAmount = Math.max(0, parseFloat(entry.compensation_amount || 0) || 0);
+                        const paymentStatus = String(entry.payment_status || 'unpaid').toLowerCase() === 'paid' ? 'paid' : 'unpaid';
+                        const canMarkPaid = compensationAmount > 0;
+
                         return (
                           <tr key={`${entry.activity_type}-${idx}`} style={{ borderTop: idx === 0 ? 'none' : '1px solid #f1f1f1' }}>
-                            <td style={{ padding: '8px 10px' }}>{isMaintenance ? (entry.processed_by || '-') : (entry.person_name || '-')}</td>
+                            <td style={{ padding: '8px 10px', wordBreak: 'break-word' }}>{isMaintenance ? (entry.processed_by || '-') : (entry.person_name || '-')}</td>
                             <td style={{ padding: '8px 10px' }}>
-                              <span style={{ 
-                                fontWeight: 700, 
+                              <span style={{
+                                fontWeight: 700,
                                 textTransform: 'capitalize',
                                 color: isMaintenance ? '#f57c00' : '#666'
                               }}>
@@ -1547,7 +1687,10 @@ const OrdersInventory = () => {
                               </span>
                             </td>
                             <td style={{ padding: '8px 10px', textTransform: 'capitalize' }}>
-                              {entry.damage_level ? (
+                              {isMaintenance ? issueTypeLabel : 'N/A'}
+                            </td>
+                            <td style={{ padding: '8px 10px', textTransform: 'capitalize' }}>
+                              {isMaintenance && issueType === 'damage' && entry.damage_level ? (
                                 <span style={{
                                   color: entry.damage_level === 'severe' ? '#d32f2f' : entry.damage_level === 'moderate' ? '#f57c00' : '#fbc02d',
                                   fontWeight: 600
@@ -1556,43 +1699,103 @@ const OrdersInventory = () => {
                                 </span>
                               ) : 'N/A'}
                             </td>
-                            <td style={{ padding: '8px 10px' }}>{entry.damage_note || 'N/A'}</td>
+                            <td style={{ padding: '8px 10px', wordBreak: 'break-word' }}>{entry.damage_note || 'N/A'}</td>
                             <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>{entry.quantity || 0}</td>
+                            <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: compensationAmount > 0 ? '#6d4c41' : '#888' }}>
+                              {isMaintenance ? `₱${compensationAmount.toFixed(2)}` : 'N/A'}
+                            </td>
+                            <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                              {isMaintenance ? (
+                                <span style={{
+                                  display: 'inline-block',
+                                  minWidth: '72px',
+                                  padding: '4px 8px',
+                                  borderRadius: '999px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  textTransform: 'uppercase',
+                                  background: paymentStatus === 'paid' ? '#e8f5e9' : '#ffebee',
+                                  color: paymentStatus === 'paid' ? '#2e7d32' : '#c62828'
+                                }}>
+                                  {paymentStatus}
+                                </span>
+                              ) : 'N/A'}
+                            </td>
                             <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                               {isMaintenance && entry.log_id ? (
-                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'center' }}>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    max={entry.quantity}
-                                    value={resolveQty}
-                                    onChange={(e) => handleMaintenanceUpdate(entry.log_id, 'quantity', e.target.value)}
-                                    style={{
-                                      width: '60px',
-                                      padding: '4px 6px',
-                                      border: '1px solid #ddd',
-                                      borderRadius: '4px',
-                                      fontSize: '12px'
-                                    }}
-                                    title="Quantity to move to available"
-                                  />
-                                  <button
-                                    onClick={() => handleResolveMaintenance(entry.log_id, entry.quantity)}
-                                    style={{
-                                      padding: '4px 12px',
-                                      backgroundColor: '#4caf50',
-                                      color: 'white',
-                                      border: 'none',
-                                      borderRadius: '4px',
-                                      fontSize: '11px',
-                                      fontWeight: 600,
-                                      cursor: 'pointer',
-                                      whiteSpace: 'nowrap'
-                                    }}
-                                    title="Move to available"
-                                  >
-                                    ✓ Fix
-                                  </button>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'center' }}>
+                                    <button
+                                      onClick={() => handleSetDamageCharge(entry)}
+                                      style={{
+                                        padding: '4px 10px',
+                                        backgroundColor: '#8B4513',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                      title="Set amount to collect from customer"
+                                    >
+                                      Set Amount
+                                    </button>
+                                    <button
+                                      onClick={() => handleDamagePaymentStatusChange(entry, paymentStatus === 'paid' ? 'unpaid' : 'paid')}
+                                      disabled={!canMarkPaid && paymentStatus !== 'paid'}
+                                      style={{
+                                        padding: '4px 10px',
+                                        backgroundColor: paymentStatus === 'paid' ? '#9e9e9e' : '#1976d2',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        cursor: (!canMarkPaid && paymentStatus !== 'paid') ? 'not-allowed' : 'pointer',
+                                        whiteSpace: 'nowrap',
+                                        opacity: (!canMarkPaid && paymentStatus !== 'paid') ? 0.7 : 1
+                                      }}
+                                      title={paymentStatus === 'paid' ? 'Mark this issue as unpaid' : 'Mark this issue as paid'}
+                                    >
+                                      {paymentStatus === 'paid' ? 'Mark Unpaid' : 'Mark Paid'}
+                                    </button>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'center' }}>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max={entry.quantity}
+                                      value={resolveQty}
+                                      onChange={(e) => handleMaintenanceUpdate(entry.log_id, 'quantity', e.target.value)}
+                                      style={{
+                                        width: '60px',
+                                        padding: '4px 6px',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '4px',
+                                        fontSize: '12px'
+                                      }}
+                                      title="Quantity to move to available"
+                                    />
+                                    <button
+                                      onClick={() => handleResolveMaintenance(entry.log_id, entry.quantity)}
+                                      style={{
+                                        padding: '4px 12px',
+                                        backgroundColor: '#4caf50',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                      title="Move to available"
+                                    >
+                                      ✓ Fix
+                                    </button>
+                                  </div>
                                 </div>
                               ) : '-'}
                             </td>
@@ -1623,7 +1826,7 @@ const OrdersInventory = () => {
               {rentalError && (
                 <div className="error-message">{rentalError}</div>
               )}
-              
+
               {/* Image Upload Section */}
               <div className="image-upload-section">
                 <h4>Upload Images (Front, Back, Side)</h4>
@@ -1668,10 +1871,10 @@ const OrdersInventory = () => {
               <div className="form-grid">
                 <div className="input-group">
                   <label>Item Name *</label>
-                  <input 
-                    type="text" 
-                    value={rentalFormData.item_name} 
-                    onChange={(e) => setRentalFormData({ ...rentalFormData, item_name: e.target.value })} 
+                  <input
+                    type="text"
+                    value={rentalFormData.item_name}
+                    onChange={(e) => setRentalFormData({ ...rentalFormData, item_name: e.target.value })}
                     placeholder="e.g., Brown Business Suit"
                   />
                 </div>
@@ -1689,19 +1892,19 @@ const OrdersInventory = () => {
                 </div>
                 <div className="input-group">
                   <label>Price *</label>
-                  <input 
-                    type="number" 
-                    value={rentalFormData.price} 
-                    onChange={(e) => setRentalFormData({ ...rentalFormData, price: e.target.value })} 
+                  <input
+                    type="number"
+                    value={rentalFormData.price}
+                    onChange={(e) => setRentalFormData({ ...rentalFormData, price: e.target.value })}
                     placeholder="0.00"
                   />
                 </div>
                 <div className="input-group">
                   <label>Downpayment</label>
-                  <input 
-                    type="number" 
-                    value={rentalFormData.downpayment} 
-                    onChange={(e) => setRentalFormData({ ...rentalFormData, downpayment: e.target.value })} 
+                  <input
+                    type="number"
+                    value={rentalFormData.downpayment}
+                    onChange={(e) => setRentalFormData({ ...rentalFormData, downpayment: e.target.value })}
                     placeholder="0.00"
                   />
                 </div>
@@ -1715,37 +1918,37 @@ const OrdersInventory = () => {
                 </div>
                 <div className="input-group">
                   <label>Total Available</label>
-                  <input 
-                    type="number" 
-                    value={rentalFormData.total_available} 
-                    onChange={(e) => setRentalFormData({ ...rentalFormData, total_available: e.target.value })} 
+                  <input
+                    type="number"
+                    value={rentalFormData.total_available}
+                    onChange={(e) => setRentalFormData({ ...rentalFormData, total_available: e.target.value })}
                     placeholder="1"
                   />
                 </div>
                 <div className="input-group full-width">
                   <label>Description</label>
-                  <textarea 
-                    value={rentalFormData.description} 
-                    onChange={(e) => setRentalFormData({ ...rentalFormData, description: e.target.value })} 
+                  <textarea
+                    value={rentalFormData.description}
+                    onChange={(e) => setRentalFormData({ ...rentalFormData, description: e.target.value })}
                     placeholder="Item description..."
                     rows="3"
                   />
                 </div>
                 <div className="input-group">
                   <label>Material</label>
-                  <input 
-                    type="text" 
-                    value={rentalFormData.material} 
-                    onChange={(e) => setRentalFormData({ ...rentalFormData, material: e.target.value })} 
+                  <input
+                    type="text"
+                    value={rentalFormData.material}
+                    onChange={(e) => setRentalFormData({ ...rentalFormData, material: e.target.value })}
                     placeholder="e.g., Cotton, Wool"
                   />
                 </div>
                 <div className="input-group">
                   <label>Color</label>
-                  <input 
-                    type="text" 
-                    value={rentalFormData.color} 
-                    onChange={(e) => setRentalFormData({ ...rentalFormData, color: e.target.value })} 
+                  <input
+                    type="text"
+                    value={rentalFormData.color}
+                    onChange={(e) => setRentalFormData({ ...rentalFormData, color: e.target.value })}
                     placeholder="e.g., Black, Navy"
                   />
                 </div>
@@ -1779,16 +1982,30 @@ const OrdersInventory = () => {
             </div>
             <div className="modal-body">
               <div className="detail-row">
+                <label>Customer Name:</label>
+                <span>{getIncidentCustomerName(selectedSettlementIncident)}</span>
+              </div>
+              <div className="detail-row">
+                <label>Handled By:</label>
+                <span>{getIncidentHandledBy(selectedSettlementIncident)}</span>
+              </div>
+              <div className="detail-row">
+                <label>Service Type:</label>
+                <span>{formatServiceTypeLabel(selectedSettlementIncident.service_type)}</span>
+              </div>
+              <div className="detail-row">
+                <label>Damage Type:</label>
+                <span style={{ textTransform: 'capitalize' }}>
+                  {String(selectedSettlementIncident.damage_type || 'N/A').replace(/_/g, ' ')}
+                </span>
+              </div>
+              <div className="detail-row">
                 <label>Incident:</label>
                 <span>{selectedSettlementIncident.damage_description || 'N/A'}</span>
               </div>
               <div className="detail-row">
-                <label>Responsible Clerk:</label>
-                <span>
-                  {selectedSettlementIncident.responsible_party
-                    || (selectedSettlementIncident.reported_by_role === 'clerk' ? 'Clerk' : null)
-                    || 'N/A'}
-                </span>
+                <label>Order Item ID:</label>
+                <span>{selectedSettlementIncident.order_item_id || 'N/A'}</span>
               </div>
               <div className="detail-row">
                 <label>Amount:</label>
@@ -1810,8 +2027,8 @@ const OrdersInventory = () => {
               </div>
               <div className="detail-row">
                 <label>Paid At:</label>
-                <span>{selectedSettlementIncident.compensation_paid_at 
-                  ? new Date(selectedSettlementIncident.compensation_paid_at).toLocaleString() 
+                <span>{selectedSettlementIncident.compensation_paid_at
+                  ? new Date(selectedSettlementIncident.compensation_paid_at).toLocaleString()
                   : 'N/A'
                 }</span>
               </div>
@@ -1819,10 +2036,14 @@ const OrdersInventory = () => {
                 <label>Payment Reference:</label>
                 <span>{selectedSettlementIncident.payment_reference || 'N/A'}</span>
               </div>
-              {selectedSettlementIncident.notes && (
+              {getIncidentDetailLines(selectedSettlementIncident).length > 0 && (
                 <div className="detail-row">
-                  <label>Notes:</label>
-                  <span>{selectedSettlementIncident.notes}</span>
+                  <label>Details:</label>
+                  <span>
+                    {getIncidentDetailLines(selectedSettlementIncident).map((line, index) => (
+                      <div key={`settlement-line-${index}`}>{line}</div>
+                    ))}
+                  </span>
                 </div>
               )}
             </div>

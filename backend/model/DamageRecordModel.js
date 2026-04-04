@@ -316,15 +316,15 @@ const DamageRecord = {
       const values = [];
 
       if (filters.service_type) {
-        where.push('service_type = ?');
+        where.push('dcr.service_type = ?');
         values.push(filters.service_type);
       }
       if (filters.liability_status) {
-        where.push('liability_status = ?');
+        where.push('dcr.liability_status = ?');
         values.push(filters.liability_status);
       }
       if (filters.compensation_status) {
-        where.push('compensation_status = ?');
+        where.push('dcr.compensation_status = ?');
         values.push(filters.compensation_status);
       }
 
@@ -333,16 +333,24 @@ const DamageRecord = {
         values.push(filters.order_item_id);
       }
 
-      let joins = '';
+      let joins = '\nLEFT JOIN user reporter ON reporter.user_id = dcr.reported_by_user_id\nLEFT JOIN order_items oi_ref ON oi_ref.item_id = dcr.order_item_id\nLEFT JOIN orders o_ref ON o_ref.order_id = oi_ref.order_id\nLEFT JOIN user customer_user ON customer_user.user_id = o_ref.user_id\nLEFT JOIN walk_in_customers walkin_customer ON walkin_customer.id = o_ref.walk_in_customer_id';
       if (filters.customer_user_id) {
-        joins += '\nJOIN order_items oi ON oi.item_id = dcr.order_item_id\nJOIN orders o ON o.order_id = oi.order_id';
-        where.push('o.user_id = ?');
+        where.push('o_ref.user_id = ?');
         values.push(filters.customer_user_id);
       }
 
       const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
       const sql = `
-        SELECT dcr.*
+        SELECT
+          dcr.*,
+          NULLIF(TRIM(CONCAT(COALESCE(reporter.first_name, ''), ' ', COALESCE(reporter.last_name, ''))), '') AS handled_by,
+          reporter.username AS handled_by_username,
+          COALESCE(
+            NULLIF(dcr.customer_name, ''),
+            NULLIF(TRIM(CONCAT(COALESCE(customer_user.first_name, ''), ' ', COALESCE(customer_user.last_name, ''))), ''),
+            NULLIF(walkin_customer.name, ''),
+            'Customer'
+          ) AS customer_name_display
         FROM damage_compensation_records dcr
         ${joins}
         ${whereClause}

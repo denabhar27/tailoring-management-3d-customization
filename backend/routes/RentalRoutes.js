@@ -62,6 +62,7 @@ router.put('/:item_id', rentalImageFields, rentalController.updateRental);
 
 router.put('/:item_id/status', rentalController.updateRentalStatus);
 router.post('/:item_id/mark-damaged', rentalController.markRentalItemDamaged);
+router.post('/:item_id/damage-payment/:log_id', rentalController.updateDamageCompensation);
 router.post('/:item_id/restock-sizes', rentalController.restockReturnedRentalSizes);
 router.post('/:item_id/resolve-maintenance/:log_id', rentalController.resolveMaintenance);
 router.get('/:item_id/size-activity/:size_key', rentalController.getRentalSizeActivity);

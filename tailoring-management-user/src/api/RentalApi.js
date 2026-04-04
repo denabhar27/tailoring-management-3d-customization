@@ -382,6 +382,40 @@ export async function resolveMaintenance(item_id, log_id, quantity, resolution_n
 
 
 
+export async function updateRentalDamagePayment(item_id, log_id, compensation_amount, payment_status = 'unpaid') {
+
+  try {
+
+    const response = await axios.post(
+
+      `${BASE_URL}/rentals/${item_id}/damage-payment/${log_id}`,
+
+      { compensation_amount, payment_status },
+
+      { headers: getAuthHeaders() }
+
+    );
+
+    return response.data;
+
+  } catch (error) {
+
+    console.error("Update rental damage payment error:", error);
+
+    return {
+
+      success: false,
+
+      message: error.response?.data?.message || "Error updating damage payment"
+
+    };
+
+  }
+
+}
+
+
+
 export async function getRentalSizeActivity(item_id, size_key) {
 
   try {

@@ -247,6 +247,31 @@ exports.getDashboardOverview = async (req, res) => {
           }
         });
       }),
+
+      query(
+        `SELECT
+           dcr.id AS compensation_incident_id,
+           dcr.order_item_id,
+           dcr.service_type,
+           COALESCE(NULLIF(dcr.customer_name, ''), 'Customer') AS customer_name,
+           dcr.damage_type,
+           dcr.compensation_amount,
+           dcr.compensation_status,
+           dcr.responsible_party,
+           dcr.notes,
+           dcr.created_at,
+           dcr.updated_at
+         FROM damage_compensation_records dcr
+         ORDER BY dcr.updated_at DESC
+         LIMIT 200`
+      ).catch(err => {
+        const message = String(err?.message || '').toLowerCase();
+        if (message.includes("doesn't exist") || message.includes('unknown table')) {
+          return [];
+        }
+        console.error('Error fetching compensation incidents for dashboard activity:', err);
+        return [];
+      }),
       
       query(
         `SELECT 
@@ -279,7 +304,7 @@ exports.getDashboardOverview = async (req, res) => {
         console.error('Error in order items query:', err);
         return [];
       })
-    ]).then(([logs, paymentActivities, orderItems]) => {
+    ]).then(([logs, paymentActivities, compensationActivities, orderItems]) => {
       
       const activityMap = new Map();
       const orderItemById = new Map();
@@ -289,10 +314,15 @@ exports.getDashboardOverview = async (req, res) => {
         const walkInName = (log.walk_in_customer_name || '').trim();
         const customerFirstName = walkInName || log.customer_first_name || log.first_name || log.actor_first_name;
         const customerLastName = walkInName ? '' : (log.customer_last_name || log.last_name || log.actor_last_name);
+        const logNotes = String(log.notes || '');
+        const serviceLineMatch = logNotes.match(/(?:^|\n)Service:\s*([^\n|]+)/i);
+        const serviceHint = String(serviceLineMatch?.[1] || '').trim();
+        const normalizedServiceHint = serviceHint ? serviceHint.toLowerCase().replace(/\s+/g, '_') : '';
+        const compensationFallbackService = normalizedServiceHint || (log.action_type === 'rental_damage_compensation' ? 'rental' : '');
         activityMap.set(key, {
           item_id: log.item_id || log.order_item_id || null,
           order_item_id: log.order_item_id || log.item_id || null,
-          service_type: log.service_type || (log.action_type === 'add_measurements' ? 'Measurements' : 'N/A'),
+          service_type: log.service_type || (log.action_type === 'add_measurements' ? 'Measurements' : (compensationFallbackService || 'N/A')),
           approval_status: log.new_status || log.previous_status || log.action_type,
           order_status: log.new_status || log.previous_status || log.action_type,
           order_date: log.created_at,
@@ -311,6 +341,49 @@ exports.getDashboardOverview = async (req, res) => {
         const key = `${payment.order_item_id || 'null'}_${payment.order_date}`;
         if (!activityMap.has(key)) {
           activityMap.set(key, payment);
+        }
+      });
+
+      (compensationActivities || []).forEach((incident) => {
+        const eventDate = incident.updated_at || incident.created_at;
+        const key = `comp_${incident.compensation_incident_id || incident.order_item_id || 'null'}_${eventDate}`;
+        if (!activityMap.has(key)) {
+          const serviceTypeRaw = String(incident.service_type || '').trim().toLowerCase();
+          const actionType = serviceTypeRaw === 'rental' ? 'rental_damage_compensation' : 'damage_compensation';
+          const serviceLabel = mapService(incident.service_type || 'rental');
+          const issueType = String(incident.damage_type || 'damage').replace(/_/g, ' ');
+          const amount = parseFloat(incident.compensation_amount || 0) || 0;
+          const baseServiceLine = `Service: ${serviceLabel}`;
+          let notes = String(incident.notes || '').trim();
+          if (!notes) {
+            notes = [
+              baseServiceLine,
+              `Customer: ${incident.customer_name || 'Customer'}`,
+              `Handled by: ${incident.responsible_party || 'admin'}`,
+              `Damage type: ${issueType}`,
+              `Amount to pay: ₱${amount.toFixed(2)}`,
+              `Payment status: ${incident.compensation_status || 'unpaid'}`
+            ].join('\n');
+          } else if (!/(?:^|\n)Service:\s*/i.test(notes)) {
+            notes = `${baseServiceLine}\n${notes}`;
+          }
+
+          activityMap.set(key, {
+            item_id: incident.order_item_id || null,
+            order_item_id: incident.order_item_id || null,
+            service_type: incident.service_type || 'rental',
+            approval_status: incident.compensation_status || 'unpaid',
+            order_status: incident.compensation_status || 'unpaid',
+            order_date: eventDate,
+            first_name: incident.customer_name || 'Customer',
+            last_name: '',
+            reason: null,
+            action_type: actionType,
+            action_by: incident.responsible_party || 'admin',
+            notes,
+            is_payment: false,
+            amount
+          });
         }
       });
 

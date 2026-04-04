@@ -114,6 +114,18 @@ function AdminPage() {
     return Boolean(status || statusText);
   };
 
+  const getActivityActionType = (activity) => String(activity?.actionType || activity?.action_type || '').toLowerCase();
+
+  const isDamageCompensationAction = (activity) => {
+    const actionType = getActivityActionType(activity);
+    return actionType === 'rental_damage_compensation' || actionType === 'damage_compensation';
+  };
+
+  const isTransactionActivity = (activity) => {
+    if (activity?.isPayment) return true;
+    return getActivityActionType(activity) === 'price_change' || isDamageCompensationAction(activity);
+  };
+
   const extractPaymentMetaFromNotes = (notes = '') => {
     const text = String(notes || '');
     const handledByMatch = text.match(/^([^\n.]+?)\s+recorded payment/i);
@@ -130,7 +142,10 @@ function AdminPage() {
   };
 
   const formatStatusDetails = (activity) => {
-    const raw = String(activity?.reason || activity?.notes || '').trim();
+    const isDamageComp = isDamageCompensationAction(activity);
+    const raw = String(isDamageComp
+      ? (activity?.notes || activity?.reason || '')
+      : (activity?.reason || activity?.notes || '')).trim();
     if (!raw) return ['-'];
 
     const lines = raw
@@ -156,6 +171,13 @@ function AdminPage() {
     const hasCustomerLine = normalizedLines.some((line) => /^customer\s*:/i.test(line));
     if (activity?.customer && !hasCustomerLine) {
       normalizedLines.push(`Customer: ${activity.customer}`);
+    }
+
+    if (isDamageComp) {
+      const hasServiceLine = normalizedLines.some((line) => /^service\s*:/i.test(line));
+      if (!hasServiceLine && activity?.service) {
+        normalizedLines.unshift(`Service: ${activity.service}`);
+      }
     }
 
     const hasActorLine = normalizedLines.some((line) => /^(changed|handled|updated|processed|recorded)\s+by\s*:/i.test(line));
@@ -327,21 +349,27 @@ function AdminPage() {
 
             paymentActivities.sort((a, b) => new Date(b.time) - new Date(a.time));
 
-            const fallbackPayments = (allActivities || []).filter((activity) => activity?.isPayment);
-            const priceChangeActivities = (allActivities || []).filter((activity) => {
-              const actionType = String(activity?.actionType || activity?.action_type || '').toLowerCase();
-              return actionType === 'price_change';
-            });
-            const mergedPayments = [...paymentActivities, ...fallbackPayments, ...priceChangeActivities];
+            const fallbackTransactionActivities = (allActivities || []).filter((activity) => isTransactionActivity(activity));
+            const mergedPayments = [...paymentActivities, ...fallbackTransactionActivities];
             const seen = new Set();
             const dedupedPayments = mergedPayments.filter((entry) => {
-              const key = [
-                entry.time || '',
-                entry.customer || '',
-                entry.service || '',
-                Number(entry.paymentInfo?.amount || 0).toFixed(2),
-                (entry.paymentInfo?.payment_status || entry.status || entry.actionType || entry.action_type || '').toLowerCase()
-              ].join('|');
+              const actionType = getActivityActionType(entry);
+              const key = entry?.isPayment
+                ? [
+                    entry.time || '',
+                    entry.customer || '',
+                    entry.service || '',
+                    Number(entry.paymentInfo?.amount || 0).toFixed(2),
+                    (entry.paymentInfo?.payment_status || entry.status || actionType || '').toLowerCase()
+                  ].join('|')
+                : [
+                    entry.time || '',
+                    entry.customer || '',
+                    entry.service || '',
+                    actionType,
+                    String(entry.notes || entry.reason || '').trim(),
+                    (entry.statusText || entry.status || '').toLowerCase()
+                  ].join('|');
               if (seen.has(key)) return false;
               seen.add(key);
               return true;
@@ -350,12 +378,12 @@ function AdminPage() {
 
             setAllPayments(dedupedPayments);
           } else {
-            const fallbackPayments = (allActivities || []).filter((activity) => activity?.isPayment);
+            const fallbackPayments = (allActivities || []).filter((activity) => isTransactionActivity(activity));
             setAllPayments(fallbackPayments);
           }
         } catch (err) {
           console.error('Error fetching all payments:', err);
-          const fallbackPayments = (allActivities || []).filter((activity) => activity?.isPayment);
+          const fallbackPayments = (allActivities || []).filter((activity) => isTransactionActivity(activity));
           setAllPayments(fallbackPayments);
           if (fallbackPayments.length === 0) {
             setError('Failed to load payment history');
@@ -391,6 +419,7 @@ function AdminPage() {
 
       if (paymentStatusFilter !== 'all') {
         filtered = filtered.filter(activity => {
+          const actionType = getActivityActionType(activity);
           const paymentStatus = activity.paymentInfo?.payment_status || activity.status || '';
           const normalizedStatus = paymentStatus.toLowerCase().replace(/-/g, '_');
           const filter = paymentStatusFilter.toLowerCase().replace(/-/g, '_');
@@ -402,7 +431,9 @@ function AdminPage() {
           } else if (filter === 'partial_payment') {
             return normalizedStatus === 'partial_payment' || normalizedStatus === 'partialpayment' || normalizedStatus === 'partial-payment';
           } else if (filter === 'price_change') {
-            return (activity.actionType || activity.action_type || '').toLowerCase() === 'price_change';
+            return actionType === 'price_change';
+          } else if (filter === 'damage_compensation') {
+            return isDamageCompensationAction(activity);
           }
           return false;
         });
@@ -638,6 +669,7 @@ function AdminPage() {
                 <option value="down-payment">Down Payment</option>
                 <option value="partial-payment">Partial Payment</option>
                 <option value="price-change">Price Change</option>
+                <option value="damage-compensation">Damage Compensation</option>
               </select>
             </div>
           )}
@@ -717,7 +749,7 @@ function AdminPage() {
                                          activity.paymentInfo?.payment_status || 'Payment'}
                           </span>
                         </div>
-                      ) : activity.actionType === 'price_change' ? (
+                      ) : getActivityActionType(activity) === 'price_change' ? (
                         <span style={{
                           backgroundColor: '#e3f2fd',
                           color: '#1976d2',
@@ -728,6 +760,18 @@ function AdminPage() {
                           display: 'inline-block'
                         }}>
                           PRICE CHANGE
+                        </span>
+                      ) : isDamageCompensationAction(activity) ? (
+                        <span style={{
+                          backgroundColor: '#fff3e0',
+                          color: '#ef6c00',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          display: 'inline-block'
+                        }}>
+                          DAMAGE COMPENSATION
                         </span>
                       ) : (
                         <span className={`status ${activity.status}`}>
@@ -793,7 +837,7 @@ function AdminPage() {
                             </div>
                           )}
                         </div>
-                      ) : activity.actionType === 'price_change' ? (
+                      ) : getActivityActionType(activity) === 'price_change' ? (
                         <div>
                           {(() => {
                             const notes = activity.notes || '';

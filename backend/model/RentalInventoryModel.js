@@ -1,4 +1,6 @@
 const db = require('../config/db');
+const DamageRecord = require('./DamageRecordModel');
+const ActionLog = require('./ActionLogModel');
 
 function parseJsonSafely(value) {
   if (value === null || value === undefined) return null;
@@ -9,6 +11,11 @@ function parseJsonSafely(value) {
   } catch {
     return null;
   }
+}
+
+function toNullablePositiveInt(value) {
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function getSizeEntriesTotal(sizeRaw) {
@@ -97,6 +104,93 @@ function collectSelectedSizesFromSpecificData(specificData = {}, fallbackItemId 
   const selectedSizes = Array.isArray(specificData?.selected_sizes) ? specificData.selected_sizes : [];
   appendSelection(fallbackItemId, selectedSizes);
   return selections;
+}
+
+const DAMAGE_NOTE_META_PREFIX = '[[DAMAGE_META:';
+const DAMAGE_NOTE_META_SUFFIX = ']]';
+
+function normalizeIssueType(rawType = '') {
+  const type = String(rawType || '').trim().toLowerCase();
+  return ['damage', 'lost', 'replaced'].includes(type) ? type : 'damage';
+}
+
+function normalizePaymentStatus(rawStatus = '') {
+  const status = String(rawStatus || '').trim().toLowerCase();
+  return status === 'paid' ? 'paid' : 'unpaid';
+}
+
+function parseDamageNoteMeta(rawNote) {
+  const text = String(rawNote || '');
+  if (!text.startsWith(DAMAGE_NOTE_META_PREFIX)) {
+    return { note: text.trim(), meta: {} };
+  }
+
+  const metaEndIdx = text.indexOf(DAMAGE_NOTE_META_SUFFIX, DAMAGE_NOTE_META_PREFIX.length);
+  if (metaEndIdx === -1) {
+    return { note: text.trim(), meta: {} };
+  }
+
+  const metaText = text.slice(DAMAGE_NOTE_META_PREFIX.length, metaEndIdx);
+  let meta = null;
+  try {
+    meta = JSON.parse(metaText);
+  } catch {
+    return { note: text.trim(), meta: {} };
+  }
+
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) {
+    return { note: text.trim(), meta: {} };
+  }
+
+  const note = text.slice(metaEndIdx + DAMAGE_NOTE_META_SUFFIX.length).trim();
+  return { note, meta };
+}
+
+function buildDamageNoteWithMeta(rawNote = '', rawMeta = {}) {
+  const note = String(rawNote || '').trim();
+  const compensation = parseFloat(rawMeta?.compensation_amount);
+  const compensationAmount = Number.isFinite(compensation) ? Math.max(0, compensation) : 0;
+  const paymentStatus = normalizePaymentStatus(rawMeta?.payment_status || 'unpaid');
+  const orderItemId = toNullablePositiveInt(rawMeta?.order_item_id);
+  const compensationIncidentId = toNullablePositiveInt(rawMeta?.compensation_incident_id);
+  const handledBy = String(rawMeta?.handled_by || '').trim() || null;
+
+  const meta = {
+    issue_type: normalizeIssueType(rawMeta?.issue_type || 'damage'),
+    compensation_amount: compensationAmount,
+    payment_status: paymentStatus,
+    order_item_id: orderItemId,
+    compensation_incident_id: compensationIncidentId,
+    handled_by: handledBy,
+    paid_at: paymentStatus === 'paid'
+      ? (rawMeta?.paid_at || new Date().toISOString())
+      : null
+  };
+
+  const serializedMeta = JSON.stringify(meta);
+  return `${DAMAGE_NOTE_META_PREFIX}${serializedMeta}${DAMAGE_NOTE_META_SUFFIX}${note ? ` ${note}` : ''}`;
+}
+
+function extractDamageNotePresentation(rawNote, fallbackDamageLevel = null) {
+  const parsed = parseDamageNoteMeta(rawNote);
+  const issueType = normalizeIssueType(parsed?.meta?.issue_type || 'damage');
+  const compensation = parseFloat(parsed?.meta?.compensation_amount);
+  const compensationAmount = Number.isFinite(compensation) ? Math.max(0, compensation) : 0;
+  const paymentStatus = normalizePaymentStatus(parsed?.meta?.payment_status || 'unpaid');
+  const orderItemId = toNullablePositiveInt(parsed?.meta?.order_item_id);
+  const compensationIncidentId = toNullablePositiveInt(parsed?.meta?.compensation_incident_id);
+  const handledBy = String(parsed?.meta?.handled_by || '').trim() || null;
+
+  return {
+    issue_type: issueType,
+    compensation_amount: compensationAmount,
+    payment_status: paymentStatus,
+    order_item_id: orderItemId,
+    compensation_incident_id: compensationIncidentId,
+    handled_by: handledBy,
+    damage_level: issueType === 'damage' ? (fallbackDamageLevel || null) : null,
+    damage_note: parsed?.note ? String(parsed.note).trim() : null
+  };
 }
 
 const RentalInventory = {
@@ -615,15 +709,20 @@ const RentalInventory = {
   markSizeDamaged: (itemId, damageData, callback) => {
     const numericItemId = parseInt(itemId, 10);
     const qty = Math.max(1, parseInt(damageData?.quantity, 10) || 1);
-    const damageLevel = String(damageData?.damage_level || '').trim().toLowerCase();
+    const damageType = normalizeIssueType(damageData?.damage_type || 'damage');
+    const damageLevelInput = String(damageData?.damage_level || '').trim().toLowerCase();
     const damageNote = String(damageData?.damage_note || '').trim();
+    const orderItemId = toNullablePositiveInt(damageData?.order_item_id);
 
     const validLevels = ['minor', 'moderate', 'severe'];
-    if (!validLevels.includes(damageLevel)) {
+    if (damageType === 'damage' && !validLevels.includes(damageLevelInput)) {
       const err = new Error('Invalid damage level. Allowed: minor, moderate, severe.');
       err.statusCode = 400;
       return callback(err);
     }
+
+    // Non-damage issue types still require a DB enum value, so keep a neutral default.
+    const damageLevel = damageType === 'damage' ? damageLevelInput : 'minor';
 
     const getSql = `SELECT item_id, item_name, size, total_available, status FROM rental_inventory WHERE item_id = ? LIMIT 1`;
     db.query(getSql, [numericItemId], (getErr, rows) => {
@@ -678,25 +777,97 @@ const RentalInventory = {
         `;
         const processedByUserId = damageData?.processed_by_user_id || null;
         const processedByRole = damageData?.processed_by_role || 'admin';
+        const processedByName = String(damageData?.processed_by_name || '').trim() || processedByRole || 'admin';
         const damagedCustomerName = String(damageData?.damaged_customer_name || '').trim() || null;
         const sizeLabel = parsed.size_entries[idx].label || normalizedKey;
+        const serializedDamageNote = buildDamageNoteWithMeta(damageNote, {
+          issue_type: damageType,
+          compensation_amount: 0,
+          payment_status: 'unpaid',
+          order_item_id: orderItemId,
+          handled_by: processedByName
+        });
 
         db.query(
           insertLogSql,
-          [numericItemId, item.item_name, normalizedKey, sizeLabel, qty, damageLevel, damageNote || null, damagedCustomerName, processedByUserId, processedByRole],
+          [numericItemId, item.item_name, normalizedKey, sizeLabel, qty, damageLevel, serializedDamageNote || null, damagedCustomerName, processedByUserId, processedByRole],
           (logErr, logResult) => {
             if (logErr) return callback(logErr);
 
-            callback(null, {
+            const damageLogId = logResult?.insertId || null;
+            const finish = (compensationIncidentId = null) => callback(null, {
               item_id: numericItemId,
               item_name: item.item_name,
               size_key: normalizedKey,
               size_label: sizeLabel,
               damaged_quantity: qty,
-              damage_level: damageLevel,
+              damage_type: damageType,
+              damage_level: damageType === 'damage' ? damageLevel : null,
+              compensation_amount: 0,
+              payment_status: 'unpaid',
               status: nextStatus,
               total_available: nextTotal,
-              damage_log_id: logResult?.insertId || null
+              damage_log_id: damageLogId,
+              compensation_incident_id: compensationIncidentId
+            });
+
+            if (!orderItemId) {
+              finish(null);
+              return;
+            }
+
+            const noteLines = [
+              `Customer: ${damagedCustomerName || 'Customer'}`,
+              `Handled by: ${processedByName}`,
+              `Damage type: ${damageType}`,
+              `Size: ${sizeLabel}`
+            ];
+            if (damageNote) noteLines.push(`Comment: ${damageNote}`);
+
+            DamageRecord.createCompensationRecord({
+              order_item_id: orderItemId,
+              order_id: null,
+              service_type: 'rental',
+              customer_name: damagedCustomerName || 'Customer',
+              reported_by_user_id: processedByUserId,
+              reported_by_role: processedByRole,
+              responsible_party: processedByName,
+              damage_type: damageType,
+              damage_description: damageNote || `${damageType} issue on ${sizeLabel}`,
+              liability_status: 'approved',
+              compensation_amount: 0,
+              compensation_status: 'unpaid',
+              notes: noteLines.join('\n')
+            }, (incidentErr, incidentResult) => {
+              if (incidentErr || !incidentResult?.id || !damageLogId) {
+                if (incidentErr) {
+                  console.error('Failed to create rental compensation incident during damage logging:', incidentErr);
+                }
+                finish(null);
+                return;
+              }
+
+              const noteWithIncident = buildDamageNoteWithMeta(damageNote, {
+                issue_type: damageType,
+                compensation_amount: 0,
+                payment_status: 'unpaid',
+                order_item_id: orderItemId,
+                compensation_incident_id: incidentResult.id,
+                handled_by: processedByName
+              });
+
+              const syncSql = `
+                UPDATE damage_logs
+                SET damage_note = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE log_id = ?
+              `;
+
+              db.query(syncSql, [noteWithIncident, damageLogId], (syncErr) => {
+                if (syncErr) {
+                  console.error('Failed to sync compensation incident id to damage note metadata:', syncErr);
+                }
+                finish(incidentResult.id);
+              });
             });
           }
         );
@@ -833,6 +1004,186 @@ const RentalInventory = {
     });
   },
 
+  updateDamageCompensation: (itemId, damageLogId, compensationData, callback) => {
+    const numericItemId = parseInt(itemId, 10);
+    const numericLogId = parseInt(damageLogId, 10);
+    const parsedAmount = parseFloat(compensationData?.compensation_amount);
+    const updatedByUserId = toNullablePositiveInt(compensationData?.updated_by_user_id);
+    const updatedByRoleRaw = String(compensationData?.updated_by_role || '').trim().toLowerCase();
+    const actionByRole = updatedByRoleRaw === 'user' ? 'user' : 'admin';
+    const updatedByNameInput = String(compensationData?.updated_by_name || '').trim();
+
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
+      const err = new Error('Compensation amount must be a valid non-negative number.');
+      err.statusCode = 400;
+      return callback(err);
+    }
+
+    const compensationAmount = Math.max(0, parsedAmount);
+    let paymentStatus = normalizePaymentStatus(compensationData?.payment_status || 'unpaid');
+    if (compensationAmount <= 0) paymentStatus = 'unpaid';
+
+    const getLogSql = `
+      SELECT dl.log_id, dl.inventory_item_id, dl.size_key, dl.size_label, dl.damage_level,
+             dl.damage_note, dl.damaged_customer_name, dl.processed_by_user_id, dl.processed_by_role,
+             CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS processed_name
+      FROM damage_logs dl
+      LEFT JOIN user u ON u.user_id = dl.processed_by_user_id
+      WHERE dl.log_id = ? AND dl.inventory_item_id = ? AND dl.status = 'active'
+      LIMIT 1
+    `;
+
+    db.query(getLogSql, [numericLogId, numericItemId], (logErr, logRows) => {
+      if (logErr) return callback(logErr);
+      if (!logRows || logRows.length === 0) {
+        const err = new Error('Damage log not found or already resolved.');
+        err.statusCode = 404;
+        return callback(err);
+      }
+
+      const existing = logRows[0];
+      const parsed = parseDamageNoteMeta(existing.damage_note);
+      const issueType = normalizeIssueType(parsed?.meta?.issue_type || 'damage');
+      const plainNote = parsed?.note || '';
+      const customerName = String(existing.damaged_customer_name || '').trim() || 'Customer';
+      const handledBy = updatedByNameInput
+        || String(parsed?.meta?.handled_by || '').trim()
+        || String(existing.processed_name || '').trim()
+        || String(existing.processed_by_role || '').trim()
+        || 'admin';
+      const orderItemId = toNullablePositiveInt(parsed?.meta?.order_item_id);
+      let compensationIncidentId = toNullablePositiveInt(parsed?.meta?.compensation_incident_id);
+      const previousPaymentStatus = normalizePaymentStatus(parsed?.meta?.payment_status || 'unpaid');
+      const sizeLabel = String(existing.size_label || existing.size_key || '').trim() || 'N/A';
+      const paidAtIso = paymentStatus === 'paid' ? new Date().toISOString() : null;
+
+      const detailLines = [
+        `Customer: ${customerName}`,
+        `Handled by: ${handledBy}`,
+        `Damage type: ${issueType}`,
+        `Size: ${sizeLabel}`,
+        `Amount to pay: ₱${compensationAmount.toFixed(2)}`,
+        `Payment status: ${paymentStatus}`
+      ];
+      if (plainNote) detailLines.push(`Comment: ${plainNote}`);
+
+      const syncCompensationIncident = (done) => {
+        const updatePayload = {
+          compensation_amount: compensationAmount,
+          compensation_status: paymentStatus,
+          compensation_paid_at: paymentStatus === 'paid' ? new Date() : null,
+          responsible_party: handledBy,
+          notes: detailLines.join('\n')
+        };
+
+        if (compensationIncidentId) {
+          DamageRecord.updateCompensationRecord(compensationIncidentId, updatePayload, (incidentErr) => {
+            if (incidentErr) {
+              console.error('Failed to update linked compensation incident:', incidentErr);
+            }
+            done();
+          });
+          return;
+        }
+
+        if (!orderItemId) {
+          done();
+          return;
+        }
+
+        DamageRecord.createCompensationRecord({
+          order_item_id: orderItemId,
+          order_id: null,
+          service_type: 'rental',
+          customer_name: customerName,
+          reported_by_user_id: existing.processed_by_user_id || updatedByUserId || null,
+          reported_by_role: existing.processed_by_role || actionByRole,
+          responsible_party: handledBy,
+          damage_type: issueType,
+          damage_description: plainNote || `${issueType} issue on ${sizeLabel}`,
+          liability_status: 'approved',
+          compensation_amount: compensationAmount,
+          compensation_status: paymentStatus,
+          notes: detailLines.join('\n')
+        }, (incidentErr, incidentResult) => {
+          if (incidentErr) {
+            console.error('Failed to create linked compensation incident:', incidentErr);
+            done();
+            return;
+          }
+          compensationIncidentId = incidentResult?.id ? parseInt(incidentResult.id, 10) : null;
+          done();
+        });
+      };
+
+      syncCompensationIncident(() => {
+        const updatedDamageNote = buildDamageNoteWithMeta(plainNote, {
+          issue_type: issueType,
+          compensation_amount: compensationAmount,
+          payment_status: paymentStatus,
+          paid_at: paidAtIso,
+          order_item_id: orderItemId,
+          compensation_incident_id: compensationIncidentId,
+          handled_by: handledBy
+        });
+
+        const updateSql = `
+          UPDATE damage_logs
+          SET damage_note = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE log_id = ? AND inventory_item_id = ?
+        `;
+
+        db.query(updateSql, [updatedDamageNote, numericLogId, numericItemId], (updateErr) => {
+          if (updateErr) return callback(updateErr);
+
+          const finishResponse = () => callback(null, {
+            log_id: numericLogId,
+            inventory_item_id: numericItemId,
+            order_item_id: orderItemId,
+            compensation_incident_id: compensationIncidentId,
+            customer_name: customerName,
+            handled_by: handledBy,
+            damage_type: issueType,
+            compensation_amount: compensationAmount,
+            payment_status: paymentStatus
+          });
+
+          if (!updatedByUserId) {
+            finishResponse();
+            return;
+          }
+
+          const actionNotes = [
+            'Service: Rental',
+            `Customer: ${customerName}`,
+            `Handled by: ${handledBy}`,
+            `Damage type: ${issueType}`,
+            `Size: ${sizeLabel}`,
+            `Amount to pay: ₱${compensationAmount.toFixed(2)}`,
+            `Payment status: ${paymentStatus}`
+          ];
+          if (plainNote) actionNotes.push(`Comment: ${plainNote}`);
+
+          ActionLog.create({
+            order_item_id: orderItemId || null,
+            user_id: updatedByUserId,
+            action_type: 'rental_damage_compensation',
+            action_by: actionByRole,
+            previous_status: previousPaymentStatus,
+            new_status: paymentStatus,
+            reason: null,
+            notes: actionNotes.join('\n')
+          }, (actionErr) => {
+            if (actionErr) {
+              console.error('Failed to write action log for rental damage compensation update:', actionErr);
+            }
+            finishResponse();
+          });
+        });
+      });
+    });
+  },
+
   getSizeActivity: (itemId, sizeKey, callback) => {
     const numericItemId = parseInt(itemId, 10);
     const normalizedSizeKey = mapSizeInputToKey(sizeKey || '');
@@ -910,13 +1261,20 @@ const RentalInventory = {
         const maintenanceActivities = (damageRows || []).map((row) => {
           const processedName = String(row.processed_name || '').trim();
           const processedBy = String(row.damaged_customer_name || '').trim() || processedName || row.processed_by_role || 'admin';
+          const presentation = extractDamageNotePresentation(row.damage_note, row.damage_level);
           return {
             log_id: row.log_id || null,
             activity_type: 'maintenance',
             quantity: Math.max(0, parseInt(row.quantity, 10) || 0),
             person_name: null,
-            damage_level: row.damage_level || null,
-            damage_note: row.damage_note || null,
+            damage_type: presentation.issue_type,
+            damage_level: presentation.damage_level,
+            damage_note: presentation.damage_note,
+            compensation_amount: presentation.compensation_amount,
+            payment_status: presentation.payment_status,
+            order_item_id: presentation.order_item_id,
+            compensation_incident_id: presentation.compensation_incident_id,
+            handled_by: presentation.handled_by || processedBy,
             processed_by: processedBy,
             created_at: row.created_at || null
           };

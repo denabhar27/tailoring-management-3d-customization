@@ -60,6 +60,7 @@ const User = {
         'online' as customer_type
       FROM user u
       LEFT JOIN orders o ON u.user_id = o.user_id
+      WHERE u.role = 'user'
       GROUP BY u.user_id, u.first_name, u.middle_name, u.last_name, u.email, u.phone_number, u.status, u.created_at
       
       UNION ALL

@@ -446,7 +446,7 @@ const CustomerList = () => {
 
               ) : (
 
-                getFilteredCustomers().map(customer => {
+                getFilteredCustomers().map((customer, index) => {
 
                   const isWalkIn = customer.customer_type === 'walk_in';
 
@@ -460,7 +460,7 @@ const CustomerList = () => {
 
                   return (
 
-                    <tr key={customerId || customer.user_id}>
+                    <tr key={`${customer.customer_type}-${customerId || customer.user_id || index}`}>
 
                       <td>
 

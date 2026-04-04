@@ -856,10 +856,10 @@ const WalkInOrders = () => {
                     onChange={(e) => setServiceType(e.target.value)}
                     className="form-control"
                   >
-                    <option key="dry_cleaning" value="dry_cleaning">Dry Cleaning</option>
-                    <option key="repair" value="repair">Repair</option>
-                    <option key="customization" value="customization">Customization</option>
-                    <option key="rental" value="rental">Rental</option>
+                    <option value="dry_cleaning">Dry Cleaning</option>
+                    <option value="repair">Repair</option>
+                    <option value="customization">Customization</option>
+                    <option value="rental">Rental</option>
                   </select>
                 </div>
 
@@ -940,9 +940,9 @@ const WalkInOrders = () => {
                         required
                       >
                         <option value="">Select damage level</option>
-                        <option key="minor" value="minor">Minor</option>
-                        <option key="moderate" value="moderate">Moderate</option>
-                        <option key="severe" value="severe">Severe</option>
+                        <option value="minor">Minor</option>
+                        <option value="moderate">Moderate</option>
+                        <option value="severe">Severe</option>
                       </select>
                     </div>
 

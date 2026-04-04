@@ -2057,7 +2057,22 @@ exports.recordRentalPayment = (req, res) => {
 
     const currentAmountPaid = parseFloat(pricingFactors.amount_paid || 0);
     const finalPrice = parseFloat(item.final_price || 0);
-    const depositAmount = parseFloat(pricingFactors.downpayment || 0);
+    
+    // Calculate deposit from selected_sizes
+    let specificData = {};
+    try {
+      specificData = item.specific_data ? JSON.parse(item.specific_data) : {};
+    } catch (e) {
+      console.error('Error parsing specific_data:', e);
+    }
+    const selectedSizes = specificData.selected_sizes || specificData.selectedSizes || [];
+    const depositFromSizes = selectedSizes.reduce((total, size) => {
+      const quantity = parseInt(size.quantity || 0, 10);
+      const deposit = parseFloat(size.deposit || 0);
+      return total + (quantity * deposit);
+    }, 0);
+    const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(pricingFactors.downpayment || specificData.downpayment || 0);
+    
     const totalPaymentRequired = finalPrice + depositAmount;
     const newAmountPaid = currentAmountPaid + amount;
     const remainingBalance = totalPaymentRequired - newAmountPaid;
@@ -2294,24 +2309,16 @@ exports.recordRentalDepositReturn = (req, res) => {
 
     const finalPriceAmount = Math.max(0, parseFloat(item.final_price || 0));
     const updatedRefundedTotal = currentRefunded + amount;
-    const adjustedAmountPaid = Math.max(0, currentAmountPaid - amount);
-    const remainingBalanceAfterRefund = Math.max(0, finalPriceAmount - adjustedAmountPaid);
-
-    pricingFactors.amount_paid = adjustedAmountPaid.toFixed(2);
-    pricingFactors.remaining_balance = remainingBalanceAfterRefund.toFixed(2);
+    
+    // Don't subtract deposit from amount_paid - deposit is separate from revenue
+    // Only track the refunded amount separately
     pricingFactors.deposit_refunded = updatedRefundedTotal >= depositAmount;
     pricingFactors.deposit_refunded_amount = updatedRefundedTotal.toFixed(2);
     pricingFactors.deposit_refunded_at = new Date().toISOString().split('T')[0];
 
+    // Payment status remains unchanged - deposit refund doesn't affect rental payment
     const previousPaymentStatus = item.payment_status || 'unpaid';
-    let recalculatedPaymentStatus = previousPaymentStatus;
-    if (adjustedAmountPaid <= 0) {
-      recalculatedPaymentStatus = 'unpaid';
-    } else if (adjustedAmountPaid >= finalPriceAmount) {
-      recalculatedPaymentStatus = 'fully_paid';
-    } else {
-      recalculatedPaymentStatus = 'partial_payment';
-    }
+    const recalculatedPaymentStatus = previousPaymentStatus;
 
     const refundTimestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
     const actorName = req.user?.username || `${req.user?.first_name || ''} ${req.user?.last_name || ''}`.trim() || req.user?.role || 'admin';

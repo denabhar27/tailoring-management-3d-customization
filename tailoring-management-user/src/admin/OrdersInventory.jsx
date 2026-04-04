@@ -582,10 +582,25 @@ const OrdersInventory = () => {
   };
 
   const getIncidentHandledBy = (incident) => {
+    // Try to extract from notes first (from action logs)
+    const notes = String(incident?.notes || '');
+    
+    // Look for liability or settlement actions first (these show who actually handled it)
+    const handledMatch = notes.match(/(?:settled|liability\s+\w+)\s+by\s+([^\n.]+)/i);
+    if (handledMatch && handledMatch[1]) {
+      return handledMatch[1].trim();
+    }
+    
+    // If no handling action found, check for reported by
+    const reportedMatch = notes.match(/reported\s+by\s+([^\n.]+)/i);
+    if (reportedMatch && reportedMatch[1]) {
+      return reportedMatch[1].trim();
+    }
+    
+    // Fallback to database fields
     return incident?.handled_by
-      || incident?.responsible_party
       || incident?.handled_by_username
-      || (incident?.reported_by_role === 'clerk' ? 'Clerk' : incident?.reported_by_role)
+      || (incident?.reported_by_role === 'clerk' ? 'Clerk' : incident?.reported_by_role === 'admin' ? 'Admin' : null)
       || 'N/A';
   };
 
@@ -1985,10 +2000,14 @@ const OrdersInventory = () => {
                 <label>Customer Name:</label>
                 <span>{getIncidentCustomerName(selectedSettlementIncident)}</span>
               </div>
-              <div className="detail-row">
-                <label>Handled By:</label>
-                <span>{getIncidentHandledBy(selectedSettlementIncident)}</span>
-              </div>
+              {selectedSettlementIncident.responsible_party && (
+                <div className="detail-row">
+                  <label>Damaged by:</label>
+                  <span style={{ color: '#d32f2f', fontWeight: '600' }}>
+                    {selectedSettlementIncident.responsible_party}
+                  </span>
+                </div>
+              )}
               <div className="detail-row">
                 <label>Service Type:</label>
                 <span>{formatServiceTypeLabel(selectedSettlementIncident.service_type)}</span>

@@ -137,7 +137,7 @@ h1, h2, h3, h4, h5, h6 {
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(90deg, #8B4513 0%, #8B4513 100%);
   transform: scaleX(0);
   transition: transform 0.4s ease;
 }
@@ -241,7 +241,7 @@ table {
 }
 
 thead {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
 }
 
 thead th {
@@ -252,7 +252,7 @@ thead th {
   color: #FFFFFF;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   white-space: nowrap;
 }
 
@@ -330,7 +330,7 @@ tbody td {
 }
 
 .modal-header {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: white;
   padding: 16px 20px;
   display: flex;
@@ -570,7 +570,7 @@ tbody td {
 
 .service-type-badge[data-service-type="customization"],
 .service-type-badge[data-service-type="customize"] {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%) !important;
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%) !important;
   color: #FFFFFF !important;
 }
 

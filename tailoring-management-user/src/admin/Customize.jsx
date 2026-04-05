@@ -54,6 +54,8 @@ const Customize = () => {
 
   const [statusFilter, setStatusFilter] = useState('');
 
+  const [todayAppointmentsOnly, setTodayAppointmentsOnly] = useState(false);
+
   const [viewFilter, setViewFilter] = useState("all");
 
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -545,6 +547,8 @@ const Customize = () => {
     }
     return null;
   };
+
+  const isTodayAppointment = (item) => getComputedStatus(item) === 'appointment-today';
 
   const getNextStatusLabel = (currentStatus, serviceType = 'customization', item = null) => {
 
@@ -1904,6 +1908,8 @@ const Customize = () => {
 
   };
 
+  const todayAppointmentsCount = allItems.filter(isTodayAppointment).length;
+
   const getFilteredItems = () => {
 
     let items = [];
@@ -1992,6 +1998,10 @@ const Customize = () => {
 
     }
 
+    if (todayAppointmentsOnly) {
+      items = items.filter(isTodayAppointment);
+    }
+
     items.sort((a, b) => {
 
       const isPendingA = a.approval_status === 'pending' || a.approval_status === 'pending_review' || !a.approval_status;
@@ -2077,6 +2087,8 @@ const Customize = () => {
     if (!priceConfirmationItem) return;
 
     const finalPrice = parseFloat(priceConfirmationPrice);
+    const currentPrice = parseFloat(priceConfirmationItem.final_price || 0);
+    const isPriceChanged = Math.abs(finalPrice - currentPrice) > 0.01;
 
     if (isNaN(finalPrice) || finalPrice <= 0) {
 
@@ -2086,7 +2098,7 @@ const Customize = () => {
 
     }
 
-    if (!priceConfirmationReason.trim()) {
+    if (isPriceChanged && !priceConfirmationReason.trim()) {
 
       showToast("Please provide a reason for the price change", "error");
 
@@ -2102,7 +2114,7 @@ const Customize = () => {
 
         finalPrice: finalPrice,
 
-        adminNotes: priceConfirmationReason.trim()
+        adminNotes: isPriceChanged ? priceConfirmationReason.trim() : undefined
 
       });
 
@@ -3221,8 +3233,6 @@ const Customize = () => {
 
             <option value="completed">Completed</option>
 
-            <option value="appointment-today">Appointment Today</option>
-
             <option value="estimated-today">Estimated Release Today</option>
 
             <option value="cancelled">Rejected</option>
@@ -3230,6 +3240,31 @@ const Customize = () => {
           </select>
 
         </div>
+
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '12px',
+          margin: '10px 0 12px 0',
+          padding: '10px 12px',
+          border: '1px solid #e7d9cc',
+          borderRadius: '8px',
+          background: '#fffaf5'
+        }}>
+          <div style={{ color: '#8B4513', fontWeight: '600', fontSize: '13px' }}>
+            Today's appointments: {todayAppointmentsCount}
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#333', fontSize: '13px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={todayAppointmentsOnly}
+              onChange={(e) => setTodayAppointmentsOnly(e.target.checked)}
+            />
+            Show only today's appointments
+          </label>
+        </div>
+
         <div className="table-container">
 
           <div className="table-scroll-viewport">
@@ -4772,7 +4807,7 @@ const Customize = () => {
 
               <div className="payment-form-group" style={{ marginTop: '12px' }}>
 
-                <label>Reason for Price Change <span style={{ color: '#d32f2f' }}>*</span></label>
+                <label>Reason for Price Change <span style={{ color: '#666', fontSize: '12px' }}>(required only if price changes)</span></label>
 
                 <textarea
 

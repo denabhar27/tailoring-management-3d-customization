@@ -332,7 +332,8 @@ const OrdersInventory = () => {
   // Fetch all data on component mount
   useEffect(() => {
     const role = getUserRole();
-    if (role !== 'admin') {
+    const canAccessPage = role === 'admin' || (role === 'clerk' && isRentalInventoryPage);
+    if (!canAccessPage) {
       navigate('/customize', { replace: true });
       return undefined;
     }
@@ -340,7 +341,7 @@ const OrdersInventory = () => {
     fetchAllData();
     const refreshInterval = setInterval(fetchAllData, 30000); // Refresh every 30 seconds
     return () => clearInterval(refreshInterval);
-  }, [navigate]);
+  }, [navigate, isRentalInventoryPage]);
 
   // Combine billing and inventory data when they change
   useEffect(() => {

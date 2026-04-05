@@ -93,10 +93,10 @@ const getNetCompensationLossExpression = () => `
 `;
 
 exports.getRevenueOverview = async (req, res) => {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'clerk')) {
     return res.status(403).json({
       success: false,
-      message: 'Access denied. Admin only.'
+      message: 'Access denied. Admin or clerk only.'
     });
   }
 
@@ -227,10 +227,10 @@ exports.getRevenueOverview = async (req, res) => {
 };
 
 exports.getRevenueTrend = async (req, res) => {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'clerk')) {
     return res.status(403).json({
       success: false,
-      message: 'Access denied. Admin only.'
+      message: 'Access denied. Admin or clerk only.'
     });
   }
 
@@ -320,10 +320,10 @@ exports.getRevenueTrend = async (req, res) => {
 };
 
 exports.getRevenueByService = async (req, res) => {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'clerk')) {
     return res.status(403).json({
       success: false,
-      message: 'Access denied. Admin only.'
+      message: 'Access denied. Admin or clerk only.'
     });
   }
 
@@ -416,10 +416,10 @@ exports.getRevenueByService = async (req, res) => {
 };
 
 exports.getTopServices = async (req, res) => {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'clerk')) {
     return res.status(403).json({
       success: false,
-      message: 'Access denied. Admin only.'
+      message: 'Access denied. Admin or clerk only.'
     });
   }
 
@@ -501,10 +501,10 @@ exports.getTopServices = async (req, res) => {
 };
 
 exports.getNetLossByService = async (req, res) => {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'clerk')) {
     return res.status(403).json({
       success: false,
-      message: 'Access denied. Admin only.'
+      message: 'Access denied. Admin or clerk only.'
     });
   }
 
@@ -581,10 +581,10 @@ exports.getNetLossByService = async (req, res) => {
 };
 
 exports.getRevenueComparison = async (req, res) => {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'clerk')) {
     return res.status(403).json({
       success: false,
-      message: 'Access denied. Admin only.'
+      message: 'Access denied. Admin or clerk only.'
     });
   }
 
@@ -695,10 +695,10 @@ exports.getRevenueComparison = async (req, res) => {
 };
 
 exports.getTopCustomers = async (req, res) => {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'clerk')) {
     return res.status(403).json({
       success: false,
-      message: 'Access denied. Admin only.'
+      message: 'Access denied. Admin or clerk only.'
     });
   }
 
@@ -759,10 +759,10 @@ exports.getTopCustomers = async (req, res) => {
 };
 
 exports.getDetailedAnalytics = async (req, res) => {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'clerk')) {
     return res.status(403).json({
       success: false,
-      message: 'Access denied. Admin only.'
+      message: 'Access denied. Admin or clerk only.'
     });
   }
 

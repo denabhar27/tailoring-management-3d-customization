@@ -3458,6 +3458,48 @@
 
 
 
+.rental .rental-card {
+
+  transition: transform 0.28s ease, box-shadow 0.28s ease;
+
+}
+
+
+
+.rental .rental-card::before {
+
+  content: none;
+
+}
+
+
+
+.rental .rental-card:hover {
+
+  transform: translateY(-6px);
+
+  box-shadow: 0 14px 30px rgba(139, 69, 19, 0.18);
+
+}
+
+
+
+.rental .rental-card img {
+
+  transition: transform 0.35s ease;
+
+}
+
+
+
+.rental .rental-card:hover img {
+
+  transform: scale(1.04);
+
+}
+
+
+
 .rental .btn-view {
 
   margin-top: 6px;
@@ -3478,6 +3520,16 @@
 
   letter-spacing: 0.2px;
 
+  transition: background-color 0.22s ease, border-color 0.22s ease, transform 0.2s ease, box-shadow 0.2s ease;
+
+}
+
+
+
+.rental .btn-view::after {
+
+  content: none;
+
 }
 
 
@@ -3489,6 +3541,20 @@
   border-color: #7f4b21;
 
   color: #fff;
+
+  transform: translateY(-1px);
+
+  box-shadow: 0 8px 18px rgba(139, 69, 19, 0.22);
+
+}
+
+
+
+.rental .btn-view:active {
+
+  transform: translateY(0);
+
+  box-shadow: 0 4px 10px rgba(139, 69, 19, 0.16);
 
 }
 

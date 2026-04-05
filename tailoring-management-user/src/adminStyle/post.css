@@ -35,7 +35,7 @@ html {
   left: 270px;
   right: 0;
   height: 70px;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -108,7 +108,7 @@ html {
 }
 
 .sidebar a.active {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   box-shadow: 0 2px 8px rgba(139, 69, 19, 0.3);
   color: white;
   border-left-color: #8B4513;
@@ -657,7 +657,7 @@ html {
 }
 
 .detail-modal-header {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   padding: 24px 32px;
   display: flex;
   justify-content: space-between;

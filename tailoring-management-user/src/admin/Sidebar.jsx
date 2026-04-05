@@ -40,7 +40,7 @@ function Sidebar() {
       <nav className="sidebar-nav-groups">
         <div className="sidebar-group">
           <p className="sidebar-group-title">Main</p>
-          {role === 'admin' && (
+          {(role === 'admin' || role === 'clerk') && (
             <NavLink to="/admin" className={navLinkClass}>
               <i className="fas fa-th-large nav-icon"></i>
               <span>Dashboard</span>
@@ -96,7 +96,7 @@ function Sidebar() {
               <span>Reports</span>
             </NavLink>
           )}
-          {role === 'admin' && (
+          {(role === 'admin' || role === 'clerk') && (
             <NavLink to="/rental-inventory" className={navLinkClass}>
               <i className="fas fa-boxes nav-icon"></i>
               <span>Rental Inventory</span>
@@ -132,15 +132,15 @@ function Sidebar() {
           )}
         </div>
 
+        {role === 'admin' && (
         <div className="sidebar-group sidebar-group-last">
           <p className="sidebar-group-title">Settings </p>
-          {role === 'admin' && (
             <NavLink to="/shop-schedule" className={navLinkClass}>
               <i className="fas fa-calendar-alt nav-icon"></i>
               <span>Shop Schedule</span>
             </NavLink>
-          )}
         </div>
+        )}
       </nav>
     </aside>
   );

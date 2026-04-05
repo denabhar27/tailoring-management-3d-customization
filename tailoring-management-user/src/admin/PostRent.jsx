@@ -42,13 +42,17 @@ const EMPTY_MEASUREMENTS = () => ({
 
   neck: { inch: '', cm: '' },
 
-  waist: { inch: '', cm: '' },
+  topWaist: { inch: '', cm: '' },
 
-  length: { inch: '', cm: '' },
+  topLength: { inch: '', cm: '' },
+
+  bottomWaist: { inch: '', cm: '' },
 
   hips: { inch: '', cm: '' },
 
   inseam: { inch: '', cm: '' },
+
+  bottomLength: { inch: '', cm: '' },
 
   thigh: { inch: '', cm: '' },
 
@@ -64,7 +68,15 @@ const createDefaultSizeEntry = (sizeKey, extraId = '') => ({
 
   sizeKey: sizeKey || 'custom',
 
+  topSizeKey: sizeKey || 'custom',
+
+  bottomSizeKey: sizeKey || 'custom',
+
   customLabel: '',
+
+  topCustomLabel: '',
+
+  bottomCustomLabel: '',
 
   quantity: '',
 
@@ -106,13 +118,27 @@ const parseSizeEntriesFromPayload = (rawSize) => {
 
         });
 
+        // Backward compatibility: old payloads stored shared waist/length keys.
+        if (!m.topWaist && m.waist) measurements.topWaist = { inch: m.waist.inch ?? '', cm: m.waist.cm ?? '' };
+        if (!m.bottomWaist && m.waist) measurements.bottomWaist = { inch: m.waist.inch ?? '', cm: m.waist.cm ?? '' };
+        if (!m.topLength && m.length) measurements.topLength = { inch: m.length.inch ?? '', cm: m.length.cm ?? '' };
+        if (!m.bottomLength && m.length) measurements.bottomLength = { inch: m.length.inch ?? '', cm: m.length.cm ?? '' };
+
         return {
 
           id: `entry_${idx}_${Date.now()}`,
 
           sizeKey: entry.sizeKey || 'custom',
 
+          topSizeKey: entry.topSizeKey || entry.top_size_key || entry.sizeKey || 'custom',
+
+          bottomSizeKey: entry.bottomSizeKey || entry.bottom_size_key || entry.sizeKey || 'custom',
+
           customLabel: entry.customLabel || '',
+
+          topCustomLabel: entry.topCustomLabel || entry.top_custom_label || entry.customLabel || '',
+
+          bottomCustomLabel: entry.bottomCustomLabel || entry.bottom_custom_label || entry.customLabel || '',
 
           quantity: entry.quantity !== undefined ? String(entry.quantity) : '',
 
@@ -160,13 +186,33 @@ const parseSizeEntriesFromPayload = (rawSize) => {
 
       Object.keys(measurements).forEach(k => { measurements[k] = getMeasVal(mp, k); });
 
+      // Backward compatibility for old v1 measurement profile.
+      const legacyWaist = getMeasVal(mp, 'waist');
+      const legacyLength = getMeasVal(mp, 'length');
+      if (legacyWaist.inch || legacyWaist.cm) {
+        measurements.topWaist = legacyWaist;
+        measurements.bottomWaist = legacyWaist;
+      }
+      if (legacyLength.inch || legacyLength.cm) {
+        measurements.topLength = legacyLength;
+        measurements.bottomLength = legacyLength;
+      }
+
       return {
 
         id: `${key}_${Date.now() + idx}`,
 
         sizeKey: key,
 
+        topSizeKey: key,
+
+        bottomSizeKey: key,
+
         customLabel: '',
+
+        topCustomLabel: '',
+
+        bottomCustomLabel: '',
 
         quantity: opt.quantity !== undefined ? String(opt.quantity) : '',
 
@@ -289,9 +335,9 @@ const TOP_MEASUREMENT_FIELDS = [
 
   { key: 'neck', label: 'Neck' },
 
-  { key: 'waist', label: 'Waist' },
+  { key: 'topWaist', label: 'Waist' },
 
-  { key: 'length', label: 'Length' }
+  { key: 'topLength', label: 'Length' }
 
 ];
 
@@ -299,13 +345,13 @@ const TOP_MEASUREMENT_FIELDS = [
 
 const BOTTOM_MEASUREMENT_FIELDS = [
 
-  { key: 'waist', label: 'Waist' },
+  { key: 'bottomWaist', label: 'Waist' },
 
   { key: 'hips', label: 'Hips' },
 
   { key: 'inseam', label: 'Inseam' },
 
-  { key: 'length', label: 'Length' },
+  { key: 'bottomLength', label: 'Length' },
 
   { key: 'thigh', label: 'Thigh' },
 
@@ -1153,18 +1199,48 @@ const PostRent = () => {
         validationErrors.push(`Size row ${rowNo}: deposit cannot be greater than price.`);
       }
 
+      const isFieldFilled = (meas) => {
+        const inchVal = String(meas?.inch ?? '').trim();
+        const cmVal = String(meas?.cm ?? '').trim();
+        return inchVal !== '' || cmVal !== '';
+      };
+
+      const isFieldValid = (meas) => {
+        const inchVal = String(meas?.inch ?? '').trim();
+        const cmVal = String(meas?.cm ?? '').trim();
+        const parsedInch = inchVal === '' ? NaN : parseFloat(inchVal);
+        const parsedCm = cmVal === '' ? NaN : parseFloat(cmVal);
+
+        if (inchVal === '' && cmVal === '') return false;
+        if ((!Number.isNaN(parsedInch) && parsedInch <= 0) || (!Number.isNaN(parsedCm) && parsedCm <= 0)) return false;
+        return true;
+      };
+
+      const topComplete = TOP_MEASUREMENT_FIELDS.every((field) => {
+        const meas = entry.measurements?.[field.key] || { inch: '', cm: '' };
+        return isFieldValid(meas);
+      });
+
+      const bottomComplete = BOTTOM_MEASUREMENT_FIELDS.every((field) => {
+        const meas = entry.measurements?.[field.key] || { inch: '', cm: '' };
+        return isFieldValid(meas);
+      });
+
+      if (!topComplete && !bottomComplete) {
+        validationErrors.push(
+          `Size row ${rowNo}: complete either all Top measurements or all Bottom measurements.`
+        );
+      }
+
       const measurementKeys = Object.keys(EMPTY_MEASUREMENTS());
       measurementKeys.forEach((key) => {
         const meas = entry.measurements?.[key] || { inch: '', cm: '' };
+        if (!isFieldFilled(meas)) return;
+
         const inchVal = String(meas.inch ?? '').trim();
         const cmVal = String(meas.cm ?? '').trim();
         const parsedInch = inchVal === '' ? NaN : parseFloat(inchVal);
         const parsedCm = cmVal === '' ? NaN : parseFloat(cmVal);
-
-        if (inchVal === '' && cmVal === '') {
-          validationErrors.push(`Size row ${rowNo}: ${key} measurement is required.`);
-          return;
-        }
 
         if ((!Number.isNaN(parsedInch) && parsedInch <= 0) || (!Number.isNaN(parsedCm) && parsedCm <= 0)) {
           validationErrors.push(`Size row ${rowNo}: ${key} measurement must be greater than 0.`);
@@ -1192,7 +1268,15 @@ const PostRent = () => {
 
       sizeKey: entry.sizeKey,
 
+      topSizeKey: entry.topSizeKey || entry.sizeKey,
+
+      bottomSizeKey: entry.bottomSizeKey || entry.sizeKey,
+
       customLabel: entry.customLabel || '',
+
+      topCustomLabel: entry.topCustomLabel || '',
+
+      bottomCustomLabel: entry.bottomCustomLabel || '',
 
       quantity: Math.max(0, parseInt(entry.quantity, 10) || 0),
 

@@ -170,7 +170,7 @@ html {
   left: 270px;
   right: 0;
   height: 70px;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -243,7 +243,7 @@ html {
 }
 
 .sidebar a.active {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   box-shadow: 0 2px 8px rgba(139, 69, 19, 0.3);
   color: white;
   border-left-color: #8B4513;
@@ -444,7 +444,7 @@ thead th {
   color: #FFFFFF;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   white-space: nowrap;
 }
 
@@ -755,7 +755,7 @@ tbody td {
 }
 
 .add-rep {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: #FFFFFF;
   padding: 12px 24px;
   border-radius: 10px;
@@ -824,7 +824,7 @@ border: 1px solid rgba(139, 69, 19, 0.1);
 }
 
 .modal-header {
- background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+ background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
 color: white;
 padding: 20px 28px;
 display: flex;
@@ -1108,7 +1108,7 @@ min-width: auto;
 }
 
 .icon-btn.edit:hover {
-  color: #A0522D;
+  color: #8B4513;
 }
 
 .icon-btn[title] {
@@ -1403,7 +1403,7 @@ tbody tr.clickable-row:active {
   justify-content: space-between;
   align-items: center;
   padding: 20px 28px;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: white;
   box-shadow: 0 4px 15px rgba(139, 69, 19, 0.2);
 }

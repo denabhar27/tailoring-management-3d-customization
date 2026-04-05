@@ -128,7 +128,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(90deg, #8B4513 0%, #8B4513 100%);
   transform: scaleX(0);
   transition: transform 0.3s ease;
 }
@@ -323,7 +323,7 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  background: linear-gradient(135deg, #5D4E37 0%, #8B4513 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
 }
 
 .table-container th {
@@ -496,7 +496,7 @@
 
 .section-header .add-btn {
   padding: 10px 20px;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: white;
   border: none;
   border-radius: 10px;
@@ -760,7 +760,7 @@
 .view-details-btn {
   width: 100%;
   padding: 10px;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -837,7 +837,7 @@
   align-items: center;
   padding: 20px 25px;
   border-bottom: 1px solid #EEE;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   border-radius: 16px 16px 0 0;
 }
 
@@ -921,7 +921,7 @@
   padding: 10px 24px;
   border: none;
   border-radius: 8px;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: #FFFFFF;
   font-size: 14px;
   font-weight: 600;

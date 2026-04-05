@@ -42,10 +42,11 @@ const Profile = () => {
   const [enhanceNotes, setEnhanceNotes] = useState('');
   const [enhancePreferredDate, setEnhancePreferredDate] = useState('');
   const [submittingEnhancement, setSubmittingEnhancement] = useState(false);
-  const [compensationIncident, setCompensationIncident] = useState(null);
-  const [loadingCompensationIncident, setLoadingCompensationIncident] = useState(false);
   const [submittingLiabilityDecision, setSubmittingLiabilityDecision] = useState(false);
   const [compensationIncidentsByItem, setCompensationIncidentsByItem] = useState({});
+  const [compensationModalOpen, setCompensationModalOpen] = useState(false);
+  const [selectedCompensationIncident, setSelectedCompensationIncident] = useState(null);
+  const [selectedCompensationOrderItemId, setSelectedCompensationOrderItemId] = useState(null);
 
   const [transactionLogModalOpen, setTransactionLogModalOpen] = useState(false);
   const [selectedOrderItemId, setSelectedOrderItemId] = useState(null);
@@ -466,38 +467,8 @@ const Profile = () => {
     setDetailsModalOpen(true);
   };
 
-  useEffect(() => {
-    const loadCompensationIncidentForItem = async () => {
-      if (!detailsModalOpen || !selectedItem?.order_item_id) {
-        setCompensationIncident(null);
-        return;
-      }
-
-      try {
-        setLoadingCompensationIncident(true);
-        const result = await getCompensationIncidents({
-          order_item_id: selectedItem.order_item_id,
-          my_only: true
-        });
-
-        if (result.success) {
-          const incidents = Array.isArray(result.incidents) ? result.incidents : [];
-          setCompensationIncident(incidents.length > 0 ? incidents[0] : null);
-        } else {
-          setCompensationIncident(null);
-        }
-      } catch (err) {
-        setCompensationIncident(null);
-      } finally {
-        setLoadingCompensationIncident(false);
-      }
-    };
-
-    loadCompensationIncidentForItem();
-  }, [detailsModalOpen, selectedItem]);
-
-  const handleCustomerLiabilityDecision = async (decision) => {
-    if (!compensationIncident?.id || !selectedItem?.order_item_id) return;
+  const handleCustomerLiabilityDecision = async (decision, targetIncident = selectedCompensationIncident, targetOrderItemId = selectedCompensationOrderItemId) => {
+    if (!targetIncident?.id || !targetOrderItemId) return;
 
     const isApprove = decision === 'approved';
     const proceed = await confirm(
@@ -516,7 +487,7 @@ const Profile = () => {
 
     try {
       setSubmittingLiabilityDecision(true);
-      const result = await submitCustomerLiabilityDecision(compensationIncident.id, {
+      const result = await submitCustomerLiabilityDecision(targetIncident.id, {
         liability_status: decision
       });
 
@@ -527,19 +498,24 @@ const Profile = () => {
 
       await alert(
         decision === 'approved'
-          ? 'Liability approved. Our team will proceed with settlement handling.'
-          : 'Liability rejected. The team will review your decision.',
+          ? 'Compensation accepted. Please claim your compensation in-store once notified by staff.'
+          : 'Compensation declined. Admin will provide a revised amount for your review.',
         'Decision Submitted',
         'success'
       );
 
       const refreshed = await getCompensationIncidents({
-        order_item_id: selectedItem.order_item_id,
+        order_item_id: targetOrderItemId,
         my_only: true
       });
       if (refreshed.success) {
         const incidents = Array.isArray(refreshed.incidents) ? refreshed.incidents : [];
-        setCompensationIncident(incidents.length > 0 ? incidents[0] : null);
+        const latestIncident = incidents.length > 0 ? incidents[0] : null;
+        setSelectedCompensationIncident(latestIncident);
+        setCompensationIncidentsByItem((prev) => ({
+          ...prev,
+          [Number(targetOrderItemId)]: latestIncident
+        }));
       }
     } catch (error) {
       await alert('Failed to submit liability decision', 'Error', 'error');
@@ -637,7 +613,18 @@ const Profile = () => {
   const closeDetailsModal = () => {
     setSelectedItem(null);
     setDetailsModalOpen(false);
-    setCompensationIncident(null);
+  };
+
+  const openCompensationModal = (incident, orderItemId) => {
+    setSelectedCompensationIncident(incident || null);
+    setSelectedCompensationOrderItemId(orderItemId || null);
+    setCompensationModalOpen(true);
+  };
+
+  const closeCompensationModal = () => {
+    setCompensationModalOpen(false);
+    setSelectedCompensationIncident(null);
+    setSelectedCompensationOrderItemId(null);
   };
 
   const openEnhancementModal = (item) => {
@@ -2371,16 +2358,25 @@ const Profile = () => {
                 );
 
                 const compensationIncidentForItem = compensationIncidentsByItem[Number(item.order_item_id)] || null;
-                const hasApprovedDamageCompensation = compensationIncidentForItem?.liability_status === 'approved';
-                const isCompensationPaid = hasApprovedDamageCompensation && compensationIncidentForItem?.compensation_status === 'paid';
+                const hasCompensationIncident = !!compensationIncidentForItem;
+                const liabilityStatus = String(compensationIncidentForItem?.liability_status || '').toLowerCase();
+                const compensationStatus = String(compensationIncidentForItem?.compensation_status || '').toLowerCase();
+                const isLiabilityPendingIncident = hasCompensationIncident && liabilityStatus === 'pending';
+                const isLiabilityRejectedIncident = hasCompensationIncident && liabilityStatus === 'rejected';
+                const hasApprovedDamageCompensation = hasCompensationIncident && liabilityStatus === 'approved';
+                const isCompensationPaid = hasApprovedDamageCompensation && compensationStatus === 'paid';
                 const isCompensationPendingPayment = hasApprovedDamageCompensation && compensationIncidentForItem?.compensation_status !== 'paid';
 
-                const displayStatusLabel = hasApprovedDamageCompensation
-                  ? (isCompensationPaid ? 'Compensated' : 'For Compensation')
+                const displayStatusLabel = hasCompensationIncident
+                  ? (isLiabilityPendingIncident
+                    ? 'Compensation Review'
+                    : isLiabilityRejectedIncident
+                      ? 'Compensation Rejected'
+                      : (isCompensationPaid ? 'Compensated' : 'For Compensation'))
                   : getStatusLabel(item.status);
 
-                const displayStatusClass = hasApprovedDamageCompensation
-                  ? (isCompensationPaid ? 'completed' : 'pending')
+                const displayStatusClass = hasCompensationIncident
+                  ? (isLiabilityRejectedIncident ? 'cancelled' : (isCompensationPaid ? 'completed' : 'pending'))
                   : getStatusBadgeClass(item.status);
 
                 return (
@@ -2402,10 +2398,10 @@ const Profile = () => {
                     <div className="order-status" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                       <span
                         className={`status-badge ${displayStatusClass}`}
-                        style={hasApprovedDamageCompensation ? {
-                          backgroundColor: isCompensationPaid ? '#e8f5e9' : '#ffebee',
-                          color: isCompensationPaid ? '#1b5e20' : '#c62828',
-                          border: `1px solid ${isCompensationPaid ? '#a5d6a7' : '#ef9a9a'}`
+                        style={hasCompensationIncident ? {
+                          backgroundColor: isCompensationPaid ? '#e8f5e9' : isLiabilityRejectedIncident ? '#fbe9e7' : '#ffebee',
+                          color: isCompensationPaid ? '#1b5e20' : isLiabilityRejectedIncident ? '#bf360c' : '#c62828',
+                          border: `1px solid ${isCompensationPaid ? '#a5d6a7' : isLiabilityRejectedIncident ? '#ffccbc' : '#ef9a9a'}`
                         } : undefined}
                       >
                         {displayStatusLabel}
@@ -2426,24 +2422,16 @@ const Profile = () => {
                         </span>
                       )}
                     </div>
-                    {isCompensationPendingPayment && (
-                      <div style={{
-                        marginTop: '10px',
-                        backgroundColor: '#fff3e0',
-                        border: '1px solid #ffcc80',
-                        color: '#e65100',
-                        padding: '10px 12px',
-                        borderRadius: '8px',
-                        fontSize: '13px',
-                        fontWeight: '600'
-                      }}>
-                        Compensation update: Please get your compensation payment at the shop.
-                      </div>
-                    )}
-                    {isRental && (item.status === 'rented' || item.status === 'picked_up') && item.rental_end_date && (() => {
+                    {isRental && (item.status === 'rented' || item.status === 'picked_up') && (() => {
+                      const dueDateSource = (rentalPaymentMode === 'flat_rate' && rentalFlatRateUntilDate)
+                        ? rentalFlatRateUntilDate
+                        : item.rental_end_date;
+                      if (!dueDateSource) return null;
+
                       const today = new Date();
                       today.setHours(0, 0, 0, 0);
-                      const endDate = new Date(item.rental_end_date);
+                      const endDate = new Date(dueDateSource);
+                      if (Number.isNaN(endDate.getTime())) return null;
                       endDate.setHours(0, 0, 0, 0);
                       const diffTime = endDate - today;
                       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -2872,22 +2860,6 @@ const Profile = () => {
                       );
                     })()}
 
-                    {hasApprovedDamageCompensation ? (
-                      <div style={{
-                        marginTop: '18px',
-                        backgroundColor: isCompensationPaid ? '#e8f5e9' : '#ffebee',
-                        border: `1px solid ${isCompensationPaid ? '#a5d6a7' : '#ef9a9a'}`,
-                        borderRadius: '10px',
-                        padding: '14px 16px'
-                      }}>
-                        <div style={{ fontWeight: '700', color: isCompensationPaid ? '#1b5e20' : '#c62828' }}>
-                          Service closed due to damage incident
-                        </div>
-                        <div style={{ marginTop: '6px', fontSize: '13px', color: '#555' }}>
-                          Liability: {compensationIncidentForItem?.liability_status || 'N/A'} / Compensation: {compensationIncidentForItem?.compensation_status || 'N/A'}
-                        </div>
-                      </div>
-                    ) : (
                     <div className="order-timeline">
                       <div className="timeline-container">
                         {item.service_type === 'rental' ? (
@@ -2977,6 +2949,77 @@ const Profile = () => {
                         )}
                       </div>
                     </div>
+                    {hasCompensationIncident && (
+                      <div style={{
+                        marginTop: '12px',
+                        backgroundColor: isCompensationPaid ? '#e8f5e9' : isLiabilityRejectedIncident ? '#fbe9e7' : '#fff3e0',
+                        border: `1px solid ${isCompensationPaid ? '#a5d6a7' : isLiabilityRejectedIncident ? '#ffccbc' : '#ffcc80'}`,
+                        color: isCompensationPaid ? '#1b5e20' : isLiabilityRejectedIncident ? '#bf360c' : '#e65100',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        display: 'grid',
+                        gap: '8px'
+                      }}>
+                        <div>
+                          Compensation Amount: <strong>{formatCurrencyPHP(compensationIncidentForItem?.compensation_amount || 0)}</strong>
+                        </div>
+                        <div>
+                          Liability: {compensationIncidentForItem?.liability_status || 'N/A'} / Compensation: {compensationIncidentForItem?.compensation_status || 'N/A'}
+                        </div>
+                        {isLiabilityPendingIncident && (
+                          <div>Please review and confirm this compensation amount.</div>
+                        )}
+                        {isCompensationPendingPayment && (
+                          <div>Compensation accepted. Please get your compensation payment at the shop.</div>
+                        )}
+                        {isLiabilityRejectedIncident && (
+                          <div>You declined this compensation. Waiting for admin to provide a revised amount.</div>
+                        )}
+                        {isCompensationPaid && (
+                          <div>Compensation payment is ready and marked as paid by staff.</div>
+                        )}
+                        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
+                            {isLiabilityPendingIncident && (
+                              <>
+                                <button
+                                  onClick={() => handleCustomerLiabilityDecision('rejected', compensationIncidentForItem, item.order_item_id)}
+                                  disabled={submittingLiabilityDecision}
+                                  style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#c62828', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
+                                >
+                                  {submittingLiabilityDecision ? 'Submitting...' : 'Decline Compensation'}
+                                </button>
+                                <button
+                                  onClick={() => handleCustomerLiabilityDecision('approved', compensationIncidentForItem, item.order_item_id)}
+                                  disabled={submittingLiabilityDecision}
+                                  style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
+                                >
+                                  {submittingLiabilityDecision ? 'Submitting...' : 'Accept Compensation'}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => openCompensationModal(compensationIncidentForItem, item.order_item_id)}
+                            style={{
+                              padding: '7px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid #8B4513',
+                              backgroundColor: '#8B4513',
+                              color: '#fff',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                              fontSize: '0.85rem',
+                              lineHeight: 1.2,
+                              marginLeft: 'auto'
+                            }}
+                          >
+                            View Compensation
+                          </button>
+                        </div>
+                      </div>
                     )}
                     {(() => {
                       const showConfirmation = shouldShowPriceConfirmation(item);
@@ -3225,59 +3268,6 @@ const Profile = () => {
 
                 {renderServiceDetails(selectedItem)}
 
-                {loadingCompensationIncident && (
-                  <div style={{ marginTop: '16px', padding: '12px 14px', borderRadius: '8px', background: '#f8f9fa', border: '1px solid #e9ecef' }}>
-                    Loading liability notice...
-                  </div>
-                )}
-
-                {!loadingCompensationIncident && compensationIncident && (
-                  <div style={{ marginTop: '16px', padding: '14px', borderRadius: '10px', background: '#fff8e1', border: '1px solid #f0d58c' }}>
-                    <div style={{ fontWeight: 700, marginBottom: '8px', color: '#6d4c00' }}>Damage Liability Notice</div>
-                    <div style={{ display: 'grid', gap: '6px', marginBottom: '10px' }}>
-                      <div><strong>Damage Type:</strong> {compensationIncident.damage_type || 'N/A'}</div>
-                      <div><strong>Description:</strong> {compensationIncident.damage_description || 'N/A'}</div>
-                      <div><strong>Compensation Amount:</strong> {formatCurrencyPHP(compensationIncident.compensation_amount || 0)}</div>
-                      <div><strong>Liability Status:</strong> {String(compensationIncident.liability_status || 'pending').replace(/_/g, ' ')}</div>
-                      <div><strong>Compensation Status:</strong> {String(compensationIncident.compensation_status || 'unpaid').replace(/_/g, ' ')}</div>
-                      {compensationIncident.payment_reference && (
-                        <div><strong>Payment Reference:</strong> {compensationIncident.payment_reference}</div>
-                      )}
-                      {compensationIncident.compensation_paid_at && (
-                        <div><strong>Paid At:</strong> {formatDateTo12Hour(compensationIncident.compensation_paid_at)}</div>
-                      )}
-                    </div>
-
-                    {String(compensationIncident.compensation_status).toLowerCase() === 'paid' && (
-                      <div style={{ marginBottom: '10px', padding: '10px 12px', borderRadius: '8px', background: '#e8f5e9', border: '1px solid #a5d6a7', color: '#1b5e20', fontWeight: 600 }}>
-                        Compensation has been marked as paid.
-                      </div>
-                    )}
-
-                    {compensationIncident.liability_status === 'pending' ? (
-                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                        <button
-                          onClick={() => handleCustomerLiabilityDecision('approved')}
-                          disabled={submittingLiabilityDecision}
-                          style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
-                        >
-                          {submittingLiabilityDecision ? 'Submitting...' : 'Approve Liability'}
-                        </button>
-                        <button
-                          onClick={() => handleCustomerLiabilityDecision('rejected')}
-                          disabled={submittingLiabilityDecision}
-                          style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#c62828', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
-                        >
-                          {submittingLiabilityDecision ? 'Submitting...' : 'Reject Liability'}
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ color: '#6b7280', fontSize: '0.92rem' }}>
-                        You have already submitted your liability decision for this incident.
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
               <div className="details-modal-footer">
@@ -3369,6 +3359,70 @@ const Profile = () => {
         }}
         orderItemId={selectedOrderItemId}
       />
+      {compensationModalOpen && selectedCompensationIncident && (
+        <div
+          className="details-modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              closeCompensationModal();
+            }
+          }}
+        >
+          <div className="details-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px' }}>
+            <div className="details-modal-header">
+              <h3>Compensation Details</h3>
+              <button className="details-modal-close" onClick={closeCompensationModal}>×</button>
+            </div>
+            <div className="details-modal-content">
+              <div style={{
+                padding: '14px',
+                borderRadius: '10px',
+                background: '#fff8e1',
+                border: '1px solid #f0d58c',
+                display: 'grid',
+                gap: '8px'
+              }}>
+                <div><strong>Damage Type:</strong> {selectedCompensationIncident.damage_type || 'N/A'}</div>
+                <div><strong>Description:</strong> {selectedCompensationIncident.damage_description || 'N/A'}</div>
+                <div><strong>Compensation Amount:</strong> {formatCurrencyPHP(selectedCompensationIncident.compensation_amount || 0)}</div>
+                <div><strong>Liability Status:</strong> {String(selectedCompensationIncident.liability_status || 'pending').replace(/_/g, ' ')}</div>
+                <div><strong>Compensation Status:</strong> {String(selectedCompensationIncident.compensation_status || 'unpaid').replace(/_/g, ' ')}</div>
+                {selectedCompensationIncident.payment_reference && (
+                  <div><strong>Payment Reference:</strong> {selectedCompensationIncident.payment_reference}</div>
+                )}
+                {selectedCompensationIncident.compensation_paid_at && (
+                  <div><strong>Paid At:</strong> {formatDateTo12Hour(selectedCompensationIncident.compensation_paid_at)}</div>
+                )}
+              </div>
+
+              {String(selectedCompensationIncident.compensation_status).toLowerCase() === 'paid' && (
+                <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '8px', background: '#e8f5e9', border: '1px solid #a5d6a7', color: '#1b5e20', fontWeight: 600 }}>
+                  Compensation has been marked as paid. Please claim it in-store.
+                </div>
+              )}
+
+              {String(selectedCompensationIncident.liability_status).toLowerCase() === 'pending' && (
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px', justifyContent: 'center' }}>
+                  <button
+                    onClick={() => handleCustomerLiabilityDecision('rejected', selectedCompensationIncident, selectedCompensationOrderItemId)}
+                    disabled={submittingLiabilityDecision}
+                    style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#c62828', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
+                  >
+                    {submittingLiabilityDecision ? 'Submitting...' : 'Decline'}
+                  </button>
+                  <button
+                    onClick={() => handleCustomerLiabilityDecision('approved', selectedCompensationIncident, selectedCompensationOrderItemId)}
+                    disabled={submittingLiabilityDecision}
+                    style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
+                  >
+                    {submittingLiabilityDecision ? 'Submitting...' : 'Accept'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {measurementsModalOpen && (
         <div
           className="details-modal-overlay"

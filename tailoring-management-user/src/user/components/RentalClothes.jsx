@@ -974,6 +974,46 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
 
 
+  const getDisplayDepositRange = (item) => {
+
+    if (!item) {
+
+      return { min: 0, max: 0 };
+
+    }
+
+
+
+    const deposits = getAvailableSizeKeys(item.sizeOptions || {})
+
+      .map((k) => parseFloat(item.sizeOptions?.[k]?.deposit))
+
+      .filter((d) => !isNaN(d) && d > 0);
+
+
+
+    if (deposits.length > 0) {
+
+      return {
+
+        min: Math.min(...deposits),
+
+        max: Math.max(...deposits)
+
+      };
+
+    }
+
+
+
+    const fallback = getDisplayDeposit(item);
+
+    return { min: fallback, max: fallback };
+
+  };
+
+
+
   const calculateEndDate = (start, duration) => {
 
     if (!start) return '';
@@ -3326,13 +3366,21 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                   <div className="rc-item-pricing">
 
-                    <p className="rc-item-price">From ₱{parsePriceValue(item.price).toLocaleString('en-PH')}</p>
+                    <p className="rc-item-price">
 
-                    {getDisplayDeposit(item) > 0 && (
+                      {(() => {
 
-                      <p className="rc-item-deposit">Deposit: ₱{getDisplayDeposit(item).toLocaleString('en-PH')}</p>
+                        const { min, max } = getDisplayPriceRange(item);
 
-                    )}
+                        const minLabel = `₱${min.toLocaleString('en-PH')}`;
+
+                        const maxLabel = `₱${max.toLocaleString('en-PH')}`;
+
+                        return min === max ? minLabel : `${minLabel} - ${maxLabel}`;
+
+                      })()}
+
+                    </p>
 
                   </div>
 
@@ -4334,12 +4382,6 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                   })()}
 
-                  {getDisplayDeposit(selectedItem) > 0 && (
-
-                    <div style={{ marginTop: '8px', color: '#d9534f', fontWeight: '600' }}>Deposit (Refundable): ₱{getDisplayDeposit(selectedItem).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</div>
-
-                  )}
-
                 </div>
 
 
@@ -4365,28 +4407,6 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                         </div>
 
                       </div>
-
-                    </div>
-
-                    <div className="rc-selection-summary" style={{ marginTop: '4px' }}>
-
-                      Available Sizes:{' '}
-
-                      {getAvailableSizeKeys(selectedItem.sizeOptions || {})
-
-                        .map((key) => {
-
-                          const opt = selectedItem.sizeOptions[key] || {};
-
-                          const qty = opt.quantity;
-
-                          const hasQty = qty !== null && qty !== undefined && qty !== '' && !Number.isNaN(parseInt(qty, 10));
-
-                          return `${opt.label || SIZE_LABELS[key] || key}${hasQty ? ` (${parseInt(qty, 10)} pcs)` : ''}`;
-
-                        })
-
-                        .join(', ')}
 
                     </div>
 
@@ -4464,55 +4484,73 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                           <div key={sizeKey} className={`rc-size-row ${currentQty > 0 ? 'selected' : ''}`}>
 
-                            <div className="rc-size-row-header">
+                            <div className="rc-size-row-header" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'stretch' }}>
 
-                              <span className="rc-size-label">{opt.label || SIZE_LABELS[sizeKey] || sizeKey}</span>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
 
-                              {opt.price > 0 && (
+                                <span className="rc-size-label">{opt.label || SIZE_LABELS[sizeKey] || sizeKey}</span>
 
-                                <span className="rc-size-price">₱ {parseFloat(opt.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })} / 3 days</span>
+                                {opt.price > 0 && (
 
-                              )}
+                                  <span className="rc-size-price">₱ {parseFloat(opt.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })} / 3 days</span>
 
-                              <div className="rc-qty-control">
+                                )}
 
-                                <button
+                                {(parseFloat(opt.deposit) || 0) > 0 && (
 
-                                  disabled={currentQty <= 0}
+                                  <span className="rc-size-price" style={{ color: '#b94a48' }}>
 
-                                  onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.max(0, currentQty - 1) }))}
+                                    Deposit: ₱ {parseFloat(opt.deposit).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
 
-                                >−</button>
+                                  </span>
 
-                                <span>{currentQty}</span>
-
-                                <button
-
-                                  disabled={currentQty >= maxQty}
-
-                                  onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.min(maxQty, currentQty + 1) }))}
-
-                                >+
-
-                                </button>
+                                )}
 
                               </div>
 
-                              {hasMeasurements && measurementRows.length > 0 && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', justifyContent: 'space-between' }}>
 
-                                <button
+                                <div className="rc-qty-control">
 
-                                  className="rc-meas-toggle"
+                                  <button
 
-                                  onClick={() => setExpandedMeasurementSize(isExpanded ? null : sizeKey)}
+                                    disabled={currentQty <= 0}
 
-                                >
+                                    onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.max(0, currentQty - 1) }))}
 
-                                  {isExpanded ? 'Hide Measurements' : 'Measurements'}
+                                  >−</button>
 
-                                </button>
+                                  <span>{currentQty}</span>
 
-                              )}
+                                  <button
+
+                                    disabled={currentQty >= maxQty}
+
+                                    onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.min(maxQty, currentQty + 1) }))}
+
+                                  >+
+
+                                  </button>
+
+                                </div>
+
+                                {hasMeasurements && measurementRows.length > 0 && (
+
+                                  <button
+
+                                    className="rc-meas-toggle"
+
+                                    onClick={() => setExpandedMeasurementSize(isExpanded ? null : sizeKey)}
+
+                                  >
+
+                                    {isExpanded ? 'Hide Measurements' : 'Measurements'}
+
+                                  </button>
+
+                                )}
+
+                              </div>
 
                             </div>
 

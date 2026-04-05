@@ -91,7 +91,7 @@ html, body {
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(90deg, #8B4513 0%, #8B4513 100%);
   transform: scaleX(0);
   transition: transform 0.4s ease;
 }
@@ -236,7 +236,7 @@ html, body {
 }
 
 .inventory-management thead {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
 }
 
 .inventory-management thead th {
@@ -247,7 +247,7 @@ html, body {
   color: #FFFFFF;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   white-space: nowrap;
 }
 
@@ -259,7 +259,7 @@ html, body {
   color: #FFFFFF;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   white-space: nowrap;
 }
 
@@ -296,7 +296,7 @@ html, body {
   font-size: 14px;
   color: #FFFFFF;
   transition: all 0.3s ease;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   box-shadow: 0 4px 12px rgba(139, 69, 19, 0.3);
 }
 
@@ -322,7 +322,7 @@ html, body {
 
 .service-type-badge[data-service-type="customization"],
 .service-type-badge[data-service-type="customize"] {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: #FFFFFF !important;
 }
 
@@ -464,7 +464,7 @@ html, body {
 }
 
 .inventory-management .modal-header {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: white;
   padding: 20px 28px;
   display: flex;

@@ -14,7 +14,7 @@ html, body {
 }
 
 .add-rep {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: #FFFFFF;
   padding: 12px 24px;
   border-radius: 10px;
@@ -125,7 +125,7 @@ table {
 }
 
 thead {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
 }
 
 thead th {
@@ -136,7 +136,7 @@ thead th {
   color: #FFFFFF;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   white-space: nowrap;
 }
 
@@ -276,7 +276,7 @@ tbody {
 }
 
 .modal-header {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: white;
   padding: 20px 28px;
   display: flex;
@@ -356,7 +356,7 @@ tbody {
 
 .btn-save {
   padding: 11px 32px;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: white;
   border: none;
   border-radius: 10px;
@@ -367,7 +367,7 @@ tbody {
 }
 
 .btn-save:hover {
-  background: linear-gradient(135deg, #A0522D 0%, #8B4513 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(139, 69, 19, 0.4);
   transform: translateY(-2px);
@@ -723,7 +723,7 @@ tbody {
 }
 
 .modal-header {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: white;
   padding: 20px 28px;
   display: flex;
@@ -803,7 +803,7 @@ tbody {
 
 .btn-save {
   padding: 11px 32px;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: white;
   border: none;
   border-radius: 10px;
@@ -814,7 +814,7 @@ tbody {
 }
 
 .btn-save:hover {
-  background: linear-gradient(135deg, #A0522D 0%, #8B4513 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(139, 69, 19, 0.4);
   transform: translateY(-2px);
@@ -977,7 +977,7 @@ tbody {
 }
 
 .modal-header {
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: white;
   padding: 20px 28px;
   display: flex;
@@ -1057,7 +1057,7 @@ tbody {
 
 .btn-save {
   padding: 11px 32px;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   color: white;
   border: none;
   border-radius: 10px;
@@ -1068,7 +1068,7 @@ tbody {
 }
 
 .btn-save:hover {
-  background: linear-gradient(135deg, #A0522D 0%, #8B4513 100%);
+  background: linear-gradient(135deg, #8B4513 0%, #8B4513 100%);
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(139, 69, 19, 0.4);
   transform: translateY(-2px);

@@ -59,6 +59,8 @@ const DryCleaning = () => {
 
   const [statusFilter, setStatusFilter] = useState('');
 
+  const [todayAppointmentsOnly, setTodayAppointmentsOnly] = useState(false);
+
   const [viewFilter, setViewFilter] = useState("all");
 
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -511,6 +513,8 @@ const DryCleaning = () => {
 
       'ready_for_pickup': 'To Pick up',
 
+      'ready_to_pickup': 'To Pick up',
+
       'completed': 'Completed',
 
       'cancelled': 'Rejected',
@@ -523,11 +527,21 @@ const DryCleaning = () => {
 
   };
 
+  const isPaidCompensationIncident = (incident) => (
+    incident &&
+    String(incident.liability_status || '').toLowerCase() === 'approved' &&
+    String(incident.compensation_status || '').toLowerCase() === 'paid'
+  );
+
+  const normalizeIncidentStatus = (value) => String(value || '').toLowerCase();
+
 
 
   const getNextStatus = (currentStatus, serviceType = 'dry_cleaning', item = null) => {
 
-    if (!currentStatus || currentStatus === 'pending_review' || currentStatus === 'pending') {
+    const normalizedCurrentStatus = currentStatus === 'ready_to_pickup' ? 'ready_for_pickup' : currentStatus;
+
+    if (!normalizedCurrentStatus || normalizedCurrentStatus === 'pending_review' || normalizedCurrentStatus === 'pending') {
 
       if (serviceType === 'dry_cleaning') {
 
@@ -541,7 +555,7 @@ const DryCleaning = () => {
 
 
 
-    if (currentStatus === 'price_confirmation') {
+    if (normalizedCurrentStatus === 'price_confirmation') {
 
       return 'accepted';
 
@@ -549,7 +563,7 @@ const DryCleaning = () => {
 
 
 
-    if (currentStatus === 'accepted') {
+    if (normalizedCurrentStatus === 'accepted') {
 
       return 'confirmed';
 
@@ -573,7 +587,7 @@ const DryCleaning = () => {
 
     const flow = statusFlow[serviceType] || statusFlow['dry_cleaning'];
 
-    const currentIndex = flow.indexOf(currentStatus);
+    const currentIndex = flow.indexOf(normalizedCurrentStatus);
 
 
 
@@ -603,9 +617,12 @@ const DryCleaning = () => {
 
       const remainingBalance = finalPrice - amountPaid;
 
+      const incident = getIncidentForItem(item.item_id);
+      const hasPaidCompensation = isPaidCompensationIncident(incident);
 
 
-      if (remainingBalance > 0.01) {
+
+      if (remainingBalance > 0.01 && !hasPaidCompensation) {
 
         return null;
 
@@ -739,6 +756,8 @@ const DryCleaning = () => {
 
   };
 
+  const isTodayAppointment = (item) => getComputedStatus(item) === 'appointment-today';
+
 
 
   const getNextStatusLabel = (currentStatus, serviceType = 'dry_cleaning', item = null) => {
@@ -828,9 +847,11 @@ const DryCleaning = () => {
 
   };
 
-  const getIncidentForItem = (itemId) => (
-    damageIncidents.find((incident) => Number(incident.order_item_id) === Number(itemId)) || null
-  );
+  const getIncidentForItem = (itemId) => {
+    const incidents = damageIncidents.filter((incident) => Number(incident.order_item_id) === Number(itemId));
+    if (!incidents.length) return null;
+    return incidents.sort((a, b) => Number(b.id || 0) - Number(a.id || 0))[0];
+  };
 
   const getCustomerNameFromItem = (item) => {
     if (item.order_type === 'walk_in') {
@@ -989,6 +1010,8 @@ const DryCleaning = () => {
 
   };
 
+  const todayAppointmentsCount = allItems.filter(isTodayAppointment).length;
+
 
 
   const getFilteredItems = () => {
@@ -1091,6 +1114,10 @@ const DryCleaning = () => {
 
       });
 
+    }
+
+    if (todayAppointmentsOnly) {
+      items = items.filter(isTodayAppointment);
     }
 
 
@@ -1274,6 +1301,8 @@ const DryCleaning = () => {
 
 
     const finalPrice = parseFloat(priceConfirmationPrice);
+    const currentPrice = parseFloat(priceConfirmationItem.final_price || 0);
+    const isPriceChanged = Math.abs(finalPrice - currentPrice) > 0.01;
 
     if (isNaN(finalPrice) || finalPrice <= 0) {
 
@@ -1285,7 +1314,7 @@ const DryCleaning = () => {
 
 
 
-    if (!priceConfirmationReason.trim()) {
+    if (isPriceChanged && !priceConfirmationReason.trim()) {
 
       showToast("Please provide a reason for the price", "error");
 
@@ -1303,7 +1332,7 @@ const DryCleaning = () => {
 
         finalPrice: finalPrice,
 
-        adminNotes: priceConfirmationReason.trim()
+        adminNotes: isPriceChanged ? priceConfirmationReason.trim() : undefined
 
       });
 
@@ -1401,9 +1430,12 @@ const DryCleaning = () => {
 
       const remainingBalance = finalPrice - amountPaid;
 
+      const incident = getIncidentForItem(item.item_id);
+      const hasPaidCompensation = isPaidCompensationIncident(incident);
 
 
-      if (remainingBalance > 0.01) {
+
+      if (remainingBalance > 0.01 && !hasPaidCompensation) {
 
         showToast(`Cannot mark as completed. Payment is not complete. Remaining balance: ₱${remainingBalance.toFixed(2)}`, "error");
 
@@ -2170,12 +2202,34 @@ const DryCleaning = () => {
 
             <option value="cancelled">Rejected</option>
 
-            <option value="appointment-today">Appointment Today</option>
-
             <option value="estimated-today">Estimated Release Today</option>
 
           </select>
 
+        </div>
+
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '12px',
+          margin: '10px 0 12px 0',
+          padding: '10px 12px',
+          border: '1px solid #e7d9cc',
+          borderRadius: '8px',
+          background: '#fffaf5'
+        }}>
+          <div style={{ color: '#8B4513', fontWeight: '600', fontSize: '13px' }}>
+            Today's appointments: {todayAppointmentsCount}
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#333', fontSize: '13px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={todayAppointmentsOnly}
+              onChange={(e) => setTodayAppointmentsOnly(e.target.checked)}
+            />
+            Show only today's appointments
+          </label>
         </div>
 
         <div className="table-container">
@@ -2225,9 +2279,11 @@ const DryCleaning = () => {
                 getFilteredItems().map(item => {
 
                   const incident = getIncidentForItem(item.item_id);
-                  const isCompensatedIncident = incident && incident.liability_status === 'approved' && incident.compensation_status === 'paid';
-                  const isDamagePendingIncident = incident && incident.liability_status === 'pending';
-                  const isForCompensationIncident = incident && incident.liability_status === 'approved' && incident.compensation_status !== 'paid';
+                  const liabilityStatus = normalizeIncidentStatus(incident?.liability_status);
+                  const compensationStatus = normalizeIncidentStatus(incident?.compensation_status);
+                  const isCompensatedIncident = incident && liabilityStatus === 'approved' && compensationStatus === 'paid';
+                  const isDamagePendingIncident = incident && liabilityStatus === 'pending';
+                  const isForCompensationIncident = incident && liabilityStatus === 'approved' && compensationStatus !== 'paid';
 
 
 
@@ -2324,9 +2380,9 @@ const DryCleaning = () => {
                     <td onClick={(e) => e.stopPropagation()}>
 
                       {(() => {
-                        const hasApprovedDamage = incident?.liability_status === 'approved';
-                        const isCompensationPaid = hasApprovedDamage && incident?.compensation_status === 'paid';
-                        const isDamagePending = incident?.liability_status === 'pending';
+                        const hasApprovedDamage = normalizeIncidentStatus(incident?.liability_status) === 'approved';
+                        const isCompensationPaid = hasApprovedDamage && normalizeIncidentStatus(incident?.compensation_status) === 'paid';
+                        const isDamagePending = normalizeIncidentStatus(incident?.liability_status) === 'pending';
                         return (
                           <span
                             className={`status-badge ${hasApprovedDamage ? (isCompensationPaid ? 'completed' : 'rejected') : isDamagePending ? 'rejected' : getStatusClass(item.approval_status || 'pending')}`}
@@ -2448,6 +2504,19 @@ const DryCleaning = () => {
                             </div>
                           ) : isCompensatedIncident && (
                             <>
+                              {getNextStatus(item.approval_status, 'dry_cleaning', item) && (
+                                <button
+                                  className="icon-btn next-status"
+                                  onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'dry_cleaning', item))}
+                                  title={`Move to ${getNextStatusLabel(item.approval_status, 'dry_cleaning', item)}`}
+                                  style={{ backgroundColor: '#4CAF50', color: 'white' }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                  </svg>
+                                </button>
+                              )}
+
                               <button
                                 className="icon-btn"
                                 onClick={(e) => {
@@ -4013,7 +4082,7 @@ const DryCleaning = () => {
 
               <div className="payment-form-group" style={{ marginTop: '12px' }}>
 
-                <label>Reason for Price <span style={{ color: '#d32f2f' }}>*</span></label>
+                <label>Reason for Price <span style={{ color: '#666', fontSize: '12px' }}>(required only if price changes)</span></label>
 
                 <textarea
 

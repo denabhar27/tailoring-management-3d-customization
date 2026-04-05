@@ -21,7 +21,7 @@ function AdminPage() {
 
   useEffect(() => {
     const role = getUserRole();
-    if (role !== 'admin') {
+    if (role !== 'admin' && role !== 'clerk') {
       navigate('/customize', { replace: true });
     }
   }, [navigate]);

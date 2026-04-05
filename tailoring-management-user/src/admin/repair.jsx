@@ -82,6 +82,8 @@ const Repair = () => {
 
   const [statusFilter, setStatusFilter] = useState('');
 
+  const [todayAppointmentsOnly, setTodayAppointmentsOnly] = useState(false);
+
   const [viewFilter, setViewFilter] = useState("all");
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -291,6 +293,8 @@ const Repair = () => {
 
       'ready_for_pickup': 'To Pick up',
 
+      'ready_to_pickup': 'To Pick up',
+
       'completed': 'Completed',
 
       'cancelled': 'Rejected',
@@ -303,11 +307,21 @@ const Repair = () => {
 
   };
 
+  const isPaidCompensationIncident = (incident) => (
+    incident &&
+    String(incident.liability_status || '').toLowerCase() === 'approved' &&
+    String(incident.compensation_status || '').toLowerCase() === 'paid'
+  );
+
+  const normalizeIncidentStatus = (value) => String(value || '').toLowerCase();
+
 
 
   const getNextStatus = (currentStatus, serviceType = 'repair', item = null) => {
 
-    if (!currentStatus || currentStatus === 'pending_review' || currentStatus === 'pending') {
+    const normalizedCurrentStatus = currentStatus === 'ready_to_pickup' ? 'ready_for_pickup' : currentStatus;
+
+    if (!normalizedCurrentStatus || normalizedCurrentStatus === 'pending_review' || normalizedCurrentStatus === 'pending') {
 
       return 'price_confirmation';
 
@@ -315,7 +329,7 @@ const Repair = () => {
 
 
 
-    if (currentStatus === 'price_confirmation') {
+    if (normalizedCurrentStatus === 'price_confirmation') {
 
       return 'accepted';
 
@@ -323,7 +337,7 @@ const Repair = () => {
 
 
 
-    if (currentStatus === 'accepted') {
+    if (normalizedCurrentStatus === 'accepted') {
 
       return 'confirmed';
 
@@ -347,7 +361,7 @@ const Repair = () => {
 
     const flow = statusFlow[serviceType] || statusFlow['repair'];
 
-    const currentIndex = flow.indexOf(currentStatus);
+    const currentIndex = flow.indexOf(normalizedCurrentStatus);
 
 
 
@@ -377,9 +391,12 @@ const Repair = () => {
 
       const remainingBalance = finalPrice - amountPaid;
 
+      const incident = getIncidentForItem(item.item_id);
+      const hasPaidCompensation = isPaidCompensationIncident(incident);
 
 
-      if (remainingBalance > 0.01) {
+
+      if (remainingBalance > 0.01 && !hasPaidCompensation) {
 
         return null;
 
@@ -534,6 +551,8 @@ const Repair = () => {
     return null;
 
   };
+
+  const isTodayAppointment = (item) => getComputedStatus(item) === 'appointment-today';
 
 
 
@@ -1032,9 +1051,11 @@ const Repair = () => {
 
   };
 
-  const getIncidentForItem = (itemId) => (
-    damageIncidents.find((incident) => Number(incident.order_item_id) === Number(itemId)) || null
-  );
+  const getIncidentForItem = (itemId) => {
+    const incidents = damageIncidents.filter((incident) => Number(incident.order_item_id) === Number(itemId));
+    if (!incidents.length) return null;
+    return incidents.sort((a, b) => Number(b.id || 0) - Number(a.id || 0))[0];
+  };
 
   const getCustomerNameFromItem = (item) => {
     if (item.order_type === 'walk_in') {
@@ -1191,6 +1212,8 @@ const Repair = () => {
 
   };
 
+  const todayAppointmentsCount = allItems.filter(isTodayAppointment).length;
+
 
 
   const getFilteredItems = () => {
@@ -1279,6 +1302,10 @@ const Repair = () => {
 
       });
 
+    }
+
+    if (todayAppointmentsOnly) {
+      items = items.filter(isTodayAppointment);
     }
 
 
@@ -1382,6 +1409,8 @@ const Repair = () => {
 
 
     const finalPrice = parseFloat(priceConfirmationPrice);
+    const currentPrice = parseFloat(priceConfirmationItem.final_price || 0);
+    const isPriceChanged = Math.abs(finalPrice - currentPrice) > 0.01;
 
     if (isNaN(finalPrice) || finalPrice <= 0) {
 
@@ -1393,7 +1422,7 @@ const Repair = () => {
 
 
 
-    if (!priceConfirmationReason.trim()) {
+    if (isPriceChanged && !priceConfirmationReason.trim()) {
 
       showToast("Please provide a reason for the price change", "error");
 
@@ -1411,7 +1440,7 @@ const Repair = () => {
 
         finalPrice: finalPrice,
 
-        adminNotes: priceConfirmationReason.trim()
+        adminNotes: isPriceChanged ? priceConfirmationReason.trim() : undefined
 
       });
 
@@ -1521,9 +1550,12 @@ const Repair = () => {
 
       const remainingBalance = finalPrice - amountPaid;
 
+      const incident = getIncidentForItem(item.item_id);
+      const hasPaidCompensation = isPaidCompensationIncident(incident);
 
 
-      if (remainingBalance > 0.01) {
+
+      if (remainingBalance > 0.01 && !hasPaidCompensation) {
 
         await alert(
 
@@ -2322,12 +2354,34 @@ const Repair = () => {
 
             <option value="cancelled">Rejected</option>
 
-            <option value="appointment-today">Appointment Today</option>
-
             <option value="estimated-today">Estimated Release Today</option>
 
           </select>
 
+        </div>
+
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '12px',
+          margin: '10px 0 12px 0',
+          padding: '10px 12px',
+          border: '1px solid #e7d9cc',
+          borderRadius: '8px',
+          background: '#fffaf5'
+        }}>
+          <div style={{ color: '#8B4513', fontWeight: '600', fontSize: '13px' }}>
+            Today's appointments: {todayAppointmentsCount}
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#333', fontSize: '13px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={todayAppointmentsOnly}
+              onChange={(e) => setTodayAppointmentsOnly(e.target.checked)}
+            />
+            Show only today's appointments
+          </label>
         </div>
 
         <div className="table-container">
@@ -2385,9 +2439,11 @@ const Repair = () => {
                 ).map(item => {
 
                   const incident = getIncidentForItem(item.item_id);
-                  const isCompensatedIncident = incident && incident.liability_status === 'approved' && incident.compensation_status === 'paid';
-                  const isDamagePendingIncident = incident && incident.liability_status === 'pending';
-                  const isForCompensationIncident = incident && incident.liability_status === 'approved' && incident.compensation_status !== 'paid';
+                  const liabilityStatus = normalizeIncidentStatus(incident?.liability_status);
+                  const compensationStatus = normalizeIncidentStatus(incident?.compensation_status);
+                  const isCompensatedIncident = incident && liabilityStatus === 'approved' && compensationStatus === 'paid';
+                  const isDamagePendingIncident = incident && liabilityStatus === 'pending';
+                  const isForCompensationIncident = incident && liabilityStatus === 'approved' && compensationStatus !== 'paid';
 
 
 
@@ -2571,6 +2627,18 @@ const Repair = () => {
                           </div>
                         ) : isCompensatedIncident ? (
                           <div className="action-buttons">
+                            {getNextStatus(item.approval_status, 'repair', item) && (
+                              <button
+                                className="icon-btn next-status"
+                                onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'repair', item))}
+                                title={`Move to ${getNextStatusLabel(item.approval_status, 'repair', item)}`}
+                                style={{ backgroundColor: '#4CAF50', color: 'white' }}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                              </button>
+                            )}
                             <button
                               className="icon-btn"
                               onClick={(e) => {
@@ -4187,7 +4255,7 @@ const Repair = () => {
 
               <div className="payment-form-group" style={{ marginTop: '12px' }}>
 
-                <label>Reason for Price Change <span style={{ color: '#d32f2f' }}>*</span></label>
+                <label>Reason for Price Change <span style={{ color: '#666', fontSize: '12px' }}>(required only if price changes)</span></label>
 
                 <textarea
 

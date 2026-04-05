@@ -45,7 +45,7 @@ html {
   left: 270px;
   right: 0;
   height: 70px;
-  background: linear-gradient(135deg, #8b4513 0%, #a0522d 100%);
+  background: linear-gradient(135deg, #8b4513 0%, #8B4513 100%);
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -125,7 +125,7 @@ html {
 }
 
 .sidebar a.active {
-  background: linear-gradient(135deg, #8b4513 0%, #a0522d 100%);
+  background: linear-gradient(135deg, #8b4513 0%, #8B4513 100%);
   color: white;
   border-left-color: #8b4513;
   font-weight: 600;
@@ -246,7 +246,7 @@ html {
 
 .filter-tab.active {
   color: #ffffff;
-  background: linear-gradient(135deg, #8b4513 0%, #a0522d 100%);
+  background: linear-gradient(135deg, #8b4513 0%, #8B4513 100%);
   border-color: #8b4513;
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(139, 69, 19, 0.3);
@@ -487,7 +487,7 @@ html {
 
 .clear-btn-dropdown {
   padding: 10px 16px;
-  background: linear-gradient(135deg, #8b4513 0%, #a0522d 100%);
+  background: linear-gradient(135deg, #8b4513 0%, #8B4513 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -556,7 +556,7 @@ html {
 
 .filter-tab-sm.active {
   color: #ffffff;
-  background: linear-gradient(135deg, #8b4513 0%, #a0522d 100%);
+  background: linear-gradient(135deg, #8b4513 0%, #8B4513 100%);
   border-color: #8b4513;
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(139, 69, 19, 0.3);
@@ -623,7 +623,7 @@ html {
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #8b4513 0%, #a0522d 100%);
+  background: linear-gradient(90deg, #8b4513 0%, #8B4513 100%);
   transform: scaleX(0);
   transition: transform 0.4s ease;
 }
@@ -725,7 +725,7 @@ html {
 }
 
 .activity-table thead {
-  background: linear-gradient(135deg, #8b4513 0%, #a0522d 100%);
+  background: linear-gradient(135deg, #8b4513 0%, #8B4513 100%);
 }
 
 .recent-activity.scrollable .activity-table thead {
@@ -743,7 +743,7 @@ html {
   border-bottom: none;
   letter-spacing: 0.5px;
   font-family: "Poppins", sans-serif;
-  background: linear-gradient(135deg, #8b4513 0%, #a0522d 100%);
+  background: linear-gradient(135deg, #8b4513 0%, #8B4513 100%);
 }
 
 .recent-activity.scrollable .activity-table th {

@@ -1492,18 +1492,26 @@ exports.updateRentalOrderItem = (req, res) => {
     let penaltyAmount = 0;
     let penaltyDays = 0;
     if (updateData.approvalStatus === 'returned' && previousStatus !== 'returned') {
-      if (item.rental_end_date) {
-        const endDate = new Date(item.rental_end_date);
+      const effectiveDueDate =
+        previousPaymentMode === 'flat_rate' && previousFlatRateUntilDate
+          ? previousFlatRateUntilDate
+          : item.rental_end_date;
+
+      if (effectiveDueDate) {
+        const endDate = new Date(effectiveDueDate);
+        if (Number.isNaN(endDate.getTime())) {
+          console.warn(`[RENTAL PENALTY] Invalid due date for item ${itemId}: ${effectiveDueDate}`);
+        }
         const today = new Date();
         today.setHours(0, 0, 0, 0); 
         endDate.setHours(0, 0, 0, 0);
 
-        if (today > endDate) {
+        if (!Number.isNaN(endDate.getTime()) && today > endDate) {
           const diffTime = today - endDate;
           penaltyDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
           penaltyAmount = penaltyDays * 100; 
           
-          console.log(`[RENTAL PENALTY] Item ${itemId}: End date: ${item.rental_end_date}, Today: ${today.toISOString().split('T')[0]}, Days exceeded: ${penaltyDays}, Penalty: ₱${penaltyAmount}`);
+          console.log(`[RENTAL PENALTY] Item ${itemId}: Due date: ${effectiveDueDate}, Today: ${today.toISOString().split('T')[0]}, Days exceeded: ${penaltyDays}, Penalty: ₱${penaltyAmount}`);
 
           const currentPricingFactors = item.pricing_factors ? (typeof item.pricing_factors === 'string' ? JSON.parse(item.pricing_factors) : item.pricing_factors) : {};
           currentPricingFactors.penalty = penaltyAmount;
@@ -1534,7 +1542,7 @@ exports.updateRentalOrderItem = (req, res) => {
                   userEmail: user.email,
                   userName: `${user.first_name} ${user.last_name}`,
                   itemName: itemName,
-                  rentalEndDate: item.rental_end_date,
+                  rentalEndDate: effectiveDueDate,
                   returnDate: new Date().toISOString().split('T')[0],
                   daysOverdue: penaltyDays,
                   penaltyAmount: penaltyAmount,

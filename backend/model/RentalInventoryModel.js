@@ -302,7 +302,7 @@ const RentalInventory = {
   },
 
   getAvailableItems: (filters = {}, callback) => {
-    let sql = "SELECT * FROM rental_inventory WHERE status = 'available' AND total_available > 0";
+    let sql = "SELECT * FROM rental_inventory WHERE status = 'available'";
     const values = [];
     
     if (filters.category) {
@@ -340,17 +340,13 @@ const RentalInventory = {
     
     db.query(sql, values, (err, rows) => {
       if (err) return callback(err);
-      const filtered = (rows || []).filter((row) => {
-        const sizeTotal = getSizeEntriesTotal(row.size);
-        if (sizeTotal === null) return true; // keep legacy/unparsed items
-        return sizeTotal > 0;
-      });
-      callback(null, filtered);
+      // Don't filter by database quantity - let frontend check real-time availability
+      callback(null, rows || []);
     });
   },
 
   getAvailableItemsCount: (filters = {}, callback) => {
-    let sql = "SELECT item_id, size, total_available FROM rental_inventory WHERE status = 'available' AND total_available > 0";
+    let sql = "SELECT COUNT(*) as total FROM rental_inventory WHERE status = 'available'";
     const values = [];
 
     if (filters.category) {
@@ -374,17 +370,7 @@ const RentalInventory = {
       values.push(searchTerm, searchTerm, searchTerm);
     }
 
-    db.query(sql, values, (err, rows) => {
-      if (err) return callback(err);
-
-      const filteredCount = (rows || []).filter((row) => {
-        const sizeTotal = getSizeEntriesTotal(row.size);
-        if (sizeTotal === null) return true;
-        return sizeTotal > 0;
-      }).length;
-
-      callback(null, [{ total: filteredCount }]);
-    });
+    db.query(sql, values, callback);
   },
 
   findById: (item_id, callback) => {
@@ -393,7 +379,7 @@ const RentalInventory = {
   },
 
   searchItems: (filters = {}, callback) => {
-    let sql = "SELECT * FROM rental_inventory WHERE status = 'available' AND total_available > 0";
+    let sql = "SELECT * FROM rental_inventory WHERE status = 'available'";
     const values = [];
     
     if (filters.query) {
@@ -433,7 +419,7 @@ const RentalInventory = {
   },
 
   getSearchCount: (filters = {}, callback) => {
-    let sql = "SELECT COUNT(*) as total FROM rental_inventory WHERE status = 'available' AND total_available > 0";
+    let sql = "SELECT COUNT(*) as total FROM rental_inventory WHERE status = 'available'";
     const values = [];
     
     if (filters.query) {
@@ -463,7 +449,7 @@ const RentalInventory = {
   getByCategoryPaginated: (category, limit, offset, callback) => {
     const sql = `
       SELECT * FROM rental_inventory 
-      WHERE category = ? AND status = 'available' AND total_available > 0 
+      WHERE category = ? AND status = 'available' 
       ORDER BY created_at DESC 
       LIMIT ? OFFSET ?
     `;
@@ -471,33 +457,28 @@ const RentalInventory = {
   },
 
   getCategoryCount: (category, callback) => {
-    const sql = "SELECT COUNT(*) as total FROM rental_inventory WHERE category = ? AND status = 'available' AND total_available > 0";
+    const sql = "SELECT COUNT(*) as total FROM rental_inventory WHERE category = ? AND status = 'available'";
     db.query(sql, [category], callback);
   },
 
   getFeaturedItems: (limit, callback) => {
-    const fetchLimit = Math.max(1, Math.ceil(limit * 5));
     const sql = `
       SELECT * FROM rental_inventory 
-      WHERE status = 'available' AND total_available > 0 
+      WHERE status = 'available' 
       ORDER BY created_at DESC 
       LIMIT ?
     `;
-    db.query(sql, [fetchLimit], (err, rows) => {
+    db.query(sql, [limit], (err, rows) => {
       if (err) return callback(err);
-      const filtered = (rows || []).filter((row) => {
-        const sizeTotal = getSizeEntriesTotal(row.size);
-        if (sizeTotal === null) return true;
-        return sizeTotal > 0;
-      });
-      callback(null, filtered.slice(0, limit));
+      // Don't filter by database quantity - let frontend check real-time availability
+      callback(null, rows || []);
     });
   },
 
   getSimilarItems: (category, excludeId, limit, callback) => {
     const sql = `
       SELECT * FROM rental_inventory 
-      WHERE category = ? AND item_id != ? AND status = 'available' AND total_available > 0 
+      WHERE category = ? AND item_id != ? AND status = 'available' 
       ORDER BY RAND() 
       LIMIT ?
     `;

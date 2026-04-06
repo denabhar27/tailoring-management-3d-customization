@@ -596,3 +596,19 @@ export function getRentalImageUrl(imageUrl) {
 
 }
 
+export async function getAvailableQuantity(item_id) {
+  try {
+    const response = await axios.get(`${BASE_URL}/rentals/${item_id}/available-quantity`, {
+      headers: getAuthHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Get available quantity error:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Error fetching available quantity",
+      available_quantities: {},
+      reserved_quantities: {}
+    };
+  }
+}

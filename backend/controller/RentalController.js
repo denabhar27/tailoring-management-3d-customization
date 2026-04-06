@@ -536,3 +536,141 @@ exports.getCategories = (req, res) => {
     });
   });
 };
+
+exports.getAvailableQuantity = (req, res) => {
+  const { item_id } = req.params;
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(401).json({ 
+      message: "User not authenticated" 
+    });
+  }
+
+  RentalInventory.findById(item_id, (err, results) => {
+    if (err) {
+      console.error("Error fetching rental item:", err);
+      return res.status(500).json({ 
+        message: "Error fetching rental item", 
+        error: err 
+      });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ 
+        message: "Rental item not found" 
+      });
+    }
+
+    const item = results[0];
+    let sizePayload;
+    try {
+      sizePayload = typeof item.size === 'string' ? JSON.parse(item.size) : item.size;
+    } catch (e) {
+      return res.status(500).json({ 
+        message: "Invalid size data" 
+      });
+    }
+
+    const sizeEntries = Array.isArray(sizePayload?.size_entries) ? sizePayload.size_entries : [];
+
+    // Get quantities in ALL users' carts (not just current user)
+    const cartSql = `
+      SELECT specific_data 
+      FROM cart 
+      WHERE service_type = 'rental' 
+        AND (service_id = ? OR JSON_EXTRACT(specific_data, '$.bundle_items[*].id') LIKE ?)
+        AND status = 'active'
+    `;
+
+    const db = require('../config/db');
+    db.query(cartSql, [item_id, `%${item_id}%`], (cartErr, cartRows) => {
+      if (cartErr) {
+        console.error("Error fetching cart items:", cartErr);
+        return res.status(500).json({ 
+          message: "Error checking cart", 
+          error: cartErr 
+        });
+      }
+
+      // Get quantities in ALL users' pending/active orders (not just current user)
+      const orderSql = `
+        SELECT oi.specific_data
+        FROM order_items oi
+        WHERE oi.service_type = 'rental'
+          AND (oi.service_id = ? OR JSON_EXTRACT(oi.specific_data, '$.bundle_items[*].id') LIKE ?)
+          AND oi.approval_status IN ('pending', 'ready_to_pickup', 'picked_up', 'rented')
+      `;
+
+      db.query(orderSql, [item_id, `%${item_id}%`], (orderErr, orderRows) => {
+        if (orderErr) {
+          console.error("Error fetching order items:", orderErr);
+          return res.status(500).json({ 
+            message: "Error checking orders", 
+            error: orderErr 
+          });
+        }
+
+        // Calculate reserved quantities per size
+        const reservedBySizeKey = {};
+
+        const processRows = (rows) => {
+          rows.forEach(row => {
+            let specificData;
+            try {
+              specificData = typeof row.specific_data === 'string' 
+                ? JSON.parse(row.specific_data) 
+                : row.specific_data;
+            } catch (e) {
+              return;
+            }
+
+            if (!specificData) return;
+
+            // Handle bundle items
+            if (specificData.is_bundle && Array.isArray(specificData.bundle_items)) {
+              specificData.bundle_items.forEach(bundleItem => {
+                const bundleItemId = parseInt(bundleItem.id || bundleItem.item_id, 10);
+                if (bundleItemId !== parseInt(item_id, 10)) return;
+
+                const selectedSizes = bundleItem.selected_sizes || [];
+                selectedSizes.forEach(sizeSelection => {
+                  const sizeKey = sizeSelection.sizeKey || sizeSelection.size_key;
+                  const qty = parseInt(sizeSelection.quantity, 10) || 0;
+                  reservedBySizeKey[sizeKey] = (reservedBySizeKey[sizeKey] || 0) + qty;
+                });
+              });
+            } else {
+              // Handle single item
+              const selectedSizes = specificData.selected_sizes || [];
+              selectedSizes.forEach(sizeSelection => {
+                const sizeKey = sizeSelection.sizeKey || sizeSelection.size_key;
+                const qty = parseInt(sizeSelection.quantity, 10) || 0;
+                reservedBySizeKey[sizeKey] = (reservedBySizeKey[sizeKey] || 0) + qty;
+              });
+            }
+          });
+        };
+
+        processRows(cartRows);
+        processRows(orderRows);
+
+        // Calculate available quantities
+        const availableQuantities = {};
+        sizeEntries.forEach(entry => {
+          const sizeKey = entry.sizeKey;
+          const totalQty = parseInt(entry.quantity, 10) || 0;
+          const reserved = reservedBySizeKey[sizeKey] || 0;
+          availableQuantities[sizeKey] = Math.max(0, totalQty - reserved);
+        });
+
+        res.json({
+          message: "Available quantities retrieved successfully",
+          item_id: parseInt(item_id, 10),
+          available_quantities: availableQuantities,
+          reserved_quantities: reservedBySizeKey
+        });
+      });
+    });
+  });
+};

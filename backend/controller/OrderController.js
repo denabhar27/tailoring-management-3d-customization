@@ -1683,6 +1683,52 @@ exports.updateRentalOrderItem = (req, res) => {
         console.log(`[BILLING] statusChanged: ${updateData.approvalStatus && updateData.approvalStatus !== previousStatus}`);
       }
 
+      // Restore inventory when rental is cancelled/rejected
+      if (updateData.approvalStatus === 'cancelled' && updateData.approvalStatus !== previousStatus) {
+        const RentalInventory = require('../model/RentalInventoryModel');
+        const db = require('../config/db');
+
+        let specificData = {};
+        try {
+          specificData = item.specific_data ? (typeof item.specific_data === 'string' ? JSON.parse(item.specific_data) : item.specific_data) : {};
+        } catch (e) {
+          console.warn('Error parsing specific_data for cancelled rental:', e);
+        }
+
+        const selectedSizes = specificData.selected_sizes || specificData.selectedSizes || [];
+        const isBundle = specificData.is_bundle === true || specificData.category === 'rental_bundle';
+        const bundleItems = specificData.bundle_items || [];
+
+        if (isBundle && bundleItems.length > 0) {
+          console.log(`[INVENTORY RESTORE] Restoring inventory for cancelled bundle rental, item ${itemId}`);
+          bundleItems.forEach(bundleItem => {
+            const itemId = bundleItem.item_id || bundleItem.id;
+            const itemSelectedSizes = bundleItem.selected_sizes || bundleItem.selectedSizes || [];
+            if (itemId && itemSelectedSizes.length > 0) {
+              RentalInventory.restockReturnedSizes(itemId, itemSelectedSizes, (restockErr) => {
+                if (restockErr) {
+                  console.error(`[INVENTORY RESTORE] Error restocking bundle item ${itemId}:`, restockErr);
+                } else {
+                  console.log(`[INVENTORY RESTORE] Successfully restocked bundle item ${itemId}`);
+                }
+              });
+            }
+          });
+        } else if (selectedSizes.length > 0) {
+          const rentalItemId = item.service_id || specificData.rental_item_id;
+          if (rentalItemId) {
+            console.log(`[INVENTORY RESTORE] Restoring inventory for cancelled rental, item ${rentalItemId}`);
+            RentalInventory.restockReturnedSizes(rentalItemId, selectedSizes, (restockErr) => {
+              if (restockErr) {
+                console.error(`[INVENTORY RESTORE] Error restocking rental item ${rentalItemId}:`, restockErr);
+              } else {
+                console.log(`[INVENTORY RESTORE] Successfully restocked rental item ${rentalItemId}`);
+              }
+            });
+          }
+        }
+      }
+
       if (updateData.approvalStatus === 'rented' && updateData.approvalStatus !== previousStatus) {
         const RentalInventory = require('../model/RentalInventoryModel');
         const db = require('../config/db');
@@ -1697,39 +1743,60 @@ exports.updateRentalOrderItem = (req, res) => {
         const isBundle = specificData.is_bundle === true || specificData.category === 'rental_bundle';
         const bundleItems = specificData.bundle_items || [];
         
-        if (isBundle && bundleItems.length > 0) {
-          
-          console.log(`Updating rental_inventory status to 'rented' for ${bundleItems.length} bundle items`);
-          
-          for (const bundleItem of bundleItems) {
-            const bundleItemId = bundleItem.item_id || bundleItem.id;
-            if (bundleItemId) {
-              const updateSql = `UPDATE rental_inventory SET status = 'rented' WHERE item_id = ?`;
-              db.query(updateSql, [bundleItemId], (rentalUpdateErr, rentalUpdateResult) => {
-                if (rentalUpdateErr) {
-                  console.error(`Error updating rental_inventory status for bundle item ${bundleItemId}:`, rentalUpdateErr);
-                } else {
-                  console.log(`Successfully updated rental_inventory status to 'rented' for bundle item: ${bundleItem.item_name} (id: ${bundleItemId})`);
-                }
+        const updateInventoryStatusSmart = (rentalItemId, itemName) => {
+          // Get all active order reservations for this item
+          const reservedSql = `
+            SELECT specific_data FROM order_items
+            WHERE service_type = 'rental'
+              AND service_id = ?
+              AND approval_status IN ('pending','ready_to_pickup','picked_up','rented')
+          `;
+          db.query(reservedSql, [rentalItemId], (resErr, resRows) => {
+            const reservedBySizeKey = {};
+            if (!resErr) {
+              (resRows || []).forEach(row => {
+                try {
+                  const sd = typeof row.specific_data === 'string' ? JSON.parse(row.specific_data) : row.specific_data;
+                  (sd?.selected_sizes || []).forEach(s => {
+                    const k = s.sizeKey || s.size_key;
+                    if (k) reservedBySizeKey[k] = (reservedBySizeKey[k] || 0) + (parseInt(s.quantity, 10) || 0);
+                  });
+                } catch (e) {}
               });
             }
+
+            db.query(`SELECT size FROM rental_inventory WHERE item_id = ? LIMIT 1`, [rentalItemId], (fetchErr, fetchRows) => {
+              if (fetchErr || !fetchRows || fetchRows.length === 0) return;
+              let newStatus = 'rented';
+              try {
+                const parsed = typeof fetchRows[0].size === 'string' ? JSON.parse(fetchRows[0].size) : fetchRows[0].size;
+                if (parsed && Array.isArray(parsed.size_entries)) {
+                  const hasStock = parsed.size_entries.some(entry => {
+                    const total = Math.max(0, parseInt(entry.quantity, 10) || 0);
+                    const reserved = reservedBySizeKey[entry.sizeKey] || 0;
+                    return (total - reserved) > 0;
+                  });
+                  newStatus = hasStock ? 'available' : 'rented';
+                }
+              } catch (e) {}
+              db.query(`UPDATE rental_inventory SET status = ? WHERE item_id = ?`, [newStatus, rentalItemId], (updateErr) => {
+                if (updateErr) console.error(`Error updating rental_inventory status for item ${rentalItemId}:`, updateErr);
+                else console.log(`Updated rental_inventory status to '${newStatus}' for item ${itemName || rentalItemId}`);
+              });
+            });
+          });
+        };
+
+        if (isBundle && bundleItems.length > 0) {
+          console.log(`Updating rental_inventory status for ${bundleItems.length} bundle items`);
+          for (const bundleItem of bundleItems) {
+            const bundleItemId = bundleItem.item_id || bundleItem.id;
+            if (bundleItemId) updateInventoryStatusSmart(bundleItemId, bundleItem.item_name);
           }
         } else {
-          
-          const rentalItemId = item.service_id; 
-          
+          const rentalItemId = item.service_id;
           if (rentalItemId) {
-            console.log(`Updating rental_inventory status to 'rented' for item_id: ${rentalItemId}`);
-
-            const updateSql = `UPDATE rental_inventory SET status = 'rented' WHERE item_id = ?`;
-            
-            db.query(updateSql, [rentalItemId], (rentalUpdateErr, rentalUpdateResult) => {
-              if (rentalUpdateErr) {
-                console.error('Error updating rental_inventory status:', rentalUpdateErr);
-              } else {
-                console.log(`Successfully updated rental_inventory status to 'rented' for item_id: ${rentalItemId}`);
-              }
-            });
+            updateInventoryStatusSmart(rentalItemId, null);
           } else {
             console.warn('Cannot update rental_inventory: service_id is missing from order item');
           }

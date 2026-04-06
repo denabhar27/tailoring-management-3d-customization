@@ -1123,13 +1123,102 @@ function Rental() {
 
     const rentalItemId = rental.service_id || rental.specific_data?.service_id || rental.specific_data?.item_id || rental.specific_data?.id;
 
+    const isBundle = rental.specific_data?.is_bundle === true || rental.specific_data?.category === 'rental_bundle';
+
+    const bundleItems = rental.specific_data?.bundle_items || [];
+
     
 
     console.log('Attempting to fetch rental item:', rentalItemId, 'from rental:', rental);
 
     
 
-    if (rentalItemId) {
+    if (isBundle && bundleItems.length > 0) {
+
+      // Fetch measurements for each bundle item
+
+      try {
+
+        const enrichedBundleItems = await Promise.all(
+
+          bundleItems.map(async (item) => {
+
+            const itemId = item.item_id || item.id;
+            console.log('Processing bundle item:', item.item_name, 'itemId:', itemId);
+
+            if (!itemId) return item;
+
+            
+
+            try {
+
+              const result = await getRentalById(itemId);
+              console.log('Fetched result for', item.item_name, ':', result);
+
+              if (result.item && result.item.size) {
+
+                const sizeConfig = parseSizeEntries(result.item.size);
+                console.log('Size config for', item.item_name, ':', sizeConfig);
+
+                const measurementsBySizeKey = {};
+
+                sizeConfig.forEach(sizeEntry => {
+
+                  if (sizeEntry.measurements) {
+
+                    measurementsBySizeKey[sizeEntry.key] = sizeEntry.measurements;
+
+                  }
+
+                });
+                console.log('Measurements by size key for', item.item_name, ':', measurementsBySizeKey);
+
+                return { ...item, measurementsBySizeKey };
+
+              }
+
+            } catch (error) {
+
+              console.error(`Error fetching measurements for bundle item ${itemId}:`, error);
+
+            }
+
+            return item;
+
+          })
+
+        );
+        console.log('All enriched bundle items:', enrichedBundleItems);
+
+        
+
+        const enrichedRental = {
+
+          ...rental,
+
+          specific_data: {
+
+            ...rental.specific_data,
+
+            bundle_items: enrichedBundleItems
+
+          }
+
+        };
+
+        
+
+        setSelectedRentalWithMeasurements(enrichedRental);
+
+      } catch (error) {
+
+        console.error('Error fetching bundle measurements:', error);
+
+        setSelectedRentalWithMeasurements(rental);
+
+      }
+
+    } else if (rentalItemId) {
 
       try {
 
@@ -4229,14 +4318,45 @@ function Rental() {
                       return bundleItems.map((item, idx) => {
 
                         const sizeData = getCustomerSelectedSizes(item.selected_sizes || item.selectedSizes, item.size);
+                        console.log('Bundle item display - item:', item.item_name, 'sizeData:', sizeData, 'measurementsBySizeKey:', item.measurementsBySizeKey);
 
                         
 
                         // Enrich size data with measurements from the fetched data
 
+                        const normalizeKey = (key) => String(key || '').toLowerCase().replace(/\s+/g, '').replace(/[()]/g, '');
+
+                        
+
                         const enrichedSizeData = sizeData.map(sizeEntry => {
 
-                          const measurements = item.measurementsBySizeKey?.[sizeEntry.key] || sizeEntry.measurements;
+                          // Try exact match first
+
+                          let measurements = item.measurementsBySizeKey?.[sizeEntry.key] || sizeEntry.measurements;
+
+                          
+
+                          // If no exact match, try normalized matching
+
+                          if (!measurements && item.measurementsBySizeKey) {
+
+                            const normalizedKey = normalizeKey(sizeEntry.key);
+
+                            const matchingKey = Object.keys(item.measurementsBySizeKey).find(key => 
+
+                              normalizeKey(key) === normalizedKey
+
+                            );
+
+                            if (matchingKey) {
+
+                              measurements = item.measurementsBySizeKey[matchingKey];
+
+                            }
+
+                          }
+
+                          
 
                           return { ...sizeEntry, measurements };
 
@@ -4396,9 +4516,55 @@ function Rental() {
 
                       const measurementsBySizeKey = selectedRentalWithMeasurements?.specific_data?.measurementsBySizeKey || {};
 
+                      console.log('measurementsBySizeKey:', measurementsBySizeKey);
+
+                      console.log('sizeData before enrichment:', sizeData);
+
+                      
+
+                      // Normalize keys for matching (remove spaces, lowercase)
+
+                      const normalizeKey = (key) => String(key || '').toLowerCase().replace(/\s+/g, '').replace(/[()]/g, '');
+
+                      
+
                       const enrichedSizeData = sizeData.map(sizeEntry => {
 
-                        const measurements = measurementsBySizeKey[sizeEntry.key] || sizeEntry.measurements;
+                        console.log(`Looking for measurements for key: ${sizeEntry.key}`);
+
+                        
+
+                        // Try exact match first
+
+                        let measurements = measurementsBySizeKey[sizeEntry.key] || sizeEntry.measurements;
+
+                        
+
+                        // If no exact match, try normalized matching
+
+                        if (!measurements) {
+
+                          const normalizedKey = normalizeKey(sizeEntry.key);
+
+                          const matchingKey = Object.keys(measurementsBySizeKey).find(key => 
+
+                            normalizeKey(key) === normalizedKey
+
+                          );
+
+                          if (matchingKey) {
+
+                            measurements = measurementsBySizeKey[matchingKey];
+
+                            console.log(`Found measurements via normalized matching: ${sizeEntry.key} -> ${matchingKey}`);
+
+                          }
+
+                        }
+
+                        
+
+                        console.log(`Found measurements:`, measurements);
 
                         return { ...sizeEntry, measurements };
 

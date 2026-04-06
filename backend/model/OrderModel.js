@@ -164,12 +164,10 @@ function reserveRentalInventoryFromCartItems(cartItems, callback) {
         const row = applied[idx++];
         const rollbackSql = `
           UPDATE rental_inventory
-          SET total_available = total_available + ?,
-              size = ?,
-              status = CASE WHEN total_available + ? > 0 AND status = 'unavailable' THEN 'available' ELSE status END
+          SET size = ?
           WHERE item_id = ?
         `;
-        db.query(rollbackSql, [row.qty, row.previousSize, row.qty, row.itemId], () => rollbackNext());
+        db.query(rollbackSql, [row.previousSize, row.itemId], () => rollbackNext());
       };
       rollbackNext();
     };
@@ -186,21 +184,13 @@ function reserveRentalInventoryFromCartItems(cartItems, callback) {
 
       const updateSql = `
         UPDATE rental_inventory
-        SET total_available = total_available - ?,
-            size = ?,
-            status = CASE WHEN total_available - ? <= 0 THEN 'unavailable' ELSE status END
-        WHERE item_id = ? AND total_available >= ?
+        SET size = ?
+        WHERE item_id = ?
       `;
 
-      db.query(updateSql, [reservation.qty, nextSizePayload, reservation.qty, reservation.itemId, reservation.qty], (updateErr, updateResult) => {
+      db.query(updateSql, [nextSizePayload, reservation.itemId], (updateErr, updateResult) => {
         if (updateErr) {
           return rollbackApplied(() => callback(updateErr));
-        }
-
-        if (!updateResult || updateResult.affectedRows === 0) {
-          const err = new Error(`Stock changed while processing rental item ${reservation.itemId}. Please try again.`);
-          err.statusCode = 409;
-          return rollbackApplied(() => callback(err));
         }
 
         applied.push({ itemId: reservation.itemId, qty: reservation.qty, previousSize: row.size });
@@ -273,7 +263,16 @@ const Order = {
         }
 
         reserveRentalInventoryFromCartItems(cartItems, (reserveErr) => {
+          console.log('[INVENTORY] ===== RENTAL INVENTORY RESERVATION =====');
+          console.log('[INVENTORY] Cart items:', JSON.stringify(cartItems.map(item => ({
+            service_type: item.service_type,
+            service_id: item.service_id,
+            quantity: item.quantity,
+            specific_data: item.specific_data
+          })), null, 2));
           if (reserveErr) {
+            console.error('[INVENTORY] ===== RESERVATION FAILED =====');
+            console.error('[INVENTORY] Error:', reserveErr.message);
             const cleanupItemsSql = `DELETE FROM order_items WHERE order_id = ?`;
             db.query(cleanupItemsSql, [orderId], () => {
               const cleanupOrderSql = `DELETE FROM orders WHERE order_id = ?`;
@@ -283,6 +282,9 @@ const Order = {
             });
             return;
           }
+
+          console.log('[INVENTORY] ===== RESERVATION SUCCESSFUL =====');
+          console.log('[INVENTORY] Inventory has been deducted for rental items');
 
           const getOrderItemsSql = `
             SELECT item_id, service_type, appointment_date, specific_data

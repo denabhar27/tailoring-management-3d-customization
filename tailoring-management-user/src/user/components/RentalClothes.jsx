@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
-import { getAllRentals, getRentalImageUrl } from '../../api/RentalApi';
+import { getAllRentals, getRentalImageUrl, getAvailableQuantity } from '../../api/RentalApi';
 
 import { addToCart } from '../../api/CartApi';
 
@@ -827,6 +827,8 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
   const [inlineMessage, setInlineMessage] = useState('');
 
   const [inlineMessageItemId, setInlineMessageItemId] = useState(null);
+
+  const [realTimeAvailability, setRealTimeAvailability] = useState({});
 
   const navigate = useNavigate();
 
@@ -2254,9 +2256,35 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
 
 
-  const updateCardSizeQuantity = (item, sizeKey, delta) => {
+  const updateCardSizeQuantity = async (item, sizeKey, delta) => {
 
     const itemId = getItemId(item);
+
+    // Fetch real-time availability if not already loaded
+
+    let availableQty = realTimeAvailability[sizeKey];
+
+    if (availableQty === undefined) {
+
+      try {
+
+        const availabilityData = await getAvailableQuantity(itemId);
+
+        if (availabilityData && availabilityData.available_quantities) {
+
+          setRealTimeAvailability(availabilityData.available_quantities);
+
+          availableQty = availabilityData.available_quantities[sizeKey];
+
+        }
+
+      } catch (error) {
+
+        console.error('Error fetching availability:', error);
+
+      }
+
+    }
 
     const option = item.sizeOptions?.[sizeKey] || {};
 
@@ -2264,11 +2292,17 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
     const parsedFallbackQty = parseInt(item.total_available, 10);
 
-    const maxQty = !Number.isNaN(parsedOptionQty)
+    // Use real-time availability if available, otherwise fall back to database quantity
 
-      ? Math.max(parsedOptionQty, 0)
+    const maxQty = availableQty !== undefined
 
-      : (!Number.isNaN(parsedFallbackQty) ? Math.max(parsedFallbackQty, 0) : Number.POSITIVE_INFINITY);
+      ? availableQty
+
+      : (!Number.isNaN(parsedOptionQty)
+
+        ? Math.max(parsedOptionQty, 0)
+
+        : (!Number.isNaN(parsedFallbackQty) ? Math.max(parsedFallbackQty, 0) : Number.POSITIVE_INFINITY));
 
 
 
@@ -2375,6 +2409,44 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
       await alert('Please select at least one item', 'Selection Required', 'warning');
 
       return;
+
+    }
+
+    // Fetch real-time availability for all selected items
+
+    const availabilityPromises = selectedItems.map(item => 
+
+      getAvailableQuantity(item.id || item.item_id)
+
+        .then(data => ({ itemId: item.id || item.item_id, data }))
+
+        .catch(err => ({ itemId: item.id || item.item_id, data: null }))
+
+    );
+
+    
+
+    try {
+
+      const availabilityResults = await Promise.all(availabilityPromises);
+
+      const availabilityMap = {};
+
+      availabilityResults.forEach(result => {
+
+        if (result.data && result.data.available_quantities) {
+
+          availabilityMap[result.itemId] = result.data.available_quantities;
+
+        }
+
+      });
+
+      setRealTimeAvailability(availabilityMap);
+
+    } catch (error) {
+
+      console.error('Error fetching availability for bundle:', error);
 
     }
 
@@ -2494,7 +2566,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
 
 
-  const openModal = (item) => {
+  const openModal = async (item) => {
 
     const preset = cardSizeSelections[item.id || item.item_id] || {};
 
@@ -2517,6 +2589,26 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
     setIsSizesSectionOpen(false);
 
     setIsModalOpen(true);
+
+    // Fetch real-time availability
+
+    try {
+
+      const availabilityData = await getAvailableQuantity(item.id || item.item_id);
+
+      if (availabilityData && availabilityData.available_quantities) {
+
+        setRealTimeAvailability(availabilityData.available_quantities);
+
+      }
+
+    } catch (error) {
+
+      console.error('Error fetching availability:', error);
+
+      setRealTimeAvailability({});
+
+    }
 
   };
 
@@ -3724,11 +3816,21 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                             const parsedFallbackQty = parseInt(item.total_available, 10);
 
-                            const maxQty = !Number.isNaN(parsedSizeQty)
+                            // Use real-time availability if available for this item
 
-                              ? Math.max(parsedSizeQty, 0)
+                            const itemAvailability = realTimeAvailability[itemId] || {};
 
-                              : (!Number.isNaN(parsedFallbackQty) ? Math.max(parsedFallbackQty, 0) : Number.POSITIVE_INFINITY);
+                            const realTimeQty = itemAvailability[sizeKey];
+
+                            const maxQty = realTimeQty !== undefined
+
+                              ? realTimeQty
+
+                              : (!Number.isNaN(parsedSizeQty)
+
+                                ? Math.max(parsedSizeQty, 0)
+
+                                : (!Number.isNaN(parsedFallbackQty) ? Math.max(parsedFallbackQty, 0) : Number.POSITIVE_INFINITY));
 
                             const isSelected = currentQty > 0;
 
@@ -3811,6 +3913,16 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                                     +
 
                                   </button>
+
+                                  {realTimeQty !== undefined && (
+
+                                    <span style={{ fontSize: '11px', color: realTimeQty === 0 ? '#d32f2f' : '#666', marginLeft: '8px' }}>
+
+                                      {realTimeQty === 0 ? 'Out of stock' : `${realTimeQty} available`}
+
+                                    </span>
+
+                                  )}
 
                                 </div>
 
@@ -4418,13 +4530,29 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                         const parsedFallbackTotal = parseInt(selectedItem.total_available, 10);
 
-                        const maxQty = Number.isFinite(opt.quantity)
+                        // Use real-time availability if available, otherwise fall back to database quantity
 
-                          ? opt.quantity
+                        const realTimeQty = realTimeAvailability[sizeKey];
 
-                          : (Number.isNaN(parsedFallbackTotal) ? 0 : parsedFallbackTotal);
+                        const maxQty = realTimeQty !== undefined 
+
+                          ? realTimeQty
+
+                          : (Number.isFinite(opt.quantity)
+
+                            ? opt.quantity
+
+                            : (Number.isNaN(parsedFallbackTotal) ? 0 : parsedFallbackTotal));
 
                         const currentQty = parseInt(sizeSelections[sizeKey] || 0, 10);
+
+                        // If current selection exceeds real-time availability, reset it
+
+                        if (realTimeQty !== undefined && currentQty > realTimeQty) {
+
+                          setSizeSelections(prev => ({ ...prev, [sizeKey]: realTimeQty }));
+
+                        }
 
                         const isExpanded = expandedMeasurementSize === sizeKey;
 
@@ -4510,27 +4638,41 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', justifyContent: 'space-between' }}>
 
-                                <div className="rc-qty-control">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
 
-                                  <button
+                                  <div className="rc-qty-control">
 
-                                    disabled={currentQty <= 0}
+                                    <button
 
-                                    onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.max(0, currentQty - 1) }))}
+                                      disabled={currentQty <= 0}
 
-                                  >−</button>
+                                      onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.max(0, currentQty - 1) }))}
 
-                                  <span>{currentQty}</span>
+                                    >−</button>
 
-                                  <button
+                                    <span>{currentQty}</span>
 
-                                    disabled={currentQty >= maxQty}
+                                    <button
 
-                                    onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.min(maxQty, currentQty + 1) }))}
+                                      disabled={currentQty >= maxQty}
 
-                                  >+
+                                      onClick={() => setSizeSelections(prev => ({ ...prev, [sizeKey]: Math.min(maxQty, currentQty + 1) }))}
 
-                                  </button>
+                                    >+
+
+                                    </button>
+
+                                  </div>
+
+                                  {realTimeQty !== undefined && (
+
+                                    <span style={{ fontSize: '12px', color: realTimeQty === 0 ? '#d32f2f' : '#666' }}>
+
+                                      {realTimeQty === 0 ? 'Out of stock' : `${realTimeQty} available`}
+
+                                    </span>
+
+                                  )}
 
                                 </div>
 

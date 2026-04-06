@@ -54,6 +54,8 @@ router.get('/available', rentalController.getAvailableRentals);
 
 router.get('/categories', rentalController.getCategories);
 
+router.get('/:item_id/available-quantity', rentalController.getAvailableQuantity);
+
 router.get('/search', rentalController.searchRentals);
 
 router.get('/category/:category', rentalController.getRentalsByCategory);

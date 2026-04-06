@@ -39,7 +39,6 @@ import { deleteOrderItem, updateOrderItemPrice } from '../api/OrderApi';
 import { API_BASE_URL } from '../api/config';
 
 import PriceEditModal from '../components/admin/PriceEditModal';
-
 import PriceHistoryModal from '../components/admin/PriceHistoryModal';
 
 import {
@@ -85,6 +84,7 @@ const Repair = () => {
   const [todayAppointmentsOnly, setTodayAppointmentsOnly] = useState(false);
   const [dateRangeStart, setDateRangeStart] = useState('');
   const [dateRangeEnd, setDateRangeEnd] = useState('');
+  const [timeFilter, setTimeFilter] = useState('');
 
   const [viewFilter, setViewFilter] = useState("all");
 
@@ -1337,6 +1337,24 @@ const Repair = () => {
       });
     }
 
+    if (timeFilter) {
+      items = items.filter(item => {
+        const specificData = parseMaybeObject(item?.specific_data);
+        const pricingFactors = parseMaybeObject(item?.pricing_factors);
+        // Check separate preferredTime field (customization)
+        const preferredTime = specificData?.preferredTime;
+        if (preferredTime) {
+          const t = String(preferredTime).includes('T') ? String(preferredTime).split('T')[1]?.slice(0, 5) : String(preferredTime).slice(0, 5);
+          return t === timeFilter;
+        }
+        // Check time embedded in pickupDate (dry cleaning / repair)
+        const apptDate = specificData?.pickupDate || pricingFactors?.pickupDate || item?.appointment_date || specificData?.appointment_date;
+        if (!apptDate) return false;
+        const timeStr = String(apptDate).split('T')[1]?.slice(0, 5);
+        return timeStr === timeFilter;
+      });
+    }
+
 
 
     items.sort((a, b) => {
@@ -2392,7 +2410,7 @@ const Repair = () => {
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           gap: '12px',
           margin: '10px 0 12px 0',
           padding: '10px 12px',
@@ -2458,6 +2476,22 @@ const Repair = () => {
               )}
             </div>
           </div>
+              <div style={{ width: '1px', height: '20px', background: '#ddd' }}></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label style={{ fontSize: '13px', color: '#333', fontWeight: '500' }}>Time:</label>
+                <input
+                  type="time"
+                  value={timeFilter}
+                  onChange={(e) => setTimeFilter(e.target.value)}
+                  style={{ padding: '4px 8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px' }}
+                />
+                {timeFilter && (
+                  <button
+                    onClick={() => setTimeFilter('')}
+                    style={{ padding: '4px 8px', background: '#f44336', color: 'white', border: 'none', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}
+                  >Clear</button>
+                )}
+              </div>
         </div>
 
         <div className="table-container">

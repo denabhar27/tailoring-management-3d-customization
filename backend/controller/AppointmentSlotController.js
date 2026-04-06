@@ -720,6 +720,63 @@ exports.updateTimeSlotCapacity = (req, res) => {
   });
 };
 
+exports.getAppointmentsByDate = (req, res) => {
+  const { date, serviceType } = req.query;
+
+  if (!date) {
+    return res.status(400).json({ success: false, message: 'Date is required' });
+  }
+
+  const serviceFilter = serviceType ? 'AND a.service_type = ?' : '';
+  const params = serviceType ? [date, serviceType] : [date];
+
+  const sql = `
+    SELECT 
+      a.slot_id,
+      a.appointment_time,
+      a.service_type,
+      a.status,
+      a.user_id,
+      a.order_item_id,
+      TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS customer_name,
+      u.email,
+      u.phone_number
+    FROM appointment_slots a
+    LEFT JOIN user u ON a.user_id = u.user_id
+    WHERE a.appointment_date = ? AND a.status = 'booked' ${serviceFilter}
+    ORDER BY a.appointment_time ASC
+  `;
+
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: 'Error fetching appointments', error: err.message });
+    }
+
+    // Group by time slot
+    const grouped = {};
+    results.forEach(row => {
+      let t = typeof row.appointment_time === 'string' ? row.appointment_time : row.appointment_time.toString();
+      if (t.length === 8) {
+        const [h, m] = t.split(':');
+        const hr = parseInt(h);
+        const ampm = hr >= 12 ? 'PM' : 'AM';
+        const display = `${hr % 12 || 12}:${m} ${ampm}`;
+        if (!grouped[display]) grouped[display] = [];
+        grouped[display].push({
+          slot_id: row.slot_id,
+          customer_name: row.customer_name?.trim() || 'Unknown',
+          email: row.email,
+          phone: row.phone_number,
+          service_type: row.service_type,
+          order_item_id: row.order_item_id
+        });
+      }
+    });
+
+    res.json({ success: true, date, appointments: grouped });
+  });
+};
+
 exports.getTimeSlotAvailability = (req, res) => {
   const { date } = req.query;
 

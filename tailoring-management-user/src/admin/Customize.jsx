@@ -4386,7 +4386,12 @@ const Customize = () => {
 
               )}
 
-              <div className="detail-row"><strong>Preferred Date:</strong> {selectedOrder.specific_data?.preferredDate || 'N/A'}</div>
+              <div className="detail-row"><strong>Preferred Date:</strong> {(() => {
+                const preferredDate = selectedOrder.specific_data?.preferredDate || selectedOrder.specific_data?.preferred_date;
+                if (!preferredDate) return 'N/A';
+                const date = new Date(preferredDate);
+                return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+              })()}</div>
               <div className="detail-row"><strong>Preferred Time:</strong> {selectedOrder.specific_data?.preferredTime ? String(selectedOrder.specific_data.preferredTime).split('T')[1]?.slice(0, 5) || String(selectedOrder.specific_data.preferredTime).slice(0, 5) : 'N/A'}</div>
 
               <div className="detail-row"><strong>Estimated Time:</strong> {(() => {
@@ -4401,7 +4406,7 @@ const Customize = () => {
                   const parsedDate = new Date(completionDate);
                   return Number.isNaN(parsedDate.getTime())
                     ? completionDate
-                    : parsedDate.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+                    : parsedDate.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
                 }
 
                 return storedEstimatedTime || 'N/A';
@@ -4438,13 +4443,6 @@ const Customize = () => {
                   <div className="detail-row"><strong>Previous Price:</strong> ₱{previousPrice.toLocaleString()}</div>
                 ) : null;
               })()}
-
-              <div className="detail-row"><strong>Preferred Date:</strong> {(() => {
-                const preferredDate = selectedOrder.specific_data?.preferredDate || selectedOrder.specific_data?.preferred_date;
-                if (!preferredDate) return 'N/A';
-                const date = new Date(preferredDate);
-                return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
-              })()}</div>
 
               <div className="detail-row"><strong>Price:</strong> ₱{parseFloat(selectedOrder.final_price || 0).toLocaleString()}</div>
 

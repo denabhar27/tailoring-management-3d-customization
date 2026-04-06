@@ -2813,29 +2813,29 @@ const Repair = () => {
 
                           <div className="action-buttons">
 
-                            {!isDamagePendingIncident && !isForCompensationIncident && getNextStatus(item.approval_status, 'repair', item) && (
-
-                              <button
-
-                                className="icon-btn next-status"
-
-                                onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'repair', item))}
-
-                                title={`Move to ${getNextStatusLabel(item.approval_status, 'repair', item)}`}
-
-                                style={{ backgroundColor: '#4CAF50', color: 'white' }}
-
-                              >
-
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-
-                                  <polyline points="9 18 15 12 9 6"></polyline>
-
-                                </svg>
-
-                              </button>
-
-                            )}
+                            {!isDamagePendingIncident && !isForCompensationIncident && getNextStatus(item.approval_status, 'repair', item) && (() => {
+                              const nextStatus = getNextStatus(item.approval_status, 'repair', item);
+                              const isMovingToInProgress = nextStatus === 'confirmed';
+                              const halfPrice = finalPrice * 0.5;
+                              const hasHalfPayment = amountPaid >= halfPrice - 0.01;
+                              
+                              if (isMovingToInProgress && !hasHalfPayment) {
+                                return null;
+                              }
+                              
+                              return (
+                                <button
+                                  className="icon-btn next-status"
+                                  onClick={() => updateStatus(item.item_id, nextStatus)}
+                                  title={`Move to ${getNextStatusLabel(item.approval_status, 'repair', item)}`}
+                                  style={{ backgroundColor: '#4CAF50', color: 'white' }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                  </svg>
+                                </button>
+                              );
+                            })()}
 
                             {!isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && (
 

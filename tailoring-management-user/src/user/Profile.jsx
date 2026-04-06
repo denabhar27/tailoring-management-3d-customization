@@ -2649,18 +2649,79 @@ const Profile = () => {
                             const isDryCleaning = item.service_type === 'dry_cleaning' || item.service_type === 'drycleaning';
                             const isEstimated = item.specific_data?.isEstimatedPrice === true;
 
-                            if (isDryCleaning && isEstimated) {
-                              return (
-                                <>
-                                  {priceChanged && previousPriceValue !== null && (
+                            if (isDryCleaning) {
+                              // For dry cleaning with "others" option that went through price confirmation
+                              if (isEstimated && priceChanged && previousPriceValue !== null) {
+                                return (
+                                  <>
                                     <div className="price-row">
                                       <span className="price-label">Previous Price:</span>
                                       <span className="price-value estimated">₱{previousPriceValue.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                     </div>
-                                  )}
+                                    <div className="price-row">
+                                      <span className="price-label">Final Price:</span>
+                                      <span className="price-value final">₱{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    </div>
+                                    {priceChanged && adminPriceReason && (
+                                      <div className="admin-notes">
+                                        <span className="notes-label">Price Change Reason:</span>
+                                        <span className="notes-text">{adminPriceReason}</span>
+                                      </div>
+                                    )}
+                                    {hasPayment && (
+                                      <>
+                                        <div className="price-row">
+                                          <span className="price-label">Amount Paid:</span>
+                                          <span className="price-value" style={{ color: '#4caf50' }}>₱{totalPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                        </div>
+                                        {remainingAmount > 0 && (
+                                          <div className="price-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
+                                            <span className="price-label" style={{ fontWeight: 'bold', fontSize: '16px' }}>Remaining Amount:</span>
+                                            <span className="price-value" style={{ fontWeight: 'bold', fontSize: '18px', color: '#ff9800' }}>
+                                              ₱{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </>
+                                    )}
+                                  </>
+                                );
+                              }
+                              
+                              // For dry cleaning with "others" option in pending status (not yet confirmed)
+                              if (isEstimated && item.status === 'pending') {
+                                return (
+                                  <>
+                                    <div className="price-row">
+                                      <span className="price-label">Estimated Price:</span>
+                                      <span className="price-value estimated">₱{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    </div>
+                                    {hasPayment && (
+                                      <>
+                                        <div className="price-row">
+                                          <span className="price-label">Amount Paid:</span>
+                                          <span className="price-value" style={{ color: '#4caf50' }}>₱{totalPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                        </div>
+                                        {remainingAmount > 0 && (
+                                          <div className="price-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
+                                            <span className="price-label" style={{ fontWeight: 'bold', fontSize: '16px' }}>Remaining Amount:</span>
+                                            <span className="price-value" style={{ fontWeight: 'bold', fontSize: '18px', color: '#ff9800' }}>
+                                              ₱{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </>
+                                    )}
+                                  </>
+                                );
+                              }
+                              
+                              // For all other dry cleaning cases (specific garment or accepted "others")
+                              return (
+                                <>
                                   <div className="price-row">
-                                    <span className="price-label">Estimated Price:</span>
-                                    <span className="price-value estimated">₱{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    <span className="price-label">Final Price:</span>
+                                    <span className="price-value final">₱{parseFloat(item.final_price).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                   </div>
                                   {hasPayment && (
                                     <>

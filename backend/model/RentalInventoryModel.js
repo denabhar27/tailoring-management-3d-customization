@@ -1,4 +1,4 @@
-const db = require('../config/db');
+﻿const db = require('../config/db');
 const DamageRecord = require('./DamageRecordModel');
 const ActionLog = require('./ActionLogModel');
 
@@ -1176,15 +1176,16 @@ const RentalInventory = {
 
     const rentalSql = `
       SELECT oi.order_id, oi.service_id, oi.approval_status, oi.specific_data,
-             CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS customer_name
+             COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), wc.name) AS customer_name
       FROM order_items oi
       LEFT JOIN orders o ON o.order_id = oi.order_id
       LEFT JOIN user u ON u.user_id = o.user_id
+      LEFT JOIN walk_in_customers wc ON wc.id = o.walk_in_customer_id
       WHERE oi.service_type = 'rental'
         AND oi.approval_status IN ('pending','ready_to_pickup','picked_up','rented','returned')
+        AND (oi.service_id = ? OR JSON_SEARCH(oi.specific_data, 'one', CAST(? AS CHAR), NULL, '$.bundle_items[*].id') IS NOT NULL OR JSON_SEARCH(oi.specific_data, 'one', CAST(? AS CHAR), NULL, '$.bundle_items[*].item_id') IS NOT NULL)
     `;
-
-    db.query(rentalSql, (rentedErr, rentedRows) => {
+    db.query(rentalSql, [numericItemId, numericItemId, numericItemId], (rentedErr, rentedRows) => {
       if (rentedErr) {
         console.error('getSizeActivity rental query error:', rentedErr);
         return callback(null, { item_id: numericItemId, size_key: normalizedSizeKey, activities: [] });

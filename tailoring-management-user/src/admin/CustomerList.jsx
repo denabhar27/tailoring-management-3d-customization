@@ -44,6 +44,8 @@ const CustomerList = () => {
 
     phone_number: '',
 
+    birthdate: '',
+
     status: 'active'
 
   });
@@ -126,6 +128,8 @@ const CustomerList = () => {
         email: result.customer.email || '',
 
         phone_number: result.customer.phone_number || '',
+
+        birthdate: result.customer.birthdate ? result.customer.birthdate.split('T')[0] : '',
 
         status: result.customer.status || 'active'
 
@@ -335,9 +339,9 @@ const CustomerList = () => {
 
     if (!dateString) return 'N/A';
 
-    const date = new Date(dateString);
+    const [year, month, day] = dateString.split('T')[0].split('-');
 
-    return date.toLocaleDateString('en-US', {
+    return new Date(year, month - 1, day).toLocaleDateString('en-US', {
 
       year: 'numeric',
 
@@ -734,6 +738,22 @@ const CustomerList = () => {
         onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })}
 
         required
+
+      />
+
+    </div>
+
+    <div className="form-group">
+
+      <label>Birthdate</label>
+
+      <input
+
+        type="date"
+
+        value={editForm.birthdate || ''}
+
+        onChange={(e) => setEditForm({ ...editForm, birthdate: e.target.value })}
 
       />
 

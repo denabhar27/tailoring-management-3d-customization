@@ -5,11 +5,11 @@ const jwt = require('jsonwebtoken');
 const axios = require('axios');
 
 exports.register = (req, res) => {
-  const { first_name, middle_name = null, last_name, username, email, password, phone_number } = req.body;
+  const { first_name, middle_name = null, last_name, username, email, password, phone_number, birthdate } = req.body;
 
-  if (!first_name || !last_name || !username || !email || !password || !phone_number) {
+  if (!first_name || !last_name || !username || !email || !password || !phone_number || !birthdate) {
     return res.status(400).json({
-      message: "First name, last name, username, email, password, and contact number are required"
+      message: "First name, last name, username, email, password, contact number, and birthdate are required"
     });
   }
 
@@ -25,7 +25,7 @@ exports.register = (req, res) => {
 
       const hashedPassword = bcrypt.hashSync(password, 10);
 
-      User.create(first_name, middle_name, last_name, username, email, hashedPassword, phone_number, 'user', (err, result) => {
+      User.create(first_name, middle_name, last_name, username, email, hashedPassword, phone_number, 'user', birthdate, (err, result) => {
         if (err) {
           console.error('[REGISTER] Error creating user:', err);
           if (err.code === 'ER_DUP_ENTRY') {

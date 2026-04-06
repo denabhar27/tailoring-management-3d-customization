@@ -1,0 +1,2 @@
+Connected to MySQL database: localhost
+ERROR: Unknown column 'u.birthdate' in 'field list'

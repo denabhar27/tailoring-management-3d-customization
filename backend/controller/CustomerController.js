@@ -1,6 +1,15 @@
 const User = require('../model/UserModel');
 const CustomerMeasurements = require('../model/CustomerMeasurementsModel');
 
+const formatDateOnly = (val) => {
+  if (!val) return null;
+  const d = new Date(val);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 exports.getAllCustomers = (req, res) => {
   User.getAllCustomers((err, results) => {
     if (err) {
@@ -11,10 +20,15 @@ exports.getAllCustomers = (req, res) => {
       });
     }
 
+    const customers = results.map(c => ({
+      ...c,
+      birthdate: formatDateOnly(c.birthdate)
+    }));
+
     res.json({
       success: true,
       message: "Customers retrieved successfully",
-      customers: results
+      customers
     });
   });
 };
@@ -94,7 +108,7 @@ exports.getCustomerById = (req, res) => {
         res.json({
           success: true,
           message: "Customer retrieved successfully",
-          customer: results[0],
+          customer: { ...results[0], birthdate: formatDateOnly(results[0].birthdate) },
           measurements: measurements && measurements.length > 0 ? measurements[0] : null
         });
       });
@@ -104,7 +118,7 @@ exports.getCustomerById = (req, res) => {
 
 exports.updateCustomer = (req, res) => {
   const { id } = req.params;
-  const { first_name, middle_name = null, last_name, email, phone_number, status, customer_type } = req.body;
+  const { first_name, middle_name = null, last_name, email, phone_number, birthdate, status, customer_type } = req.body;
 
   // Handle walk-in customer update
   if (customer_type === 'walk_in') {
@@ -149,7 +163,7 @@ exports.updateCustomer = (req, res) => {
     });
   }
 
-  User.updateCustomer(id, first_name, middle_name, last_name, email, phone_number, status || 'active', (err, result) => {
+  User.updateCustomer(id, first_name, middle_name, last_name, email, phone_number, birthdate, status || 'active', (err, result) => {
     if (err) {
       return res.status(500).json({
         success: false,

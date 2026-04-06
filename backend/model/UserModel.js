@@ -1,9 +1,9 @@
 const db = require('../config/db');
 
 const User = {
-  create: (first_name, middle_name, last_name, username, email, password, phone_number, role = 'user', callback) => {
-    const sql = "INSERT INTO user (first_name, middle_name, last_name, username, email, password, phone_number, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-    db.query(sql, [first_name, middle_name, last_name, username, email, password, phone_number, role], callback);
+  create: (first_name, middle_name, last_name, username, email, password, phone_number, role = 'user', birthdate, callback) => {
+    const sql = "INSERT INTO user (first_name, middle_name, last_name, username, email, password, phone_number, role, birthdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    db.query(sql, [first_name, middle_name, last_name, username, email, password, phone_number, role, birthdate], callback);
   },
   
   findByUsername: (username, callback) =>{
@@ -17,7 +17,7 @@ const User = {
   },
 
   findById: (user_id, callback) => {
-    const sql = "SELECT user_id, first_name, middle_name, last_name, username, email, phone_number, profile_picture, role, status, created_at, updated_at FROM user WHERE user_id = ?";
+    const sql = "SELECT user_id, first_name, middle_name, last_name, username, email, phone_number, birthdate, profile_picture, role, status, created_at, updated_at FROM user WHERE user_id = ?";
     db.query(sql, [user_id], callback);
   },
   
@@ -54,6 +54,7 @@ const User = {
         TRIM(CONCAT(u.first_name, ' ', COALESCE(u.middle_name, ''), ' ', u.last_name)) as full_name,
         u.email,
         u.phone_number,
+        u.birthdate,
         COALESCE(u.status, 'active') as status,
         COALESCE(u.created_at, NOW()) as created_at,
         COUNT(DISTINCT o.order_id) as total_orders,
@@ -61,7 +62,7 @@ const User = {
       FROM user u
       LEFT JOIN orders o ON u.user_id = o.user_id
       WHERE u.role = 'user'
-      GROUP BY u.user_id, u.first_name, u.middle_name, u.last_name, u.email, u.phone_number, u.status, u.created_at
+      GROUP BY u.user_id, u.first_name, u.middle_name, u.last_name, u.email, u.phone_number, u.birthdate, u.status, u.created_at
       
       UNION ALL
       
@@ -73,6 +74,7 @@ const User = {
         wc.name as full_name,
         wc.email,
         wc.phone as phone_number,
+        NULL as birthdate,
         'active' as status,
         COALESCE(wc.created_at, NOW()) as created_at,
         COUNT(DISTINCT o.order_id) as total_orders,
@@ -104,13 +106,13 @@ const User = {
     db.query(sql, [status, userId], callback);
   },
 
-  updateCustomer: (userId, first_name, middle_name, last_name, email, phone_number, status, callback) => {
+  updateCustomer: (userId, first_name, middle_name, last_name, email, phone_number, birthdate, status, callback) => {
     const sql = `
       UPDATE user 
-      SET first_name = ?, middle_name = ?, last_name = ?, email = ?, phone_number = ?, status = ?
+      SET first_name = ?, middle_name = ?, last_name = ?, email = ?, phone_number = ?, birthdate = ?, status = ?
       WHERE user_id = ?
     `;
-    db.query(sql, [first_name, middle_name, last_name, email, phone_number, status, userId], callback);
+    db.query(sql, [first_name, middle_name, last_name, email, phone_number, birthdate, status, userId], callback);
   },
 
   // Password Reset Methods

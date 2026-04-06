@@ -36,6 +36,7 @@ const App = ({ setIsLoggedIn }) => {
   const [signupPassword, setSignupPassword] = useState('');
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
   const [signupPhone, setSignupPhone] = useState('');
+  const [signupBirthdate, setSignupBirthdate] = useState('');
   const [authError, setAuthError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -123,7 +124,7 @@ const App = ({ setIsLoggedIn }) => {
         }
       } else {
 
-        if (!signupFirstName || !signupLastName || !signupUsername || !signupEmail || !signupPassword || !signupPhone) {
+        if (!signupFirstName || !signupLastName || !signupUsername || !signupEmail || !signupPassword || !signupPhone || !signupBirthdate) {
           setAuthError('Please fill in all required fields');
           setIsLoading(false);
           return;
@@ -150,7 +151,8 @@ const App = ({ setIsLoggedIn }) => {
             username: signupUsername.trim(),
             email: signupEmail.trim(),
             password: signupPassword,
-            phone_number: signupPhone.trim()
+            phone_number: signupPhone.trim(),
+            birthdate: signupBirthdate
           });
 
           console.log('Registration result:', result);
@@ -170,6 +172,7 @@ const App = ({ setIsLoggedIn }) => {
             setSignupPassword('');
             setSignupConfirmPassword('');
             setSignupPhone('');
+            setSignupBirthdate('');
             navigate('/user-home', { replace: true });
           } else {
             const errorMessage = result.message || 'Registration failed';
@@ -665,6 +668,16 @@ const App = ({ setIsLoggedIn }) => {
                   autoComplete="tel"
                   value={signupPhone}
                   onChange={(e) => setSignupPhone(e.target.value)}
+                />
+              </div>
+              <div className="input-group">
+                <input
+                  type="date"
+                  placeholder="Date of Birth"
+                  required
+                  value={signupBirthdate}
+                  onChange={(e) => setSignupBirthdate(e.target.value)}
+                  max={new Date().toISOString().split('T')[0]}
                 />
               </div>
             </>

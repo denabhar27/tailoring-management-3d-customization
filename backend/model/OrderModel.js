@@ -1,4 +1,4 @@
-const db = require('../config/db');
+﻿const db = require('../config/db');
 
 function parseJsonSafely(value, fallback = {}) {
   if (value === null || value === undefined) return fallback;
@@ -575,7 +575,7 @@ const Order = {
       FROM orders o
       JOIN user u ON o.user_id = u.user_id
       WHERE o.user_id = ?
-      ORDER BY o.order_date DESC
+      ORDER BY COALESCE((SELECT MAX(al.created_at) FROM action_logs al WHERE al.order_item_id = oi.item_id), o.order_date) DESC
     `;
     db.query(sql, [userId], callback);
   },
@@ -595,7 +595,7 @@ const Order = {
       FROM orders o
       LEFT JOIN user u ON o.user_id = u.user_id
       LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
-      ORDER BY o.order_date DESC
+      ORDER BY COALESCE((SELECT MAX(al.created_at) FROM action_logs al WHERE al.order_item_id = oi.item_id), o.order_date) DESC
     `;
     db.query(sql, callback);
   },
@@ -738,7 +738,7 @@ const Order = {
       FROM orders o
       JOIN user u ON o.user_id = u.user_id
       WHERE o.status = ?
-      ORDER BY o.order_date DESC
+      ORDER BY COALESCE((SELECT MAX(al.created_at) FROM action_logs al WHERE al.order_item_id = oi.item_id), o.order_date) DESC
     `;
     db.query(sql, [status], callback);
   },
@@ -794,7 +794,7 @@ const Order = {
       LEFT JOIN user u ON o.user_id = u.user_id
       LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
       WHERE oi.service_type = 'repair'
-      ORDER BY o.order_date DESC
+      ORDER BY COALESCE((SELECT MAX(al.created_at) FROM action_logs al WHERE al.order_item_id = oi.item_id), o.order_date) DESC
     `;
     db.query(sql, callback);
   },
@@ -829,7 +829,7 @@ const Order = {
       LEFT JOIN user u ON o.user_id = u.user_id
       LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
       WHERE oi.service_type = 'repair' AND (o.status = ? OR oi.approval_status = ?)
-      ORDER BY o.order_date DESC
+      ORDER BY COALESCE((SELECT MAX(al.created_at) FROM action_logs al WHERE al.order_item_id = oi.item_id), o.order_date) DESC
     `;
     db.query(sql, [status, status], callback);
   },
@@ -864,7 +864,7 @@ const Order = {
       LEFT JOIN user u ON o.user_id = u.user_id
       LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
       WHERE oi.service_type IN ('dry_cleaning', 'drycleaning', 'dry-cleaning', 'dry cleaning')
-      ORDER BY o.order_date DESC
+      ORDER BY COALESCE((SELECT MAX(al.created_at) FROM action_logs al WHERE al.order_item_id = oi.item_id), o.order_date) DESC
     `;
     db.query(sql, callback);
   },
@@ -900,7 +900,7 @@ const Order = {
       LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
       WHERE oi.service_type IN ('dry_cleaning', 'drycleaning', 'dry-cleaning', 'dry cleaning') 
       AND (o.status = ? OR oi.approval_status = ?)
-      ORDER BY o.order_date DESC
+      ORDER BY COALESCE((SELECT MAX(al.created_at) FROM action_logs al WHERE al.order_item_id = oi.item_id), o.order_date) DESC
     `;
     db.query(sql, [status, status], callback);
   },
@@ -1181,7 +1181,7 @@ Order.getRentalOrders = (callback) => {
     LEFT JOIN user u ON o.user_id = u.user_id
     LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
     WHERE oi.service_type = 'rental'
-    ORDER BY o.order_date DESC
+    ORDER BY COALESCE((SELECT MAX(al.created_at) FROM action_logs al WHERE al.order_item_id = oi.item_id), o.order_date) DESC
   `;
   db.query(sql, callback);
 };
@@ -1217,7 +1217,7 @@ Order.getRentalOrdersByStatus = (status, callback) => {
     LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
     WHERE oi.service_type = 'rental' 
     AND (o.status = ? OR oi.approval_status = ?)
-    ORDER BY o.order_date DESC
+    ORDER BY COALESCE((SELECT MAX(al.created_at) FROM action_logs al WHERE al.order_item_id = oi.item_id), o.order_date) DESC
   `;
   db.query(sql, [status, status], callback);
 };
@@ -1448,3 +1448,4 @@ function getRentalStatusNote(approvalStatus) {
 }
 
 module.exports = Order;
+

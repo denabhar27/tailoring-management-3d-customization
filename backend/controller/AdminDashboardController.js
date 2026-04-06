@@ -1,4 +1,4 @@
-const db = require('../config/db');
+﻿const db = require('../config/db');
 
 function query(sql, params = []) {
   return new Promise((resolve, reject) => {
@@ -298,7 +298,7 @@ exports.getDashboardOverview = async (req, res) => {
          LEFT JOIN user u ON o.user_id = u.user_id
          LEFT JOIN walk_in_customers wc ON o.walk_in_customer_id = wc.id
          WHERE oi.approval_status IS NOT NULL
-         ORDER BY o.order_date DESC, oi.item_id DESC
+         ORDER BY COALESCE((SELECT MAX(al.created_at) FROM action_logs al WHERE al.order_item_id = oi.item_id), o.order_date) DESC, oi.item_id DESC
          LIMIT 200`
       ).catch(err => {
         console.error('Error in order items query:', err);
@@ -434,7 +434,11 @@ exports.getDashboardOverview = async (req, res) => {
       });
 
       const activities = Array.from(activityMap.values())
-        .sort((a, b) => new Date(b.order_date) - new Date(a.order_date))
+        .sort((a, b) => {
+          const dateA = new Date(a.order_date || a.created_at || 0);
+          const dateB = new Date(b.order_date || b.created_at || 0);
+          return dateB - dateA;
+        })
         .slice(0, 500);
       
       return activities;

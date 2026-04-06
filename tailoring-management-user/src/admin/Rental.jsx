@@ -4307,9 +4307,11 @@ function Rental() {
 
                   {(() => {
 
-                    const isBundle = selectedRental.specific_data?.is_bundle === true || selectedRental.specific_data?.category === 'rental_bundle';
+                    const displayRental = selectedRentalWithMeasurements || selectedRental;
 
-                    const bundleItems = selectedRental.specific_data?.bundle_items || [];
+                    const isBundle = displayRental.specific_data?.is_bundle === true || displayRental.specific_data?.category === 'rental_bundle';
+
+                    const bundleItems = displayRental.specific_data?.bundle_items || [];
 
 
 

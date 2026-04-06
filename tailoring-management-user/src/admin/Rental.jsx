@@ -1007,6 +1007,9 @@ function Rental() {
 
         setShowPricingSetupModal(false);
 
+        const savedRental = pendingPricingRental;
+        const savedNextStatus = nextStatus;
+
         setPendingPricingRental(null);
 
         setPendingPricingData({ paymentMode: 'regular', finalPrice: '', flatRateUntilDate: '' });
@@ -1014,6 +1017,21 @@ function Rental() {
         await alert('Rental pricing option saved and status updated.', 'Success', 'success');
 
         await loadRentalOrders();
+
+        // For walk-in rentals moving to 'rented', open payment modal after pricing is set
+        if (savedNextStatus === 'rented' && savedRental?.order_type === 'walk_in') {
+          const updatedRentals = await getAllRentalOrders();
+          const updatedRental = (updatedRentals?.orders || []).find(r => r.item_id === savedRental.item_id) || savedRental;
+          const paymentSnapshot = getRentalPaymentSnapshot(updatedRental);
+          if (paymentSnapshot.totalPayment > 0) {
+            setSelectedRental(updatedRental);
+            setPaymentAmount(paymentSnapshot.totalPayment.toFixed(2));
+            setCashReceived('');
+            setRequiredPaymentAmount(paymentSnapshot.totalPayment);
+            setPendingRentedStatus(null);
+            setShowPaymentModal(true);
+          }
+        }
 
       } else {
 
@@ -2811,6 +2829,7 @@ function Rental() {
 
 
                                   const isMovingToRented = nextStatus === 'rented';
+                                  const isPendingStep = currentStatus === 'pending' || currentStatus === 'pending_review';
 
                                   const requiredDepositAmount = Math.max(0, parseFloat(downpaymentAmount || 0));
                                   const hasNoDepositPayment = amountPaid < requiredDepositAmount;
@@ -2819,9 +2838,8 @@ function Rental() {
 
                                   const hasRemainingBalance = remainingBalance > 0;
 
-
-
-                                  const shouldDisable = (isMovingToRented && hasNoDepositPayment) || (isCurrentlyRented && hasRemainingBalance);
+                                  // Don't disable when moving from pending — pricing setup modal handles it
+                                  const shouldDisable = (!isPendingStep && isMovingToRented && hasNoDepositPayment) || (isCurrentlyRented && hasRemainingBalance);
 
 
 
@@ -2945,7 +2963,7 @@ function Rental() {
 
                                 )}
 
-                                {rental.approval_status !== 'cancelled' && rental.approval_status !== 'pending' && rental.approval_status !== 'pending_review' && rental.approval_status !== 'price_confirmation' && rental.approval_status !== 'returned' && !isPending && (
+                                {rental.approval_status !== 'cancelled' && rental.approval_status !== 'price_confirmation' && rental.approval_status !== 'returned' && !(isPending && rental.order_type !== 'walk_in') && (
 
                                 <button
 

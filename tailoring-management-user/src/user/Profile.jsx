@@ -1197,12 +1197,6 @@ const Profile = () => {
                 {estimatedCompletionDate ? formatDate(estimatedCompletionDate) : 'N/A'}
               </span>
             </div>
-            <div className="detail-row">
-              <span className="detail-label">Estimated Time:</span>
-              <span className="detail-value">
-                {estimatedTimeDisplay}
-              </span>
-            </div>
             {specific_data.notes && (
               <div className="detail-row">
                 <span className="detail-label">Notes:</span>
@@ -1625,10 +1619,6 @@ const Profile = () => {
             <div className="detail-row">
               <span className="detail-label">Drop Off Item Date:</span>
               <span className="detail-value">{formatDateTo12Hour(specific_data.pickupDate)}</span>
-            </div>
-            <div className="detail-row">
-              <span className="detail-label">Estimated Time:</span>
-              <span className="detail-value">{dryCleaningEstimatedTimeDisplay}</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Estimated Completion Date:</span>

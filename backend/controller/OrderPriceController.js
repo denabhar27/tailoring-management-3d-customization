@@ -50,7 +50,12 @@ const acceptPrice = async (req, res) => {
           });
         }
 
-        Order.updateRepairOrderItem(itemId, {
+        const serviceType = String(item.service_type || '').toLowerCase().trim();
+        const updateFunction = (serviceType === 'dry_cleaning' || serviceType === 'drycleaning' || serviceType === 'dry-cleaning')
+          ? Order.updateDryCleaningOrderItem
+          : Order.updateRepairOrderItem;
+
+        updateFunction(itemId, {
           approvalStatus: 'accepted'
         }, (updateErr, result) => {
           if (updateErr) {
@@ -61,7 +66,7 @@ const acceptPrice = async (req, res) => {
             });
           }
 
-          console.log("Successfully updated order status");
+          console.log("Successfully updated order status to accepted for service type:", serviceType);
           res.json({
             success: true,
             message: 'Price accepted successfully. Order is now accepted.'
@@ -128,7 +133,12 @@ const declinePrice = async (req, res) => {
           });
         }
 
-        Order.updateRepairOrderItem(itemId, {
+        const serviceType = String(item.service_type || '').toLowerCase().trim();
+        const updateFunction = (serviceType === 'dry_cleaning' || serviceType === 'drycleaning' || serviceType === 'dry-cleaning')
+          ? Order.updateDryCleaningOrderItem
+          : Order.updateRepairOrderItem;
+
+        updateFunction(itemId, {
           approvalStatus: 'price_declined'
         }, (updateErr, result) => {
           if (updateErr) {
@@ -139,7 +149,7 @@ const declinePrice = async (req, res) => {
             });
           }
 
-          console.log("Successfully updated order status");
+          console.log("Successfully updated order status to price_declined for service type:", serviceType);
           res.json({
             success: true,
             message: 'Price declined. Order has been cancelled.'

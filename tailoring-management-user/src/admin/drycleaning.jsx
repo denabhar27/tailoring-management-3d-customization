@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
@@ -2328,12 +2328,34 @@ const DryCleaning = () => {
               <div style={{ width: '1px', height: '20px', background: '#ddd' }}></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <label style={{ fontSize: '13px', color: '#333', fontWeight: '500' }}>Time:</label>
-                <input
-                  type="time"
+                <select
                   value={timeFilter}
                   onChange={(e) => setTimeFilter(e.target.value)}
                   style={{ padding: '4px 8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px' }}
-                />
+                >
+                  <option value="">All Times</option>
+                  <option value="08:00">8:00 AM</option>
+                  <option value="08:30">8:30 AM</option>
+                  <option value="09:00">9:00 AM</option>
+                  <option value="09:30">9:30 AM</option>
+                  <option value="10:00">10:00 AM</option>
+                  <option value="10:30">10:30 AM</option>
+                  <option value="11:00">11:00 AM</option>
+                  <option value="11:30">11:30 AM</option>
+                  <option value="12:00">12:00 PM</option>
+                  <option value="12:30">12:30 PM</option>
+                  <option value="13:00">1:00 PM</option>
+                  <option value="13:30">1:30 PM</option>
+                  <option value="14:00">2:00 PM</option>
+                  <option value="14:30">2:30 PM</option>
+                  <option value="15:00">3:00 PM</option>
+                  <option value="15:30">3:30 PM</option>
+                  <option value="16:00">4:00 PM</option>
+                  <option value="16:30">4:30 PM</option>
+                  <option value="17:00">5:00 PM</option>
+                  <option value="17:30">5:30 PM</option>
+                </select>
+
                 {timeFilter && (
                   <button
                     onClick={() => setTimeFilter('')}

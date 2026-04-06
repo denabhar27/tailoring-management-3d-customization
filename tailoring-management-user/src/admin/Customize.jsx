@@ -96,6 +96,8 @@ const Customize = () => {
 
   });
 
+  const [additionalMeasurementProfiles, setAdditionalMeasurementProfiles] = useState([]);
+
   const [measurementsLoading, setMeasurementsLoading] = useState(false);
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -1546,6 +1548,195 @@ const Customize = () => {
       }
     }
     return null;
+  };
+
+  const topMeasurementFields = [
+    { key: 'chest', label: 'Chest' },
+    { key: 'shoulders', label: 'Shoulders' },
+    { key: 'sleeve_length', label: 'Sleeve Length' },
+    { key: 'neck', label: 'Neck' },
+    { key: 'waist', label: 'Waist' },
+    { key: 'length', label: 'Length' }
+  ];
+
+  const bottomMeasurementFields = [
+    { key: 'waist', label: 'Waist' },
+    { key: 'hips', label: 'Hips' },
+    { key: 'inseam', label: 'Inseam' },
+    { key: 'length', label: 'Length' },
+    { key: 'thigh', label: 'Thigh' },
+    { key: 'outseam', label: 'Outseam' }
+  ];
+
+  const normalizeMeasurementMap = (value) => {
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  };
+
+  const createMeasurementProfileId = () => {
+    return `profile-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  };
+
+  const createEmptyAdditionalProfile = (label = '') => ({
+    id: createMeasurementProfileId(),
+    label,
+    top: {},
+    bottom: {},
+    notes: ''
+  });
+
+  const profileHasAnyMeasurement = (profile) => {
+    if (!profile || typeof profile !== 'object') return false;
+    const hasTop = Object.values(normalizeMeasurementMap(profile.top)).some((value) => String(value ?? '').trim() !== '');
+    const hasBottom = Object.values(normalizeMeasurementMap(profile.bottom)).some((value) => String(value ?? '').trim() !== '');
+    const hasLabel = String(profile.label || '').trim() !== '';
+    const hasNotes = String(profile.notes || '').trim() !== '';
+    return hasTop || hasBottom || hasLabel || hasNotes;
+  };
+
+  const sanitizeAdditionalMeasurementProfiles = (profiles) => {
+    if (!Array.isArray(profiles)) return [];
+
+    return profiles
+      .map((profile, index) => ({
+        id: profile?.id || createMeasurementProfileId(),
+        label: (profile?.label || profile?.name || `Person ${index + 1}`).toString(),
+        top: normalizeMeasurementMap(profile?.top || profile?.top_measurements),
+        bottom: normalizeMeasurementMap(profile?.bottom || profile?.bottom_measurements),
+        notes: (profile?.notes || '').toString()
+      }))
+      .filter(profileHasAnyMeasurement);
+  };
+
+  const parseAdditionalMeasurementProfiles = (measurementsSource = {}, specificData = {}) => {
+    const rawProfiles =
+      measurementsSource?.additional_profiles ||
+      measurementsSource?.additionalProfiles ||
+      specificData?.measurement_profiles ||
+      specificData?.additional_measurements ||
+      [];
+
+    let parsedProfiles = rawProfiles;
+
+    if (typeof rawProfiles === 'string') {
+      try {
+        parsedProfiles = JSON.parse(rawProfiles);
+      } catch {
+        parsedProfiles = [];
+      }
+    }
+
+    return sanitizeAdditionalMeasurementProfiles(parsedProfiles);
+  };
+
+  const hydrateMeasurementsFromSource = (rawMeasurementSource = null, specificData = {}) => {
+    const source = rawMeasurementSource && typeof rawMeasurementSource === 'object'
+      ? rawMeasurementSource
+      : {};
+
+    setMeasurements({
+      top: normalizeMeasurementMap(source.top || source.top_measurements),
+      bottom: normalizeMeasurementMap(source.bottom || source.bottom_measurements),
+      notes: source.notes || ''
+    });
+
+    setAdditionalMeasurementProfiles(parseAdditionalMeasurementProfiles(source, specificData));
+  };
+
+  const updateAdditionalMeasurementProfile = (profileId, updater) => {
+    setAdditionalMeasurementProfiles((prevProfiles) =>
+      prevProfiles.map((profile) => {
+        if (profile.id !== profileId) return profile;
+        return typeof updater === 'function' ? updater(profile) : updater;
+      })
+    );
+  };
+
+  const openMeasurementsEditor = async (order) => {
+    if (!order) return;
+    setMeasurementsLoading(true);
+
+    try {
+      const customerId = order.order_type === 'walk_in'
+        ? order.walk_in_customer_id
+        : order.user_id;
+      const customerType = order.order_type === 'walk_in' ? 'walk_in' : 'online';
+
+      if (order.specific_data?.measurements) {
+        const orderMeasurements = typeof order.specific_data.measurements === 'string'
+          ? JSON.parse(order.specific_data.measurements)
+          : order.specific_data.measurements;
+
+        hydrateMeasurementsFromSource(orderMeasurements, order.specific_data);
+        setShowMeasurementsModal(true);
+        return;
+      }
+
+      const result = await getMeasurements(customerId, customerType);
+
+      if (result.success && result.measurements) {
+        hydrateMeasurementsFromSource({
+          top: typeof result.measurements.top_measurements === 'string'
+            ? JSON.parse(result.measurements.top_measurements)
+            : normalizeMeasurementMap(result.measurements.top_measurements),
+          bottom: typeof result.measurements.bottom_measurements === 'string'
+            ? JSON.parse(result.measurements.bottom_measurements)
+            : normalizeMeasurementMap(result.measurements.bottom_measurements),
+          notes: result.measurements.notes || ''
+        }, order.specific_data || {});
+
+        setShowMeasurementsModal(true);
+        return;
+      }
+
+      const garments = Array.isArray(order.specific_data?.garments) ? order.specific_data.garments : [];
+      let userMeas = null;
+
+      if (garments.length > 0) {
+        for (const garment of garments) {
+          const designData = parseDesignData(garment.designData);
+          if (designData?.userMeasurements && Object.keys(designData.userMeasurements).length > 0) {
+            userMeas = designData.userMeasurements;
+            break;
+          }
+        }
+      } else {
+        const designData = parseDesignData(order.specific_data?.designData);
+        if (designData?.userMeasurements && Object.keys(designData.userMeasurements).length > 0) {
+          userMeas = designData.userMeasurements;
+        }
+      }
+
+      if (userMeas) {
+        const topFields = ['chest', 'shoulders', 'sleeveLength', 'neck', 'waist', 'length', 'backLength'];
+        const bottomFields = ['waist', 'hips', 'inseam', 'outseam', 'thigh', 'cuff'];
+        const topMeas = {};
+        const bottomMeas = {};
+
+        Object.entries(userMeas).forEach(([key, val]) => {
+          if (!val) return;
+          const mappedKey = key === 'sleeveLength' ? 'sleeve_length' : key === 'backLength' ? 'length' : key;
+          if (topFields.includes(key)) topMeas[mappedKey] = val;
+          if (bottomFields.includes(key)) bottomMeas[mappedKey] = val;
+        });
+
+        hydrateMeasurementsFromSource({
+          top: topMeas,
+          bottom: bottomMeas,
+          notes: 'Pre-filled from customer-provided body measurements'
+        }, order.specific_data || {});
+      } else {
+        hydrateMeasurementsFromSource({ top: {}, bottom: {}, notes: '' }, order.specific_data || {});
+      }
+
+      setShowMeasurementsModal(true);
+    } catch (error) {
+      console.error('Error loading measurements:', error);
+      setMeasurements({ top: {}, bottom: {}, notes: '' });
+      setAdditionalMeasurementProfiles([]);
+      setShowMeasurementsModal(true);
+    } finally {
+      setMeasurementsLoading(false);
+    }
   };
 
   const getAllGarmentCategories = () => {
@@ -3956,77 +4147,7 @@ const Customize = () => {
 
                     className="btn-secondary"
 
-                    onClick={async () => {
-
-                      setMeasurementsLoading(true);
-
-                      const customerId = selectedOrder.order_type === 'walk_in'
-
-                        ? selectedOrder.walk_in_customer_id
-
-                        : selectedOrder.user_id;
-
-                      const customerType = selectedOrder.order_type === 'walk_in' ? 'walk_in' : 'online';
-
-                      if (selectedOrder.order_type === 'walk_in' && selectedOrder.specific_data?.measurements) {
-
-                        const orderMeasurements = typeof selectedOrder.specific_data.measurements === 'string'
-
-                          ? JSON.parse(selectedOrder.specific_data.measurements)
-
-                          : selectedOrder.specific_data.measurements;
-
-                        setMeasurements({
-
-                          top: orderMeasurements.top || {},
-
-                          bottom: orderMeasurements.bottom || {},
-
-                          notes: orderMeasurements.notes || ''
-
-                        });
-
-                        setMeasurementsLoading(false);
-
-                        setShowMeasurementsModal(true);
-
-                      } else {
-
-                        const result = await getMeasurements(customerId, customerType);
-
-                        if (result.success && result.measurements) {
-
-                          setMeasurements({
-
-                            top: typeof result.measurements.top_measurements === 'string'
-
-                              ? JSON.parse(result.measurements.top_measurements)
-
-                              : result.measurements.top_measurements || {},
-
-                            bottom: typeof result.measurements.bottom_measurements === 'string'
-
-                              ? JSON.parse(result.measurements.bottom_measurements)
-
-                              : result.measurements.bottom_measurements || {},
-
-                            notes: result.measurements.notes || ''
-
-                          });
-
-                        } else {
-
-                          setMeasurements({ top: {}, bottom: {}, notes: '' });
-
-                        }
-
-                        setMeasurementsLoading(false);
-
-                        setShowMeasurementsModal(true);
-
-                      }
-
-                    }}
+                    onClick={() => openMeasurementsEditor(selectedOrder)}
 
                     style={{ padding: '6px 12px', fontSize: '14px' }}
 
@@ -4233,115 +4354,7 @@ const Customize = () => {
 
                   className="btn-measurements"
 
-                  onClick={async () => {
-
-                    setMeasurementsLoading(true);
-
-                    const customerId = selectedOrder.order_type === 'walk_in'
-
-                      ? selectedOrder.walk_in_customer_id
-
-                      : selectedOrder.user_id;
-
-                    const customerType = selectedOrder.order_type === 'walk_in' ? 'walk_in' : 'online';
-
-                    if (selectedOrder.order_type === 'walk_in' && selectedOrder.specific_data?.measurements) {
-
-                      const orderMeasurements = typeof selectedOrder.specific_data.measurements === 'string'
-
-                        ? JSON.parse(selectedOrder.specific_data.measurements)
-
-                        : selectedOrder.specific_data.measurements;
-
-                      setMeasurements({
-
-                        top: orderMeasurements.top || {},
-
-                        bottom: orderMeasurements.bottom || {},
-
-                        notes: orderMeasurements.notes || ''
-
-                      });
-
-                      setMeasurementsLoading(false);
-
-                      setShowMeasurementsModal(true);
-
-                    } else {
-
-                      const result = await getMeasurements(customerId, customerType);
-
-                      if (result.success && result.measurements) {
-
-                        setMeasurements({
-
-                          top: typeof result.measurements.top_measurements === 'string'
-
-                            ? JSON.parse(result.measurements.top_measurements)
-
-                            : result.measurements.top_measurements || {},
-
-                          bottom: typeof result.measurements.bottom_measurements === 'string'
-
-                            ? JSON.parse(result.measurements.bottom_measurements)
-
-                            : result.measurements.bottom_measurements || {},
-
-                          notes: result.measurements.notes || ''
-
-                        });
-
-                      } else {
-
-                        // Try to pre-populate from user-provided measurements in designData
-                        const garments = Array.isArray(selectedOrder.specific_data?.garments) ? selectedOrder.specific_data.garments : [];
-                        let userMeas = null;
-                        if (garments.length > 0) {
-                          for (const g of garments) {
-                            const dd = parseDesignData(g.designData);
-                            if (dd?.userMeasurements && Object.keys(dd.userMeasurements).length > 0) {
-                              userMeas = dd.userMeasurements;
-                              break;
-                            }
-                          }
-                        } else {
-                          const dd = parseDesignData(selectedOrder.specific_data?.designData);
-                          if (dd?.userMeasurements && Object.keys(dd.userMeasurements).length > 0) {
-                            userMeas = dd.userMeasurements;
-                          }
-                        }
-
-                        if (userMeas) {
-                          // Map user measurements to top/bottom format
-                          const topFields = ['chest', 'shoulders', 'sleeveLength', 'neck', 'waist', 'length', 'backLength'];
-                          const bottomFields = ['waist', 'hips', 'inseam', 'outseam', 'thigh', 'cuff'];
-                          const topMeas = {};
-                          const bottomMeas = {};
-                          Object.entries(userMeas).forEach(([key, val]) => {
-                            if (val) {
-                              const mappedKey = key === 'sleeveLength' ? 'sleeve_length' : key === 'backLength' ? 'length' : key;
-                              if (topFields.includes(key)) topMeas[mappedKey] = val;
-                              if (bottomFields.includes(key)) bottomMeas[mappedKey] = val;
-                            }
-                          });
-                          setMeasurements({
-                            top: topMeas,
-                            bottom: bottomMeas,
-                            notes: 'Pre-filled from customer-provided body measurements'
-                          });
-                        } else {
-                          setMeasurements({ top: {}, bottom: {}, notes: '' });
-                        }
-
-                      }
-
-                      setMeasurementsLoading(false);
-
-                      setShowMeasurementsModal(true);
-
-                    }
-
-                  }}
+                  onClick={() => openMeasurementsEditor(selectedOrder)}
 
                 >
 
@@ -4889,10 +4902,13 @@ const Customize = () => {
                 )}
 
               </div>
+              <div style={{ marginTop: '8px', fontSize: '13px', color: '#6b7280' }}>
+                The section below is reserved for the main customer. Use Add Another Measurement for family members or other people included in this order.
+              </div>
               <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
                 <div style={{ flex: 1, padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
 
-                  <p className="measurement-title" style={{ marginTop: 0, marginBottom: '15px', color: '#000', textAlign: 'center', fontWeight: '600', fontSize: '16px', padding: 0 }}>Top Measurements</p>
+                  <p className="measurement-title" style={{ marginTop: 0, marginBottom: '15px', color: '#000', textAlign: 'center', fontWeight: '600', fontSize: '16px', padding: 0 }}>Primary Customer - Top Measurements</p>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
 
@@ -5033,7 +5049,7 @@ const Customize = () => {
                 </div>
                 <div style={{ flex: 1, padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
 
-                  <p className="measurement-title" style={{ marginTop: 0, marginBottom: '15px', color: '#000', textAlign: 'center', fontWeight: '600', fontSize: '16px', padding: 0 }}>Bottom Measurements</p>
+                  <p className="measurement-title" style={{ marginTop: 0, marginBottom: '15px', color: '#000', textAlign: 'center', fontWeight: '600', fontSize: '16px', padding: 0 }}>Primary Customer - Bottom Measurements</p>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
 
@@ -5194,6 +5210,129 @@ const Customize = () => {
 
               </div>
 
+              <div style={{ marginTop: '20px', padding: '18px', backgroundColor: '#f7f8fc', border: '1px solid #dfe3ef', borderRadius: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '10px', flexWrap: 'wrap' }}>
+                  <div>
+                    <strong style={{ color: '#1f2937', fontSize: '16px' }}>Additional People Measurements</strong>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                      Add measurements for people like niece, nephew, or others included in this customization.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setAdditionalMeasurementProfiles((prev) => [...prev, createEmptyAdditionalProfile()])}
+                    style={{ padding: '6px 12px', fontSize: '13px' }}
+                  >
+                    + Add Another Measurement
+                  </button>
+                </div>
+
+                {additionalMeasurementProfiles.length === 0 ? (
+                  <div style={{ fontSize: '13px', color: '#6b7280', background: '#fff', border: '1px dashed #cbd5e1', borderRadius: '8px', padding: '12px' }}>
+                    No additional person added yet.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gap: '14px' }}>
+                    {additionalMeasurementProfiles.map((profile, index) => (
+                      <div key={profile.id} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                          <div style={{ flex: '1 1 240px' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', color: '#333' }}>
+                              Person Label
+                            </label>
+                            <input
+                              type="text"
+                              value={profile.label || ''}
+                              onChange={(e) => updateAdditionalMeasurementProfile(profile.id, (current) => ({
+                                ...current,
+                                label: e.target.value
+                              }))}
+                              placeholder={`Example: Niece #${index + 1}`}
+                              style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            className="btn-cancel-list"
+                            onClick={() => setAdditionalMeasurementProfiles((prev) => prev.filter((entry) => entry.id !== profile.id))}
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                          <div style={{ flex: '1 1 320px', padding: '12px', background: '#f9fafb', borderRadius: '8px' }}>
+                            <p className="measurement-title" style={{ marginTop: 0, marginBottom: '12px', color: '#000', textAlign: 'center', fontWeight: '600', fontSize: '14px', padding: 0 }}>Top Measurements</p>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                              {topMeasurementFields.map((field) => (
+                                <div className="form-group" key={`${profile.id}-top-${field.key}`}>
+                                  <label>{field.label} (inches)</label>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    value={profile.top?.[field.key] || ''}
+                                    onChange={(e) => updateAdditionalMeasurementProfile(profile.id, (current) => ({
+                                      ...current,
+                                      top: {
+                                        ...(current.top || {}),
+                                        [field.key]: e.target.value
+                                      }
+                                    }))}
+                                    placeholder={`Enter ${field.label.toLowerCase()}`}
+                                    style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div style={{ flex: '1 1 320px', padding: '12px', background: '#f9fafb', borderRadius: '8px' }}>
+                            <p className="measurement-title" style={{ marginTop: 0, marginBottom: '12px', color: '#000', textAlign: 'center', fontWeight: '600', fontSize: '14px', padding: 0 }}>Bottom Measurements</p>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                              {bottomMeasurementFields.map((field) => (
+                                <div className="form-group" key={`${profile.id}-bottom-${field.key}`}>
+                                  <label>{field.label} (inches)</label>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    value={profile.bottom?.[field.key] || ''}
+                                    onChange={(e) => updateAdditionalMeasurementProfile(profile.id, (current) => ({
+                                      ...current,
+                                      bottom: {
+                                        ...(current.bottom || {}),
+                                        [field.key]: e.target.value
+                                      }
+                                    }))}
+                                    placeholder={`Enter ${field.label.toLowerCase()}`}
+                                    style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: '12px' }}>
+                          <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontWeight: '600', fontSize: '13px' }}>Notes</label>
+                          <textarea
+                            value={profile.notes || ''}
+                            onChange={(e) => updateAdditionalMeasurementProfile(profile.id, (current) => ({
+                              ...current,
+                              notes: e.target.value
+                            }))}
+                            placeholder="Optional notes for this person..."
+                            rows={2}
+                            style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px', lineHeight: '1.4', backgroundColor: '#fff' }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
             </div>
 
             <div className="modal-footer-centered">
@@ -5209,10 +5348,19 @@ const Customize = () => {
                   ? selectedOrder.walk_in_customer_name
                   : `${selectedOrder.first_name || ''} ${selectedOrder.last_name || ''}`.trim();
 
+                const sanitizedAdditionalProfiles = sanitizeAdditionalMeasurementProfiles(additionalMeasurementProfiles);
+                const orderMeasurementsPayload = {
+                  top: measurements.top,
+                  bottom: measurements.bottom,
+                  notes: measurements.notes,
+                  additional_profiles: sanitizedAdditionalProfiles
+                };
+
                 const measurementsData = {
                   top_measurements: measurements.top,
                   bottom_measurements: measurements.bottom,
                   notes: measurements.notes,
+                  additional_profiles: sanitizedAdditionalProfiles,
                   isWalkIn: isWalkIn,
                   orderId: selectedOrder.order_id,
                   itemId: selectedOrder.item_id,
@@ -5222,6 +5370,31 @@ const Customize = () => {
                 try {
                   const result = await saveMeasurements(customerId, measurementsData);
                   if (result.success) {
+                    setSelectedOrder((prev) => {
+                      if (!prev || prev.item_id !== selectedOrder.item_id) return prev;
+                      return {
+                        ...prev,
+                        specific_data: {
+                          ...(prev.specific_data || {}),
+                          measurements: orderMeasurementsPayload
+                        }
+                      };
+                    });
+
+                    setAllItems((prevItems) =>
+                      prevItems.map((item) =>
+                        item.item_id === selectedOrder.item_id
+                          ? {
+                              ...item,
+                              specific_data: {
+                                ...(item.specific_data || {}),
+                                measurements: orderMeasurementsPayload
+                              }
+                            }
+                          : item
+                      )
+                    );
+
                     await alert('Measurements saved successfully!', 'Success', 'success');
                     setShowMeasurementsModal(false);
 

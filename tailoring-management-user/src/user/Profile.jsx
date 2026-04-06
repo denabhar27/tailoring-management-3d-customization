@@ -3160,7 +3160,7 @@ const Profile = () => {
                   </div>
                   <div className="summary-item summary-item-price">
                     <span className="summary-label">Price:</span>
-                  <span className="order-price order-price-clean" style={{ textAlign: 'right', display: 'block' }}>
+                    <span className="order-price order-price-clean" style={{ display: 'block' }}>
                       {(() => {
                         const isRental = selectedItem.service_type === 'rental';
                         const isRepair = selectedItem.service_type === 'repair';

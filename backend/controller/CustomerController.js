@@ -194,16 +194,19 @@ exports.updateCustomerStatus = (req, res) => {
 
 exports.saveMeasurements = (req, res) => {
   const { id } = req.params;
-  const { top_measurements, bottom_measurements, notes, isWalkIn, orderId, itemId, customer_name } = req.body;
+  const { top_measurements, bottom_measurements, notes, isWalkIn, orderId, itemId, customer_name, additional_profiles, additionalProfiles } = req.body;
   
   const top = top_measurements || req.body.top;
   const bottom = bottom_measurements || req.body.bottom;
   const adminId = req.user.id;
   const customerType = req.body.customer_type;
+  const normalizedAdditionalProfiles = Array.isArray(additional_profiles)
+    ? additional_profiles
+    : (Array.isArray(additionalProfiles) ? additionalProfiles : []);
   
   const isWalkInCustomer = isWalkIn === true || customerType === 'walk_in';
 
-  if (isWalkInCustomer && itemId) {
+  if (itemId) {
     const db = require('../config/db');
 
     db.query('SELECT specific_data FROM order_items WHERE item_id = ?', [itemId], (err, results) => {
@@ -222,7 +225,8 @@ exports.saveMeasurements = (req, res) => {
         specificData.measurements = {
           top: top || {},
           bottom: bottom || {},
-          notes: notes || ''
+          notes: notes || '',
+          additional_profiles: normalizedAdditionalProfiles
         };
 
         db.query(

@@ -18,7 +18,6 @@ const ShopSchedule = () => {
   const [expandedDay, setExpandedDay] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [editingCapacity, setEditingCapacity] = useState({});
 
   const daysOfWeek = [
     { value: 0, name: 'Sunday' },
@@ -119,43 +118,9 @@ const ShopSchedule = () => {
   };
 
   const handleSlotCapacityChange = (slotId, newCapacity) => {
-    setEditingCapacity(prev => ({
-      ...prev,
-      [slotId]: newCapacity
-    }));
-  };
-
-  const handleSlotCapacityUpdate = async (slot) => {
-    const newCapacity = editingCapacity[slot.slot_id];
-    if (newCapacity === undefined || newCapacity === slot.capacity) {
-      return;
-    }
-
-    const capacity = parseInt(newCapacity, 10);
-    if (isNaN(capacity) || capacity < 0) {
-      await alert('Please enter a valid capacity (0 or greater)', 'Invalid Input', 'warning');
-      return;
-    }
-
-    try {
-      const result = await updateTimeSlotCapacity(slot.slot_id, capacity, slot.is_active);
-      if (result.success) {
-        setTimeSlots(prev => prev.map(s => 
-          s.slot_id === slot.slot_id ? { ...s, capacity } : s
-        ));
-        setEditingCapacity(prev => {
-          const newState = { ...prev };
-          delete newState[slot.slot_id];
-          return newState;
-        });
-        await alert('Slot capacity updated successfully!', 'Success', 'success');
-      } else {
-        await alert(result.message || 'Failed to update capacity', 'Error', 'error');
-      }
-    } catch (error) {
-      console.error('Error updating capacity:', error);
-      await alert('Failed to update capacity', 'Error', 'error');
-    }
+    setTimeSlots(prev => prev.map(s => 
+      s.slot_id === slotId ? { ...s, capacity: parseInt(newCapacity, 10) || 0 } : s
+    ));
   };
 
   const toggleTimeSlot = (dayOfWeek, timeSlot) => {
@@ -199,12 +164,21 @@ const ShopSchedule = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const result = await updateShopSchedule(schedule);
-      if (result.success) {
-        await alert('Shop schedule updated successfully!', 'Success', 'success');
-      } else {
-        await alert(result.message || 'Failed to update shop schedule', 'Error', 'error');
+      
+      // Update schedule
+      const scheduleResult = await updateShopSchedule(schedule);
+      if (!scheduleResult.success) {
+        await alert(scheduleResult.message || 'Failed to update shop schedule', 'Error', 'error');
+        return;
       }
+      
+      // Update slot capacities
+      const slotUpdates = timeSlots.map(slot => 
+        updateTimeSlotCapacity(slot.slot_id, slot.capacity, slot.is_active)
+      );
+      await Promise.all(slotUpdates);
+      
+      await alert('Shop schedule updated successfully!', 'Success', 'success');
     } catch (error) {
       console.error('Error updating shop schedule:', error);
       await alert('Failed to update shop schedule', 'Error', 'error');
@@ -319,10 +293,7 @@ const ShopSchedule = () => {
                           const displayHour = hour % 12 || 12;
                           const displayTime = `${displayHour}:${minutes}${ampm}`;
                           
-                          const currentCapacity = editingCapacity[slot.slot_id] !== undefined 
-                            ? editingCapacity[slot.slot_id] 
-                            : slot.capacity;
-                          const isEditing = editingCapacity[slot.slot_id] !== undefined;
+                          const currentCapacity = slot.capacity;
                           
                           return (
                             <div key={slot.slot_id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -341,16 +312,10 @@ const ShopSchedule = () => {
                                   min="0"
                                   value={currentCapacity}
                                   onChange={(e) => handleSlotCapacityChange(slot.slot_id, e.target.value)}
-                                  onBlur={() => handleSlotCapacityUpdate(slot)}
-                                  onKeyPress={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.target.blur();
-                                    }
-                                  }}
                                   style={{
                                     width: '50px',
                                     padding: '2px 4px',
-                                    border: isEditing ? '1px solid #2196f3' : '1px solid #ddd',
+                                    border: '1px solid #ddd',
                                     borderRadius: '3px',
                                     fontSize: '11px',
                                     textAlign: 'center'

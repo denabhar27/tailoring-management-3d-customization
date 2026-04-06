@@ -220,10 +220,7 @@ const Repair = () => {
     setToast({ show: true, message, type });
 
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
-
   };
-
-
 
   const openImagePreview = (url, alt) => {
 
@@ -3222,10 +3219,6 @@ const Repair = () => {
 
 
 
-              <div className="detail-row"><strong>Damage Description:</strong> {selectedOrder.specific_data?.damageDescription || 'N/A'}</div>
-
-
-
               <div className="form-group" style={{ marginTop: '20px' }}>
 
                 <label>Final Price (₱)</label>
@@ -3758,10 +3751,6 @@ const Repair = () => {
                 </div>
 
               )}
-
-
-
-              <div className="detail-row"><strong>Damage Description:</strong> {selectedOrder.specific_data?.damageDescription || 'N/A'}</div>
 
               <div className="detail-row"><strong>Preferred Date:</strong> {(() => {
                 const pickupDate = selectedOrder.specific_data?.pickupDate || selectedOrder.pricing_factors?.pickupDate;
@@ -4324,9 +4313,25 @@ const Repair = () => {
 
               <div className="detail-row"><strong>Order ID:</strong> #{priceConfirmationItem.order_id}</div>
 
-              <div className="detail-row"><strong>Garment Type:</strong> {priceConfirmationItem.specific_data?.garmentType || 'N/A'}</div>
-
-              <div className="detail-row"><strong>Damage Level:</strong> {priceConfirmationItem.specific_data?.damageLevel || 'N/A'}</div>
+              {/* Multiple garments support */}
+              {priceConfirmationItem.specific_data?.garments && priceConfirmationItem.specific_data.garments.length > 0 ? (
+                <>
+                  <div className="detail-row"><strong>Garments:</strong> {priceConfirmationItem.specific_data.garments.length} item{priceConfirmationItem.specific_data.garments.length > 1 ? 's' : ''}</div>
+                  {priceConfirmationItem.specific_data.garments.map((garment, idx) => (
+                    <div key={idx} style={{ marginLeft: '20px', paddingLeft: '10px', borderLeft: '2px solid #e0e0e0', marginBottom: '10px' }}>
+                      <div className="detail-row"><strong>Garment #{idx + 1}:</strong> {garment.garmentType || 'N/A'}</div>
+                      <div className="detail-row"><strong>Damage Level:</strong> {garment.damageLevel ? garment.damageLevel.charAt(0).toUpperCase() + garment.damageLevel.slice(1) : 'N/A'}</div>
+                      <div className="detail-row"><strong>Description:</strong> {garment.notes || 'N/A'}</div>
+                      <div className="detail-row"><strong>Price:</strong> ₱{garment.basePrice || 'N/A'}</div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <div className="detail-row"><strong>Garment Type:</strong> {priceConfirmationItem.specific_data?.garmentType || 'N/A'}</div>
+                  <div className="detail-row"><strong>Damage Level:</strong> {priceConfirmationItem.specific_data?.damageLevel || 'N/A'}</div>
+                </>
+              )}
 
 
 

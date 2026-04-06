@@ -976,7 +976,16 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                     <div className="cart-item-actions" onClick={(e) => e.stopPropagation()}>
                       <div className="cart-quantity">
                         <label>Qty:</label>
-                        <span className="quantity-display">{item.quantity || 1}</span>
+                        <span className="quantity-display">
+                          {/* For multi-garment services, show total garment count */}
+                          {(item.service_type === 'dry_cleaning' || item.service_type === 'repair') && 
+                           item.specific_data?.garments && item.specific_data.garments.length > 0
+                            ? item.service_type === 'dry_cleaning'
+                              ? item.specific_data.garments.reduce((sum, g) => sum + parseInt(g.quantity || 1), 0)
+                              : item.specific_data.garments.length
+                            : (item.quantity || 1)
+                          }
+                        </span>
                       </div>
 
                       <button
@@ -1010,6 +1019,21 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           const rentalPrice = parseFloat(item.final_price || 0);
                           const deposit = parseFloat(item.pricing_factors?.downpayment || 0);
                           return total + rentalPrice + deposit;
+                        }
+                        // For dry_cleaning and repair with multiple garments, recalculate from garments array
+                        if ((item.service_type === 'dry_cleaning' || item.service_type === 'repair') && 
+                            item.specific_data?.garments && item.specific_data.garments.length > 0) {
+                          console.log('Calculating total for:', item.service_type, item.specific_data.garments);
+                          const garmentsTotal = item.specific_data.garments.reduce((sum, garment) => {
+                            // Repair uses basePrice, dry_cleaning uses pricePerItem
+                            const price = item.service_type === 'repair' 
+                              ? parseFloat(garment.basePrice || 0)
+                              : parseFloat(garment.pricePerItem || 0) * parseInt(garment.quantity || 1);
+                            console.log(`  ${garment.garmentType}: ₱${price}`);
+                            return sum + price;
+                          }, 0);
+                          console.log('  Total:', garmentsTotal);
+                          return total + garmentsTotal;
                         }
                         return total + (parseFloat(item.final_price || 0) * (item.quantity || 1));
                       }, 0)

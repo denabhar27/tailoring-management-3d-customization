@@ -60,6 +60,8 @@ const DryCleaning = () => {
   const [statusFilter, setStatusFilter] = useState('');
 
   const [todayAppointmentsOnly, setTodayAppointmentsOnly] = useState(false);
+  const [dateRangeStart, setDateRangeStart] = useState('');
+  const [dateRangeEnd, setDateRangeEnd] = useState('');
 
   const [viewFilter, setViewFilter] = useState("all");
 
@@ -1118,6 +1120,33 @@ const DryCleaning = () => {
 
     if (todayAppointmentsOnly) {
       items = items.filter(isTodayAppointment);
+    }
+
+    if (dateRangeStart || dateRangeEnd) {
+      items = items.filter(item => {
+        const specificData = parseMaybeObject(item?.specific_data);
+        const pricingFactors = parseMaybeObject(item?.pricing_factors);
+        const appointmentDate = item?.appointment_date || item?.appointmentDate || specificData?.appointment_date || specificData?.appointmentDate || specificData?.pickupDate || specificData?.preferredDate || specificData?.date;
+        if (!appointmentDate) return false;
+        const itemDate = new Date(appointmentDate);
+        itemDate.setHours(0, 0, 0, 0);
+        if (dateRangeStart && dateRangeEnd) {
+          const start = new Date(dateRangeStart);
+          const end = new Date(dateRangeEnd);
+          start.setHours(0, 0, 0, 0);
+          end.setHours(23, 59, 59, 999);
+          return itemDate >= start && itemDate <= end;
+        } else if (dateRangeStart) {
+          const start = new Date(dateRangeStart);
+          start.setHours(0, 0, 0, 0);
+          return itemDate >= start;
+        } else if (dateRangeEnd) {
+          const end = new Date(dateRangeEnd);
+          end.setHours(23, 59, 59, 999);
+          return itemDate <= end;
+        }
+        return true;
+      });
     }
 
 
@@ -2219,17 +2248,64 @@ const DryCleaning = () => {
           borderRadius: '8px',
           background: '#fffaf5'
         }}>
-          <div style={{ color: '#8B4513', fontWeight: '600', fontSize: '13px' }}>
-            Today's appointments: {todayAppointmentsCount}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#333', fontSize: '13px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={todayAppointmentsOnly}
+                onChange={(e) => {
+                  setTodayAppointmentsOnly(e.target.checked);
+                  if (e.target.checked) {
+                    setDateRangeStart('');
+                    setDateRangeEnd('');
+                  }
+                }}
+              />
+              Today's appointments ({todayAppointmentsCount})
+            </label>
+            <div style={{ width: '1px', height: '20px', background: '#ddd' }}></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '13px', color: '#333', fontWeight: '500' }}>Date Range:</label>
+              <input
+                type="date"
+                value={dateRangeStart}
+                onChange={(e) => {
+                  setDateRangeStart(e.target.value);
+                  if (e.target.value) setTodayAppointmentsOnly(false);
+                }}
+                style={{ padding: '4px 8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px' }}
+              />
+              <span style={{ color: '#666' }}>to</span>
+              <input
+                type="date"
+                value={dateRangeEnd}
+                onChange={(e) => {
+                  setDateRangeEnd(e.target.value);
+                  if (e.target.value) setTodayAppointmentsOnly(false);
+                }}
+                style={{ padding: '4px 8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px' }}
+              />
+              {(dateRangeStart || dateRangeEnd) && (
+                <button
+                  onClick={() => {
+                    setDateRangeStart('');
+                    setDateRangeEnd('');
+                  }}
+                  style={{
+                    padding: '4px 8px',
+                    background: '#f44336',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#333', fontSize: '13px', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={todayAppointmentsOnly}
-              onChange={(e) => setTodayAppointmentsOnly(e.target.checked)}
-            />
-            Show only today's appointments
-          </label>
         </div>
 
         <div className="table-container">
@@ -2357,7 +2433,12 @@ const DryCleaning = () => {
 
                     <td><span style={{ fontSize: '0.9em', color: '#d32f2f' }}>{item.specific_data?.serviceName || 'N/A'}</span></td>
 
-                    <td>{new Date(item.order_date).toLocaleDateString()}</td>
+                    <td>{(() => {
+                      const pickupDate = item.specific_data?.pickupDate || item.pricing_factors?.pickupDate;
+                      if (!pickupDate) return 'N/A';
+                      const date = new Date(pickupDate);
+                      return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                    })()}</td>
 
                     <td>₱{parseFloat(item.final_price || 0).toLocaleString()}</td>
 
@@ -3561,9 +3642,23 @@ const DryCleaning = () => {
 
 
 
-              <div className="detail-row"><strong>Date Received:</strong> {new Date(selectedOrder.order_date).toLocaleDateString()}</div>
+              <div className="detail-row"><strong>Preferred Date:</strong> {(() => {
+                const pickupDate = selectedOrder.specific_data?.pickupDate || selectedOrder.pricing_factors?.pickupDate;
+                if (!pickupDate) return 'N/A';
+                const date = new Date(pickupDate);
+                return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+              })()}</div>
 
-              <div className="detail-row"><strong>Selected Time:</strong> {(selectedOrder.specific_data?.pickupDate || selectedOrder.pricing_factors?.pickupDate) ? String(selectedOrder.specific_data?.pickupDate || selectedOrder.pricing_factors?.pickupDate).split('T')[1]?.slice(0, 5) || 'N/A' : 'N/A'}</div>
+              <div className="detail-row"><strong>Preferred Time:</strong> {(() => {
+                const pickupDate = selectedOrder.specific_data?.pickupDate || selectedOrder.pricing_factors?.pickupDate;
+                if (!pickupDate) return 'N/A';
+                const timeStr = String(pickupDate).split('T')[1]?.slice(0, 5);
+                if (!timeStr) return 'N/A';
+                const [hours, minutes] = timeStr.split(':').map(Number);
+                const period = hours >= 12 ? 'PM' : 'AM';
+                const displayHours = hours % 12 || 12;
+                return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
+              })()}</div>
 
               <div className="detail-row"><strong>Estimated Time:</strong> {(() => {
 

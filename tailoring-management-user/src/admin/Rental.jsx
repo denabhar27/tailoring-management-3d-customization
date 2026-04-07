@@ -100,18 +100,25 @@ function Rental() {
     }
   };
 
+  const calcDepositFromRental = (rental) => {
+    const pricingFactors = parsePricingFactors(rental?.pricing_factors);
+    const isBundle = rental?.specific_data?.is_bundle || pricingFactors?.is_bundle;
+    if (isBundle && Array.isArray(rental?.specific_data?.bundle_items)) {
+      const total = rental.specific_data.bundle_items.reduce((sum, bundleItem) => {
+        const sizes = bundleItem.selected_sizes || bundleItem.selectedSizes || [];
+        return sum + sizes.reduce((s, size) => s + (parseInt(size.quantity || 0, 10) * parseFloat(size.deposit || 0)), 0);
+      }, 0);
+      if (total > 0) return total;
+    }
+    const selectedSizes = rental?.specific_data?.selected_sizes || rental?.specific_data?.selectedSizes || [];
+    const fromSizes = selectedSizes.reduce((total, size) => total + (parseInt(size.quantity || 0, 10) * parseFloat(size.deposit || 0)), 0);
+    return fromSizes > 0 ? fromSizes : parseFloat(pricingFactors?.downpayment || pricingFactors?.deposit_amount || rental?.specific_data?.downpayment || 0);
+  };
+
   const getRentalPaymentSnapshot = (rental) => {
     const pricingFactors = parsePricingFactors(rental?.pricing_factors);
     const finalPrice = parseFloat(rental?.final_price || 0);
-    
-    // Calculate deposit from selected sizes
-    const selectedSizes = rental?.specific_data?.selected_sizes || rental?.specific_data?.selectedSizes || [];
-    const depositFromSizes = selectedSizes.reduce((total, size) => {
-      const quantity = parseInt(size.quantity || 0, 10);
-      const deposit = parseFloat(size.deposit || 0);
-      return total + (quantity * deposit);
-    }, 0);
-    const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(pricingFactors?.downpayment || pricingFactors?.deposit_amount || rental?.specific_data?.downpayment || 0);
+    const depositAmount = calcDepositFromRental(rental);
     
     const amountPaid = parseFloat(pricingFactors?.amount_paid || 0);
     const totalPayment = finalPrice + depositAmount;
@@ -128,15 +135,7 @@ function Rental() {
 
   const getDepositReturnSnapshot = (rental) => {
     const pricingFactors = parsePricingFactors(rental?.pricing_factors);
-    
-    // Calculate deposit from selected sizes
-    const selectedSizes = rental?.specific_data?.selected_sizes || rental?.specific_data?.selectedSizes || [];
-    const depositFromSizes = selectedSizes.reduce((total, size) => {
-      const quantity = parseInt(size.quantity || 0, 10);
-      const deposit = parseFloat(size.deposit || 0);
-      return total + (quantity * deposit);
-    }, 0);
-    const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(pricingFactors?.downpayment || pricingFactors?.deposit_amount || rental?.specific_data?.downpayment || 0);
+    const depositAmount = calcDepositFromRental(rental);
     
     const refundedAmount = parseFloat(rental?.deposit_refunded || pricingFactors?.deposit_refunded_amount || 0);
     
@@ -900,14 +899,8 @@ function Rental() {
 
     }
 
-    // Calculate deposit from selected sizes
-    const selectedSizes = rental?.specific_data?.selected_sizes || rental?.specific_data?.selectedSizes || [];
-    const depositFromSizes = selectedSizes.reduce((total, size) => {
-      const quantity = parseInt(size.quantity || 0, 10);
-      const deposit = parseFloat(size.deposit || 0);
-      return total + (quantity * deposit);
-    }, 0);
-    const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(currentPricingFactors?.downpayment || rental?.specific_data?.downpayment || 0);
+    // Calculate deposit using the shared helper (handles bundles correctly)
+    const depositAmount = calcDepositFromRental(rental);
 
     const fallbackPrice = parseFloat(rental?.specific_data?.total_price || 0);
 
@@ -963,22 +956,8 @@ function Rental() {
 
 
 
-    // Calculate deposit from selected sizes
-    const selectedSizes = pendingPricingRental?.specific_data?.selected_sizes || pendingPricingRental?.specific_data?.selectedSizes || [];
-    const depositFromSizes = selectedSizes.reduce((total, size) => {
-      const quantity = parseInt(size.quantity || 0, 10);
-      const deposit = parseFloat(size.deposit || 0);
-      return total + (quantity * deposit);
-    }, 0);
-    let currentPricingFactors = {};
-    try {
-      currentPricingFactors = typeof pendingPricingRental?.pricing_factors === 'string'
-        ? JSON.parse(pendingPricingRental.pricing_factors || '{}')
-        : (pendingPricingRental?.pricing_factors || {});
-    } catch (e) {
-      currentPricingFactors = {};
-    }
-    const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(currentPricingFactors?.downpayment || pendingPricingRental?.specific_data?.downpayment || 0);
+    // Calculate deposit using the shared helper (handles bundles correctly)
+    const depositAmount = calcDepositFromRental(pendingPricingRental);
     const rentalPriceOnly = parsedPrice - depositAmount;
 
     const isWalkIn = pendingPricingRental.order_type === 'walk_in';
@@ -2439,14 +2418,8 @@ function Rental() {
 
                     const isPending = rental.approval_status === 'pending' || rental.approval_status === 'pending_review';
 
-                    // Calculate total deposit from selected sizes
-                    const selectedSizes = rental.specific_data?.selected_sizes || rental.specific_data?.selectedSizes || [];
-                    const depositFromSizes = selectedSizes.reduce((total, size) => {
-                      const quantity = parseInt(size.quantity || 0, 10);
-                      const deposit = parseFloat(size.deposit || 0);
-                      return total + (quantity * deposit);
-                    }, 0);
-                    const downpaymentAmount = depositFromSizes > 0 ? depositFromSizes : (rental.pricing_factors?.downpayment || rental.specific_data?.downpayment || 0);
+                    // Calculate deposit from selected sizes
+                    const downpaymentAmount = calcDepositFromRental(rental);
 
 
 
@@ -3735,16 +3708,7 @@ function Rental() {
 
                 <span style={{ color: '#ff9800', fontWeight: 'bold' }}>
 
-                  ₱{(() => {
-                    const selectedSizes = selectedRental?.specific_data?.selected_sizes || selectedRental?.specific_data?.selectedSizes || [];
-                    const depositFromSizes = selectedSizes.reduce((total, size) => {
-                      const quantity = parseInt(size.quantity || 0, 10);
-                      const deposit = parseFloat(size.deposit || 0);
-                      return total + (quantity * deposit);
-                    }, 0);
-                    const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(selectedRental.pricing_factors?.downpayment || selectedRental.specific_data?.downpayment || 0);
-                    return depositAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                  })()}
+                  ₱{calcDepositFromRental(selectedRental).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
 
                 </span>
 
@@ -3756,16 +3720,7 @@ function Rental() {
 
                 <span style={{ color: '#2e7d32', fontWeight: 'bold', fontSize: '16px' }}>
 
-                  ₱{(() => {
-                    const selectedSizes = selectedRental?.specific_data?.selected_sizes || selectedRental?.specific_data?.selectedSizes || [];
-                    const depositFromSizes = selectedSizes.reduce((total, size) => {
-                      const quantity = parseInt(size.quantity || 0, 10);
-                      const deposit = parseFloat(size.deposit || 0);
-                      return total + (quantity * deposit);
-                    }, 0);
-                    const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(selectedRental.pricing_factors?.downpayment || selectedRental.specific_data?.downpayment || 0);
-                    return (parseFloat(selectedRental.final_price || 0) + depositAmount).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                  })()}
+                  ₱{(parseFloat(selectedRental.final_price || 0) + calcDepositFromRental(selectedRental)).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
 
                 </span>
 
@@ -4933,15 +4888,43 @@ function Rental() {
                 <strong style={{ marginBottom: '8px' }}>Deposit (Refundable):</strong>
 
                 {(() => {
+                  const depositAmount = calcDepositFromRental(selectedRental);
+                  const isBundle = selectedRental?.specific_data?.is_bundle || selectedRental?.pricing_factors?.is_bundle;
+                  const bundleItems = selectedRental?.specific_data?.bundle_items || [];
                   const selectedSizes = selectedRental?.specific_data?.selected_sizes || selectedRental?.specific_data?.selectedSizes || [];
-                  const depositFromSizes = selectedSizes.reduce((total, size) => {
-                    const quantity = parseInt(size.quantity || 0, 10);
-                    const deposit = parseFloat(size.deposit || 0);
-                    return total + (quantity * deposit);
-                  }, 0);
-                  const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(selectedRental.pricing_factors?.downpayment || selectedRental.specific_data?.downpayment || 0);
 
-                  if (selectedSizes.length > 0 && depositFromSizes > 0) {
+                  // Show per-size breakdown for bundles
+                  if (isBundle && bundleItems.length > 0) {
+                    const lines = [];
+                    bundleItems.forEach((bundleItem) => {
+                      const sizes = bundleItem.selected_sizes || bundleItem.selectedSizes || [];
+                      sizes.forEach((size) => {
+                        const qty = parseInt(size.quantity || 0, 10);
+                        const dep = parseFloat(size.deposit || 0);
+                        const lineDeposit = qty * dep;
+                        if (lineDeposit > 0) lines.push({ label: `${bundleItem.item_name || 'Item'} - ${size.label || size.sizeKey} ×${qty}`, amount: lineDeposit });
+                      });
+                    });
+                    if (lines.length > 0) {
+                      return (
+                        <div style={{ width: '100%' }}>
+                          {lines.map((line, idx) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '14px', color: '#666' }}>
+                              <span>{line.label} Deposit:</span>
+                              <span style={{ color: '#ff9800', fontWeight: '600' }}>₱{line.amount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                            </div>
+                          ))}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '1px solid #e0e0e0', marginTop: '4px' }}>
+                            <span style={{ fontWeight: 'bold' }}>Total Deposit:</span>
+                            <span style={{ color: '#ff9800', fontWeight: 'bold' }}>₱{depositAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                          </div>
+                        </div>
+                      );
+                    }
+                  }
+
+                  // Show per-size breakdown for single items
+                  if (selectedSizes.length > 0 && selectedSizes.some(s => parseFloat(s.deposit || 0) > 0)) {
                     return (
                       <div style={{ width: '100%' }}>
                         {selectedSizes.map((size, idx) => {
@@ -4979,16 +4962,7 @@ function Rental() {
 
                 <span style={{ color: '#2e7d32', fontWeight: 'bold', fontSize: '16px' }}>
 
-                  ₱{(() => {
-                    const selectedSizes = selectedRental?.specific_data?.selected_sizes || selectedRental?.specific_data?.selectedSizes || [];
-                    const depositFromSizes = selectedSizes.reduce((total, size) => {
-                      const quantity = parseInt(size.quantity || 0, 10);
-                      const deposit = parseFloat(size.deposit || 0);
-                      return total + (quantity * deposit);
-                    }, 0);
-                    const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(selectedRental.pricing_factors?.downpayment || selectedRental.specific_data?.downpayment || 0);
-                    return (parseFloat(selectedRental.final_price || 0) + depositAmount).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                  })()}
+                  ₱{(parseFloat(selectedRental.final_price || 0) + calcDepositFromRental(selectedRental)).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
 
                 </span>
 

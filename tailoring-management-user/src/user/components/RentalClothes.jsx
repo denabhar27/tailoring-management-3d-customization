@@ -2790,6 +2790,8 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
           price: item.sizeOptions?.[sizeKey]?.price || 0,
 
+          deposit: item.sizeOptions?.[sizeKey]?.deposit || 0,
+
           label: item.sizeOptions?.[sizeKey]?.label || SIZE_LABELS[sizeKey] || sizeKey
 
         }));

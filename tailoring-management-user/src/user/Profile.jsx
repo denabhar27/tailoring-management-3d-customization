@@ -2307,13 +2307,24 @@ const Profile = () => {
                   ? JSON.parse(item.pricing_factors || '{}')
                   : (item.pricing_factors || {});
                 const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
-                // Calculate deposit from selected_sizes
-                const selectedSizes = item.specific_data?.selected_sizes || item.specific_data?.selectedSizes || [];
-                const depositFromSizes = selectedSizes.reduce((total, size) => {
-                  const quantity = parseInt(size.quantity || 0, 10);
-                  const deposit = parseFloat(size.deposit || 0);
-                  return total + (quantity * deposit);
-                }, 0);
+                // Calculate deposit from selected_sizes (single) or bundle_items (bundle)
+                const isBundle = item.specific_data?.is_bundle || pricingFactors?.is_bundle;
+                let depositFromSizes = 0;
+                if (isBundle && Array.isArray(item.specific_data?.bundle_items)) {
+                  depositFromSizes = item.specific_data.bundle_items.reduce((total, bundleItem) => {
+                    const sizes = bundleItem.selected_sizes || bundleItem.selectedSizes || [];
+                    return total + sizes.reduce((s, size) => {
+                      return s + (parseInt(size.quantity || 0, 10) * parseFloat(size.deposit || 0));
+                    }, 0);
+                  }, 0);
+                } else {
+                  const selectedSizes = item.specific_data?.selected_sizes || item.specific_data?.selectedSizes || [];
+                  depositFromSizes = selectedSizes.reduce((total, size) => {
+                    const quantity = parseInt(size.quantity || 0, 10);
+                    const deposit = parseFloat(size.deposit || 0);
+                    return total + (quantity * deposit);
+                  }, 0);
+                }
                 const downpayment = depositFromSizes > 0 ? depositFromSizes : parseFloat(pricingFactors.downpayment || item.specific_data?.downpayment || 0);
                 const finalPrice = parseFloat(item.final_price || 0);
                 const rentalPaymentMode = String(pricingFactors.rental_payment_mode || 'regular').toLowerCase();
@@ -2803,13 +2814,19 @@ const Profile = () => {
                         </div>
                         <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ff9800' }}>
                           Deposit Amount: ₱{(() => {
-                            const selectedSizes = item.specific_data?.selected_sizes || item.specific_data?.selectedSizes || [];
-                            const depositFromSizes = selectedSizes.reduce((total, size) => {
-                              const quantity = parseInt(size.quantity || 0, 10);
-                              const deposit = parseFloat(size.deposit || 0);
-                              return total + (quantity * deposit);
-                            }, 0);
-                            const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(item.pricing_factors?.downpayment || item.specific_data?.downpayment || 0);
+                            const pf = typeof item.pricing_factors === 'string' ? JSON.parse(item.pricing_factors || '{}') : (item.pricing_factors || {});
+                            const isBundleItem = item.specific_data?.is_bundle || pf?.is_bundle;
+                            let depositAmt = 0;
+                            if (isBundleItem && Array.isArray(item.specific_data?.bundle_items)) {
+                              depositAmt = item.specific_data.bundle_items.reduce((total, bundleItem) => {
+                                const sizes = bundleItem.selected_sizes || bundleItem.selectedSizes || [];
+                                return total + sizes.reduce((s, size) => s + (parseInt(size.quantity || 0, 10) * parseFloat(size.deposit || 0)), 0);
+                              }, 0);
+                            } else {
+                              const sizes = item.specific_data?.selected_sizes || item.specific_data?.selectedSizes || [];
+                              depositAmt = sizes.reduce((total, size) => total + (parseInt(size.quantity || 0, 10) * parseFloat(size.deposit || 0)), 0);
+                            }
+                            const depositAmount = depositAmt > 0 ? depositAmt : parseFloat(pf?.downpayment || item.specific_data?.downpayment || 0);
                             return depositAmount.toLocaleString();
                           })()}
                         </div>
@@ -2821,13 +2838,19 @@ const Profile = () => {
                       const refundedDate = item.deposit_refund_date || item.pricing_factors?.deposit_refunded_at;
 
                       if (item.status === 'returned') {
-                        const selectedSizes = item.specific_data?.selected_sizes || item.specific_data?.selectedSizes || [];
-                        const depositFromSizes = selectedSizes.reduce((total, size) => {
-                          const quantity = parseInt(size.quantity || 0, 10);
-                          const deposit = parseFloat(size.deposit || 0);
-                          return total + (quantity * deposit);
-                        }, 0);
-                        const totalDeposit = depositFromSizes > 0 ? depositFromSizes : parseFloat(item.pricing_factors?.downpayment || item.specific_data?.downpayment || 0);
+                        const pf2 = typeof item.pricing_factors === 'string' ? JSON.parse(item.pricing_factors || '{}') : (item.pricing_factors || {});
+                        const isBundleItem2 = item.specific_data?.is_bundle || pf2?.is_bundle;
+                        let depositFromSizes2 = 0;
+                        if (isBundleItem2 && Array.isArray(item.specific_data?.bundle_items)) {
+                          depositFromSizes2 = item.specific_data.bundle_items.reduce((total, bundleItem) => {
+                            const sizes = bundleItem.selected_sizes || bundleItem.selectedSizes || [];
+                            return total + sizes.reduce((s, size) => s + (parseInt(size.quantity || 0, 10) * parseFloat(size.deposit || 0)), 0);
+                          }, 0);
+                        } else {
+                          const sizes2 = item.specific_data?.selected_sizes || item.specific_data?.selectedSizes || [];
+                          depositFromSizes2 = sizes2.reduce((total, size) => total + (parseInt(size.quantity || 0, 10) * parseFloat(size.deposit || 0)), 0);
+                        }
+                        const totalDeposit = depositFromSizes2 > 0 ? depositFromSizes2 : parseFloat(pf2?.downpayment || item.specific_data?.downpayment || 0);
                         const remainingRefund = totalDeposit - refundedAmount;
 
                         if (refundedAmount > 0) {
@@ -3208,13 +3231,24 @@ const Profile = () => {
                           ? JSON.parse(selectedItem.pricing_factors || '{}')
                           : (selectedItem.pricing_factors || {});
                         const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
-                        // Calculate deposit from selected_sizes
-                        const selectedSizes = selectedItem.specific_data?.selected_sizes || selectedItem.specific_data?.selectedSizes || [];
-                        const depositFromSizes = selectedSizes.reduce((total, size) => {
-                          const quantity = parseInt(size.quantity || 0, 10);
-                          const deposit = parseFloat(size.deposit || 0);
-                          return total + (quantity * deposit);
-                        }, 0);
+                        // Calculate deposit from selected_sizes (single) or bundle_items (bundle)
+                        const isBundle = selectedItem.specific_data?.is_bundle || pricingFactors?.is_bundle;
+                        let depositFromSizes = 0;
+                        if (isBundle && Array.isArray(selectedItem.specific_data?.bundle_items)) {
+                          depositFromSizes = selectedItem.specific_data.bundle_items.reduce((total, bundleItem) => {
+                            const sizes = bundleItem.selected_sizes || bundleItem.selectedSizes || [];
+                            return total + sizes.reduce((s, size) => {
+                              return s + (parseInt(size.quantity || 0, 10) * parseFloat(size.deposit || 0));
+                            }, 0);
+                          }, 0);
+                        } else {
+                          const selectedSizes = selectedItem.specific_data?.selected_sizes || selectedItem.specific_data?.selectedSizes || [];
+                          depositFromSizes = selectedSizes.reduce((total, size) => {
+                            const quantity = parseInt(size.quantity || 0, 10);
+                            const deposit = parseFloat(size.deposit || 0);
+                            return total + (quantity * deposit);
+                          }, 0);
+                        }
                         const downpayment = depositFromSizes > 0 ? depositFromSizes : parseFloat(pricingFactors.downpayment || selectedItem.specific_data?.downpayment || 0);
                         const finalPrice = parseFloat(selectedItem.final_price || 0);
                         const refundedAmount = parseFloat(selectedItem.deposit_refunded || pricingFactors.deposit_refunded_amount || 0);

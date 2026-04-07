@@ -6412,12 +6412,10 @@ const Customize = () => {
                         key={m.field}
                         type="button"
                         onClick={() => active ? removeMeasurementFromSizeModal(m.field) : addMeasurementToSizeModal(m)}
+                        className={`size-modal-measurement-btn ${active ? 'active' : ''}`}
                         style={{
                           padding: '4px 10px',
                           borderRadius: '14px',
-                          border: active ? '2px solid #4caf50' : '1px solid #ccc',
-                          backgroundColor: active ? '#e8f5e9' : '#fff',
-                          color: active ? '#2e7d32' : '#555',
                           fontSize: '12px',
                           cursor: 'pointer'
                         }}

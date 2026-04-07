@@ -1712,6 +1712,24 @@ tbody tr.clickable-row:active {
   margin-left: 2px;
 }
 
+.size-modal-measurement-btn {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  background-image: none !important;
+  color: #555555 !important;
+  border: 1px solid #cccccc !important;
+  box-shadow: none !important;
+  text-transform: none !important;
+}
+
+.size-modal-measurement-btn.active {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  background-image: none !important;
+  color: #2e7d32 !important;
+  border: 2px solid #4caf50 !important;
+}
+
 .customize-form-group label input[type="checkbox"] {
   margin-right: 10px;
   cursor: pointer;

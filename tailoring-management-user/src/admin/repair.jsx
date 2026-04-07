@@ -2761,7 +2761,7 @@ const Repair = () => {
                           </div>
                         ) : isCompensatedIncident ? (
                           <div className="action-buttons">
-                            {getNextStatus(item.approval_status, 'repair', item) && (
+                            {item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'repair', item) && (
                               <button
                                 className="icon-btn next-status"
                                 onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'repair', item))}
@@ -2835,7 +2835,7 @@ const Repair = () => {
 
                           <div className="action-buttons">
 
-                            {!isDamagePendingIncident && !isForCompensationIncident && getNextStatus(item.approval_status, 'repair', item) && (() => {
+                            {!isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'repair', item) && (() => {
                               const nextStatus = getNextStatus(item.approval_status, 'repair', item);
                               const isMovingToInProgress = nextStatus === 'confirmed';
                               const halfPrice = finalPrice * 0.5;

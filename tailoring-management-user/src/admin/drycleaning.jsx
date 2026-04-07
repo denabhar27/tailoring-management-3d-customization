@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
@@ -985,7 +985,7 @@ const DryCleaning = () => {
 
     item.approval_status === 'pending' ||
 
-    item.approval_status === 'price_confirmation' ||
+    (item.approval_status === 'price_confirmation' && statusFilter !== 'price_confirmation') ||
 
     item.approval_status === null ||
 
@@ -1101,7 +1101,7 @@ const DryCleaning = () => {
 
         if (item.approval_status === 'pending_review' ||
 
-            item.approval_status === 'price_confirmation' ||
+            (item.approval_status === 'price_confirmation' && statusFilter !== 'price_confirmation') ||
 
             item.approval_status === null ||
 
@@ -2240,6 +2240,8 @@ const DryCleaning = () => {
 
             <option value="pending">Pending</option>
 
+            <option value="price_confirmation">Price Confirmation</option>
+
             <option value="accepted">Accepted</option>
 
             <option value="confirmed">In Progress</option>
@@ -2568,7 +2570,7 @@ const DryCleaning = () => {
 
                     <td onClick={(e) => e.stopPropagation()}>
 
-                      {item.approval_status === 'pending_review' || item.approval_status === 'pending' || item.approval_status === 'price_confirmation' || item.approval_status === null || item.approval_status === undefined || item.approval_status === '' ? (
+                      {item.approval_status === 'pending_review' || item.approval_status === 'pending' || item.approval_status === null || item.approval_status === undefined || item.approval_status === '' ? (
 
                         <div className="action-buttons">
 
@@ -2642,7 +2644,7 @@ const DryCleaning = () => {
                             </div>
                           ) : isCompensatedIncident && (
                             <>
-                              {getNextStatus(item.approval_status, 'dry_cleaning', item) && (
+                              {item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'dry_cleaning', item) && (
                                 <button
                                   className="icon-btn next-status"
                                   onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'dry_cleaning', item))}
@@ -2688,7 +2690,7 @@ const DryCleaning = () => {
                             </>
                           )}
 
-                          {!isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && getNextStatus(item.approval_status, 'dry_cleaning', item) && (() => {
+                          {!isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'dry_cleaning', item) && (() => {
                             const nextStatus = getNextStatus(item.approval_status, 'dry_cleaning', item);
                             const isMovingToInProgress = nextStatus === 'confirmed';
                             const halfPrice = finalPrice * 0.5;
@@ -2712,7 +2714,7 @@ const DryCleaning = () => {
                             );
                           })()}
 
-                          {!isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
+                          {!isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && (
 
                             <>
 

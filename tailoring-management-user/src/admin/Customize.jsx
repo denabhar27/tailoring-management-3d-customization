@@ -3797,7 +3797,7 @@ const Customize = () => {
 
                           <div className="action-buttons">
 
-                            {getNextStatus(item.approval_status, 'customization', item) && (() => {
+                            {item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'customization', item) && (() => {
                               const nextStatus = getNextStatus(item.approval_status, 'customization', item);
                               const isMovingToInProgress = nextStatus === 'confirmed';
                               const halfPrice = finalPrice * 0.5;

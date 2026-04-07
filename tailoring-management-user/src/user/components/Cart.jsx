@@ -1035,7 +1035,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                           console.log('  Total:', garmentsTotal);
                           return total + garmentsTotal;
                         }
-                        return total + (parseFloat(item.final_price || 0) * (item.quantity || 1));
+                        return total + parseFloat(item.final_price || 0);
                       }, 0)
                   )}</span>
                 </div>

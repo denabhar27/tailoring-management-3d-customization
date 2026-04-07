@@ -2519,26 +2519,12 @@ const Profile = () => {
                               <span className="price-label">Deposit (Refundable):</span>
                               <span className="price-value" style={{ color: '#ff9800' }}>₱{downpayment.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                             </div>
-                            <div className="price-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
-                              <span className="price-label" style={{ fontWeight: 'bold', fontSize: '16px' }}>Total Payment:</span>
-                              <span className="price-value" style={{ fontWeight: 'bold', fontSize: '18px', color: '#2d5a3d' }}>
-                                ₱{(finalPrice + downpayment).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                              </span>
-                            </div>
                             <div className="price-row">
                               <span className="price-label">Amount Paid:</span>
                               <span className="price-value" style={{ color: '#4caf50' }}>₱{totalPaid.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                             </div>
-                            <div className="price-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
-                              <span className="price-label" style={{ fontWeight: 'bold', fontSize: '16px' }}>Remaining Amount:</span>
-                              <span className="price-value" style={{ fontWeight: 'bold', fontSize: '18px', color: '#ff9800' }}>
-                                ₱{remainingAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                              </span>
-                            </div>
-                            <div style={{ marginTop: '8px', padding: '10px', backgroundColor: '#fff3e0', borderRadius: '6px', fontSize: '13px', color: '#666' }}>
-                              💡 Pay the remaining amount when you return the rental item.
-                            </div>
                           </>
+
                         ) : item.status === 'pending' ? (
 
                           (() => {

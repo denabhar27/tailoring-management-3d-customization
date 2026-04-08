@@ -399,6 +399,25 @@ try {
   console.error('[SERVER] Error initializing rental monitoring service:', err.message);
 }
 
+// Auto-migrate action_logs.action_by column to support longer usernames
+try {
+  const alterActionByColumnSQL = `
+    ALTER TABLE action_logs
+    MODIFY COLUMN action_by VARCHAR(50) NULL
+  `;
+  db.query(alterActionByColumnSQL, (err) => {
+    if (err) {
+      if (!err.message.includes("doesn't exist") && !err.message.includes('Unknown table')) {
+        console.log('[SERVER] action_logs.action_by migration note:', err.message);
+      }
+    } else {
+      console.log('[SERVER] ✅ action_logs.action_by column size increased to VARCHAR(50)');
+    }
+  });
+} catch (err) {
+  console.error('[SERVER] Error updating action_logs.action_by column:', err.message);
+}
+
 // Auto-migrate payment_status ENUM to include all required values
 try {
   const alterPaymentStatusSQL = `

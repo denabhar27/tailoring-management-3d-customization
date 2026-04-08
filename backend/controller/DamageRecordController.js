@@ -156,6 +156,9 @@ exports.createCompensationIncident = (req, res) => {
     responsible_party,
     damage_type,
     damage_description,
+    total_quantity,
+    damaged_quantity,
+    damaged_garment_type,
     compensation_amount,
     compensation_type,
     clothe_description,
@@ -170,6 +173,43 @@ exports.createCompensationIncident = (req, res) => {
   }
 
   const amount = Number.isFinite(parseFloat(compensation_amount)) ? parseFloat(compensation_amount) : 0;
+  const parsedTotalQuantity = total_quantity !== undefined && total_quantity !== null && total_quantity !== ''
+    ? parseInt(total_quantity, 10)
+    : null;
+  const parsedDamagedQuantity = damaged_quantity !== undefined && damaged_quantity !== null && damaged_quantity !== ''
+    ? parseInt(damaged_quantity, 10)
+    : null;
+
+  let normalizedTotalQuantity = parsedTotalQuantity;
+  let normalizedDamagedQuantity = parsedDamagedQuantity;
+
+  if ((service_type || '').toLowerCase() === 'dry_cleaning') {
+    normalizedTotalQuantity = parsedTotalQuantity || 1;
+    normalizedDamagedQuantity = parsedDamagedQuantity || 1;
+  }
+
+  if (normalizedTotalQuantity !== null || normalizedDamagedQuantity !== null) {
+    if (!Number.isInteger(normalizedTotalQuantity) || normalizedTotalQuantity < 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid total_quantity. Must be a whole number greater than 0.'
+      });
+    }
+
+    if (!Number.isInteger(normalizedDamagedQuantity) || normalizedDamagedQuantity < 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid damaged_quantity. Must be a whole number greater than 0.'
+      });
+    }
+
+    if (normalizedDamagedQuantity > normalizedTotalQuantity) {
+      return res.status(400).json({
+        success: false,
+        message: 'damaged_quantity cannot be greater than total_quantity.'
+      });
+    }
+  }
 
   // Get the logged-in user info
   const reportedByUserId = req.user?.id || req.user?.user_id || null;
@@ -185,6 +225,9 @@ exports.createCompensationIncident = (req, res) => {
     responsible_party: responsible_party || null,
     damage_type,
     damage_description: damage_description || null,
+    total_quantity: normalizedTotalQuantity,
+    damaged_quantity: normalizedDamagedQuantity,
+    damaged_garment_type: damaged_garment_type || null,
     compensation_amount: amount,
     compensation_type: compensation_type || 'money',
     clothe_description: clothe_description || null,
@@ -215,7 +258,7 @@ exports.createCompensationIncident = (req, res) => {
       previous_status: null,
       new_status: 'pending',
       reason: null,
-      notes: `Damage compensation reported by ${actorName}. Customer: ${customer_name}. Damage type: ${damage_type}. Amount: ₱${amount}${responsible_party ? `. Damaged by: ${responsible_party}` : ''}`
+      notes: `Damage compensation reported by ${actorName}. Customer: ${customer_name}. Damage type: ${damage_type}.${normalizedDamagedQuantity && normalizedTotalQuantity ? ` Qty damaged: ${normalizedDamagedQuantity}/${normalizedTotalQuantity}.` : ''} Amount: ₱${amount}${responsible_party ? `. Damaged by: ${responsible_party}` : ''}`
     }, (logErr) => {
       if (logErr) {
         console.error('Error logging damage compensation creation:', logErr);
@@ -232,7 +275,7 @@ exports.createCompensationIncident = (req, res) => {
 
 exports.updateLiabilityDecision = (req, res) => {
   const { id } = req.params;
-  const { liability_status, compensation_amount, responsible_party, compensation_type, clothe_description, notes } = req.body;
+  const { liability_status, compensation_amount, responsible_party, compensation_type, clothe_description, notes, total_quantity, damaged_quantity } = req.body;
 
   if (!['pending', 'approved', 'rejected'].includes(liability_status)) {
     return res.status(400).json({
@@ -242,6 +285,38 @@ exports.updateLiabilityDecision = (req, res) => {
   }
 
   const amount = Number.isFinite(parseFloat(compensation_amount)) ? parseFloat(compensation_amount) : undefined;
+  const parsedTotalQuantity = total_quantity !== undefined && total_quantity !== null && total_quantity !== ''
+    ? parseInt(total_quantity, 10)
+    : undefined;
+  const parsedDamagedQuantity = damaged_quantity !== undefined && damaged_quantity !== null && damaged_quantity !== ''
+    ? parseInt(damaged_quantity, 10)
+    : undefined;
+
+  if (parsedTotalQuantity !== undefined || parsedDamagedQuantity !== undefined) {
+    const total = parsedTotalQuantity !== undefined ? parsedTotalQuantity : null;
+    const damaged = parsedDamagedQuantity !== undefined ? parsedDamagedQuantity : null;
+
+    if (total !== null && (!Number.isInteger(total) || total < 1)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid total_quantity. Must be a whole number greater than 0.'
+      });
+    }
+
+    if (damaged !== null && (!Number.isInteger(damaged) || damaged < 1)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid damaged_quantity. Must be a whole number greater than 0.'
+      });
+    }
+
+    if (total !== null && damaged !== null && damaged > total) {
+      return res.status(400).json({
+        success: false,
+        message: 'damaged_quantity cannot be greater than total_quantity.'
+      });
+    }
+  }
 
   const updatePayload = {
     liability_status,
@@ -253,6 +328,12 @@ exports.updateLiabilityDecision = (req, res) => {
 
   if (amount !== undefined) {
     updatePayload.compensation_amount = amount;
+  }
+  if (parsedTotalQuantity !== undefined) {
+    updatePayload.total_quantity = parsedTotalQuantity;
+  }
+  if (parsedDamagedQuantity !== undefined) {
+    updatePayload.damaged_quantity = parsedDamagedQuantity;
   }
 
   if (liability_status === 'rejected') {

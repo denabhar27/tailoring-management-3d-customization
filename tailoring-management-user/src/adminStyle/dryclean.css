@@ -3011,6 +3011,80 @@ tbody td {
 
 }
 
+/* Scoped overrides for damage modal garment selector */
+.payment-form-group .affected-garments-box .affected-garment-row {
+  background: #f8faff;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.payment-form-group .affected-garments-box .affected-garment-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.payment-form-group .affected-garments-box .affected-garment-name {
+  margin: 0;
+  width: auto;
+  cursor: pointer;
+  color: #1f2a44;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.payment-form-group .affected-garments-box .affected-garment-checkbox {
+  appearance: auto;
+  -webkit-appearance: checkbox;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px;
+  max-width: 16px;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 3px;
+  background: transparent !important;
+  box-shadow: none !important;
+  display: inline-block !important;
+  vertical-align: middle;
+  align-self: center;
+  accent-color: #8b4513;
+}
+
+.payment-form-group .affected-garments-box .affected-garment-checkbox:focus {
+  outline: 2px solid rgba(139, 69, 19, 0.25);
+  outline-offset: 2px;
+  box-shadow: none !important;
+}
+
+.payment-form-group .affected-garments-box .affected-garment-qty-input {
+  width: 64px !important;
+  max-width: 64px !important;
+  min-width: 64px;
+  text-align: center;
+}
+
+.payment-form-group .affected-garments-box .affected-garment-damaged {
+  justify-self: end;
+}
+
+@media (max-width: 640px) {
+  .payment-form-group .affected-garments-box .affected-garment-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .payment-form-group .affected-garments-box .affected-garment-damaged {
+    justify-self: start;
+  }
+}
+
 .modal-content.damage-compensation-modal .modal-body {
   width: 100%;
   display: flex !important;

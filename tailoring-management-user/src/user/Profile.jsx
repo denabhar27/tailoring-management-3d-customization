@@ -3062,13 +3062,26 @@ const Profile = () => {
                       }}>
                         <div>
                           {compensationIncidentForItem?.compensation_type === 'clothe' ? (
-                            <>👕 Clothe Compensation: {compensationIncidentForItem?.clothe_description || 'Replacement garment'}</>
+                            <>Clothe Compensation: {compensationIncidentForItem?.clothe_description || 'Replacement garment'}</>
                           ) : compensationIncidentForItem?.compensation_type === 'both' && compensationIncidentForItem?.customer_compensation_choice === 'clothe' ? (
-                            <>👕 Clothe Compensation: {compensationIncidentForItem?.clothe_description || 'Replacement garment'}</>
+                            <>Clothe Compensation: {compensationIncidentForItem?.clothe_description || 'Replacement garment'}</>
                           ) : (
                             <>Compensation Amount: <strong>{formatCurrencyPHP(compensationIncidentForItem?.compensation_amount || 0)}</strong></>
                           )}
                         </div>
+                        {(() => {
+                          const damagedQty = parseInt(compensationIncidentForItem?.damaged_quantity ?? '', 10);
+                          const totalQty = parseInt(compensationIncidentForItem?.total_quantity ?? '', 10);
+                          const garmentType = compensationIncidentForItem?.damaged_garment_type;
+                          if (Number.isInteger(damagedQty) && damagedQty > 0 && Number.isInteger(totalQty) && totalQty > 0) {
+                            return (
+                              <div>
+                                Affected Quantity: {damagedQty} of {totalQty} piece{totalQty > 1 ? 's' : ''}{garmentType ? ` of ${garmentType}` : ''} damaged
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                         <div>
                           Liability: {compensationIncidentForItem?.liability_status || 'N/A'} / Compensation: {compensationIncidentForItem?.compensation_status || 'N/A'}
                         </div>
@@ -3082,7 +3095,7 @@ const Profile = () => {
                           <div>You declined this compensation. Waiting for admin to provide a revised amount.</div>
                         )}
                         {isCompensationPaid && customerWantsToProceed && (
-                          <div>✅ Compensation settled. Your order is continuing as normal.</div>
+                          <div>Compensation settled. Your order is continuing as normal.</div>
                         )}
                         {isCompensationPaid && !customerWantsToProceed && (
                           <div>Compensation payment is ready and marked as paid by staff.</div>
@@ -3110,7 +3123,7 @@ const Profile = () => {
                                           checked={(customerCompensationChoice[item.order_item_id] || 'money') === 'money'}
                                           onChange={(e) => { e.stopPropagation(); setCustomerCompensationChoice(prev => ({ ...prev, [item.order_item_id]: 'money' })); }}
                                         />
-                                        💵 Money — {formatCurrencyPHP(compensationIncidentForItem?.compensation_amount || 0)}
+                                        Money — {formatCurrencyPHP(compensationIncidentForItem?.compensation_amount || 0)}
                                       </label>
                                     )}
                                     {showClothe && (
@@ -3122,7 +3135,7 @@ const Profile = () => {
                                           checked={(customerCompensationChoice[item.order_item_id] || 'money') === 'clothe'}
                                           onChange={(e) => { e.stopPropagation(); setCustomerCompensationChoice(prev => ({ ...prev, [item.order_item_id]: 'clothe' })); }}
                                         />
-                                        👕 Clothe — {compensationIncidentForItem?.clothe_description || 'Replacement garment'}
+                                        Clothe — {compensationIncidentForItem?.clothe_description || 'Replacement garment'}
                                       </label>
                                     )}
                                   </div>
@@ -3139,7 +3152,7 @@ const Profile = () => {
                                         checked={customerProceedChoice[String(item.order_item_id)] !== 'dont_proceed'}
                                         onChange={(e) => { e.stopPropagation(); setCustomerProceedChoice(prev => ({ ...prev, [String(item.order_item_id)]: 'proceed' })); }}
                                       />
-                                      ✅ Yes, proceed
+                                      Yes, proceed
                                     </label>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'normal', color: '#333' }}>
                                       <input
@@ -3149,7 +3162,7 @@ const Profile = () => {
                                         checked={customerProceedChoice[String(item.order_item_id)] === 'dont_proceed'}
                                         onChange={(e) => { e.stopPropagation(); setCustomerProceedChoice(prev => ({ ...prev, [String(item.order_item_id)]: 'dont_proceed' })); }}
                                       />
-                                      ❌ No, don't proceed
+                                      No, don't proceed
                                     </label>
                                   </div>
                                 </div>
@@ -3572,23 +3585,34 @@ const Profile = () => {
               }}>
                 <div><strong>Damage Type:</strong> {selectedCompensationIncident.damage_type || 'N/A'}</div>
                 <div><strong>Description:</strong> {selectedCompensationIncident.damage_description || 'N/A'}</div>
+                {(() => {
+                  const damagedQty = parseInt(selectedCompensationIncident.damaged_quantity ?? '', 10);
+                  const totalQty = parseInt(selectedCompensationIncident.total_quantity ?? '', 10);
+                  if (Number.isInteger(damagedQty) && damagedQty > 0 && Number.isInteger(totalQty) && totalQty > 0) {
+                    return <div><strong>Affected Quantity:</strong> {damagedQty} of {totalQty} piece{totalQty > 1 ? 's' : ''} damaged</div>;
+                  }
+                  return null;
+                })()}
                 {selectedCompensationIncident.compensation_type === 'clothe' ? (
-                  <div><strong>Compensation:</strong> 👕 Clothe — {selectedCompensationIncident.clothe_description || 'Replacement garment'}</div>
+                  <div><strong>Compensation:</strong> Clothe — {selectedCompensationIncident.clothe_description || 'Replacement garment'}</div>
                 ) : selectedCompensationIncident.compensation_type === 'both' ? (
                   <>
                     <div><strong>Money Option:</strong> {formatCurrencyPHP(selectedCompensationIncident.compensation_amount || 0)}</div>
-                    <div><strong>Clothe Option:</strong> 👕 {selectedCompensationIncident.clothe_description || 'Replacement garment'}</div>
+                    <div><strong>Clothe Option:</strong> {selectedCompensationIncident.clothe_description || 'Replacement garment'}</div>
                   </>
                 ) : (
                   <div><strong>Compensation Amount:</strong> {formatCurrencyPHP(selectedCompensationIncident.compensation_amount || 0)}</div>
                 )}
+                {selectedCompensationIncident.damaged_garment_type && (
+                  <div><strong>Damaged Garment:</strong> {selectedCompensationIncident.damaged_garment_type}</div>
+                )}
                 <div><strong>Liability Status:</strong> {String(selectedCompensationIncident.liability_status || 'pending').replace(/_/g, ' ')}</div>
                 <div><strong>Compensation Status:</strong> {String(selectedCompensationIncident.compensation_status || 'unpaid').replace(/_/g, ' ')}</div>
                 {selectedCompensationIncident.customer_compensation_choice && (
-                  <div><strong>Your Choice:</strong> {selectedCompensationIncident.customer_compensation_choice === 'clothe' ? '👕 Clothe replacement' : '💵 Money'}</div>
+                  <div><strong>Your Choice:</strong> {selectedCompensationIncident.customer_compensation_choice === 'clothe' ? 'Clothe replacement' : 'Money'}</div>
                 )}
                 {selectedCompensationIncident.customer_proceed_choice && (
-                  <div><strong>Order Proceed:</strong> {selectedCompensationIncident.customer_proceed_choice === 'proceed' ? '✅ Proceed' : '❌ Don’t proceed'}</div>
+                  <div><strong>Order Proceed:</strong> {selectedCompensationIncident.customer_proceed_choice === 'proceed' ? 'Proceed' : 'Don’t proceed'}</div>
                 )}
                 {selectedCompensationIncident.payment_reference && (
                   <div><strong>Payment Reference:</strong> {selectedCompensationIncident.payment_reference}</div>
@@ -3619,7 +3643,7 @@ const Profile = () => {
                             <input type="radio" name="modal-comp-choice" value="money"
                               checked={(customerCompensationChoice[selectedCompensationOrderItemId] || 'money') === 'money'}
                               onChange={() => setCustomerCompensationChoice(prev => ({ ...prev, [selectedCompensationOrderItemId]: 'money' }))} />
-                            💵 Money — {formatCurrencyPHP(selectedCompensationIncident.compensation_amount || 0)}
+                            Money — {formatCurrencyPHP(selectedCompensationIncident.compensation_amount || 0)}
                           </label>
                         )}
                         {showClothe && (
@@ -3627,7 +3651,7 @@ const Profile = () => {
                             <input type="radio" name="modal-comp-choice" value="clothe"
                               checked={(customerCompensationChoice[selectedCompensationOrderItemId] || 'money') === 'clothe'}
                               onChange={() => setCustomerCompensationChoice(prev => ({ ...prev, [selectedCompensationOrderItemId]: 'clothe' }))} />
-                            👕 Clothe — {selectedCompensationIncident.clothe_description || 'Replacement garment'}
+                            Clothe — {selectedCompensationIncident.clothe_description || 'Replacement garment'}
                           </label>
                         )}
                       </div>
@@ -3640,13 +3664,13 @@ const Profile = () => {
                           <input type="radio" name="modal-proceed-choice" value="proceed"
                             checked={customerProceedChoice[selectedCompensationOrderItemId] !== 'dont_proceed'}
                             onChange={(e) => { e.stopPropagation(); setCustomerProceedChoice(prev => ({ ...prev, [selectedCompensationOrderItemId]: 'proceed' })); }} />
-                          ✅ Yes, proceed
+                          Yes, proceed
                         </label>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'normal', color: '#333' }}>
                           <input type="radio" name="modal-proceed-choice" value="dont_proceed"
                             checked={customerProceedChoice[selectedCompensationOrderItemId] === 'dont_proceed'}
                             onChange={(e) => { e.stopPropagation(); setCustomerProceedChoice(prev => ({ ...prev, [selectedCompensationOrderItemId]: 'dont_proceed' })); }} />
-                          ❌ No, don't proceed
+                          No, don't proceed
                         </label>
                       </div>
                     </div>

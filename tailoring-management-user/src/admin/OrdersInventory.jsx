@@ -614,6 +614,65 @@ const OrdersInventory = () => {
       .filter(Boolean);
   };
 
+  const formatCompensationAmount = (amount) => {
+    const value = parseFloat(amount || 0);
+    if (!Number.isFinite(value) || value <= 0) return '₱0';
+    return `₱${value.toLocaleString()}`;
+  };
+
+  const getIncidentCompensationMeta = (incident) => {
+    const type = String(incident?.compensation_type || 'money').toLowerCase();
+    const chosen = String(incident?.customer_compensation_choice || '').toLowerCase();
+    const amount = parseFloat(incident?.compensation_amount || 0) || 0;
+    const clotheDescription = String(incident?.clothe_description || '').trim();
+
+    const clotheText = clotheDescription || 'Replacement garment';
+    const moneyText = formatCompensationAmount(amount);
+
+    if (chosen === 'clothe') {
+      return {
+        text: `Clothe: ${clotheText}`,
+        color: '#1f2937',
+        weight: 600,
+        mode: 'clothe'
+      };
+    }
+
+    if (chosen === 'money') {
+      return {
+        text: moneyText,
+        color: '#c41c3b',
+        weight: 'bold',
+        mode: 'money'
+      };
+    }
+
+    if (type === 'clothe') {
+      return {
+        text: `Clothe: ${clotheText}`,
+        color: '#1f2937',
+        weight: 600,
+        mode: 'clothe'
+      };
+    }
+
+    if (type === 'both') {
+      return {
+        text: amount > 0 ? `${moneyText} or Clothe` : `Clothe: ${clotheText}`,
+        color: amount > 0 ? '#c41c3b' : '#1f2937',
+        weight: 'bold',
+        mode: amount > 0 ? 'both' : 'clothe'
+      };
+    }
+
+    return {
+      text: moneyText,
+      color: '#c41c3b',
+      weight: 'bold',
+      mode: 'money'
+    };
+  };
+
   const getRentalPriceDisplay = (item) => {
     const fullPrice = parseFloat(item.price || 0);
     const amountPaid = parseFloat(item.pricingFactors?.amount_paid || 0);
@@ -1289,7 +1348,9 @@ const OrdersInventory = () => {
                         <td>{getIncidentCustomerName(incident)}</td>
                         <td style={{ textTransform: 'capitalize' }}>{String(incident.damage_type || 'N/A').replace(/_/g, ' ')}</td>
                         <td><span className={`badge liability-${incident.liability_status}`}>{incident.liability_status}</span></td>
-                        <td style={{ color: '#c41c3b', fontWeight: 'bold' }}>₱{parseFloat(incident.compensation_amount || 0).toLocaleString()}</td>
+                        <td style={{ color: getIncidentCompensationMeta(incident).color, fontWeight: getIncidentCompensationMeta(incident).weight }}>
+                          {getIncidentCompensationMeta(incident).text}
+                        </td>
                         <td><span className={`badge status-${incident.compensation_status}`}>{incident.compensation_status}</span></td>
                         <td>
                           <button
@@ -2028,11 +2089,47 @@ const OrdersInventory = () => {
                 <span>{selectedSettlementIncident.order_item_id || 'N/A'}</span>
               </div>
               <div className="detail-row">
-                <label>Amount:</label>
-                <span style={{ color: '#c41c3b', fontWeight: 'bold', fontSize: '18px' }}>
-                  ₱{parseFloat(selectedSettlementIncident.compensation_amount || 0).toLocaleString()}
+                <label>Compensation:</label>
+                <span style={{
+                  color: getIncidentCompensationMeta(selectedSettlementIncident).color,
+                  fontWeight: getIncidentCompensationMeta(selectedSettlementIncident).weight,
+                  fontSize: '16px'
+                }}>
+                  {getIncidentCompensationMeta(selectedSettlementIncident).text}
                 </span>
               </div>
+              {String(selectedSettlementIncident.compensation_type || '').toLowerCase() === 'both' && (
+                <>
+                  <div className="detail-row">
+                    <label>Money Option:</label>
+                    <span>{formatCompensationAmount(selectedSettlementIncident.compensation_amount)}</span>
+                  </div>
+                  <div className="detail-row">
+                    <label>Clothe Option:</label>
+                    <span>{selectedSettlementIncident.clothe_description || 'Replacement garment'}</span>
+                  </div>
+                </>
+              )}
+              {String(selectedSettlementIncident.compensation_type || '').toLowerCase() === 'clothe' && (
+                <div className="detail-row">
+                  <label>Clothe Details:</label>
+                  <span>{selectedSettlementIncident.clothe_description || 'Replacement garment'}</span>
+                </div>
+              )}
+              {selectedSettlementIncident.customer_compensation_choice && (
+                <div className="detail-row">
+                  <label>Customer Choice:</label>
+                  <span style={{ textTransform: 'capitalize' }}>{selectedSettlementIncident.customer_compensation_choice}</span>
+                </div>
+              )}
+              {selectedSettlementIncident.refund_amount !== null && selectedSettlementIncident.refund_amount !== undefined && (
+                <div className="detail-row">
+                  <label>Refund Amount:</label>
+                  <span style={{ color: '#c41c3b', fontWeight: 'bold' }}>
+                    {formatCompensationAmount(selectedSettlementIncident.refund_amount)}
+                  </span>
+                </div>
+              )}
               <div className="detail-row">
                 <label>Liability Status:</label>
                 <span className={`badge liability-${selectedSettlementIncident.liability_status}`}>

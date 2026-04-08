@@ -2,6 +2,24 @@ const db = require('../config/db');
 
 let compensationTableReady = false;
 
+const ensureColumnExists = (tableName, columnName, definitionSql, callback) => {
+  const checkSql = `SHOW COLUMNS FROM ${tableName} LIKE ?`;
+  db.query(checkSql, [columnName], (checkErr, rows) => {
+    if (checkErr) {
+      callback(checkErr);
+      return;
+    }
+
+    if (Array.isArray(rows) && rows.length > 0) {
+      callback(null);
+      return;
+    }
+
+    const alterSql = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definitionSql}`;
+    db.query(alterSql, (alterErr) => callback(alterErr || null));
+  });
+};
+
 const ensureCompensationTable = (callback) => {
   if (compensationTableReady) {
     callback(null);
@@ -20,6 +38,8 @@ const ensureCompensationTable = (callback) => {
       responsible_party VARCHAR(255) NULL,
       damage_type VARCHAR(100) NOT NULL,
       damage_description TEXT NULL,
+      total_quantity INT NULL,
+      damaged_quantity INT NULL,
       liability_status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
       compensation_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
       compensation_status ENUM('unpaid', 'paid') NOT NULL DEFAULT 'unpaid',
@@ -42,10 +62,31 @@ const ensureCompensationTable = (callback) => {
   `;
 
   db.query(sql, (err) => {
-    if (!err) {
-      compensationTableReady = true;
+    if (err) {
+      callback(err || null);
+      return;
     }
-    callback(err || null);
+
+    ensureColumnExists('damage_compensation_records', 'total_quantity', 'INT NULL', (totalQtyErr) => {
+      if (totalQtyErr) {
+        callback(totalQtyErr);
+        return;
+      }
+
+      ensureColumnExists('damage_compensation_records', 'damaged_quantity', 'INT NULL', (damagedQtyErr) => {
+        if (damagedQtyErr) {
+          callback(damagedQtyErr);
+          return;
+        }
+
+        ensureColumnExists('damage_compensation_records', 'damaged_garment_type', 'VARCHAR(255) NULL', (garmentErr) => {
+          if (!garmentErr) {
+            compensationTableReady = true;
+          }
+          callback(garmentErr || null);
+        });
+      });
+    });
   });
 };
 
@@ -187,8 +228,8 @@ const DamageRecord = {
 
       const sql = `
         INSERT INTO damage_compensation_records
-        (order_item_id, order_id, service_type, customer_name, reported_by_user_id, reported_by_role, responsible_party, damage_type, damage_description, liability_status, compensation_amount, compensation_status, compensation_type, clothe_description, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (order_item_id, order_id, service_type, customer_name, reported_by_user_id, reported_by_role, responsible_party, damage_type, damage_description, total_quantity, damaged_quantity, damaged_garment_type, liability_status, compensation_amount, compensation_status, compensation_type, clothe_description, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       const values = [
         payload.order_item_id,
@@ -200,6 +241,9 @@ const DamageRecord = {
         payload.responsible_party || null,
         payload.damage_type,
         payload.damage_description || null,
+        payload.total_quantity || null,
+        payload.damaged_quantity || null,
+        payload.damaged_garment_type || null,
         payload.liability_status || 'pending',
         payload.compensation_amount || 0,
         payload.compensation_status || 'unpaid',
@@ -280,6 +324,14 @@ const DamageRecord = {
         fields.push('compensation_amount = ?');
         values.push(updateData.compensation_amount);
       }
+      if (updateData.total_quantity !== undefined) {
+        fields.push('total_quantity = ?');
+        values.push(updateData.total_quantity);
+      }
+      if (updateData.damaged_quantity !== undefined) {
+        fields.push('damaged_quantity = ?');
+        values.push(updateData.damaged_quantity);
+      }
       if (updateData.compensation_status !== undefined) {
         fields.push('compensation_status = ?');
         values.push(updateData.compensation_status);
@@ -319,6 +371,10 @@ const DamageRecord = {
       if (updateData.notes !== undefined) {
         fields.push('notes = ?');
         values.push(updateData.notes);
+      }
+      if (updateData.damaged_garment_type !== undefined) {
+        fields.push('damaged_garment_type = ?');
+        values.push(updateData.damaged_garment_type);
       }
 
       if (fields.length === 0) {

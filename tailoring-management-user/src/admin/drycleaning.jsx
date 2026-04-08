@@ -153,15 +153,25 @@ const DryCleaning = () => {
     damageType: '',
     damageDescription: '',
     responsibleParty: '',
-    compensationAmount: ''
+    totalQuantity: '1',
+    damagedQuantity: '1',
+    affectedGarments: [],
+    compensationAmount: '',
+    compensationType: 'money',
+    clotheDescription: ''
   });
   const [liabilityForm, setLiabilityForm] = useState({
     decision: 'approved',
+    totalQuantity: '1',
+    damagedQuantity: '1',
     compensationAmount: '',
+    compensationType: 'money',
+    clotheDescription: '',
     notes: ''
   });
   const [settlementForm, setSettlementForm] = useState({
-    paymentReference: ''
+    paymentReference: '',
+    refundAmount: ''
   });
 
 
@@ -864,12 +874,19 @@ const DryCleaning = () => {
   };
 
   const openDamageReportModal = (item) => {
+    const totalQtyRaw = Number(item?.specific_data?.quantity || 1);
+    const totalQty = Number.isFinite(totalQtyRaw) && totalQtyRaw > 0 ? Math.floor(totalQtyRaw) : 1;
     setDamageTargetItem(item);
     setDamageForm({
       damageType: '',
       damageDescription: '',
       responsibleParty: '',
-      compensationAmount: ''
+      totalQuantity: String(totalQty),
+      damagedQuantity: '1',
+      affectedGarments: [],
+      compensationAmount: '',
+      compensationType: 'money',
+      clotheDescription: ''
     });
     setShowDamageReportModal(true);
   };
@@ -877,15 +894,44 @@ const DryCleaning = () => {
   const handleReportDamage = async () => {
     if (!damageTargetItem) return;
 
+    const totalQuantity = parseInt(damageForm.totalQuantity || '1', 10);
+    const damagedQuantity = parseInt(damageForm.damagedQuantity || '1', 10);
     const compensationAmount = parseFloat(damageForm.compensationAmount || '0');
+    const selectedGarments = Array.isArray(damageForm.affectedGarments) ? damageForm.affectedGarments : [];
+    const totalAffectedQty = selectedGarments.reduce((sum, garment) => {
+      const qty = parseInt(garment?.damagedQty || 0, 10);
+      return sum + (Number.isInteger(qty) && qty > 0 ? qty : 0);
+    }, 0);
     if (!damageForm.damageType.trim()) {
       showToast('Please enter a damage type', 'error');
       return;
     }
-    if (!Number.isFinite(compensationAmount) || compensationAmount < 0) {
-      showToast('Please enter a valid compensation amount', 'error');
+    if (!Number.isInteger(totalQuantity) || totalQuantity < 1) {
+      showToast('Please enter a valid total quantity', 'error');
       return;
     }
+    if (!Number.isInteger(damagedQuantity) || damagedQuantity < 1 || damagedQuantity > totalQuantity) {
+      showToast('Damaged quantity must be between 1 and total quantity', 'error');
+      return;
+    }
+    if (selectedGarments.length === 0) {
+      showToast('Please select at least one affected garment', 'error');
+      return;
+    }
+    if (totalAffectedQty !== damagedQuantity) {
+      showToast('Damaged quantity must match the total of affected garment quantities', 'error');
+      return;
+    }
+    const hasMoneyOffer = Number.isFinite(compensationAmount) && compensationAmount > 0;
+    const hasClotheOffer = damageForm.clotheDescription.trim().length > 0;
+    if (!hasMoneyOffer && !hasClotheOffer) {
+      showToast('Please provide at least one compensation option (money amount or clothe description)', 'error');
+      return;
+    }
+
+    const damagedGarmentSummary = selectedGarments
+      .map((garment) => `${garment.garmentType} x${garment.damagedQty}`)
+      .join(', ');
 
     const result = await createCompensationIncident({
       order_item_id: damageTargetItem.item_id,
@@ -895,7 +941,12 @@ const DryCleaning = () => {
       responsible_party: damageForm.responsibleParty.trim(),
       damage_type: damageForm.damageType.trim(),
       damage_description: damageForm.damageDescription.trim(),
+      total_quantity: totalQuantity,
+      damaged_quantity: damagedQuantity,
+      damaged_garment_type: damagedGarmentSummary || null,
       compensation_amount: compensationAmount,
+      compensation_type: hasMoneyOffer && hasClotheOffer ? 'both' : hasMoneyOffer ? 'money' : 'clothe',
+      clothe_description: hasClotheOffer ? damageForm.clotheDescription.trim() : null,
       notes: 'Reported from Dry Cleaning management'
     });
 
@@ -914,7 +965,11 @@ const DryCleaning = () => {
     setActiveDamageIncident(incident);
     setLiabilityForm({
       decision,
+      totalQuantity: `${incident.total_quantity || 1}`,
+      damagedQuantity: `${incident.damaged_quantity || 1}`,
       compensationAmount: `${incident.compensation_amount || 0}`,
+      compensationType: incident.compensation_type || 'money',
+      clotheDescription: incident.clothe_description || '',
       notes: incident.notes || ''
     });
     setShowLiabilityModal(true);
@@ -923,15 +978,31 @@ const DryCleaning = () => {
   const handleLiabilityDecision = async () => {
     if (!activeDamageIncident) return;
 
+    const totalQuantity = parseInt(liabilityForm.totalQuantity || '1', 10);
+    const damagedQuantity = parseInt(liabilityForm.damagedQuantity || '1', 10);
     const compensationAmount = parseFloat(liabilityForm.compensationAmount || '0');
-    if (!Number.isFinite(compensationAmount) || compensationAmount < 0) {
-      showToast('Please enter a valid compensation amount', 'error');
+    if (!Number.isInteger(totalQuantity) || totalQuantity < 1) {
+      showToast('Please enter a valid total quantity', 'error');
+      return;
+    }
+    if (!Number.isInteger(damagedQuantity) || damagedQuantity < 1 || damagedQuantity > totalQuantity) {
+      showToast('Damaged quantity must be between 1 and total quantity', 'error');
+      return;
+    }
+    const hasMoneyOffer = Number.isFinite(compensationAmount) && compensationAmount > 0;
+    const hasClotheOffer = liabilityForm.clotheDescription.trim().length > 0;
+    if (!hasMoneyOffer && !hasClotheOffer) {
+      showToast('Please provide at least one compensation option (money amount or clothe description)', 'error');
       return;
     }
 
     const result = await updateCompensationLiability(activeDamageIncident.id, {
       liability_status: liabilityForm.decision,
-      compensation_amount: compensationAmount,
+      total_quantity: totalQuantity,
+      damaged_quantity: damagedQuantity,
+      compensation_amount: hasMoneyOffer ? compensationAmount : 0,
+      compensation_type: hasMoneyOffer && hasClotheOffer ? 'both' : hasMoneyOffer ? 'money' : 'clothe',
+      clothe_description: hasClotheOffer ? liabilityForm.clotheDescription.trim() : null,
       notes: liabilityForm.notes
     });
 
@@ -948,8 +1019,17 @@ const DryCleaning = () => {
 
   const openSettlementModal = (incident) => {
     setActiveDamageIncident(incident);
+    const item = allItems.find(i => Number(i.item_id) === Number(incident.order_item_id));
+    const pf = typeof item?.pricing_factors === 'string' ? JSON.parse(item?.pricing_factors || '{}') : (item?.pricing_factors || {});
+    const servicePaid = parseFloat(pf.amount_paid || 0);
+    const compensationAmt = parseFloat(incident.compensation_amount || 0);
+    const shouldAutoRefund =
+      incident.customer_proceed_choice === 'dont_proceed' &&
+      (incident.customer_compensation_choice === 'money' || incident.compensation_type === 'money');
+    const autoRefund = shouldAutoRefund ? (servicePaid + compensationAmt) : 0;
     setSettlementForm({
-      paymentReference: incident.payment_reference || ''
+      paymentReference: incident.payment_reference || '',
+      refundAmount: autoRefund > 0 ? autoRefund.toFixed(2) : ''
     });
     setShowSettlementModal(true);
   };
@@ -963,7 +1043,8 @@ const DryCleaning = () => {
     }
 
     const result = await settleCompensationIncident(activeDamageIncident.id, {
-      payment_reference: settlementForm.paymentReference.trim()
+      payment_reference: settlementForm.paymentReference.trim(),
+      refund_amount: settlementForm.refundAmount ? parseFloat(settlementForm.refundAmount) : undefined
     });
 
     if (!result.success) {
@@ -3840,8 +3921,26 @@ const DryCleaning = () => {
                   <>
                     <div className="detail-row"><strong>Damage Incident:</strong> {incident.damage_type}</div>
                     <div className="detail-row"><strong>Liability:</strong> {incident.liability_status}</div>
-                    <div className="detail-row"><strong>Compensation:</strong> ₱{parseFloat(incident.compensation_amount || 0).toLocaleString()}</div>
+                    {(incident.damaged_quantity || incident.total_quantity) && (
+                      <div className="detail-row"><strong>Affected Quantity:</strong> {incident.damaged_quantity || 1} of {incident.total_quantity || 1}</div>
+                    )}
+                    {incident.compensation_type === 'clothe' ? (
+                      <div className="detail-row"><strong>Compensation:</strong> 👕 Clothe — {incident.clothe_description || 'Replacement garment'}</div>
+                    ) : incident.compensation_type === 'both' ? (
+                      <>
+                        <div className="detail-row"><strong>Compensation (Money):</strong> ₱{parseFloat(incident.compensation_amount || 0).toLocaleString()}</div>
+                        <div className="detail-row"><strong>Compensation (Clothe):</strong> 👕 {incident.clothe_description || 'Replacement garment'}</div>
+                      </>
+                    ) : (
+                      <div className="detail-row"><strong>Compensation:</strong> ₱{parseFloat(incident.compensation_amount || 0).toLocaleString()}</div>
+                    )}
                     <div className="detail-row"><strong>Compensation Status:</strong> {incident.compensation_status}</div>
+                    {incident.customer_compensation_choice && (
+                      <div className="detail-row"><strong>Customer Chose:</strong> {incident.customer_compensation_choice === 'clothe' ? '👕 Clothe' : '💵 Money'}</div>
+                    )}
+                    {incident.customer_proceed_choice && (
+                      <div className="detail-row"><strong>Order Proceed:</strong> {incident.customer_proceed_choice === 'proceed' ? '✅ Proceed' : '❌ Don\'t proceed'}</div>
+                    )}
                   </>
                 );
               })()}
@@ -4543,6 +4642,119 @@ const DryCleaning = () => {
               </div>
 
               <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
+                <label>Affected Garments *</label>
+                <div className="affected-garments-box" style={{ 
+                  border: '1px solid #d7deea', 
+                  borderRadius: '10px', 
+                  padding: '8px', 
+                  backgroundColor: '#f8faff',
+                  maxHeight: '300px',
+                  overflowY: 'auto'
+                }}>
+                  {damageTargetItem && (() => {
+                    try {
+                      const specificData = typeof damageTargetItem.specific_data === 'string'
+                        ? JSON.parse(damageTargetItem.specific_data)
+                        : damageTargetItem.specific_data || {};
+                      
+                      const garments = specificData.garments || [];
+                      if (!Array.isArray(garments) || garments.length === 0) {
+                        return <div style={{ padding: '10px', color: '#999' }}>No garments in this order</div>;
+                      }
+
+                      return garments.map((garment, idx) => {
+                        const garmentType = garment.garmentType || garment.garment_type || `Garment ${idx + 1}`;
+                        const garmentQty = garment.quantity || 1;
+                        const isChecked = damageForm.affectedGarments.some(ag => ag.garmentType === garmentType);
+                        const affectedGarment = damageForm.affectedGarments.find(ag => ag.garmentType === garmentType);
+                        const damagedQty = affectedGarment?.damagedQty || 1;
+
+                        return (
+                          <div key={idx} className="affected-garment-row" style={{
+                            padding: '10px 12px',
+                            borderBottom: idx < garments.length - 1 ? '1px solid #e8edf6' : 'none',
+                            borderRadius: '6px'
+                          }}>
+                            <div className="affected-garment-main">
+                              <input
+                                className="affected-garment-checkbox"
+                                type="checkbox"
+                                id={`garment-${idx}`}
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    const nextAffectedGarments = [...damageForm.affectedGarments, { garmentType, damagedQty: 1 }];
+                                    const nextDamagedQty = nextAffectedGarments.reduce((sum, ag) => sum + (parseInt(ag.damagedQty || 0, 10) || 0), 0);
+                                    setDamageForm({
+                                      ...damageForm,
+                                      affectedGarments: nextAffectedGarments,
+                                      damagedQuantity: String(Math.max(1, nextDamagedQty))
+                                    });
+                                  } else {
+                                    const nextAffectedGarments = damageForm.affectedGarments.filter(ag => ag.garmentType !== garmentType);
+                                    const nextDamagedQty = nextAffectedGarments.reduce((sum, ag) => sum + (parseInt(ag.damagedQty || 0, 10) || 0), 0);
+                                    setDamageForm({
+                                      ...damageForm,
+                                      affectedGarments: nextAffectedGarments,
+                                      damagedQuantity: String(Math.max(1, nextDamagedQty))
+                                    });
+                                  }
+                                }}
+                              />
+                              <label className="affected-garment-name" htmlFor={`garment-${idx}`}>
+                                {garmentType} (qty: {garmentQty})
+                              </label>
+                            </div>
+                            {isChecked && (
+                              <div className="affected-garment-damaged" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <label style={{ fontSize: '12px', margin: 0, color: '#51607d', fontWeight: 600 }}>Damaged</label>
+                                <input
+                                  className="affected-garment-qty-input"
+                                  type="number"
+                                  min="1"
+                                  max={garmentQty}
+                                  step="1"
+                                  value={damagedQty}
+                                  onChange={(e) => {
+                                    const newQty = parseInt(e.target.value || '1', 10);
+                                    if (newQty >= 1 && newQty <= garmentQty) {
+                                      const nextAffectedGarments = damageForm.affectedGarments.map(ag =>
+                                        ag.garmentType === garmentType ? { ...ag, damagedQty: newQty } : ag
+                                      );
+                                      const nextDamagedQty = nextAffectedGarments.reduce((sum, ag) => sum + (parseInt(ag.damagedQty || 0, 10) || 0), 0);
+                                      setDamageForm({
+                                        ...damageForm,
+                                        affectedGarments: nextAffectedGarments,
+                                        damagedQuantity: String(Math.max(1, nextDamagedQty))
+                                      });
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '6px 8px',
+                                    border: '1px solid #c7d2e5',
+                                    borderRadius: '6px',
+                                    fontWeight: 600,
+                                    color: '#1f2a44'
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      });
+                    } catch (e) {
+                      return <div style={{ padding: '10px', color: '#d32f2f' }}>Error loading garments</div>;
+                    }
+                  })()}
+                </div>
+                {damageForm.affectedGarments.length === 0 && (
+                  <div style={{ fontSize: '12px', color: '#d32f2f', marginTop: '5px' }}>
+                    At least one garment must be selected
+                  </div>
+                )}
+              </div>
+
+              <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
                 <label>Responsible Staff/Admin</label>
                 <input
                   type="text"
@@ -4555,7 +4767,34 @@ const DryCleaning = () => {
               </div>
 
               <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
-                <label>Compensation Amount (PHP) *</label>
+                <label>Total Quantity in this item</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  min="1"
+                  step="1"
+                  value={damageForm.totalQuantity}
+                  onChange={(e) => setDamageForm({ ...damageForm, totalQuantity: e.target.value })}
+                />
+              </div>
+
+              <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
+                <label>Damaged Quantity *</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  min="1"
+                  step="1"
+                  max={Math.max(1, parseInt(damageForm.totalQuantity || '1', 10) || 1)}
+                  value={damageForm.damagedQuantity}
+                  onChange={(e) => setDamageForm({ ...damageForm, damagedQuantity: e.target.value })}
+                />
+              </div>
+
+              <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
+                <label>Compensation Amount (PHP)</label>
                 <input
                   type="number"
                   className="form-control"
@@ -4565,6 +4804,21 @@ const DryCleaning = () => {
                   value={damageForm.compensationAmount}
                   onChange={(e) => setDamageForm({ ...damageForm, compensationAmount: e.target.value })}
                 />
+              </div>
+
+              <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
+                <label>Clothe Compensation Description</label>
+                <textarea
+                  rows={3}
+                  className="form-control"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  placeholder="Describe the replacement clothe (e.g. same barong, size L, white). Leave blank if not offering clothe."
+                  value={damageForm.clotheDescription}
+                  onChange={(e) => setDamageForm({ ...damageForm, clotheDescription: e.target.value })}
+                />
+              </div>
+              <div style={{ fontSize: '12px', color: '#666', gridColumn: '1 / -1' }}>
+                ℹ️ Fill in one or both options. The customer will choose which compensation they prefer.
               </div>
             </div>
             <div className="modal-footer-centered" style={{ justifyContent: 'flex-end' }}>
@@ -4586,6 +4840,33 @@ const DryCleaning = () => {
               <div className="detail-row"><strong>Damage Type:</strong> {activeDamageIncident.damage_type}</div>
 
               <div className="payment-form-group">
+                <label>Total Quantity</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  min="1"
+                  step="1"
+                  value={liabilityForm.totalQuantity}
+                  onChange={(e) => setLiabilityForm({ ...liabilityForm, totalQuantity: e.target.value })}
+                />
+              </div>
+
+              <div className="payment-form-group">
+                <label>Damaged Quantity *</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  min="1"
+                  step="1"
+                  max={Math.max(1, parseInt(liabilityForm.totalQuantity || '1', 10) || 1)}
+                  value={liabilityForm.damagedQuantity}
+                  onChange={(e) => setLiabilityForm({ ...liabilityForm, damagedQuantity: e.target.value })}
+                />
+              </div>
+
+              <div className="payment-form-group">
                 <label>Decision *</label>
                 <select
                   className="form-control"
@@ -4600,7 +4881,7 @@ const DryCleaning = () => {
               </div>
 
               <div className="payment-form-group">
-                <label>Compensation Amount (PHP) *</label>
+                <label>Compensation Amount (PHP)</label>
                 <input
                   type="number"
                   className="form-control"
@@ -4610,6 +4891,21 @@ const DryCleaning = () => {
                   value={liabilityForm.compensationAmount}
                   onChange={(e) => setLiabilityForm({ ...liabilityForm, compensationAmount: e.target.value })}
                 />
+              </div>
+
+              <div className="payment-form-group">
+                <label>Clothe Compensation Description</label>
+                <textarea
+                  rows={3}
+                  className="form-control"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  placeholder="Describe the replacement clothe. Leave blank if not offering clothe."
+                  value={liabilityForm.clotheDescription}
+                  onChange={(e) => setLiabilityForm({ ...liabilityForm, clotheDescription: e.target.value })}
+                />
+              </div>
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                ℹ️ Fill in one or both options. The customer will choose which compensation they prefer.
               </div>
 
               <div className="payment-form-group">
@@ -4636,35 +4932,87 @@ const DryCleaning = () => {
           <div className="modal-content damage-compensation-modal" style={{ maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', textAlign: 'left' }}>
             <div className="modal-header">
               <h2>
-                <i
-                  className={`fas ${activeDamageIncident.compensation_status === 'paid' ? 'fa-receipt' : 'fa-hand-holding-usd'}`}
-                  style={{ marginRight: '8px' }}
-                ></i>
                 {activeDamageIncident.compensation_status === 'paid' ? 'Settlement Details' : 'Settle Compensation'}
               </h2>
               <span className="close-modal" onClick={() => setShowSettlementModal(false)}>×</span>
             </div>
             <div className="modal-body damage-compensation-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left' }}>
               <div className="detail-row"><strong>Incident:</strong> {activeDamageIncident.damage_type}</div>
-              <div className="detail-row"><strong>Amount:</strong> ₱{parseFloat(activeDamageIncident.compensation_amount || 0).toLocaleString()}</div>
+              {(activeDamageIncident.damaged_quantity || activeDamageIncident.total_quantity) && (
+                <div className="detail-row"><strong>Affected Quantity:</strong> {activeDamageIncident.damaged_quantity || 1} of {activeDamageIncident.total_quantity || 1}</div>
+              )}
+              {activeDamageIncident.compensation_type === 'clothe' ? (
+                <div className="detail-row"><strong>Compensation:</strong> Clothe - {activeDamageIncident.clothe_description || 'Replacement garment'}</div>
+              ) : activeDamageIncident.compensation_type === 'both' ? (
+                <>
+                  <div className="detail-row"><strong>Money Option:</strong> ₱{parseFloat(activeDamageIncident.compensation_amount || 0).toLocaleString()}</div>
+                  <div className="detail-row"><strong>Clothe Option:</strong> {activeDamageIncident.clothe_description || 'Replacement garment'}</div>
+                  {activeDamageIncident.customer_compensation_choice && (
+                    <div className="detail-row"><strong>Customer Chose:</strong> {activeDamageIncident.customer_compensation_choice === 'clothe' ? 'Clothe' : 'Money - ₱' + parseFloat(activeDamageIncident.compensation_amount || 0).toLocaleString()}</div>
+                  )}
+                </>
+              ) : (
+                <div className="detail-row"><strong>Amount:</strong> ₱{parseFloat(activeDamageIncident.compensation_amount || 0).toLocaleString()}</div>
+              )}
+              {activeDamageIncident.customer_proceed_choice && (
+                <div className="detail-row"><strong>Order Proceed:</strong> {activeDamageIncident.customer_proceed_choice === 'proceed' ? 'Proceed' : 'Don\'t proceed'}</div>
+              )}
 
               {activeDamageIncident.compensation_status === 'paid' ? (
                 <>
                   <div className="detail-row"><strong>Payment Reference:</strong> {activeDamageIncident.payment_reference || 'N/A'}</div>
+                  {activeDamageIncident.refund_amount > 0 && (
+                    <div className="detail-row"><strong>Refund Amount:</strong> ₱{parseFloat(activeDamageIncident.refund_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</div>
+                  )}
                   <div className="detail-row"><strong>Paid At:</strong> {activeDamageIncident.compensation_paid_at ? new Date(activeDamageIncident.compensation_paid_at).toLocaleString() : 'N/A'}</div>
                 </>
               ) : (
-                <div className="payment-form-group">
-                  <label>Payment Reference</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    style={{ width: '100%', boxSizing: 'border-box' }}
-                    placeholder="Receipt number or reference"
-                    value={settlementForm.paymentReference}
-                    onChange={(e) => setSettlementForm({ paymentReference: e.target.value })}
-                  />
-                </div>
+                <>
+                  <div className="payment-form-group">
+                    <label>Payment Reference</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      style={{ width: '100%', boxSizing: 'border-box' }}
+                      placeholder="Receipt number or reference"
+                      value={settlementForm.paymentReference}
+                      onChange={(e) => setSettlementForm({ ...settlementForm, paymentReference: e.target.value })}
+                    />
+                  </div>
+                  <div className="payment-form-group" style={{ marginTop: 0 }}>
+                    <label>Refund Amount (PHP) <span style={{ fontSize: '11px', color: '#888', fontWeight: 'normal' }}>(optional — if customer is owed a refund)</span></label>
+                    {(() => {
+                      const item = allItems.find(i => Number(i.item_id) === Number(activeDamageIncident.order_item_id));
+                      const pf = typeof item?.pricing_factors === 'string' ? JSON.parse(item?.pricing_factors || '{}') : (item?.pricing_factors || {});
+                      const servicePaid = parseFloat(pf.amount_paid || 0);
+                      const compensationAmt = parseFloat(activeDamageIncident.compensation_amount || 0);
+                      const isDontProceed = activeDamageIncident.customer_proceed_choice === 'dont_proceed';
+                      const isMoneyComp = activeDamageIncident.customer_compensation_choice === 'money' || activeDamageIncident.compensation_type === 'money';
+                      if (isDontProceed && isMoneyComp && (servicePaid > 0 || compensationAmt > 0)) {
+                        return (
+                          <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px', padding: '8px', background: '#fff3e0', borderRadius: '6px', border: '1px solid #ffcc80' }}>
+                            Customer chose not to proceed. Suggested refund:<br />
+                            {servicePaid > 0 && <span>Service paid: ₱{servicePaid.toFixed(2)}</span>}
+                            {servicePaid > 0 && compensationAmt > 0 && <span> + </span>}
+                            {compensationAmt > 0 && <span>Compensation: ₱{compensationAmt.toFixed(2)}</span>}
+                            {(servicePaid > 0 || compensationAmt > 0) && <strong> = ₱{(servicePaid + compensationAmt).toFixed(2)}</strong>}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    <input
+                      type="number"
+                      className="form-control"
+                      style={{ width: '100%', boxSizing: 'border-box' }}
+                      min="0"
+                      step="0.01"
+                      placeholder="Enter refund amount"
+                      value={settlementForm.refundAmount || ''}
+                      onChange={(e) => setSettlementForm({ ...settlementForm, refundAmount: e.target.value })}
+                    />
+                  </div>
+                </>
               )}
             </div>
             <div className="modal-footer-centered" style={{ justifyContent: 'flex-end' }}>

@@ -206,6 +206,9 @@ const Repair = () => {
     damageType: '',
     damageDescription: '',
     responsibleParty: '',
+    totalQuantity: '1',
+    damagedQuantity: '1',
+    affectedGarments: [],
     compensationAmount: '',
     compensationType: 'money',
     clotheDescription: ''
@@ -1076,11 +1079,33 @@ const Repair = () => {
   };
 
   const openDamageReportModal = (item) => {
+    let totalQty = 1;
+    try {
+      const specificData = typeof item?.specific_data === 'string'
+        ? JSON.parse(item.specific_data)
+        : (item?.specific_data || {});
+      const garments = Array.isArray(specificData?.garments) ? specificData.garments : [];
+      if (garments.length > 0) {
+        totalQty = garments.reduce((sum, garment) => {
+          const qty = parseInt(garment?.quantity || 1, 10);
+          return sum + (Number.isInteger(qty) && qty > 0 ? qty : 1);
+        }, 0);
+      } else {
+        const fallbackQty = parseInt(specificData?.quantity || 1, 10);
+        totalQty = Number.isInteger(fallbackQty) && fallbackQty > 0 ? fallbackQty : 1;
+      }
+    } catch (error) {
+      totalQty = 1;
+    }
+
     setDamageTargetItem(item);
     setDamageForm({
       damageType: '',
       damageDescription: '',
       responsibleParty: '',
+      totalQuantity: String(Math.max(1, totalQty)),
+      damagedQuantity: '1',
+      affectedGarments: [],
       compensationAmount: '',
       compensationType: 'money',
       clotheDescription: ''
@@ -1091,9 +1116,32 @@ const Repair = () => {
   const handleReportDamage = async () => {
     if (!damageTargetItem) return;
 
+    const totalQuantity = parseInt(damageForm.totalQuantity || '1', 10);
+    const damagedQuantity = parseInt(damageForm.damagedQuantity || '1', 10);
     const compensationAmount = parseFloat(damageForm.compensationAmount || '0');
+    const selectedGarments = Array.isArray(damageForm.affectedGarments) ? damageForm.affectedGarments : [];
+    const totalAffectedQty = selectedGarments.reduce((sum, garment) => {
+      const qty = parseInt(garment?.damagedQty || 0, 10);
+      return sum + (Number.isInteger(qty) && qty > 0 ? qty : 0);
+    }, 0);
     if (!damageForm.damageType.trim()) {
       showToast('Please enter a damage type', 'error');
+      return;
+    }
+    if (!Number.isInteger(totalQuantity) || totalQuantity < 1) {
+      showToast('Please enter a valid total quantity', 'error');
+      return;
+    }
+    if (!Number.isInteger(damagedQuantity) || damagedQuantity < 1 || damagedQuantity > totalQuantity) {
+      showToast('Damaged quantity must be between 1 and total quantity', 'error');
+      return;
+    }
+    if (selectedGarments.length === 0) {
+      showToast('Please select at least one affected garment', 'error');
+      return;
+    }
+    if (totalAffectedQty !== damagedQuantity) {
+      showToast('Damaged quantity must match the total of affected garment quantities', 'error');
       return;
     }
     const hasMoneyOffer = Number.isFinite(compensationAmount) && compensationAmount > 0;
@@ -1103,6 +1151,10 @@ const Repair = () => {
       return;
     }
 
+    const damagedGarmentSummary = selectedGarments
+      .map((garment) => `${garment.garmentType} x${garment.damagedQty}`)
+      .join(', ');
+
     const result = await createCompensationIncident({
       order_item_id: damageTargetItem.item_id,
       order_id: damageTargetItem.order_id,
@@ -1111,6 +1163,9 @@ const Repair = () => {
       responsible_party: damageForm.responsibleParty.trim(),
       damage_type: damageForm.damageType.trim(),
       damage_description: damageForm.damageDescription.trim(),
+      total_quantity: totalQuantity,
+      damaged_quantity: damagedQuantity,
+      damaged_garment_type: damagedGarmentSummary || null,
       compensation_amount: compensationAmount,
       compensation_type: hasMoneyOffer && hasClotheOffer ? 'both' : hasMoneyOffer ? 'money' : 'clothe',
       clothe_description: hasClotheOffer ? damageForm.clotheDescription.trim() : null,
@@ -4984,6 +5039,146 @@ const Repair = () => {
               </div>
 
               <div className="payment-form-group" style={{ marginTop: 0, width: '100%', gridColumn: '1 / -1' }}>
+                <label>Affected Garments *</label>
+                <div className="affected-garments-box" style={{
+                  border: '1px solid #d7deea',
+                  borderRadius: '10px',
+                  padding: '8px',
+                  backgroundColor: '#f8faff',
+                  maxHeight: '300px',
+                  overflowY: 'auto'
+                }}>
+                  {(() => {
+                    try {
+                      const specificData = typeof damageTargetItem?.specific_data === 'string'
+                        ? JSON.parse(damageTargetItem.specific_data)
+                        : (damageTargetItem?.specific_data || {});
+                      const garments = Array.isArray(specificData?.garments) ? specificData.garments : [];
+                      if (!garments.length) {
+                        return <div style={{ padding: '10px', color: '#999' }}>No garments in this order</div>;
+                      }
+
+                      return garments.map((garment, idx) => {
+                        const garmentType = garment?.garmentType || garment?.garment_type || `Garment ${idx + 1}`;
+                        const garmentQtyRaw = parseInt(garment?.quantity || 1, 10);
+                        const garmentQty = Number.isInteger(garmentQtyRaw) && garmentQtyRaw > 0 ? garmentQtyRaw : 1;
+                        const isChecked = damageForm.affectedGarments.some((ag) => ag.garmentType === garmentType);
+                        const affectedGarment = damageForm.affectedGarments.find((ag) => ag.garmentType === garmentType);
+                        const damagedQty = affectedGarment?.damagedQty || 1;
+
+                        return (
+                          <div key={idx} className="affected-garment-row" style={{
+                            padding: '10px 12px',
+                            borderBottom: idx < garments.length - 1 ? '1px solid #e8edf6' : 'none',
+                            borderRadius: '6px'
+                          }}>
+                            <div className="affected-garment-main">
+                              <input
+                                className="affected-garment-checkbox"
+                                type="checkbox"
+                                id={`repair-garment-${idx}`}
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    const nextAffectedGarments = [...damageForm.affectedGarments, { garmentType, damagedQty: 1 }];
+                                    const nextDamagedQty = nextAffectedGarments.reduce((sum, ag) => sum + (parseInt(ag.damagedQty || 0, 10) || 0), 0);
+                                    setDamageForm({
+                                      ...damageForm,
+                                      affectedGarments: nextAffectedGarments,
+                                      damagedQuantity: String(Math.max(1, nextDamagedQty))
+                                    });
+                                  } else {
+                                    const nextAffectedGarments = damageForm.affectedGarments.filter((ag) => ag.garmentType !== garmentType);
+                                    const nextDamagedQty = nextAffectedGarments.reduce((sum, ag) => sum + (parseInt(ag.damagedQty || 0, 10) || 0), 0);
+                                    setDamageForm({
+                                      ...damageForm,
+                                      affectedGarments: nextAffectedGarments,
+                                      damagedQuantity: String(Math.max(1, nextDamagedQty))
+                                    });
+                                  }
+                                }}
+                              />
+                              <label className="affected-garment-name" htmlFor={`repair-garment-${idx}`}>
+                                {garmentType} (qty: {garmentQty})
+                              </label>
+                            </div>
+                            {isChecked && (
+                              <div className="affected-garment-damaged" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <label style={{ fontSize: '12px', margin: 0, color: '#51607d', fontWeight: 600 }}>Damaged</label>
+                                <input
+                                  className="affected-garment-qty-input"
+                                  type="number"
+                                  min="1"
+                                  max={garmentQty}
+                                  step="1"
+                                  value={damagedQty}
+                                  onChange={(e) => {
+                                    const newQty = parseInt(e.target.value || '1', 10);
+                                    if (newQty >= 1 && newQty <= garmentQty) {
+                                      const nextAffectedGarments = damageForm.affectedGarments.map((ag) =>
+                                        ag.garmentType === garmentType ? { ...ag, damagedQty: newQty } : ag
+                                      );
+                                      const nextDamagedQty = nextAffectedGarments.reduce((sum, ag) => sum + (parseInt(ag.damagedQty || 0, 10) || 0), 0);
+                                      setDamageForm({
+                                        ...damageForm,
+                                        affectedGarments: nextAffectedGarments,
+                                        damagedQuantity: String(Math.max(1, nextDamagedQty))
+                                      });
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '6px 8px',
+                                    border: '1px solid #c7d2e5',
+                                    borderRadius: '6px',
+                                    fontWeight: 600,
+                                    color: '#1f2a44'
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      });
+                    } catch (error) {
+                      return <div style={{ padding: '10px', color: '#d32f2f' }}>Error loading garments</div>;
+                    }
+                  })()}
+                </div>
+                {damageForm.affectedGarments.length === 0 && (
+                  <div style={{ fontSize: '12px', color: '#d32f2f', marginTop: '5px' }}>
+                    At least one garment must be selected
+                  </div>
+                )}
+              </div>
+
+              <div className="payment-form-group" style={{ marginTop: 0, width: '100%', gridColumn: '1 / -1' }}>
+                <label>Total Quantity in this item</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  min="1"
+                  step="1"
+                  value={damageForm.totalQuantity}
+                  onChange={(e) => setDamageForm({ ...damageForm, totalQuantity: e.target.value })}
+                />
+              </div>
+
+              <div className="payment-form-group" style={{ marginTop: 0, width: '100%', gridColumn: '1 / -1' }}>
+                <label>Damaged Quantity *</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  min="1"
+                  step="1"
+                  max={Math.max(1, parseInt(damageForm.totalQuantity || '1', 10) || 1)}
+                  value={damageForm.damagedQuantity}
+                  onChange={(e) => setDamageForm({ ...damageForm, damagedQuantity: e.target.value })}
+                />
+              </div>
+
+              <div className="payment-form-group" style={{ marginTop: 0, width: '100%', gridColumn: '1 / -1' }}>
                 <label>Responsible Staff/Admin</label>
                 <input
                   type="text"
@@ -5109,10 +5304,6 @@ const Repair = () => {
           <div className="modal-content damage-compensation-modal" style={{ maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', textAlign: 'left' }}>
             <div className="modal-header">
               <h2>
-                <i
-                  className={`fas ${activeDamageIncident.compensation_status === 'paid' ? 'fa-receipt' : 'fa-hand-holding-usd'}`}
-                  style={{ marginRight: '8px' }}
-                ></i>
                 {activeDamageIncident.compensation_status === 'paid' ? 'Settlement Details' : 'Settle Compensation'}
               </h2>
               <span className="close-modal" onClick={() => setShowSettlementModal(false)}>×</span>
@@ -5120,20 +5311,20 @@ const Repair = () => {
             <div className="modal-body damage-compensation-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left' }}>
               <div className="detail-row"><strong>Incident:</strong> {activeDamageIncident.damage_type}</div>
               {activeDamageIncident.compensation_type === 'clothe' ? (
-                <div className="detail-row"><strong>Compensation:</strong> 👕 Clothe — {activeDamageIncident.clothe_description || 'Replacement garment'}</div>
+                <div className="detail-row"><strong>Compensation:</strong> Clothe - {activeDamageIncident.clothe_description || 'Replacement garment'}</div>
               ) : activeDamageIncident.compensation_type === 'both' ? (
                 <>
                   <div className="detail-row"><strong>Money Option:</strong> ₱{parseFloat(activeDamageIncident.compensation_amount || 0).toLocaleString()}</div>
-                  <div className="detail-row"><strong>Clothe Option:</strong> 👕 {activeDamageIncident.clothe_description || 'Replacement garment'}</div>
+                  <div className="detail-row"><strong>Clothe Option:</strong> {activeDamageIncident.clothe_description || 'Replacement garment'}</div>
                   {activeDamageIncident.customer_compensation_choice && (
-                    <div className="detail-row"><strong>Customer Chose:</strong> {activeDamageIncident.customer_compensation_choice === 'clothe' ? '👕 Clothe' : '💵 Money — ₱' + parseFloat(activeDamageIncident.compensation_amount || 0).toLocaleString()}</div>
+                    <div className="detail-row"><strong>Customer Chose:</strong> {activeDamageIncident.customer_compensation_choice === 'clothe' ? 'Clothe' : 'Money - ₱' + parseFloat(activeDamageIncident.compensation_amount || 0).toLocaleString()}</div>
                   )}
                 </>
               ) : (
                 <div className="detail-row"><strong>Amount:</strong> ₱{parseFloat(activeDamageIncident.compensation_amount || 0).toLocaleString()}</div>
               )}
               {activeDamageIncident.customer_proceed_choice && (
-                <div className="detail-row"><strong>Order Proceed:</strong> {activeDamageIncident.customer_proceed_choice === 'proceed' ? '✅ Proceed' : '❌ Don\'t proceed'}</div>
+                <div className="detail-row"><strong>Order Proceed:</strong> {activeDamageIncident.customer_proceed_choice === 'proceed' ? 'Proceed' : 'Don\'t proceed'}</div>
               )}
 
               {activeDamageIncident.compensation_status === 'paid' ? (
@@ -5169,7 +5360,7 @@ const Repair = () => {
                       if (isDontProceed && isMoneyComp && (servicePaid > 0 || compensationAmt > 0)) {
                         return (
                           <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px', padding: '8px', background: '#fff3e0', borderRadius: '6px', border: '1px solid #ffcc80' }}>
-                            ⚠️ Customer chose not to proceed. Suggested refund:<br />
+                            Customer chose not to proceed. Suggested refund:<br />
                             {servicePaid > 0 && <span>Service paid: ₱{servicePaid.toFixed(2)}</span>}
                             {servicePaid > 0 && compensationAmt > 0 && <span> + </span>}
                             {compensationAmt > 0 && <span>Compensation: ₱{compensationAmt.toFixed(2)}</span>}

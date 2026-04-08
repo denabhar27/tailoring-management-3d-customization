@@ -384,7 +384,7 @@ exports.updateLiabilityDecision = (req, res) => {
 
 exports.recordCompensationSettlement = (req, res) => {
   const { id } = req.params;
-  const { payment_reference, notes, refund_amount } = req.body;
+  const { payment_reference, notes, refund_amount, customer_compensation_choice, customer_proceed_choice } = req.body;
   DamageRecord.getCompensationById(id, (findErr, record) => {
     if (findErr) {
       return res.status(500).json({
@@ -408,13 +408,23 @@ exports.recordCompensationSettlement = (req, res) => {
       });
     }
 
-    DamageRecord.updateCompensationRecord(id, {
+    const updatePayload = {
       compensation_status: 'paid',
       compensation_paid_at: new Date(),
       payment_reference: payment_reference || null,
       notes: notes !== undefined ? notes : record.notes,
       refund_amount: (refund_amount !== undefined && refund_amount !== "") ? (parseFloat(refund_amount) || null) : null,
-    }, (updateErr) => {
+    };
+
+    if (customer_compensation_choice && ['money', 'clothe'].includes(customer_compensation_choice)) {
+      updatePayload.customer_compensation_choice = customer_compensation_choice;
+    }
+
+    if (customer_proceed_choice && ['proceed', 'dont_proceed'].includes(customer_proceed_choice)) {
+      updatePayload.customer_proceed_choice = customer_proceed_choice;
+    }
+
+    DamageRecord.updateCompensationRecord(id, updatePayload, (updateErr) => {
       if (updateErr) {
         return res.status(500).json({
           success: false,

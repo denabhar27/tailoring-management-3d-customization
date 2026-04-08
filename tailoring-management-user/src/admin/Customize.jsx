@@ -3879,7 +3879,7 @@ const Customize = () => {
                               );
                             })()}
 
-                            {item.approval_status === 'accepted' && (
+                            {item.approval_status === 'accepted' && item.order_type !== 'walk_in' && (
 
                               <button
 

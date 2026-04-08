@@ -133,11 +133,12 @@ exports.getDashboardOverview = async (req, res) => {
       ), 0) AS total
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.order_id
+       LEFT JOIN transaction_logs tl ON oi.item_id = tl.order_item_id
        WHERE (
          oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
          OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
        )
-         AND DATE(o.order_date) = CURDATE()`
+         AND DATE(COALESCE(tl.created_at, o.order_date)) = CURDATE()`
     ).catch(err => {
       console.error('Error in todayRevenueQuery:', err);
       return [{ total: 0 }];
@@ -152,11 +153,12 @@ exports.getDashboardOverview = async (req, res) => {
       ), 0) AS total
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.order_id
+       LEFT JOIN transaction_logs tl ON oi.item_id = tl.order_item_id
        WHERE (
          oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
          OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
        )
-         AND DATE(o.order_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
+         AND DATE(COALESCE(tl.created_at, o.order_date)) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
     ).catch(err => {
       console.error('Error in yesterdayRevenueQuery:', err);
       return [{ total: 0 }];
@@ -171,12 +173,13 @@ exports.getDashboardOverview = async (req, res) => {
       ), 0) AS total
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.order_id
+       LEFT JOIN transaction_logs tl ON oi.item_id = tl.order_item_id
        WHERE (
          oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
          OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
        )
-         AND YEAR(o.order_date) = YEAR(CURDATE())
-         AND MONTH(o.order_date) = MONTH(CURDATE())`
+         AND YEAR(COALESCE(tl.created_at, o.order_date)) = YEAR(CURDATE())
+         AND MONTH(COALESCE(tl.created_at, o.order_date)) = MONTH(CURDATE())`
     ).catch(err => {
       console.error('Error in currentMonthRevenueQuery:', err);
       return [{ total: 0 }];
@@ -191,12 +194,13 @@ exports.getDashboardOverview = async (req, res) => {
       ), 0) AS total
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.order_id
+       LEFT JOIN transaction_logs tl ON oi.item_id = tl.order_item_id
        WHERE (
          oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
          OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
        )
-         AND YEAR(o.order_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
-         AND MONTH(o.order_date) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))`
+         AND YEAR(COALESCE(tl.created_at, o.order_date)) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
+         AND MONTH(COALESCE(tl.created_at, o.order_date)) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))`
     ).catch(err => {
       console.error('Error in previousMonthRevenueQuery:', err);
       return [{ total: 0 }];

@@ -175,7 +175,9 @@ const DryCleaning = () => {
   });
   const [settlementForm, setSettlementForm] = useState({
     paymentReference: '',
-    refundAmount: ''
+    refundAmount: '',
+    customerCompensationChoice: '',
+    customerProceedChoice: ''
   });
 
 
@@ -628,7 +630,9 @@ const DryCleaning = () => {
 
         : (item.pricing_factors || {});
 
-      const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
+      const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
+
+      const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
 
       const finalPrice = parseFloat(item.final_price || 0);
 
@@ -1024,6 +1028,7 @@ const DryCleaning = () => {
   const openSettlementModal = (incident) => {
     setActiveDamageIncident(incident);
     const item = allItems.find(i => Number(i.item_id) === Number(incident.order_item_id));
+    const isWalkIn = item?.order_type === 'walk_in';
     const pf = typeof item?.pricing_factors === 'string' ? JSON.parse(item?.pricing_factors || '{}') : (item?.pricing_factors || {});
     const servicePaid = parseFloat(pf.amount_paid || 0);
     const compensationAmt = parseFloat(incident.compensation_amount || 0);
@@ -1033,7 +1038,13 @@ const DryCleaning = () => {
     const autoRefund = shouldAutoRefund ? (servicePaid + compensationAmt) : 0;
     setSettlementForm({
       paymentReference: incident.payment_reference || '',
-      refundAmount: autoRefund > 0 ? autoRefund.toFixed(2) : ''
+      refundAmount: autoRefund > 0 ? autoRefund.toFixed(2) : '',
+      customerCompensationChoice: isWalkIn
+        ? (incident.customer_compensation_choice || (incident.compensation_type === 'clothe' ? 'clothe' : 'money'))
+        : '',
+      customerProceedChoice: isWalkIn
+        ? (incident.customer_proceed_choice || 'proceed')
+        : ''
     });
     setShowSettlementModal(true);
   };
@@ -1046,9 +1057,26 @@ const DryCleaning = () => {
       return;
     }
 
+    const item = allItems.find(i => Number(i.item_id) === Number(activeDamageIncident.order_item_id));
+    const isWalkIn = item?.order_type === 'walk_in';
+
+    if (isWalkIn && !settlementForm.customerCompensationChoice) {
+      showToast('Please select customer compensation choice', 'error');
+      return;
+    }
+
+    if (isWalkIn && !settlementForm.customerProceedChoice) {
+      showToast('Please select if customer wants to proceed with the order', 'error');
+      return;
+    }
+
     const result = await settleCompensationIncident(activeDamageIncident.id, {
       payment_reference: settlementForm.paymentReference.trim(),
-      refund_amount: settlementForm.refundAmount ? parseFloat(settlementForm.refundAmount) : undefined
+      refund_amount: settlementForm.refundAmount ? parseFloat(settlementForm.refundAmount) : undefined,
+      ...(isWalkIn ? {
+        customer_compensation_choice: settlementForm.customerCompensationChoice,
+        customer_proceed_choice: settlementForm.customerProceedChoice
+      } : {})
     });
 
     if (!result.success) {
@@ -1557,7 +1585,9 @@ const DryCleaning = () => {
 
         : (item.pricing_factors || {});
 
-      const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
+      const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
+
+      const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
 
       const finalPrice = parseFloat(item.final_price || 0);
 
@@ -2550,7 +2580,9 @@ const DryCleaning = () => {
 
                     : (item.pricing_factors || {});
 
-                  const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
+                  const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
+
+                  const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
 
                   const finalPrice = parseFloat(item.final_price || 0);
 
@@ -2824,7 +2856,7 @@ const DryCleaning = () => {
                             const halfPrice = finalPrice * 0.5;
                             const hasHalfPayment = amountPaid >= halfPrice - 0.01;
                             
-                            if (isMovingToInProgress && !hasHalfPayment) {
+                            if (isMovingToInProgress && !hasHalfPayment && !isEnhancementOrder) {
                               return null;
                             }
                             
@@ -2974,6 +3006,7 @@ const DryCleaning = () => {
 
                               )}
 
+                              {!isEnhancementOrder && (
                               <button
 
                                 className="icon-btn"
@@ -2984,17 +3017,7 @@ const DryCleaning = () => {
 
                                   setSelectedOrder(item);
 
-                                  const pricingFactors = typeof item.pricing_factors === 'string'
-
-                                    ? JSON.parse(item.pricing_factors || '{}')
-
-                                    : (item.pricing_factors || {});
-
-                                  const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
-
                                   const finalPrice = parseFloat(item.final_price || 0);
-
-                                  const remainingBalance = Math.max(0, finalPrice - amountPaid);
 
                                   const halfPrice = (finalPrice * 0.5).toFixed(2);
 
@@ -3015,8 +3038,9 @@ const DryCleaning = () => {
                                 💰
 
                               </button>
+                              )}
 
-                              {item.approval_status === 'accepted' && (
+                              {item.approval_status === 'accepted' && item.order_type !== 'walk_in' && (
                               <button
 
                                 className="icon-btn"
@@ -4865,7 +4889,18 @@ const DryCleaning = () => {
                         ? JSON.parse(damageTargetItem.specific_data)
                         : damageTargetItem.specific_data || {};
                       
-                      const garments = specificData.garments || [];
+                      let garments = Array.isArray(specificData.garments) ? specificData.garments : [];
+
+                      // Walk-in dry cleaning orders can store a single garment in specific_data.garmentType.
+                      if (!garments.length && specificData?.garmentType) {
+                        const pricingFactors = typeof damageTargetItem?.pricing_factors === 'string'
+                          ? JSON.parse(damageTargetItem.pricing_factors || '{}')
+                          : (damageTargetItem?.pricing_factors || {});
+                        const fallbackQtyRaw = parseInt(specificData?.quantity || pricingFactors?.quantity || 1, 10);
+                        const fallbackQty = Number.isInteger(fallbackQtyRaw) && fallbackQtyRaw > 0 ? fallbackQtyRaw : 1;
+                        garments = [{ garmentType: specificData.garmentType, quantity: fallbackQty }];
+                      }
+
                       if (!Array.isArray(garments) || garments.length === 0) {
                         return <div style={{ padding: '10px', color: '#999' }}>No garments in this order</div>;
                       }
@@ -5176,6 +5211,44 @@ const DryCleaning = () => {
                 </>
               ) : (
                 <>
+                  {(() => {
+                    const item = allItems.find(i => Number(i.item_id) === Number(activeDamageIncident.order_item_id));
+                    const isWalkIn = item?.order_type === 'walk_in';
+                    if (!isWalkIn) return null;
+
+                    return (
+                      <>
+                        <div className="payment-form-group">
+                          <label>Customer Compensation Choice *</label>
+                          <select
+                            className="form-control"
+                            style={{ width: '100%', boxSizing: 'border-box' }}
+                            value={settlementForm.customerCompensationChoice}
+                            onChange={(e) => setSettlementForm({ ...settlementForm, customerCompensationChoice: e.target.value })}
+                          >
+                            <option value="">Select choice</option>
+                            <option value="money">Money</option>
+                            <option value="clothe">Clothe</option>
+                          </select>
+                        </div>
+
+                        <div className="payment-form-group">
+                          <label>Order Proceed Choice *</label>
+                          <select
+                            className="form-control"
+                            style={{ width: '100%', boxSizing: 'border-box' }}
+                            value={settlementForm.customerProceedChoice}
+                            onChange={(e) => setSettlementForm({ ...settlementForm, customerProceedChoice: e.target.value })}
+                          >
+                            <option value="">Select choice</option>
+                            <option value="proceed">Proceed</option>
+                            <option value="dont_proceed">Don't proceed</option>
+                          </select>
+                        </div>
+                      </>
+                    );
+                  })()}
+
                   <div className="payment-form-group">
                     <label>Payment Reference</label>
                     <input

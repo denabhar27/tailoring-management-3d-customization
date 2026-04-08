@@ -89,6 +89,7 @@ const WalkInOrders = () => {
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [preferredPickupDate, setPreferredPickupDate] = useState('');
   const [preferredPickupTime, setPreferredPickupTime] = useState('');
+  const [estimatedDryCleaningPrice, setEstimatedDryCleaningPrice] = useState('');
   const [garmentTypes, setGarmentTypes] = useState([]);
 
   const [repairGarmentType, setRepairGarmentType] = useState('');
@@ -285,6 +286,17 @@ const WalkInOrders = () => {
     const pricePerItem = selectedGarment ? parseFloat(selectedGarment.garment_price || 200) : 200;
     return pricePerItem * parseInt(quantity);
   };
+
+  useEffect(() => {
+    if (serviceType !== 'dry_cleaning') return;
+    if (!garmentType || !quantity) {
+      setEstimatedDryCleaningPrice('');
+      return;
+    }
+
+    const computedTotal = calculateDryCleaningPrice();
+    setEstimatedDryCleaningPrice(Number.isFinite(computedTotal) ? computedTotal.toFixed(2) : '');
+  }, [serviceType, garmentType, quantity, garmentTypes]);
 
   const calculateRentalPrice = () => {
     if (selectedRentalItems.length === 0 || !rentalDuration) return 0;
@@ -574,14 +586,26 @@ const WalkInOrders = () => {
         alert('Please select garment type and quantity');
         return;
       }
+      if (!estimatedDryCleaningPrice || Number.isNaN(parseFloat(estimatedDryCleaningPrice)) || parseFloat(estimatedDryCleaningPrice) <= 0) {
+        alert('Please enter a valid final price for dry cleaning order');
+        return;
+      }
     } else if (serviceType === 'repair') {
       if (!repairGarmentType || !damageLevel || !repairDescription) {
         alert('Please fill in all required repair fields');
         return;
       }
+      if (!estimatedRepairPrice || Number.isNaN(parseFloat(estimatedRepairPrice)) || parseFloat(estimatedRepairPrice) <= 0) {
+        alert('Please enter a valid final price for repair order');
+        return;
+      }
     } else if (serviceType === 'customization') {
       if (!customGarmentType) {
         alert('Please select garment type');
+        return;
+      }
+      if (!estimatedCustomPrice || Number.isNaN(parseFloat(estimatedCustomPrice)) || parseFloat(estimatedCustomPrice) <= 0) {
+        alert('Please enter a valid final price for customization order');
         return;
       }
     } else if (serviceType === 'rental') {
@@ -616,17 +640,20 @@ const WalkInOrders = () => {
       let result;
 
       if (serviceType === 'dry_cleaning') {
-        const pricePerItem = garmentTypes.find(gt => gt.garment_name === garmentType)?.garment_price || 200;
+        const totalPrice = parseFloat(estimatedDryCleaningPrice);
+        const qty = parseInt(quantity, 10);
+        const pricePerItem = qty > 0 ? (totalPrice / qty) : 0;
         result = await createWalkInDryCleaningOrder({
           customerName: `${customerFirstName} ${customerLastName}`.trim(),
           customerEmail,
           customerPhone,
           garmentType,
-          quantity: parseInt(quantity),
+          quantity: qty,
           specialInstructions,
           pricingFactors: {
-            pricePerItem: pricePerItem.toString(),
-            quantity: quantity.toString()
+            pricePerItem: pricePerItem.toFixed(2),
+            quantity: quantity.toString(),
+            editedTotalPrice: totalPrice.toFixed(2)
           },
           notes
         });
@@ -638,7 +665,7 @@ const WalkInOrders = () => {
           garmentType: repairGarmentType,
           damageLevel,
           description: repairDescription,
-          estimatedPrice: estimatedRepairPrice || '0',
+          estimatedPrice: estimatedRepairPrice,
           notes
         });
       } else if (serviceType === 'customization') {
@@ -657,7 +684,7 @@ const WalkInOrders = () => {
           fabricType,
           patternType,
           measurements: structuredMeasurements,
-          estimatedPrice: estimatedCustomPrice || '0',
+          estimatedPrice: estimatedCustomPrice,
           notes,
           referenceImage: referenceImage
         });
@@ -724,6 +751,7 @@ const WalkInOrders = () => {
         setCustomerPhone('');
         setGarmentType('');
         setQuantity(1);
+        setEstimatedDryCleaningPrice('');
         setSpecialInstructions('');
         setPreferredPickupDate('');
         setPreferredPickupTime('');
@@ -906,8 +934,18 @@ const WalkInOrders = () => {
                       />
                     </div>
 
-                    <div className="price-display">
-                      <strong>Total Price: ₱{calculateDryCleaningPrice().toFixed(2)}</strong>
+                    <div className="form-group">
+                      <label>Total Price *</label>
+                      <input
+                        type="number"
+                        value={estimatedDryCleaningPrice}
+                        onChange={(e) => setEstimatedDryCleaningPrice(e.target.value)}
+                        className="form-control"
+                        min="0"
+                        step="0.01"
+                        placeholder="Enter final price"
+                        required
+                      />
                     </div>
                   </div>
                 )}
@@ -959,7 +997,7 @@ const WalkInOrders = () => {
                     </div>
 
                     <div className="form-group">
-                      <label>Final Price</label>
+                      <label>Final Price *</label>
                       <input
                         type="number"
                         value={estimatedRepairPrice}
@@ -967,7 +1005,8 @@ const WalkInOrders = () => {
                         className="form-control"
                         min="0"
                         step="0.01"
-                        placeholder="Enter final price (optional)"
+                        placeholder="Enter final price"
+                        required
                       />
                     </div>
                   </div>
@@ -1193,7 +1232,7 @@ const WalkInOrders = () => {
               </div>
 
               <div className="form-group">
-                <label>Final Price</label>
+                <label>Final Price *</label>
                 <input
                   type="number"
                   value={estimatedCustomPrice}
@@ -1201,7 +1240,8 @@ const WalkInOrders = () => {
                   className="form-control"
                   min="0"
                   step="0.01"
-                  placeholder="Enter final price (optional)"
+                  placeholder="Enter final price"
+                  required
                 />
               </div>
             </div>

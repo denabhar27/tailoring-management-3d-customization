@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { format, subDays, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import {
   ServiceRevenuePieChart,
@@ -60,7 +60,7 @@ const AnalyticsDashboard = () => {
     }
   };
 
-  const fetchAllData = async () => {
+  const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
       const [serviceRes, topRes, netLossRes] = await Promise.all([
@@ -77,11 +77,31 @@ const AnalyticsDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange.startDate, dateRange.endDate, selectedServices]);
 
   useEffect(() => {
     fetchAllData();
-  }, []);
+  }, [fetchAllData]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchAllData();
+    }, 30000);
+
+    const handleWindowFocus = () => fetchAllData();
+    const handleVisibilityChange = () => {
+      if (!document.hidden) fetchAllData();
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchAllData]);
 
   const setQuickDateRange = (preset) => {
     const today = new Date();

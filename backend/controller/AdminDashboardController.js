@@ -63,6 +63,17 @@ function mapService(serviceType) {
   return serviceType || 'Service';
 }
 
+function getActivityTimestamp(entry) {
+  const rawDate = entry?.order_date || entry?.created_at || 0;
+  const parsed = new Date(rawDate).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 exports.getDashboardOverview = async (req, res) => {
   if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'clerk')) {
     return res.status(403).json({
@@ -229,6 +240,8 @@ exports.getDashboardOverview = async (req, res) => {
           } else {
             
             const paymentActivities = (transactions || []).slice(0, 20).map(tx => ({
+              id: tx.transaction_id || tx.id || null,
+              transaction_id: tx.transaction_id || tx.id || null,
               item_id: tx.item_id || tx.order_item_id,
               order_item_id: tx.order_item_id,
               service_type: tx.service_type,
@@ -314,7 +327,13 @@ exports.getDashboardOverview = async (req, res) => {
       const orderItemById = new Map();
 
       logs.forEach(log => {
-        const key = `${log.order_item_id || 'null'}_${log.created_at}`;
+        const key = [
+          'log',
+          log.id || 'no-id',
+          log.order_item_id || log.item_id || 'null',
+          log.created_at || 'no-time',
+          log.action_type || 'unknown'
+        ].join('_');
         const walkInName = (log.walk_in_customer_name || '').trim();
         const customerFirstName = walkInName || log.customer_first_name || log.first_name || log.actor_first_name;
         const customerLastName = walkInName ? '' : (log.customer_last_name || log.last_name || log.actor_last_name);
@@ -342,7 +361,14 @@ exports.getDashboardOverview = async (req, res) => {
       });
 
       paymentActivities.forEach(payment => {
-        const key = `${payment.order_item_id || 'null'}_${payment.order_date}`;
+        const key = [
+          'pay',
+          payment.transaction_id || payment.id || 'no-id',
+          payment.order_item_id || payment.item_id || 'null',
+          payment.order_date || 'no-time',
+          payment.amount || 0,
+          payment.payment_method || 'cash'
+        ].join('_');
         if (!activityMap.has(key)) {
           activityMap.set(key, payment);
         }
@@ -439,9 +465,18 @@ exports.getDashboardOverview = async (req, res) => {
 
       const activities = Array.from(activityMap.values())
         .sort((a, b) => {
-          const dateA = new Date(a.order_date || a.created_at || 0);
-          const dateB = new Date(b.order_date || b.created_at || 0);
-          return dateB - dateA;
+          const timeDiff = getActivityTimestamp(b) - getActivityTimestamp(a);
+          if (timeDiff !== 0) return timeDiff;
+
+          const idB = toNumber(b.id ?? b.transaction_id ?? b.item_id ?? b.order_item_id, -1);
+          const idA = toNumber(a.id ?? a.transaction_id ?? a.item_id ?? a.order_item_id, -1);
+          if (idB !== idA) return idB - idA;
+
+          const actionB = String(b.action_type || '').toLowerCase();
+          const actionA = String(a.action_type || '').toLowerCase();
+          if (actionB !== actionA) return actionB > actionA ? 1 : -1;
+
+          return String(b.notes || '').localeCompare(String(a.notes || ''));
         })
         .slice(0, 500);
       

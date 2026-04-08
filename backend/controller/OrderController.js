@@ -2736,7 +2736,7 @@ exports.updateOrderItemPrice = (req, res) => {
       });
     }
 
-    const updateSql = `UPDATE order_items SET final_price = ? WHERE item_id = ?`;
+    const updateSql = `UPDATE order_items SET final_price = ?, approval_status = 'price_confirmation' WHERE item_id = ?`;
 
     db.query(updateSql, [price, itemId], (updateErr, updateResult) => {
       if (updateErr) {
@@ -2746,6 +2746,16 @@ exports.updateOrderItemPrice = (req, res) => {
           error: updateErr
         });
       }
+
+      // Insert price_confirmation into order_tracking so user sees updated status
+      const trackingNotes = reason
+        ? `Price updated to ${price.toFixed(2)}. Reason: ${reason}. Please confirm the new price to proceed.`
+        : `Price updated to ${price.toFixed(2)}. Please confirm the new price to proceed.`;
+      db.query(
+        `INSERT INTO order_tracking (order_item_id, status, notes, updated_by) VALUES (?, 'price_confirmation', ?, ?)`,
+        [itemId, trackingNotes, req.user?.id || null],
+        (trackErr) => { if (trackErr) console.error('Error inserting tracking entry:', trackErr); }
+      );
 
       const getCustomerSql = `
         SELECT 

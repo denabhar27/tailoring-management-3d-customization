@@ -2888,6 +2888,7 @@ const DryCleaning = () => {
 
                               </button>
 
+                              {item.approval_status === 'accepted' && (
                               <button
 
                                 className="icon-btn"
@@ -2925,6 +2926,7 @@ const DryCleaning = () => {
                                 </svg>
 
                               </button>
+                              )}
 
                             </>
 

@@ -893,15 +893,13 @@ tbody td {
 
 .action-buttons {
   display: flex;
-  gap: 2px;
+  gap: 8px;
   align-items: center;
 }
 
 .icon-btn {
-  width: 18px;
-  height: 18px;
-  transform: scale(0.85);
-  transform-origin: center;
+  width: 22px;
+  height: 22px;
 }
 
 .icon-btn svg {
@@ -911,7 +909,73 @@ tbody td {
 }
 
 .icon-btn:hover {
-  transform: scale(0.9) translateY(-2px);
+  transform: scale(1.08);
+}
+
+.dry-cleaning-management .table-scroll-viewport table,
+.dry-cleaning-management table {
+  table-layout: auto;
+}
+
+.dry-cleaning-management thead,
+.dry-cleaning-management thead th {
+  background: #ffffff;
+}
+
+.dry-cleaning-management thead th {
+  color: #8a93a6;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  border-bottom: 1px solid #e7ebf5;
+  padding: 10px 16px;
+}
+
+.dry-cleaning-management tbody td {
+  font-size: 12px;
+  color: #4f5a6d;
+  padding: 10px 16px;
+}
+
+.dry-cleaning-management tbody tr {
+  border-bottom: 1px solid #eef2f8;
+}
+
+.dry-cleaning-management tbody tr.clickable-row:hover {
+  background: #f9fbff;
+  transform: none;
+  box-shadow: none;
+}
+
+.dry-cleaning-management .action-buttons {
+  gap: 8px;
+}
+
+.dry-cleaning-management .icon-btn {
+  width: 22px;
+  height: 22px;
+}
+
+.dry-cleaning-management .icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.dry-cleaning-management .icon-btn,
+.dry-cleaning-management .icon-btn.accept,
+.dry-cleaning-management .icon-btn.next-status,
+.dry-cleaning-management .icon-btn.edit {
+  color: #5c72cb;
+}
+
+.dry-cleaning-management .icon-btn.decline,
+.dry-cleaning-management .icon-btn.delete {
+  color: #e15f5f;
+}
+
+.dry-cleaning-management .icon-btn:hover {
+  transform: scale(1.08);
 }
 
 /* Final enhancement modal overflow fix (placed at end to win cascade). */

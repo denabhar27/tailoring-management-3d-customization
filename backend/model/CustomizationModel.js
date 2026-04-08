@@ -144,6 +144,12 @@ const Customization = {
         updates.push(`pricing_factors = JSON_SET(COALESCE(pricing_factors, '{}'), '$.${key}', ?)`);
         values.push(pricingFactors[key]);
       });
+
+      // When admin accepts an enhancement, reset amount_paid to 0 so revenue
+      // analytics don't double-count payments from the original order.
+      if (pricingFactors.enhancementAdminAccepted === true) {
+        updates.push(`pricing_factors = JSON_SET(COALESCE(pricing_factors, '{}'), '$.amount_paid', '0')`);
+      }
     }
     
     if (updates.length === 0) {

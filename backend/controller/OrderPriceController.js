@@ -1,4 +1,13 @@
 const Order = require('../model/OrderModel');
+const db = require('../config/db');
+
+const insertTracking = (itemId, status, notes, userId) => {
+  db.query(
+    `INSERT INTO order_tracking (order_item_id, status, notes, updated_by) VALUES (?, ?, ?, ?)`,
+    [itemId, status, notes, userId || null],
+    (err) => { if (err) console.error('Error inserting tracking entry:', err); }
+  );
+};
 
 const acceptPrice = async (req, res) => {
   try {
@@ -51,9 +60,15 @@ const acceptPrice = async (req, res) => {
         }
 
         const serviceType = String(item.service_type || '').toLowerCase().trim();
-        const updateFunction = (serviceType === 'dry_cleaning' || serviceType === 'drycleaning' || serviceType === 'dry-cleaning')
-          ? Order.updateDryCleaningOrderItem
-          : Order.updateRepairOrderItem;
+        let updateFunction;
+        if (serviceType === 'dry_cleaning' || serviceType === 'drycleaning' || serviceType === 'dry-cleaning') {
+          updateFunction = Order.updateDryCleaningOrderItem;
+        } else if (serviceType === 'customization' || serviceType === 'customize') {
+          const Customization = require('../model/CustomizationModel');
+          updateFunction = (id, data, cb) => Customization.updateOrderItem(id, data, cb);
+        } else {
+          updateFunction = Order.updateRepairOrderItem;
+        }
 
         updateFunction(itemId, {
           approvalStatus: 'accepted'
@@ -66,6 +81,7 @@ const acceptPrice = async (req, res) => {
             });
           }
 
+          insertTracking(itemId, 'accepted', 'Price confirmed by customer. Order is now accepted.', userId);
           console.log("Successfully updated order status to accepted for service type:", serviceType);
           res.json({
             success: true,
@@ -134,9 +150,15 @@ const declinePrice = async (req, res) => {
         }
 
         const serviceType = String(item.service_type || '').toLowerCase().trim();
-        const updateFunction = (serviceType === 'dry_cleaning' || serviceType === 'drycleaning' || serviceType === 'dry-cleaning')
-          ? Order.updateDryCleaningOrderItem
-          : Order.updateRepairOrderItem;
+        let updateFunction;
+        if (serviceType === 'dry_cleaning' || serviceType === 'drycleaning' || serviceType === 'dry-cleaning') {
+          updateFunction = Order.updateDryCleaningOrderItem;
+        } else if (serviceType === 'customization' || serviceType === 'customize') {
+          const Customization = require('../model/CustomizationModel');
+          updateFunction = (id, data, cb) => Customization.updateOrderItem(id, data, cb);
+        } else {
+          updateFunction = Order.updateRepairOrderItem;
+        }
 
         updateFunction(itemId, {
           approvalStatus: 'price_declined'
@@ -149,6 +171,7 @@ const declinePrice = async (req, res) => {
             });
           }
 
+          insertTracking(itemId, 'price_declined', 'Price declined by customer.', userId);
           console.log("Successfully updated order status to price_declined for service type:", serviceType);
           res.json({
             success: true,

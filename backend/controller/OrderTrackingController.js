@@ -511,15 +511,16 @@ exports.requestEnhancement = (req, res) => {
 
       const normalizedService = serviceType === 'customize' ? 'customization' : serviceType;
       const updateData = {
-        approvalStatus: 'confirmed',
+        approvalStatus: 'pending',
         adminNotes: `Customer requested enhancement: ${enhancementNotes}`,
         estimatedCompletionDate: preferredCompletionDate || null,
         pricingFactors: {
           enhancementRequest: true,
+          enhancementPendingAdminReview: true,
           enhancementRequestedBy: 'customer',
           enhancementNotes,
-          enhancementUpdatedAt: new Date().toISOString(),
-          estimatedCompletionDate: preferredCompletionDate || null
+          enhancementPreferredCompletionDate: preferredCompletionDate || null,
+          enhancementUpdatedAt: new Date().toISOString()
         }
       };
 
@@ -532,7 +533,7 @@ exports.requestEnhancement = (req, res) => {
         }
         return res.json({
           success: true,
-          message: 'Enhancement request submitted. Your order is now in progress.'
+          message: 'Enhancement request submitted. The admin will review and confirm the price.'
         });
       };
 

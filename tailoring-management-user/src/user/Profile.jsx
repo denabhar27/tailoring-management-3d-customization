@@ -652,7 +652,7 @@ const Profile = () => {
       setSubmittingEnhancement(true);
       const result = await requestEnhancement(itemToEnhance.order_item_id, notes, enhancePreferredDate || null);
       if (result.success) {
-        await alert('Enhancement request submitted. Your order is now in progress.', 'Success', 'success');
+        await alert('Enhancement request submitted. The admin will review and confirm the price.', 'Success', 'success');
         const ordersResult = await getUserOrderTracking();
         if (ordersResult.success) {
           setOrders(ordersResult.data || []);
@@ -2306,7 +2306,8 @@ const Profile = () => {
                 const pricingFactors = typeof item.pricing_factors === 'string'
                   ? JSON.parse(item.pricing_factors || '{}')
                   : (item.pricing_factors || {});
-                const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
+                const isEnhancement = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
+                const amountPaid = isEnhancement ? 0 : parseFloat(pricingFactors.amount_paid || 0);
                 // Calculate deposit from selected_sizes (single) or bundle_items (bundle)
                 const isBundle = item.specific_data?.is_bundle || pricingFactors?.is_bundle;
                 let depositFromSizes = 0;
@@ -2376,6 +2377,9 @@ const Profile = () => {
                       : (isCompensationPaid ? 'Compensated' : 'For Compensation'))
                   : getStatusLabel(item.status);
 
+                const isEnhancementOrder = pricingFactors.enhancementRequest === true && pricingFactors.enhancementAdminAccepted === true;
+                const isEnhancementPending = pricingFactors.enhancementRequest === true && pricingFactors.enhancementPendingAdminReview === true;
+
                 const displayStatusClass = hasCompensationIncident
                   ? (isLiabilityRejectedIncident ? 'cancelled' : (isCompensationPaid ? 'completed' : 'pending'))
                   : getStatusBadgeClass(item.status);
@@ -2407,6 +2411,16 @@ const Profile = () => {
                       >
                         {displayStatusLabel}
                       </span>
+                      {isEnhancementPending && (
+                        <span className="status-badge" style={{ backgroundColor: '#ede7f6', color: '#673ab7', border: '1px solid #ce93d8', fontSize: '11px' }}>
+                          ✨ Enhancement Pending Review
+                        </span>
+                      )}
+                      {isEnhancementOrder && (item.status === 'accepted' || item.status === 'price_confirmation' || item.status === 'confirmed' || item.status === 'in_progress') && (
+                        <span className="status-badge" style={{ backgroundColor: '#ede7f6', color: '#673ab7', border: '1px solid #ce93d8', fontSize: '11px' }}>
+                          ✨ Enhancement
+                        </span>
+                      )}
                       {isRental && (
                         <span className="status-badge" style={{ backgroundColor: '#eef7ff', color: '#1f4f82' }}>
                           {rentalPaymentModeLabel}
@@ -3230,7 +3244,8 @@ const Profile = () => {
                         const pricingFactors = typeof selectedItem.pricing_factors === 'string'
                           ? JSON.parse(selectedItem.pricing_factors || '{}')
                           : (selectedItem.pricing_factors || {});
-                        const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
+                        const isEnhancement = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
+                        const amountPaid = isEnhancement ? 0 : parseFloat(pricingFactors.amount_paid || 0);
                         // Calculate deposit from selected_sizes (single) or bundle_items (bundle)
                         const isBundle = selectedItem.specific_data?.is_bundle || pricingFactors?.is_bundle;
                         let depositFromSizes = 0;

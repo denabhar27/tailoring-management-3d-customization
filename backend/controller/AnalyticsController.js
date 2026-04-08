@@ -92,9 +92,13 @@ const getNetCompensationLossExpression = () => `
   END
 `;
 
-// Prefer latest order-item update time for analytics windows so payment/status changes
-// are reflected even when the original order was created earlier.
-const getAnalyticsActivityDateExpression = () => `COALESCE(oi.updated_at, o.order_date)`;
+// Prefer transaction timestamp for analytics windows so payment records
+// are reflected based on when payment was actually made, not when order was created.
+const getAnalyticsActivityDateExpression = () => `COALESCE(
+  (SELECT MAX(tl.created_at) FROM transaction_logs tl WHERE tl.order_item_id = oi.item_id),
+  oi.updated_at,
+  o.order_date
+)`;
 
 exports.getRevenueOverview = async (req, res) => {
   if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'clerk')) {

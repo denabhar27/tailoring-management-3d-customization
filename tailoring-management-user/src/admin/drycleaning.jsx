@@ -81,6 +81,10 @@ const DryCleaning = () => {
   const [enhanceOrder, setEnhanceOrder] = useState(null);
 
   const [savingEnhancement, setSavingEnhancement] = useState(false);
+  const [showEnhancementViewModal, setShowEnhancementViewModal] = useState(false);
+  const [enhancementViewItem, setEnhancementViewItem] = useState(null);
+  const [enhancementPriceItem, setEnhancementPriceItem] = useState(null);
+  const [savingEnhancementPrice, setSavingEnhancementPrice] = useState(false);
 
   const [enhanceForm, setEnhanceForm] = useState({
 
@@ -1790,6 +1794,43 @@ const DryCleaning = () => {
 
   };
 
+  const handleEnhancementPriceConfirm = async (item) => {
+    const target = item || enhancementPriceItem;
+    if (!target) return;
+
+    try {
+      setSavingEnhancementPrice(true);
+
+      const pricingFactors = typeof target.pricing_factors === 'string'
+        ? JSON.parse(target.pricing_factors || '{}')
+        : (target.pricing_factors || {});
+
+      const result = await updateDryCleaningOrderItem(target.item_id, {
+        approvalStatus: 'accepted',
+        finalPrice: parseFloat(target.final_price || 0),
+        pricingFactors: {
+          ...pricingFactors,
+          enhancementAdminAccepted: true,
+          enhancementPendingAdminReview: false,
+          enhancementAdminAcceptedAt: new Date().toISOString()
+        }
+      });
+
+      if (result.success) {
+        setEnhancementPriceItem(null);
+        setShowEnhancementViewModal(false);
+        showToast('Enhancement accepted. Order moved to Accepted.', 'success');
+        loadDryCleaningOrders();
+      } else {
+        showToast(result.message || 'Failed to accept enhancement', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to accept enhancement', 'error');
+    } finally {
+      setSavingEnhancementPrice(false);
+    }
+  };
+
 
 
   const handleSaveEstimatedCompletionDateFromDetails = async () => {
@@ -2647,6 +2688,12 @@ const DryCleaning = () => {
                         </div>
                       )}
 
+                      {pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted && (
+                        <div style={{ fontSize: '11px', color: '#673ab7', marginTop: '4px', fontWeight: '600' }}>
+                          ✨ Enhancement
+                        </div>
+                      )}
+
                     </td>
 
                     <td onClick={(e) => e.stopPropagation()}>
@@ -3103,6 +3150,118 @@ const DryCleaning = () => {
 
         </div>
 
+        {/* Enhancement Requests Table */}
+        {(() => {
+          const enhancementItems = allItems.filter(item => {
+            const pf = typeof item.pricing_factors === 'string'
+              ? JSON.parse(item.pricing_factors || '{}')
+              : (item.pricing_factors || {});
+            return pf.enhancementRequest === true && pf.enhancementPendingAdminReview === true
+              && (item.approval_status === 'pending' || item.approval_status === 'pending_review');
+          });
+
+          return (
+            <div style={{ marginTop: '40px' }}>
+              <div className="dashboard-title" style={{ marginBottom: '12px' }}>
+                <div>
+                  <h2 style={{ color: '#673ab7' }}>Enhancement Requests</h2>
+                  <p>Customer-requested enhancements pending admin review</p>
+                </div>
+              </div>
+              <div className="table-container">
+                <div className="table-scroll-viewport">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Garment</th>
+                        <th>Service</th>
+                        <th>Date</th>
+                        <th>Price</th>
+                        <th>Payment Status</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {enhancementItems.length === 0 ? (
+                        <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No enhancement requests</td></tr>
+                      ) : enhancementItems.map(item => {
+                        const pf = typeof item.pricing_factors === 'string'
+                          ? JSON.parse(item.pricing_factors || '{}')
+                          : (item.pricing_factors || {});
+                        const amountPaid = parseFloat(pf.amount_paid || 0);
+                        const finalPrice = parseFloat(item.final_price || 0);
+                        const remainingBalance = finalPrice - amountPaid;
+
+                        return (
+                          <tr key={item.item_id}>
+                            <td><strong>#{item.order_id}</strong></td>
+                            <td>
+                              {item.order_type === 'walk_in'
+                                ? <span><span style={{ display: 'inline-block', backgroundColor: '#ff9800', color: 'white', padding: '2px 8px', borderRadius: '3px', fontSize: '0.75em', marginRight: '5px', fontWeight: 'bold' }}>WALK-IN</span>{item.walk_in_customer_name || 'Walk-in Customer'}</span>
+                                : `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'N/A'}
+                            </td>
+                            <td>
+                              {item.specific_data?.garments && item.specific_data.garments.length > 0
+                                ? item.specific_data.garments.map(g => g.garmentType || 'Unknown').join(', ')
+                                : (item.specific_data?.garmentType || 'N/A')}
+                            </td>
+                            <td><span style={{ fontSize: '0.9em', color: '#d32f2f' }}>{item.specific_data?.serviceName || 'N/A'}</span></td>
+                            <td>{(() => {
+                              const pickupDate = item.specific_data?.pickupDate || item.pricing_factors?.pickupDate;
+                              if (!pickupDate) return 'N/A';
+                              return new Date(pickupDate).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                            })()}</td>
+                            <td>&#8369;{finalPrice.toLocaleString()}</td>
+                            <td>
+                              <div style={{ fontSize: '12px' }}>
+                                <div>Paid: &#8369;{amountPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div style={{ color: remainingBalance > 0 ? '#ff9800' : '#4caf50', fontWeight: 'bold' }}>
+                                  Remaining: &#8369;{Math.max(0, remainingBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <span className="status-badge" style={{ backgroundColor: '#ede7f6', color: '#673ab7', border: '1px solid #ce93d8' }}>
+                                Enhancement Request
+                              </span>
+                            </td>
+                            <td>
+                              <div className="action-buttons">
+                                <button
+                                  className="icon-btn"
+                                  title="View Enhancement Details"
+                                  style={{ backgroundColor: '#2196F3', color: 'white' }}
+                                  onClick={() => {
+                                    setEnhancementViewItem(item);
+                                    setShowEnhancementViewModal(true);
+                                  }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                </button>
+                                <button
+                                  className="icon-btn accept"
+                                  title="Accept Enhancement"
+                                  disabled={savingEnhancementPrice}
+                                  onClick={() => handleEnhancementPriceConfirm(item)}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
       </div>
 
       {showEditModal && selectedOrder && (
@@ -3486,6 +3645,55 @@ const DryCleaning = () => {
         </div>
 
       )}
+
+      {showEnhancementViewModal && enhancementViewItem && (() => {
+        const pf = typeof enhancementViewItem.pricing_factors === 'string'
+          ? JSON.parse(enhancementViewItem.pricing_factors || '{}')
+          : (enhancementViewItem.pricing_factors || {});
+
+        return (
+          <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowEnhancementViewModal(false)}>
+            <div className="modal-content" style={{ maxWidth: '500px' }}>
+              <div className="modal-header">
+                <h2>Enhancement Request Details</h2>
+                <span className="close-modal" onClick={() => setShowEnhancementViewModal(false)}>×</span>
+              </div>
+              <div className="modal-body">
+                <div className="detail-row"><strong>Order ID:</strong> #{enhancementViewItem.order_id}</div>
+                <div className="detail-row">
+                  <strong>Customer:</strong>
+                  {enhancementViewItem.order_type === 'walk_in'
+                    ? (enhancementViewItem.walk_in_customer_name || 'Walk-in Customer')
+                    : `${enhancementViewItem.first_name || ''} ${enhancementViewItem.last_name || ''}`.trim() || 'N/A'}
+                </div>
+                <div className="detail-row"><strong>Enhancement Notes:</strong></div>
+                <div style={{ padding: '10px', backgroundColor: '#f3e5f5', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ce93d8' }}>
+                  {pf.enhancementNotes || 'No notes provided'}
+                </div>
+                <div className="detail-row">
+                  <strong>Preferred Completion Date:</strong>
+                  {pf.enhancementPreferredCompletionDate
+                    ? new Date(pf.enhancementPreferredCompletionDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                    : 'Not specified'}
+                </div>
+                <div className="detail-row"><strong>Requested At:</strong> {pf.enhancementUpdatedAt ? new Date(pf.enhancementUpdatedAt).toLocaleString() : 'N/A'}</div>
+                <div className="detail-row"><strong>Current Price:</strong> ₱{parseFloat(enhancementViewItem.final_price || 0).toLocaleString()}</div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn-cancel" onClick={() => setShowEnhancementViewModal(false)}>Close</button>
+                <button
+                  className="btn-save"
+                  disabled={savingEnhancementPrice}
+                  onClick={() => handleEnhancementPriceConfirm(enhancementViewItem)}
+                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
+                >
+                  {savingEnhancementPrice ? 'Accepting...' : 'Accept Enhancement'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {showEnhanceModal && enhanceOrder && (
 

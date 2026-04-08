@@ -632,7 +632,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                               </p>
                               {item.specific_data.garments.map((garment, idx) => (
                                 <div key={idx} className="garment-item-cart">
-                                  <p>• {garment.garmentType} ({garment.damageLevel}): ₱{garment.basePrice}</p>
+                                  <p>• {garment.garmentType} {garment.size ? `(${garment.size})` : ''} ({garment.damageLevel}): ₱{garment.basePrice}</p>
                                   {garment.notes && <p className="garment-notes">  Notes: {garment.notes}</p>}
                                 </div>
                               ))}
@@ -641,6 +641,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                             <>
                               <p>Damage Level: {item.specific_data.damageLevel || 'N/A'}</p>
                               <p>Garment: {item.specific_data.garmentType || 'N/A'}</p>
+                              <p>Size: {item.specific_data.size || 'N/A'}</p>
                               <p>Description: {item.specific_data.damageDescription || 'N/A'}</p>
                             </>
                           )}

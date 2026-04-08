@@ -183,6 +183,7 @@ export async function addRepairToCart(repairData) {
         damageLevel: repairData.garments?.[0]?.damageLevel || repairData.damageLevel,
         damageLevelDescription: repairData.garments?.[0]?.damageLevelDescription || repairData.damageLevelDescription,
         garmentType: repairData.garments?.[0]?.garmentType || repairData.garmentType,
+        size: repairData.garments?.[0]?.size || repairData.size,
         damageDescription: repairData.garments?.[0]?.notes || repairData.damageDescription,
         damageLocation: repairData.damageLocation
       }

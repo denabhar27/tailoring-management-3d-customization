@@ -1097,6 +1097,7 @@ const Profile = () => {
                     width: '100%'
                   }}>
                     <div style={{ marginBottom: '6px' }}><strong>Garment #{idx + 1}:</strong> {garment.garmentType || 'N/A'}</div>
+                    <div style={{ marginBottom: '6px' }}><strong>Size:</strong> {garment.size || 'N/A'}</div>
                     <div style={{ marginBottom: '6px' }}><strong>Damage Level:</strong> {garment.damageLevel ? garment.damageLevel.charAt(0).toUpperCase() + garment.damageLevel.slice(1) : 'N/A'}</div>
                     <div style={{ marginBottom: '6px' }}><strong>Damage Level Description:</strong> {garment.damageLevelDescription || 'N/A'}</div>
                     <div style={{ marginBottom: '6px' }}><strong>Description:</strong> {garment.notes || 'N/A'}</div>
@@ -1117,6 +1118,10 @@ const Profile = () => {
                 <div className="detail-row">
                   <span className="detail-label">Garment Type:</span>
                   <span className="detail-value">{specific_data.damageLocation || specific_data.garmentType || 'N/A'}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Size:</span>
+                  <span className="detail-value">{specific_data.size || 'N/A'}</span>
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">Description:</span>

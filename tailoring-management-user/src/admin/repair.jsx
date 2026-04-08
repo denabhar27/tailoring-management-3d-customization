@@ -2105,6 +2105,11 @@ const Repair = () => {
 
   };
 
+  const formatGarmentWithSize = (garment) => {
+    const garmentType = garment?.garmentType || 'Unknown';
+    return garment?.size ? `${garmentType} (${garment.size})` : garmentType;
+  };
+
 
 
   const handleSaveEdit = async () => {
@@ -2770,9 +2775,9 @@ const Repair = () => {
 
                         {item.specific_data?.garments && item.specific_data.garments.length > 0
 
-                          ? item.specific_data.garments.map(g => g.garmentType || 'Unknown').join(', ')
+                          ? item.specific_data.garments.map((g) => formatGarmentWithSize(g)).join(', ')
 
-                          : (item.specific_data?.garmentType || 'N/A')}
+                          : (item.specific_data?.size ? `${item.specific_data?.garmentType || 'N/A'} (${item.specific_data.size})` : (item.specific_data?.garmentType || 'N/A'))}
 
                       </td>
 
@@ -3368,8 +3373,8 @@ const Repair = () => {
                             </td>
                             <td>
                               {item.specific_data?.garments && item.specific_data.garments.length > 0
-                                ? item.specific_data.garments.map(g => g.garmentType || 'Unknown').join(', ')
-                                : (item.specific_data?.garmentType || 'N/A')}
+                                ? item.specific_data.garments.map((g) => formatGarmentWithSize(g)).join(', ')
+                                : (item.specific_data?.size ? `${item.specific_data?.garmentType || 'N/A'} (${item.specific_data.size})` : (item.specific_data?.garmentType || 'N/A'))}
                             </td>
                             <td><span style={{ fontSize: '0.9em', color: '#d32f2f' }}>{getDamageLevelSummary(item)}</span></td>
                             <td>{(() => {
@@ -3465,6 +3470,7 @@ const Repair = () => {
                   className="btn-save"
                   disabled={savingEnhancementPrice}
                   onClick={() => handleEnhancementPriceConfirm(enhancementViewItem)}
+                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
                 >
                   {savingEnhancementPrice ? 'Accepting...' : 'Accept Enhancement'}
                 </button>
@@ -3494,6 +3500,8 @@ const Repair = () => {
               <div className="detail-row"><strong>Order ID:</strong> #{selectedOrder.order_id}</div>
 
               <div className="detail-row"><strong>Garment:</strong> {selectedOrder.specific_data?.garmentType || 'N/A'}</div>
+
+              <div className="detail-row"><strong>Size:</strong> {selectedOrder.specific_data?.size || 'N/A'}</div>
 
               <div className="detail-row"><strong>Service:</strong> {selectedOrder.specific_data?.serviceName || 'N/A'}</div>
 
@@ -4006,6 +4014,8 @@ const Repair = () => {
 
                       <div className="detail-row"><strong>Garment #{idx + 1}:</strong> {garment.garmentType || 'N/A'}</div>
 
+                      <div className="detail-row"><strong>Size:</strong> {garment.size || 'N/A'}</div>
+
                       <div className="detail-row"><strong>Damage Level:</strong> {garment.damageLevel ? garment.damageLevel.charAt(0).toUpperCase() + garment.damageLevel.slice(1) : 'N/A'}</div>
 
                       <div className="detail-row"><strong>Description:</strong> {garment.notes || 'N/A'}</div>
@@ -4023,6 +4033,8 @@ const Repair = () => {
                 <>
 
                   <div className="detail-row"><strong>Garment:</strong> {selectedOrder.specific_data?.garmentType || 'N/A'}</div>
+
+                  <div className="detail-row"><strong>Size:</strong> {selectedOrder.specific_data?.size || 'N/A'}</div>
 
                   <div className="detail-row"><strong>Service:</strong> {selectedOrder.specific_data?.serviceName || 'N/A'}</div>
 
@@ -4675,6 +4687,7 @@ const Repair = () => {
                   {priceConfirmationItem.specific_data.garments.map((garment, idx) => (
                     <div key={idx} style={{ marginLeft: '20px', paddingLeft: '10px', borderLeft: '2px solid #e0e0e0', marginBottom: '10px' }}>
                       <div className="detail-row"><strong>Garment #{idx + 1}:</strong> {garment.garmentType || 'N/A'}</div>
+                      <div className="detail-row"><strong>Size:</strong> {garment.size || 'N/A'}</div>
                       <div className="detail-row"><strong>Damage Level:</strong> {garment.damageLevel ? garment.damageLevel.charAt(0).toUpperCase() + garment.damageLevel.slice(1) : 'N/A'}</div>
                       <div className="detail-row"><strong>Description:</strong> {garment.notes || 'N/A'}</div>
                       <div className="detail-row"><strong>Price:</strong> ₱{garment.basePrice || 'N/A'}</div>
@@ -4684,6 +4697,7 @@ const Repair = () => {
               ) : (
                 <>
                   <div className="detail-row"><strong>Garment Type:</strong> {priceConfirmationItem.specific_data?.garmentType || 'N/A'}</div>
+                  <div className="detail-row"><strong>Size:</strong> {priceConfirmationItem.specific_data?.size || 'N/A'}</div>
                   <div className="detail-row"><strong>Damage Level:</strong> {priceConfirmationItem.specific_data?.damageLevel || 'N/A'}</div>
                 </>
               )}
@@ -5009,7 +5023,7 @@ const Repair = () => {
                 <div className="incident-detail-item"><span className="incident-detail-label">Order Item ID</span><span className="incident-detail-value">#{damageTargetItem.item_id || 'N/A'}</span></div>
                 <div className="incident-detail-item"><span className="incident-detail-label">Customer Name</span><span className="incident-detail-value">{getCustomerNameFromItem(damageTargetItem)}</span></div>
                 <div className="incident-detail-item"><span className="incident-detail-label">Order Type</span><span className="incident-detail-value">{damageTargetItem.order_type === 'walk_in' ? 'Walk-in' : 'Online'}</span></div>
-                <div className="incident-detail-item"><span className="incident-detail-label">Garment</span><span className="incident-detail-value">{Array.isArray(damageTargetItem.specific_data?.garments) && damageTargetItem.specific_data.garments.length > 0 ? damageTargetItem.specific_data.garments.map((g) => g?.garmentType || 'Unknown').join(', ') : (damageTargetItem.specific_data?.garmentType || 'N/A')}</span></div>
+                <div className="incident-detail-item"><span className="incident-detail-label">Garment</span><span className="incident-detail-value">{Array.isArray(damageTargetItem.specific_data?.garments) && damageTargetItem.specific_data.garments.length > 0 ? damageTargetItem.specific_data.garments.map((g) => formatGarmentWithSize(g)).join(', ') : (damageTargetItem.specific_data?.size ? `${damageTargetItem.specific_data?.garmentType || 'N/A'} (${damageTargetItem.specific_data.size})` : (damageTargetItem.specific_data?.garmentType || 'N/A'))}</span></div>
                 <div className="incident-detail-item"><span className="incident-detail-label">Service</span><span className="incident-detail-value">{damageTargetItem.specific_data?.serviceName || 'N/A'}</span></div>
                 <div className="incident-detail-item"><span className="incident-detail-label">Status</span><span className="incident-detail-value">{(damageTargetItem.approval_status || 'N/A').toString().replace(/_/g, ' ')}</span></div>
               </div>
@@ -5060,10 +5074,11 @@ const Repair = () => {
 
                       return garments.map((garment, idx) => {
                         const garmentType = garment?.garmentType || garment?.garment_type || `Garment ${idx + 1}`;
+                        const garmentDisplay = garment?.size ? `${garmentType} (${garment.size})` : garmentType;
                         const garmentQtyRaw = parseInt(garment?.quantity || 1, 10);
                         const garmentQty = Number.isInteger(garmentQtyRaw) && garmentQtyRaw > 0 ? garmentQtyRaw : 1;
-                        const isChecked = damageForm.affectedGarments.some((ag) => ag.garmentType === garmentType);
-                        const affectedGarment = damageForm.affectedGarments.find((ag) => ag.garmentType === garmentType);
+                        const isChecked = damageForm.affectedGarments.some((ag) => ag.garmentType === garmentDisplay);
+                        const affectedGarment = damageForm.affectedGarments.find((ag) => ag.garmentType === garmentDisplay);
                         const damagedQty = affectedGarment?.damagedQty || 1;
 
                         return (
@@ -5080,7 +5095,7 @@ const Repair = () => {
                                 checked={isChecked}
                                 onChange={(e) => {
                                   if (e.target.checked) {
-                                    const nextAffectedGarments = [...damageForm.affectedGarments, { garmentType, damagedQty: 1 }];
+                                    const nextAffectedGarments = [...damageForm.affectedGarments, { garmentType: garmentDisplay, damagedQty: 1 }];
                                     const nextDamagedQty = nextAffectedGarments.reduce((sum, ag) => sum + (parseInt(ag.damagedQty || 0, 10) || 0), 0);
                                     setDamageForm({
                                       ...damageForm,
@@ -5088,7 +5103,7 @@ const Repair = () => {
                                       damagedQuantity: String(Math.max(1, nextDamagedQty))
                                     });
                                   } else {
-                                    const nextAffectedGarments = damageForm.affectedGarments.filter((ag) => ag.garmentType !== garmentType);
+                                    const nextAffectedGarments = damageForm.affectedGarments.filter((ag) => ag.garmentType !== garmentDisplay);
                                     const nextDamagedQty = nextAffectedGarments.reduce((sum, ag) => sum + (parseInt(ag.damagedQty || 0, 10) || 0), 0);
                                     setDamageForm({
                                       ...damageForm,
@@ -5099,7 +5114,7 @@ const Repair = () => {
                                 }}
                               />
                               <label className="affected-garment-name" htmlFor={`repair-garment-${idx}`}>
-                                {garmentType} (qty: {garmentQty})
+                                {garmentDisplay} (qty: {garmentQty})
                               </label>
                             </div>
                             {isChecked && (
@@ -5116,7 +5131,7 @@ const Repair = () => {
                                     const newQty = parseInt(e.target.value || '1', 10);
                                     if (newQty >= 1 && newQty <= garmentQty) {
                                       const nextAffectedGarments = damageForm.affectedGarments.map((ag) =>
-                                        ag.garmentType === garmentType ? { ...ag, damagedQty: newQty } : ag
+                                        ag.garmentType === garmentDisplay ? { ...ag, damagedQty: newQty } : ag
                                       );
                                       const nextDamagedQty = nextAffectedGarments.reduce((sum, ag) => sum + (parseInt(ag.damagedQty || 0, 10) || 0), 0);
                                       setDamageForm({

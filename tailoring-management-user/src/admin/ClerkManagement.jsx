@@ -13,6 +13,7 @@ function ClerkManagement() {
   const navigate = useNavigate();
   const { alert, confirm } = useAlert();
   const [clerks, setClerks] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [clerkLoading, setClerkLoading] = useState(false);
   const [showClerkModal, setShowClerkModal] = useState(false);
   const [creatingClerk, setCreatingClerk] = useState(false);
@@ -52,6 +53,23 @@ function ClerkManagement() {
     return false;
   };
 
+  const filteredClerks = clerks.filter((clerk) => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return true;
+
+    const fullName = [clerk.first_name, clerk.middle_name, clerk.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    return (
+      fullName.includes(query) ||
+      String(clerk.email || '').toLowerCase().includes(query) ||
+      String(clerk.phone_number || '').toLowerCase().includes(query) ||
+      String(clerk.user_id || clerk.id || '').toLowerCase().includes(query)
+    );
+  });
+
   return (
     <div className="admin-page clerk-management-page">
       <Sidebar />
@@ -66,9 +84,28 @@ function ClerkManagement() {
           <button className="btn-primary-shared clerk-create-btn" onClick={() => setShowClerkModal(true)}>Create New Clerk</button>
         </div>
 
+        <div className="clerk-search-bar" style={{ marginBottom: '16px' }}>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search clerks by name, email, phone, or ID"
+            style={{
+              width: '100%',
+              maxWidth: '420px',
+              padding: '10px 14px',
+              border: '1px solid #d9d2c7',
+              borderRadius: '10px',
+              fontSize: '14px',
+              outline: 'none',
+              boxSizing: 'border-box'
+            }}
+          />
+        </div>
+
         <div className="clerk-management">
           <ClerkTable
-            clerks={clerks}
+            clerks={filteredClerks}
             onToggleStatus={async (clerk) => {
               const isActive = isClerkActive(clerk.status);
               const confirmMessage = isActive

@@ -4173,6 +4173,7 @@ const Customize = () => {
                   className="btn-save"
                   disabled={savingEnhancementPrice}
                   onClick={() => handleEnhancementPriceConfirm(enhancementViewItem)}
+                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
                 >
                   {savingEnhancementPrice ? 'Accepting...' : 'Accept Enhancement'}
                 </button>

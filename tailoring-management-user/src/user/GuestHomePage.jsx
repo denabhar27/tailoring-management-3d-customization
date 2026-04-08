@@ -86,6 +86,19 @@ const App = ({ setIsLoggedIn }) => {
     return { isValid: true };
   };
 
+  const validatePhoneNumber = (phoneNumber) => {
+    const digitsOnly = String(phoneNumber || '').replace(/\D/g, '');
+
+    if (digitsOnly.length !== 11) {
+      return {
+        isValid: false,
+        message: 'Phone number must be exactly 11 digits.'
+      };
+    }
+
+    return { isValid: true };
+  };
+
   const handleLogin = async () => {
     setAuthError('');
 
@@ -132,6 +145,13 @@ const App = ({ setIsLoggedIn }) => {
 
         if (signupPassword !== signupConfirmPassword) {
           setAuthError('Passwords do not match');
+          setIsLoading(false);
+          return;
+        }
+
+        const phoneValidation = validatePhoneNumber(signupPhone);
+        if (!phoneValidation.isValid) {
+          setAuthError(phoneValidation.message);
           setIsLoading(false);
           return;
         }
@@ -667,9 +687,25 @@ const App = ({ setIsLoggedIn }) => {
                   placeholder="Phone Number"
                   required
                   autoComplete="tel"
+                  inputMode="numeric"
+                  maxLength={11}
+                  pattern="[0-9]{11}"
                   value={signupPhone}
-                  onChange={(e) => setSignupPhone(e.target.value)}
+                  onChange={(e) => setSignupPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
                 />
+                {signupPhone && signupPhone.replace(/\D/g, '').length !== 11 && (
+                  <div style={{
+                    fontSize: '11px',
+                    marginTop: '5px',
+                    color: '#dc3545',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <span style={{ fontSize: '14px' }}>✗</span>
+                    Phone number must be exactly 11 digits.
+                  </div>
+                )}
               </div>
               <div className="input-group">
                 <label htmlFor="signup-birthdate" className="input-label">Birthdate</label>

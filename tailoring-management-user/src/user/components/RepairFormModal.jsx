@@ -8,9 +8,16 @@ import '../../styles/SharedModal.css';
 const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const defaultDamageLevels = [];
+  const sizeOptions = [
+    { value: 'S', label: 'S (Small)' },
+    { value: 'M', label: 'M (Medium)' },
+    { value: 'L', label: 'L (Large)' },
+    { value: 'XL', label: 'XL (Extra-large)' },
+    { value: 'XXL', label: 'XXL' }
+  ];
 
   const [garments, setGarments] = useState([
-    { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', notes: '' }
+    { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', size: '', notes: '' }
   ]);
 
   const [formData, setFormData] = useState({
@@ -155,7 +162,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         time: ''
       });
       setGarments([
-        { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', notes: '' }
+        { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', size: '', notes: '' }
       ]);
       setAllTimeSlots([]);
       setAvailableTimeSlots([]);
@@ -198,7 +205,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const addGarment = () => {
     const newId = Math.max(...garments.map(g => g.id)) + 1;
-    setGarments([...garments, { id: newId, garmentType: '', damageLevel: '', damageLevelId: '', notes: '' }]);
+    setGarments([...garments, { id: newId, garmentType: '', damageLevel: '', damageLevelId: '', size: '', notes: '' }]);
   };
 
   const removeGarment = (id) => {
@@ -383,6 +390,9 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       if (!garment.garmentType) {
         newErrors[`garment_${garment.id}_garmentType`] = 'Please select a garment type';
       }
+      if (!garment.size) {
+        newErrors[`garment_${garment.id}_size`] = 'Please select a size';
+      }
       if (!garment.notes || garment.notes.trim() === '') {
         newErrors[`garment_${garment.id}_notes`] = 'Please provide a detailed description';
       }
@@ -458,6 +468,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           damageLevelId: garment.damageLevelId || null,
           damageLevelDescription: damageLevel?.level_description || '',
           garmentType: garment.garmentType,
+          size: garment.size,
           notes: garment.notes,
           basePrice: basePrice
         };
@@ -525,7 +536,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       time: ''
     });
     setGarments([
-      { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', notes: '' }
+      { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', size: '', notes: '' }
     ]);
     setImageFiles([]);
     setImagePreviews([]);
@@ -616,6 +627,27 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 )}
                 {errors[`garment_${garment.id}_damageLevel`] && (
                   <span className="error-message-shared">{errors[`garment_${garment.id}_damageLevel`]}</span>
+                )}
+              </div>
+
+              <div className="form-group-shared">
+                <label className="form-label-shared">
+                  <i className="fas fa-ruler"></i> Size <span className="required-indicator">*</span>
+                </label>
+                <select
+                  value={garment.size || ''}
+                  onChange={(e) => updateGarment(garment.id, 'size', e.target.value)}
+                  className={`form-select-shared ${errors[`garment_${garment.id}_size`] ? 'error' : ''}`}
+                >
+                  <option value="">Select size</option>
+                  {sizeOptions.map((size) => (
+                    <option key={size.value} value={size.value}>
+                      {size.label}
+                    </option>
+                  ))}
+                </select>
+                {errors[`garment_${garment.id}_size`] && (
+                  <span className="error-message-shared">{errors[`garment_${garment.id}_size`]}</span>
                 )}
               </div>
 

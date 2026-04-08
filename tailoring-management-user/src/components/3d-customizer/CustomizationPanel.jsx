@@ -391,35 +391,6 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                 </label>
               </div>
               <h3 onClick={() => toggleSection('sizeDetails')} className={styles.collapsibleHeader}>
-        <span>{getSizeLabel(size)} Size Details</span>
-        <span className={styles.toggleIcon}>{expandedSections.sizeDetails ? '−' : '+'}</span>
-      </h3>
-              {expandedSections.sizeDetails && (
-                <div className={styles.sectionContent} style={{ marginTop: '0', paddingTop: '0' }}>
-                  <div className={styles.measurementDetails}>
-                    {getGarmentMeasurements().map((measurement) => (
-                      <div key={measurement.field} className={styles.measurementDetail}>
-                        <span className={styles.measurementName}>{measurement.label}:</span>
-                        <span className={styles.measurementValue}>
-                          {getSizeMeasurement(measurement.field)} {measurement.unit}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="row">
-                <label className={styles.sizeLabel}>Size
-                  <div className={styles.sizeFieldRow}>
-                    <select value={size} onChange={e => setSize(e.target.value)}>
-                      {getAvailableSizes().map(s => (
-                        <option key={s} value={s}>{getSizeLabel(s)}</option>
-                      ))}
-                    </select>
-                  </div>
-                </label>
-              </div>
-              <h3 onClick={() => toggleSection('sizeDetails')} className={styles.collapsibleHeader}>
                 <span>{getSizeLabel(size)} Size Details</span>
                 <span className={styles.toggleIcon}>{expandedSections.sizeDetails ? '−' : '+'}</span>
               </h3>

@@ -157,6 +157,8 @@ exports.createCompensationIncident = (req, res) => {
     damage_type,
     damage_description,
     compensation_amount,
+    compensation_type,
+    clothe_description,
     notes
   } = req.body;
 
@@ -184,6 +186,8 @@ exports.createCompensationIncident = (req, res) => {
     damage_type,
     damage_description: damage_description || null,
     compensation_amount: amount,
+    compensation_type: compensation_type || 'money',
+    clothe_description: clothe_description || null,
     notes: notes || null,
     liability_status: 'pending',
     compensation_status: 'unpaid'
@@ -228,7 +232,7 @@ exports.createCompensationIncident = (req, res) => {
 
 exports.updateLiabilityDecision = (req, res) => {
   const { id } = req.params;
-  const { liability_status, compensation_amount, responsible_party, notes } = req.body;
+  const { liability_status, compensation_amount, responsible_party, compensation_type, clothe_description, notes } = req.body;
 
   if (!['pending', 'approved', 'rejected'].includes(liability_status)) {
     return res.status(400).json({
@@ -242,6 +246,8 @@ exports.updateLiabilityDecision = (req, res) => {
   const updatePayload = {
     liability_status,
     responsible_party,
+    compensation_type,
+    clothe_description,
     notes
   };
 
@@ -297,8 +303,7 @@ exports.updateLiabilityDecision = (req, res) => {
 
 exports.recordCompensationSettlement = (req, res) => {
   const { id } = req.params;
-  const { payment_reference, notes } = req.body;
-
+  const { payment_reference, notes, refund_amount } = req.body;
   DamageRecord.getCompensationById(id, (findErr, record) => {
     if (findErr) {
       return res.status(500).json({
@@ -326,7 +331,8 @@ exports.recordCompensationSettlement = (req, res) => {
       compensation_status: 'paid',
       compensation_paid_at: new Date(),
       payment_reference: payment_reference || null,
-      notes: notes !== undefined ? notes : record.notes
+      notes: notes !== undefined ? notes : record.notes,
+      refund_amount: (refund_amount !== undefined && refund_amount !== "") ? (parseFloat(refund_amount) || null) : null,
     }, (updateErr) => {
       if (updateErr) {
         return res.status(500).json({
@@ -421,7 +427,7 @@ exports.getCompensationIncidents = (req, res) => {
 
 exports.customerLiabilityDecision = (req, res) => {
   const { id } = req.params;
-  const { liability_status, notes } = req.body;
+  const { liability_status, customer_compensation_choice, customer_proceed_choice, notes } = req.body;
 
   if (!req.user?.id) {
     return res.status(401).json({
@@ -468,6 +474,14 @@ exports.customerLiabilityDecision = (req, res) => {
       liability_status,
       notes: mergedNotes
     };
+
+    if (customer_compensation_choice && ['money', 'clothe'].includes(customer_compensation_choice)) {
+      updatePayload.customer_compensation_choice = customer_compensation_choice;
+    }
+
+    if (customer_proceed_choice && ['proceed', 'dont_proceed'].includes(customer_proceed_choice)) {
+      updatePayload.customer_proceed_choice = customer_proceed_choice;
+    }
 
     if (liability_status === 'rejected') {
       updatePayload.compensation_status = 'unpaid';

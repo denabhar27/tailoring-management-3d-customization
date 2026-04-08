@@ -47,6 +47,8 @@ const Profile = () => {
   const [compensationModalOpen, setCompensationModalOpen] = useState(false);
   const [selectedCompensationIncident, setSelectedCompensationIncident] = useState(null);
   const [selectedCompensationOrderItemId, setSelectedCompensationOrderItemId] = useState(null);
+  const [customerCompensationChoice, setCustomerCompensationChoice] = useState({});
+  const [customerProceedChoice, setCustomerProceedChoice] = useState({});
 
   const [transactionLogModalOpen, setTransactionLogModalOpen] = useState(false);
   const [selectedOrderItemId, setSelectedOrderItemId] = useState(null);
@@ -471,9 +473,16 @@ const Profile = () => {
     if (!targetIncident?.id || !targetOrderItemId) return;
 
     const isApprove = decision === 'approved';
+    const compType = targetIncident.compensation_type || 'money';
+    const hasClothOption = compType === 'clothe' || (compType === 'money' && parseFloat(targetIncident.compensation_amount || 0) > 0);
+
+    // If approving, ask for compensation choice and proceed choice
+    let chosenCompensation = customerCompensationChoice[targetOrderItemId] || 'money';
+    let chosenProceed = customerProceedChoice[targetOrderItemId] || 'proceed';
+
     const proceed = await confirm(
       isApprove
-        ? 'Do you agree with the reported liability and compensation amount?'
+        ? 'Do you agree with the reported liability and compensation?'
         : 'Do you want to reject this liability decision?',
       isApprove ? 'Approve Liability' : 'Reject Liability',
       isApprove ? 'question' : 'warning',
@@ -488,7 +497,9 @@ const Profile = () => {
     try {
       setSubmittingLiabilityDecision(true);
       const result = await submitCustomerLiabilityDecision(targetIncident.id, {
-        liability_status: decision
+        liability_status: decision,
+        customer_compensation_choice: isApprove ? chosenCompensation : undefined,
+        customer_proceed_choice: isApprove ? chosenProceed : undefined
       });
 
       if (!result.success) {
@@ -498,7 +509,7 @@ const Profile = () => {
 
       await alert(
         decision === 'approved'
-          ? 'Compensation accepted. Please claim your compensation in-store once notified by staff.'
+          ? `Decision submitted. You chose ${chosenCompensation === 'clothe' ? 'clothe replacement' : 'money compensation'}. ${chosenProceed === 'proceed' ? 'Your order will proceed.' : 'Your order will not proceed.'} Please visit the store once notified.`
           : 'Compensation declined. Admin will provide a revised amount for your review.',
         'Decision Submitted',
         'success'
@@ -618,6 +629,8 @@ const Profile = () => {
   const openCompensationModal = (incident, orderItemId) => {
     setSelectedCompensationIncident(incident || null);
     setSelectedCompensationOrderItemId(orderItemId || null);
+    setCustomerCompensationChoice(prev => ({ ...prev, [orderItemId]: incident?.compensation_type === 'clothe' ? 'clothe' : 'money' }));
+    setCustomerProceedChoice(prev => ({ ...prev, [orderItemId]: 'proceed' }));
     setCompensationModalOpen(true);
   };
 
@@ -2368,20 +2381,26 @@ const Profile = () => {
                 const hasApprovedDamageCompensation = hasCompensationIncident && liabilityStatus === 'approved';
                 const isCompensationPaid = hasApprovedDamageCompensation && compensationStatus === 'paid';
                 const isCompensationPendingPayment = hasApprovedDamageCompensation && compensationIncidentForItem?.compensation_status !== 'paid';
+                const customerProceedChoiceFromDB = String(compensationIncidentForItem?.customer_proceed_choice || '').toLowerCase();
+                const customerWantsToProceed = isCompensationPaid && customerProceedChoiceFromDB === 'proceed';
 
                 const displayStatusLabel = hasCompensationIncident
                   ? (isLiabilityPendingIncident
                     ? 'Compensation Review'
                     : isLiabilityRejectedIncident
                       ? 'Compensation Rejected'
-                      : (isCompensationPaid ? 'Compensated' : 'For Compensation'))
+                      : isCompensationPaid && customerWantsToProceed
+                        ? getStatusLabel(item.status)
+                        : isCompensationPaid
+                          ? 'Compensated'
+                          : 'For Compensation')
                   : getStatusLabel(item.status);
 
                 const isEnhancementOrder = pricingFactors.enhancementRequest === true && pricingFactors.enhancementAdminAccepted === true;
                 const isEnhancementPending = pricingFactors.enhancementRequest === true && pricingFactors.enhancementPendingAdminReview === true;
 
                 const displayStatusClass = hasCompensationIncident
-                  ? (isLiabilityRejectedIncident ? 'cancelled' : (isCompensationPaid ? 'completed' : 'pending'))
+                  ? (isLiabilityRejectedIncident ? 'cancelled' : (isCompensationPaid && !customerWantsToProceed ? 'completed' : isCompensationPaid ? getStatusBadgeClass(item.status) : 'pending'))
                   : getStatusBadgeClass(item.status);
 
                 return (
@@ -2404,13 +2423,18 @@ const Profile = () => {
                       <span
                         className={`status-badge ${displayStatusClass}`}
                         style={hasCompensationIncident ? {
-                          backgroundColor: isCompensationPaid ? '#e8f5e9' : isLiabilityRejectedIncident ? '#fbe9e7' : '#ffebee',
-                          color: isCompensationPaid ? '#1b5e20' : isLiabilityRejectedIncident ? '#bf360c' : '#c62828',
-                          border: `1px solid ${isCompensationPaid ? '#a5d6a7' : isLiabilityRejectedIncident ? '#ffccbc' : '#ef9a9a'}`
+                          backgroundColor: isCompensationPaid && !customerWantsToProceed ? '#e8f5e9' : isLiabilityRejectedIncident ? '#fbe9e7' : '#ffebee',
+                          color: isCompensationPaid && !customerWantsToProceed ? '#1b5e20' : isLiabilityRejectedIncident ? '#bf360c' : '#c62828',
+                          border: `1px solid ${isCompensationPaid && !customerWantsToProceed ? '#a5d6a7' : isLiabilityRejectedIncident ? '#ffccbc' : '#ef9a9a'}`
                         } : undefined}
                       >
                         {displayStatusLabel}
                       </span>
+                      {customerWantsToProceed && (
+                        <span className="status-badge" style={{ backgroundColor: '#e8f5e9', color: '#1b5e20', border: '1px solid #a5d6a7', fontSize: '11px' }}>
+                          📝 Note: Compensated
+                        </span>
+                      )}
                       {isEnhancementPending && (
                         <span className="status-badge" style={{ backgroundColor: '#ede7f6', color: '#673ab7', border: '1px solid #ce93d8', fontSize: '11px' }}>
                           ✨ Enhancement Pending Review
@@ -3037,13 +3061,19 @@ const Profile = () => {
                         gap: '8px'
                       }}>
                         <div>
-                          Compensation Amount: <strong>{formatCurrencyPHP(compensationIncidentForItem?.compensation_amount || 0)}</strong>
+                          {compensationIncidentForItem?.compensation_type === 'clothe' ? (
+                            <>👕 Clothe Compensation: {compensationIncidentForItem?.clothe_description || 'Replacement garment'}</>
+                          ) : compensationIncidentForItem?.compensation_type === 'both' && compensationIncidentForItem?.customer_compensation_choice === 'clothe' ? (
+                            <>👕 Clothe Compensation: {compensationIncidentForItem?.clothe_description || 'Replacement garment'}</>
+                          ) : (
+                            <>Compensation Amount: <strong>{formatCurrencyPHP(compensationIncidentForItem?.compensation_amount || 0)}</strong></>
+                          )}
                         </div>
                         <div>
                           Liability: {compensationIncidentForItem?.liability_status || 'N/A'} / Compensation: {compensationIncidentForItem?.compensation_status || 'N/A'}
                         </div>
                         {isLiabilityPendingIncident && (
-                          <div>Please review and confirm this compensation amount.</div>
+                          <div>Please review and confirm this compensation.</div>
                         )}
                         {isCompensationPendingPayment && (
                           <div>Compensation accepted. Please get your compensation payment at the shop.</div>
@@ -3051,30 +3081,102 @@ const Profile = () => {
                         {isLiabilityRejectedIncident && (
                           <div>You declined this compensation. Waiting for admin to provide a revised amount.</div>
                         )}
-                        {isCompensationPaid && (
+                        {isCompensationPaid && customerWantsToProceed && (
+                          <div>✅ Compensation settled. Your order is continuing as normal.</div>
+                        )}
+                        {isCompensationPaid && !customerWantsToProceed && (
                           <div>Compensation payment is ready and marked as paid by staff.</div>
                         )}
-                        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
-                            {isLiabilityPendingIncident && (
+                        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'flex-start', gap: '10px', flexDirection: 'column' }}>
+                          {isLiabilityPendingIncident && (() => {
+                            const compType = compensationIncidentForItem?.compensation_type || 'money';
+                            const hasBothOptions = compType === 'both';
+                            const isMoneyOnly = (compType === 'money' || compType === 'both') && !compensationIncidentForItem?.clothe_description;
+                            const isClotheOnly = compType === 'clothe' && !parseFloat(compensationIncidentForItem?.compensation_amount || 0);
+                            const showMoney = compType === 'money' || compType === 'both';
+                            const showClothe = compType === 'clothe' || compType === 'both';
+                            return (
                               <>
-                                <button
-                                  onClick={() => handleCustomerLiabilityDecision('rejected', compensationIncidentForItem, item.order_item_id)}
-                                  disabled={submittingLiabilityDecision}
-                                  style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#c62828', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
-                                >
-                                  {submittingLiabilityDecision ? 'Submitting...' : 'Decline Compensation'}
-                                </button>
-                                <button
-                                  onClick={() => handleCustomerLiabilityDecision('approved', compensationIncidentForItem, item.order_item_id)}
-                                  disabled={submittingLiabilityDecision}
-                                  style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
-                                >
-                                  {submittingLiabilityDecision ? 'Submitting...' : 'Accept Compensation'}
-                                </button>
+                                {/* Compensation choice */}
+                                <div style={{ width: '100%' }}>
+                                  <div style={{ fontWeight: '600', marginBottom: '6px', fontSize: '13px' }}>Choose compensation:</div>
+                                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                    {showMoney && (
+                                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'normal', color: '#333' }}>
+                                        <input
+                                          type="radio"
+                                          name={`comp-choice-${item.order_item_id}`}
+                                          value="money"
+                                          checked={(customerCompensationChoice[item.order_item_id] || 'money') === 'money'}
+                                          onChange={(e) => { e.stopPropagation(); setCustomerCompensationChoice(prev => ({ ...prev, [item.order_item_id]: 'money' })); }}
+                                        />
+                                        💵 Money — {formatCurrencyPHP(compensationIncidentForItem?.compensation_amount || 0)}
+                                      </label>
+                                    )}
+                                    {showClothe && (
+                                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'normal', color: '#333' }}>
+                                        <input
+                                          type="radio"
+                                          name={`comp-choice-${item.order_item_id}`}
+                                          value="clothe"
+                                          checked={(customerCompensationChoice[item.order_item_id] || 'money') === 'clothe'}
+                                          onChange={(e) => { e.stopPropagation(); setCustomerCompensationChoice(prev => ({ ...prev, [item.order_item_id]: 'clothe' })); }}
+                                        />
+                                        👕 Clothe — {compensationIncidentForItem?.clothe_description || 'Replacement garment'}
+                                      </label>
+                                    )}
+                                  </div>
+                                </div>
+                                {/* Proceed choice */}
+                                <div style={{ width: '100%' }}>
+                                  <div style={{ fontWeight: '600', marginBottom: '6px', fontSize: '13px' }}>Do you want the order to proceed?</div>
+                                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'normal', color: '#333' }}>
+                                      <input
+                                        type="radio"
+                                        name={`proceed-choice-${item.order_item_id}`}
+                                        value="proceed"
+                                        checked={customerProceedChoice[String(item.order_item_id)] !== 'dont_proceed'}
+                                        onChange={(e) => { e.stopPropagation(); setCustomerProceedChoice(prev => ({ ...prev, [String(item.order_item_id)]: 'proceed' })); }}
+                                      />
+                                      ✅ Yes, proceed
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'normal', color: '#333' }}>
+                                      <input
+                                        type="radio"
+                                        name={`proceed-choice-${item.order_item_id}`}
+                                        value="dont_proceed"
+                                        checked={customerProceedChoice[String(item.order_item_id)] === 'dont_proceed'}
+                                        onChange={(e) => { e.stopPropagation(); setCustomerProceedChoice(prev => ({ ...prev, [String(item.order_item_id)]: 'dont_proceed' })); }}
+                                      />
+                                      ❌ No, don't proceed
+                                    </label>
+                                  </div>
+                                </div>
+                                {/* Action buttons */}
+                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                  <button
+                                    onClick={() => handleCustomerLiabilityDecision('rejected', compensationIncidentForItem, item.order_item_id)}
+                                    disabled={submittingLiabilityDecision}
+                                    style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#c62828', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
+                                  >
+                                    {submittingLiabilityDecision ? 'Submitting...' : 'Decline Compensation'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleCustomerLiabilityDecision('approved', compensationIncidentForItem, item.order_item_id)}
+                                    disabled={submittingLiabilityDecision}
+                                    style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
+                                  >
+                                    {submittingLiabilityDecision ? 'Submitting...' : 'Accept Compensation'}
+                                  </button>
+                                </div>
                               </>
-                            )}
-                          </div>
+                            );
+                          })()}
+                          {!isLiabilityPendingIncident && (
+                            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
+                            </div>
+                          )}
                           <button
                             onClick={() => openCompensationModal(compensationIncidentForItem, item.order_item_id)}
                             style={{
@@ -3470,9 +3572,24 @@ const Profile = () => {
               }}>
                 <div><strong>Damage Type:</strong> {selectedCompensationIncident.damage_type || 'N/A'}</div>
                 <div><strong>Description:</strong> {selectedCompensationIncident.damage_description || 'N/A'}</div>
-                <div><strong>Compensation Amount:</strong> {formatCurrencyPHP(selectedCompensationIncident.compensation_amount || 0)}</div>
+                {selectedCompensationIncident.compensation_type === 'clothe' ? (
+                  <div><strong>Compensation:</strong> 👕 Clothe — {selectedCompensationIncident.clothe_description || 'Replacement garment'}</div>
+                ) : selectedCompensationIncident.compensation_type === 'both' ? (
+                  <>
+                    <div><strong>Money Option:</strong> {formatCurrencyPHP(selectedCompensationIncident.compensation_amount || 0)}</div>
+                    <div><strong>Clothe Option:</strong> 👕 {selectedCompensationIncident.clothe_description || 'Replacement garment'}</div>
+                  </>
+                ) : (
+                  <div><strong>Compensation Amount:</strong> {formatCurrencyPHP(selectedCompensationIncident.compensation_amount || 0)}</div>
+                )}
                 <div><strong>Liability Status:</strong> {String(selectedCompensationIncident.liability_status || 'pending').replace(/_/g, ' ')}</div>
                 <div><strong>Compensation Status:</strong> {String(selectedCompensationIncident.compensation_status || 'unpaid').replace(/_/g, ' ')}</div>
+                {selectedCompensationIncident.customer_compensation_choice && (
+                  <div><strong>Your Choice:</strong> {selectedCompensationIncident.customer_compensation_choice === 'clothe' ? '👕 Clothe replacement' : '💵 Money'}</div>
+                )}
+                {selectedCompensationIncident.customer_proceed_choice && (
+                  <div><strong>Order Proceed:</strong> {selectedCompensationIncident.customer_proceed_choice === 'proceed' ? '✅ Proceed' : '❌ Don’t proceed'}</div>
+                )}
                 {selectedCompensationIncident.payment_reference && (
                   <div><strong>Payment Reference:</strong> {selectedCompensationIncident.payment_reference}</div>
                 )}
@@ -3487,24 +3604,71 @@ const Profile = () => {
                 </div>
               )}
 
-              {String(selectedCompensationIncident.liability_status).toLowerCase() === 'pending' && (
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px', justifyContent: 'center' }}>
-                  <button
-                    onClick={() => handleCustomerLiabilityDecision('rejected', selectedCompensationIncident, selectedCompensationOrderItemId)}
-                    disabled={submittingLiabilityDecision}
-                    style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#c62828', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
-                  >
-                    {submittingLiabilityDecision ? 'Submitting...' : 'Decline'}
-                  </button>
-                  <button
-                    onClick={() => handleCustomerLiabilityDecision('approved', selectedCompensationIncident, selectedCompensationOrderItemId)}
-                    disabled={submittingLiabilityDecision}
-                    style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
-                  >
-                    {submittingLiabilityDecision ? 'Submitting...' : 'Accept'}
-                  </button>
-                </div>
-              )}
+              {String(selectedCompensationIncident.liability_status).toLowerCase() === 'pending' && (() => {
+                const compType = selectedCompensationIncident.compensation_type || 'money';
+                const showMoney = compType === 'money' || compType === 'both';
+                const showClothe = compType === 'clothe' || compType === 'both';
+                return (
+                  <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {/* Compensation choice */}
+                    <div>
+                      <div style={{ fontWeight: '600', marginBottom: '6px', fontSize: '13px' }}>Choose compensation:</div>
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        {showMoney && (
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                            <input type="radio" name="modal-comp-choice" value="money"
+                              checked={(customerCompensationChoice[selectedCompensationOrderItemId] || 'money') === 'money'}
+                              onChange={() => setCustomerCompensationChoice(prev => ({ ...prev, [selectedCompensationOrderItemId]: 'money' }))} />
+                            💵 Money — {formatCurrencyPHP(selectedCompensationIncident.compensation_amount || 0)}
+                          </label>
+                        )}
+                        {showClothe && (
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                            <input type="radio" name="modal-comp-choice" value="clothe"
+                              checked={(customerCompensationChoice[selectedCompensationOrderItemId] || 'money') === 'clothe'}
+                              onChange={() => setCustomerCompensationChoice(prev => ({ ...prev, [selectedCompensationOrderItemId]: 'clothe' }))} />
+                            👕 Clothe — {selectedCompensationIncident.clothe_description || 'Replacement garment'}
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                    {/* Proceed choice */}
+                    <div>
+                      <div style={{ fontWeight: '600', marginBottom: '6px', fontSize: '13px' }}>Do you want the order to proceed?</div>
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'normal', color: '#333' }}>
+                          <input type="radio" name="modal-proceed-choice" value="proceed"
+                            checked={customerProceedChoice[selectedCompensationOrderItemId] !== 'dont_proceed'}
+                            onChange={(e) => { e.stopPropagation(); setCustomerProceedChoice(prev => ({ ...prev, [selectedCompensationOrderItemId]: 'proceed' })); }} />
+                          ✅ Yes, proceed
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'normal', color: '#333' }}>
+                          <input type="radio" name="modal-proceed-choice" value="dont_proceed"
+                            checked={customerProceedChoice[selectedCompensationOrderItemId] === 'dont_proceed'}
+                            onChange={(e) => { e.stopPropagation(); setCustomerProceedChoice(prev => ({ ...prev, [selectedCompensationOrderItemId]: 'dont_proceed' })); }} />
+                          ❌ No, don't proceed
+                        </label>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <button
+                        onClick={() => handleCustomerLiabilityDecision('rejected', selectedCompensationIncident, selectedCompensationOrderItemId)}
+                        disabled={submittingLiabilityDecision}
+                        style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#c62828', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
+                      >
+                        {submittingLiabilityDecision ? 'Submitting...' : 'Decline'}
+                      </button>
+                      <button
+                        onClick={() => handleCustomerLiabilityDecision('approved', selectedCompensationIncident, selectedCompensationOrderItemId)}
+                        disabled={submittingLiabilityDecision}
+                        style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
+                      >
+                        {submittingLiabilityDecision ? 'Submitting...' : 'Accept'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

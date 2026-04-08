@@ -118,10 +118,7 @@ const Repair = () => {
 
   const [showEnhancementViewModal, setShowEnhancementViewModal] = useState(false);
   const [enhancementViewItem, setEnhancementViewItem] = useState(null);
-  const [showEnhancementPriceModal, setShowEnhancementPriceModal] = useState(false);
   const [enhancementPriceItem, setEnhancementPriceItem] = useState(null);
-  const [enhancementPrice, setEnhancementPrice] = useState('');
-  const [enhancementPriceReason, setEnhancementPriceReason] = useState('');
   const [savingEnhancementPrice, setSavingEnhancementPrice] = useState(false);
 
   const [editForm, setEditForm] = useState({
@@ -209,15 +206,20 @@ const Repair = () => {
     damageType: '',
     damageDescription: '',
     responsibleParty: '',
-    compensationAmount: ''
+    compensationAmount: '',
+    compensationType: 'money',
+    clotheDescription: ''
   });
   const [liabilityForm, setLiabilityForm] = useState({
     decision: 'approved',
     compensationAmount: '',
+    compensationType: 'money',
+    clotheDescription: '',
     notes: ''
   });
   const [settlementForm, setSettlementForm] = useState({
-    paymentReference: ''
+    paymentReference: '',
+    refundAmount: ''
   });
   const isAdminUser = getUserRole() === 'admin';
 
@@ -392,7 +394,9 @@ const Repair = () => {
 
         : (item.pricing_factors || {});
 
-      const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
+      const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
+
+      const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
 
       const finalPrice = parseFloat(item.final_price || 0);
 
@@ -1077,7 +1081,9 @@ const Repair = () => {
       damageType: '',
       damageDescription: '',
       responsibleParty: '',
-      compensationAmount: ''
+      compensationAmount: '',
+      compensationType: 'money',
+      clotheDescription: ''
     });
     setShowDamageReportModal(true);
   };
@@ -1090,8 +1096,10 @@ const Repair = () => {
       showToast('Please enter a damage type', 'error');
       return;
     }
-    if (!Number.isFinite(compensationAmount) || compensationAmount < 0) {
-      showToast('Please enter a valid compensation amount', 'error');
+    const hasMoneyOffer = Number.isFinite(compensationAmount) && compensationAmount > 0;
+    const hasClotheOffer = damageForm.clotheDescription.trim().length > 0;
+    if (!hasMoneyOffer && !hasClotheOffer) {
+      showToast('Please provide at least one compensation option (money amount or clothe description)', 'error');
       return;
     }
 
@@ -1104,6 +1112,8 @@ const Repair = () => {
       damage_type: damageForm.damageType.trim(),
       damage_description: damageForm.damageDescription.trim(),
       compensation_amount: compensationAmount,
+      compensation_type: hasMoneyOffer && hasClotheOffer ? 'both' : hasMoneyOffer ? 'money' : 'clothe',
+      clothe_description: hasClotheOffer ? damageForm.clotheDescription.trim() : null,
       notes: 'Reported from Repair management'
     });
 
@@ -1123,6 +1133,8 @@ const Repair = () => {
     setLiabilityForm({
       decision,
       compensationAmount: `${incident.compensation_amount || 0}`,
+      compensationType: incident.compensation_type || 'money',
+      clotheDescription: incident.clothe_description || '',
       notes: incident.notes || ''
     });
     setShowLiabilityModal(true);
@@ -1132,14 +1144,18 @@ const Repair = () => {
     if (!activeDamageIncident) return;
 
     const compensationAmount = parseFloat(liabilityForm.compensationAmount || '0');
-    if (!Number.isFinite(compensationAmount) || compensationAmount < 0) {
-      showToast('Please enter a valid compensation amount', 'error');
+    const hasMoneyOffer = Number.isFinite(compensationAmount) && compensationAmount > 0;
+    const hasClotheOffer = liabilityForm.clotheDescription.trim().length > 0;
+    if (!hasMoneyOffer && !hasClotheOffer) {
+      showToast('Please provide at least one compensation option (money amount or clothe description)', 'error');
       return;
     }
 
     const result = await updateCompensationLiability(activeDamageIncident.id, {
       liability_status: liabilityForm.decision,
-      compensation_amount: compensationAmount,
+      compensation_amount: hasMoneyOffer ? compensationAmount : 0,
+      compensation_type: hasMoneyOffer && hasClotheOffer ? 'both' : hasMoneyOffer ? 'money' : 'clothe',
+      clothe_description: hasClotheOffer ? liabilityForm.clotheDescription.trim() : null,
       notes: liabilityForm.notes
     });
 
@@ -1156,8 +1172,17 @@ const Repair = () => {
 
   const openSettlementModal = (incident) => {
     setActiveDamageIncident(incident);
+    const item = allItems.find(i => Number(i.item_id) === Number(incident.order_item_id));
+    const pf = typeof item?.pricing_factors === 'string' ? JSON.parse(item?.pricing_factors || '{}') : (item?.pricing_factors || {});
+    const servicePaid = parseFloat(pf.amount_paid || 0);
+    const compensationAmt = parseFloat(incident.compensation_amount || 0);
+    const shouldAutoRefund =
+      incident.customer_proceed_choice === 'dont_proceed' &&
+      (incident.customer_compensation_choice === 'money' || incident.compensation_type === 'money');
+    const autoRefund = shouldAutoRefund ? (servicePaid + compensationAmt) : 0;
     setSettlementForm({
-      paymentReference: incident.payment_reference || ''
+      paymentReference: incident.payment_reference || '',
+      refundAmount: autoRefund > 0 ? autoRefund.toFixed(2) : ''
     });
     setShowSettlementModal(true);
   };
@@ -1171,7 +1196,8 @@ const Repair = () => {
     }
 
     const result = await settleCompensationIncident(activeDamageIncident.id, {
-      payment_reference: settlementForm.paymentReference.trim()
+      payment_reference: settlementForm.paymentReference.trim(),
+      refund_amount: settlementForm.refundAmount ? parseFloat(settlementForm.refundAmount) : undefined
     });
 
     if (!result.success) {
@@ -1596,7 +1622,9 @@ const Repair = () => {
 
         : (item.pricing_factors || {});
 
-      const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
+      const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
+
+      const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
 
       const finalPrice = parseFloat(item.final_price || 0);
 
@@ -2086,28 +2114,17 @@ const Repair = () => {
 
 
 
-  const handleEnhancementPriceConfirm = async () => {
-    if (!enhancementPriceItem) return;
-    const finalPrice = parseFloat(enhancementPrice);
-    if (isNaN(finalPrice) || finalPrice <= 0) {
-      showToast('Please enter a valid price', 'error');
-      return;
-    }
-    const currentPrice = parseFloat(enhancementPriceItem.final_price || 0);
-    const isPriceChanged = Math.abs(finalPrice - currentPrice) > 0.01;
-    if (isPriceChanged && !enhancementPriceReason.trim()) {
-      showToast('Please provide a reason for the price change', 'error');
-      return;
-    }
+  const handleEnhancementPriceConfirm = async (item) => {
+    const target = item || enhancementPriceItem;
+    if (!target) return;
     try {
       setSavingEnhancementPrice(true);
-      const pricingFactors = typeof enhancementPriceItem.pricing_factors === 'string'
-        ? JSON.parse(enhancementPriceItem.pricing_factors || '{}')
-        : (enhancementPriceItem.pricing_factors || {});
-      const result = await updateRepairOrderItem(enhancementPriceItem.item_id, {
-        approvalStatus: 'price_confirmation',
-        finalPrice,
-        adminNotes: isPriceChanged ? enhancementPriceReason.trim() : undefined,
+      const pricingFactors = typeof target.pricing_factors === 'string'
+        ? JSON.parse(target.pricing_factors || '{}')
+        : (target.pricing_factors || {});
+      const result = await updateRepairOrderItem(target.item_id, {
+        approvalStatus: 'accepted',
+        finalPrice: parseFloat(target.final_price || 0),
         pricingFactors: {
           ...pricingFactors,
           enhancementAdminAccepted: true,
@@ -2116,11 +2133,9 @@ const Repair = () => {
         }
       });
       if (result.success) {
-        setShowEnhancementPriceModal(false);
         setEnhancementPriceItem(null);
-        setEnhancementPrice('');
-        setEnhancementPriceReason('');
-        showToast('Enhancement accepted. Price confirmation sent to user.', 'success');
+        setShowEnhancementViewModal(false);
+        showToast('Enhancement accepted. Order moved to Accepted.', 'success');
         loadRepairOrders();
       } else {
         showToast(result.message || 'Failed to accept enhancement', 'error');
@@ -2630,6 +2645,9 @@ const Repair = () => {
                   const isCompensatedIncident = incident && liabilityStatus === 'approved' && compensationStatus === 'paid';
                   const isDamagePendingIncident = incident && liabilityStatus === 'pending';
                   const isForCompensationIncident = incident && liabilityStatus === 'approved' && compensationStatus !== 'paid';
+                  const customerProceedChoice = String(incident?.customer_proceed_choice || '').toLowerCase();
+                  const customerWantsToProceed = isCompensatedIncident && customerProceedChoice === 'proceed';
+                  const customerDontProceed = isCompensatedIncident && customerProceedChoice === 'dont_proceed';
 
 
 
@@ -2639,7 +2657,9 @@ const Repair = () => {
 
                     : (item.pricing_factors || {});
 
-                  const amountPaid = parseFloat(pricingFactors.amount_paid || 0);
+                  const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
+
+                  const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
 
                   const finalPrice = parseFloat(item.final_price || 0);
 
@@ -2731,7 +2751,7 @@ const Repair = () => {
                       <td onClick={(e) => e.stopPropagation()}>
 
                         <span
-                          className={`status-badge ${isCompensatedIncident ? 'completed' : isDamagePendingIncident ? 'rejected' : isForCompensationIncident ? 'price-confirmation' : getStatusClass(item.approval_status || 'pending')}`}
+                          className={`status-badge ${customerWantsToProceed ? getStatusClass(item.approval_status || 'pending') : isCompensatedIncident ? 'completed' : isDamagePendingIncident ? 'rejected' : isForCompensationIncident ? 'price-confirmation' : getStatusClass(item.approval_status || 'pending')}`}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -2740,7 +2760,7 @@ const Repair = () => {
                             lineHeight: '1',
                             padding: '3px 7px',
                             fontWeight: 600,
-                            ...(isCompensatedIncident ? {
+                            ...(!customerWantsToProceed && isCompensatedIncident ? {
                             backgroundColor: '#e8f5e9',
                             color: '#1b5e20',
                             border: '1px solid #a5d6a7'
@@ -2755,10 +2775,18 @@ const Repair = () => {
                           } : {})
                           }}
                         >
-
-                          {isCompensatedIncident ? 'Compensated' : isDamagePendingIncident ? 'Damage Reported' : isForCompensationIncident ? 'For Compensation' : getStatusText(item.approval_status || 'pending')}
-
+                          {customerWantsToProceed
+                            ? getStatusText(item.approval_status || 'pending')
+                            : isCompensatedIncident ? 'Compensated'
+                            : isDamagePendingIncident ? 'Damage Reported'
+                            : isForCompensationIncident ? 'For Compensation'
+                            : getStatusText(item.approval_status || 'pending')}
                         </span>
+                        {customerWantsToProceed && (
+                          <div style={{ marginTop: '4px', fontSize: '11px', color: '#1b5e20', fontWeight: '600' }}>
+                            📝 Note: Compensated
+                          </div>
+                        )}
 
                         {incident && !isDamagePendingIncident && (
                           <div style={{ marginTop: '6px', fontSize: '11px', color: '#444' }}>
@@ -2832,7 +2860,7 @@ const Repair = () => {
                           </div>
                         ) : isCompensatedIncident ? (
                           <div className="action-buttons">
-                            {item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'repair', item) && (
+                            {customerWantsToProceed && item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'repair', item) && (
                               <button
                                 className="icon-btn next-status"
                                 onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'repair', item))}
@@ -2842,6 +2870,23 @@ const Repair = () => {
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <polyline points="9 18 15 12 9 6"></polyline>
                                 </svg>
+                              </button>
+                            )}
+                            {customerWantsToProceed && !isEnhancementOrder && (
+                              <button
+                                className="icon-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedOrder(item);
+                                  const fp = parseFloat(item.final_price || 0);
+                                  setPaymentAmount((fp * 0.5).toFixed(2));
+                                  setCashReceived('');
+                                  setShowPaymentModal(true);
+                                }}
+                                title="Record Payment"
+                                style={{ backgroundColor: '#2196F3', color: 'white' }}
+                              >
+                                💰
                               </button>
                             )}
                             <button
@@ -2855,7 +2900,7 @@ const Repair = () => {
                             >
                               <i className="fas fa-receipt"></i>
                             </button>
-                            {isAdminUser && (
+                            {isAdminUser && !customerWantsToProceed && (
                               <button
                                 className="icon-btn delete"
                                 onClick={(e) => {
@@ -2912,7 +2957,7 @@ const Repair = () => {
                               const halfPrice = finalPrice * 0.5;
                               const hasHalfPayment = amountPaid >= halfPrice - 0.01;
                               
-                              if (isMovingToInProgress && !hasHalfPayment) {
+                              if (isMovingToInProgress && !hasHalfPayment && !isEnhancementOrder) {
                                 return null;
                               }
                               
@@ -3062,37 +3107,24 @@ const Repair = () => {
 
                                 )}
 
-                                <button
-
-                                  className="icon-btn"
-
-                                  onClick={(e) => {
-
-                                    e.stopPropagation();
-
-                                    setSelectedOrder(item);
-
-                                    const finalPrice = parseFloat(item.final_price || 0);
-
-                                    const halfPrice = (finalPrice * 0.5).toFixed(2);
-
-                                    setPaymentAmount(halfPrice);
-
-                                    setCashReceived('');
-
-                                    setShowPaymentModal(true);
-
-                                  }}
-
-                                  title="Record Payment"
-
-                                  style={{ backgroundColor: '#2196F3', color: 'white' }}
-
-                                >
-
-                                  💰
-
-                                </button>
+                                {!isEnhancementOrder && (
+                                  <button
+                                    className="icon-btn"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedOrder(item);
+                                      const finalPrice = parseFloat(item.final_price || 0);
+                                      const halfPrice = (finalPrice * 0.5).toFixed(2);
+                                      setPaymentAmount(halfPrice);
+                                      setCashReceived('');
+                                      setShowPaymentModal(true);
+                                    }}
+                                    title="Record Payment"
+                                    style={{ backgroundColor: '#2196F3', color: 'white' }}
+                                  >
+                                    💰
+                                  </button>
+                                )}
 
                                 {item.approval_status === 'accepted' && (
                                 <button
@@ -3320,12 +3352,8 @@ const Repair = () => {
                                 <button
                                   className="icon-btn accept"
                                   title="Accept Enhancement"
-                                  onClick={() => {
-                                    setEnhancementPriceItem(item);
-                                    setEnhancementPrice(finalPrice.toFixed(2));
-                                    setEnhancementPriceReason('');
-                                    setShowEnhancementPriceModal(true);
-                                  }}
+                                  disabled={savingEnhancementPrice}
+                                  onClick={() => handleEnhancementPriceConfirm(item)}
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                 </button>
@@ -3380,89 +3408,17 @@ const Repair = () => {
                 <button className="btn-cancel" onClick={() => setShowEnhancementViewModal(false)}>Close</button>
                 <button
                   className="btn-save"
-                  onClick={() => {
-                    setShowEnhancementViewModal(false);
-                    setEnhancementPriceItem(enhancementViewItem);
-                    setEnhancementPrice(parseFloat(enhancementViewItem.final_price || 0).toFixed(2));
-                    setEnhancementPriceReason('');
-                    setShowEnhancementPriceModal(true);
-                  }}
-                >
-                  Accept Enhancement
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-      {showEnhancementPriceModal && enhancementPriceItem && (() => {
-        const pf = typeof enhancementPriceItem.pricing_factors === 'string'
-          ? JSON.parse(enhancementPriceItem.pricing_factors || '{}')
-          : (enhancementPriceItem.pricing_factors || {});
-        const currentPrice = parseFloat(enhancementPriceItem.final_price || 0);
-        const newPrice = parseFloat(enhancementPrice || 0);
-        const isPriceChanged = !isNaN(newPrice) && Math.abs(newPrice - currentPrice) > 0.01;
-        return (
-          <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowEnhancementPriceModal(false)}>
-            <div className="modal-content">
-              <div className="modal-header">
-                <h2>Enhancement Price Confirmation</h2>
-                <span className="close-modal" onClick={() => setShowEnhancementPriceModal(false)}>×</span>
-              </div>
-              <div className="modal-body">
-                <div className="detail-row"><strong>Order ID:</strong> #{enhancementPriceItem.order_id}</div>
-                <div className="detail-row"><strong>Service:</strong> Repair</div>
-                <div className="detail-row"><strong>Enhancement Notes:</strong> {pf.enhancementNotes || 'N/A'}</div>
-                {pf.enhancementPreferredCompletionDate && (
-                  <div className="detail-row">
-                    <strong>Preferred Completion Date:</strong>
-                    {new Date(pf.enhancementPreferredCompletionDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                  </div>
-                )}
-                <div className="payment-form-group" style={{ marginTop: '12px' }}>
-                  <label>Final Price for Enhancement (₱)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={enhancementPrice}
-                    onChange={(e) => setEnhancementPrice(e.target.value)}
-                    placeholder="Enter final price"
-                  />
-                  {isPriceChanged && (
-                    <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#fff3cd', borderRadius: '4px', fontSize: '0.9em' }}>
-                      <strong>⚠️ Price Changed:</strong> Current: ₱{currentPrice.toFixed(2)} {'→'} New: ₱{newPrice.toFixed(2)}
-                    </div>
-                  )}
-                </div>
-                <div className="payment-form-group" style={{ marginTop: '12px' }}>
-                  <label>Reason for Price Change <span style={{ color: '#666', fontSize: '12px' }}>(required if price changes)</span></label>
-                  <textarea
-                    value={enhancementPriceReason}
-                    onChange={(e) => setEnhancementPriceReason(e.target.value)}
-                    placeholder="Explain the enhancement cost..."
-                    rows={3}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-                  />
-                </div>
-                <div style={{ marginTop: '15px', padding: '12px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '0.9em', color: '#1976d2' }}>
-                  ℹ️ Customer will be notified to confirm the price before the enhancement proceeds.
-                </div>
-              </div>
-              <div className="modal-footer-centered">
-                <button className="btn-cancel" onClick={() => setShowEnhancementPriceModal(false)}>Cancel</button>
-                <button
-                  className="btn-save"
-                  onClick={handleEnhancementPriceConfirm}
                   disabled={savingEnhancementPrice}
+                  onClick={() => handleEnhancementPriceConfirm(enhancementViewItem)}
                 >
-                  {savingEnhancementPrice ? 'Sending...' : 'Confirm & Send to User'}
+                  {savingEnhancementPrice ? 'Accepting...' : 'Accept Enhancement'}
                 </button>
               </div>
             </div>
           </div>
         );
       })()}
+
 
       {showEditModal && selectedOrder && (
 
@@ -4232,8 +4188,23 @@ const Repair = () => {
                   <>
                     <div className="detail-row"><strong>Damage Incident:</strong> {incident.damage_type}</div>
                     <div className="detail-row"><strong>Liability:</strong> {incident.liability_status}</div>
-                    <div className="detail-row"><strong>Compensation:</strong> ₱{parseFloat(incident.compensation_amount || 0).toLocaleString()}</div>
+                    {incident.compensation_type === 'clothe' ? (
+                      <div className="detail-row"><strong>Compensation:</strong> 👕 Clothe — {incident.clothe_description || 'Replacement garment'}</div>
+                    ) : incident.compensation_type === 'both' ? (
+                      <>
+                        <div className="detail-row"><strong>Money Option:</strong> ₱{parseFloat(incident.compensation_amount || 0).toLocaleString()}</div>
+                        <div className="detail-row"><strong>Clothe Option:</strong> 👕 {incident.clothe_description || 'Replacement garment'}</div>
+                        {incident.customer_compensation_choice && (
+                          <div className="detail-row"><strong>Customer Chose:</strong> {incident.customer_compensation_choice === 'clothe' ? '👕 Clothe' : '💵 Money'}</div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="detail-row"><strong>Compensation:</strong> ₱{parseFloat(incident.compensation_amount || 0).toLocaleString()}</div>
+                    )}
                     <div className="detail-row"><strong>Compensation Status:</strong> {incident.compensation_status}</div>
+                    {incident.customer_proceed_choice && (
+                      <div className="detail-row"><strong>Order Proceed:</strong> {incident.customer_proceed_choice === 'proceed' ? '✅ Proceed' : '❌ Don\'t proceed'}</div>
+                    )}
                   </>
                 );
               })()}
@@ -5025,16 +4996,32 @@ const Repair = () => {
               </div>
 
               <div className="payment-form-group" style={{ marginTop: 0, width: '100%', gridColumn: '1 / -1' }}>
-                <label>Compensation Amount (PHP) *</label>
+                <label>Compensation Amount (PHP)</label>
                 <input
                   type="number"
                   className="form-control"
                   style={{ width: '100%', boxSizing: 'border-box' }}
                   min="0"
                   step="0.01"
+                  placeholder="Leave 0 if not offering money"
                   value={damageForm.compensationAmount}
                   onChange={(e) => setDamageForm({ ...damageForm, compensationAmount: e.target.value })}
                 />
+              </div>
+
+              <div className="payment-form-group" style={{ marginTop: 0, width: '100%', gridColumn: '1 / -1' }}>
+                <label>Clothe Compensation Description</label>
+                <textarea
+                  rows={3}
+                  className="form-control"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  placeholder="Describe the replacement clothe (e.g. same jacket, size M, black). Leave blank if not offering clothe."
+                  value={damageForm.clotheDescription}
+                  onChange={(e) => setDamageForm({ ...damageForm, clotheDescription: e.target.value })}
+                />
+              </div>
+              <div style={{ fontSize: '12px', color: '#666', gridColumn: '1 / -1' }}>
+                ℹ️ Fill in one or both options. The customer will choose which compensation they prefer.
               </div>
             </div>
             <div className="modal-footer-centered" style={{ justifyContent: 'flex-end' }}>
@@ -5070,16 +5057,32 @@ const Repair = () => {
               </div>
 
               <div className="payment-form-group" style={{ marginTop: 0 }}>
-                <label>Compensation Amount (PHP) *</label>
+                <label>Compensation Amount (PHP)</label>
                 <input
                   type="number"
                   className="form-control"
                   style={{ width: '100%', boxSizing: 'border-box' }}
                   min="0"
                   step="0.01"
+                  placeholder="Leave 0 if not offering money"
                   value={liabilityForm.compensationAmount}
                   onChange={(e) => setLiabilityForm({ ...liabilityForm, compensationAmount: e.target.value })}
                 />
+              </div>
+
+              <div className="payment-form-group" style={{ marginTop: 0 }}>
+                <label>Clothe Compensation Description</label>
+                <textarea
+                  rows={3}
+                  className="form-control"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  placeholder="Describe the replacement clothe. Leave blank if not offering clothe."
+                  value={liabilityForm.clotheDescription}
+                  onChange={(e) => setLiabilityForm({ ...liabilityForm, clotheDescription: e.target.value })}
+                />
+              </div>
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                ℹ️ Fill in one or both options. The customer will choose which compensation they prefer.
               </div>
 
               <div className="payment-form-group" style={{ marginTop: 0 }}>
@@ -5116,25 +5119,78 @@ const Repair = () => {
             </div>
             <div className="modal-body damage-compensation-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left' }}>
               <div className="detail-row"><strong>Incident:</strong> {activeDamageIncident.damage_type}</div>
-              <div className="detail-row"><strong>Amount:</strong> ₱{parseFloat(activeDamageIncident.compensation_amount || 0).toLocaleString()}</div>
+              {activeDamageIncident.compensation_type === 'clothe' ? (
+                <div className="detail-row"><strong>Compensation:</strong> 👕 Clothe — {activeDamageIncident.clothe_description || 'Replacement garment'}</div>
+              ) : activeDamageIncident.compensation_type === 'both' ? (
+                <>
+                  <div className="detail-row"><strong>Money Option:</strong> ₱{parseFloat(activeDamageIncident.compensation_amount || 0).toLocaleString()}</div>
+                  <div className="detail-row"><strong>Clothe Option:</strong> 👕 {activeDamageIncident.clothe_description || 'Replacement garment'}</div>
+                  {activeDamageIncident.customer_compensation_choice && (
+                    <div className="detail-row"><strong>Customer Chose:</strong> {activeDamageIncident.customer_compensation_choice === 'clothe' ? '👕 Clothe' : '💵 Money — ₱' + parseFloat(activeDamageIncident.compensation_amount || 0).toLocaleString()}</div>
+                  )}
+                </>
+              ) : (
+                <div className="detail-row"><strong>Amount:</strong> ₱{parseFloat(activeDamageIncident.compensation_amount || 0).toLocaleString()}</div>
+              )}
+              {activeDamageIncident.customer_proceed_choice && (
+                <div className="detail-row"><strong>Order Proceed:</strong> {activeDamageIncident.customer_proceed_choice === 'proceed' ? '✅ Proceed' : '❌ Don\'t proceed'}</div>
+              )}
 
               {activeDamageIncident.compensation_status === 'paid' ? (
                 <>
                   <div className="detail-row"><strong>Payment Reference:</strong> {activeDamageIncident.payment_reference || 'N/A'}</div>
+                  {activeDamageIncident.refund_amount > 0 && (
+                    <div className="detail-row"><strong>Refund Amount:</strong> ₱{parseFloat(activeDamageIncident.refund_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</div>
+                  )}
                   <div className="detail-row"><strong>Paid At:</strong> {activeDamageIncident.compensation_paid_at ? new Date(activeDamageIncident.compensation_paid_at).toLocaleString() : 'N/A'}</div>
                 </>
               ) : (
-                <div className="payment-form-group" style={{ marginTop: 0 }}>
-                  <label>Payment Reference</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    style={{ width: '100%', boxSizing: 'border-box' }}
-                    placeholder="Receipt number or reference"
-                    value={settlementForm.paymentReference}
-                    onChange={(e) => setSettlementForm({ paymentReference: e.target.value })}
-                  />
-                </div>
+                <>
+                  <div className="payment-form-group" style={{ marginTop: 0 }}>
+                    <label>Payment Reference</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      style={{ width: '100%', boxSizing: 'border-box' }}
+                      placeholder="Receipt number or reference"
+                      value={settlementForm.paymentReference}
+                      onChange={(e) => setSettlementForm({ ...settlementForm, paymentReference: e.target.value })}
+                    />
+                  </div>
+                  <div className="payment-form-group" style={{ marginTop: 0 }}>
+                    <label>Refund Amount (PHP) <span style={{ fontSize: '11px', color: '#888', fontWeight: 'normal' }}>(optional — if customer is owed a refund)</span></label>
+                    {(() => {
+                      const item = allItems.find(i => Number(i.item_id) === Number(activeDamageIncident.order_item_id));
+                      const pf = typeof item?.pricing_factors === 'string' ? JSON.parse(item?.pricing_factors || '{}') : (item?.pricing_factors || {});
+                      const servicePaid = parseFloat(pf.amount_paid || 0);
+                      const compensationAmt = parseFloat(activeDamageIncident.compensation_amount || 0);
+                      const isDontProceed = activeDamageIncident.customer_proceed_choice === 'dont_proceed';
+                      const isMoneyComp = activeDamageIncident.customer_compensation_choice === 'money' || activeDamageIncident.compensation_type === 'money';
+                      if (isDontProceed && isMoneyComp && (servicePaid > 0 || compensationAmt > 0)) {
+                        return (
+                          <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px', padding: '8px', background: '#fff3e0', borderRadius: '6px', border: '1px solid #ffcc80' }}>
+                            ⚠️ Customer chose not to proceed. Suggested refund:<br />
+                            {servicePaid > 0 && <span>Service paid: ₱{servicePaid.toFixed(2)}</span>}
+                            {servicePaid > 0 && compensationAmt > 0 && <span> + </span>}
+                            {compensationAmt > 0 && <span>Compensation: ₱{compensationAmt.toFixed(2)}</span>}
+                            {(servicePaid > 0 || compensationAmt > 0) && <strong> = ₱{(servicePaid + compensationAmt).toFixed(2)}</strong>}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    <input
+                      type="number"
+                      className="form-control"
+                      style={{ width: '100%', boxSizing: 'border-box' }}
+                      min="0"
+                      step="0.01"
+                      placeholder="Enter refund amount"
+                      value={settlementForm.refundAmount || ''}
+                      onChange={(e) => setSettlementForm({ ...settlementForm, refundAmount: e.target.value })}
+                    />
+                  </div>
+                </>
               )}
             </div>
             <div className="modal-footer-centered" style={{ justifyContent: 'flex-end' }}>

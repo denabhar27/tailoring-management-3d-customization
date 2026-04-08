@@ -25,6 +25,11 @@ const ensureCompensationTable = (callback) => {
       compensation_status ENUM('unpaid', 'paid') NOT NULL DEFAULT 'unpaid',
       compensation_paid_at DATETIME NULL,
       payment_reference VARCHAR(120) NULL,
+      refund_amount DECIMAL(10,2) NULL DEFAULT NULL,
+      compensation_type ENUM('money', 'clothe', 'both') NOT NULL DEFAULT 'money',
+      clothe_description TEXT NULL,
+      customer_compensation_choice ENUM('money', 'clothe') NULL,
+      customer_proceed_choice ENUM('proceed', 'dont_proceed') NULL,
       notes TEXT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -182,8 +187,8 @@ const DamageRecord = {
 
       const sql = `
         INSERT INTO damage_compensation_records
-        (order_item_id, order_id, service_type, customer_name, reported_by_user_id, reported_by_role, responsible_party, damage_type, damage_description, liability_status, compensation_amount, compensation_status, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (order_item_id, order_id, service_type, customer_name, reported_by_user_id, reported_by_role, responsible_party, damage_type, damage_description, liability_status, compensation_amount, compensation_status, compensation_type, clothe_description, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       const values = [
         payload.order_item_id,
@@ -198,6 +203,8 @@ const DamageRecord = {
         payload.liability_status || 'pending',
         payload.compensation_amount || 0,
         payload.compensation_status || 'unpaid',
+        payload.compensation_type || 'money',
+        payload.clothe_description || null,
         payload.notes || null
       ];
 
@@ -285,9 +292,29 @@ const DamageRecord = {
         fields.push('payment_reference = ?');
         values.push(updateData.payment_reference);
       }
+      if (updateData.refund_amount !== undefined) {
+        fields.push('refund_amount = ?');
+        values.push(updateData.refund_amount);
+      }
       if (updateData.responsible_party !== undefined) {
         fields.push('responsible_party = ?');
         values.push(updateData.responsible_party);
+      }
+      if (updateData.compensation_type !== undefined) {
+        fields.push('compensation_type = ?');
+        values.push(updateData.compensation_type);
+      }
+      if (updateData.clothe_description !== undefined) {
+        fields.push('clothe_description = ?');
+        values.push(updateData.clothe_description);
+      }
+      if (updateData.customer_compensation_choice !== undefined) {
+        fields.push('customer_compensation_choice = ?');
+        values.push(updateData.customer_compensation_choice);
+      }
+      if (updateData.customer_proceed_choice !== undefined) {
+        fields.push('customer_proceed_choice = ?');
+        values.push(updateData.customer_proceed_choice);
       }
       if (updateData.notes !== undefined) {
         fields.push('notes = ?');

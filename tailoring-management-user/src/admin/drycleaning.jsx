@@ -3745,13 +3745,12 @@ const DryCleaning = () => {
                 <div className="detail-row"><strong>Requested At:</strong> {pf.enhancementUpdatedAt ? new Date(pf.enhancementUpdatedAt).toLocaleString() : 'N/A'}</div>
                 <div className="detail-row"><strong>Current Price:</strong> ₱{parseFloat(enhancementViewItem.final_price || 0).toLocaleString()}</div>
               </div>
-              <div className="modal-footer">
-                <button className="btn-cancel" onClick={() => setShowEnhancementViewModal(false)}>Close</button>
+              <div className="modal-footer enhancement-view-footer">
                 <button
                   className="btn-save"
                   disabled={savingEnhancementPrice}
                   onClick={() => handleEnhancementPriceConfirm(enhancementViewItem)}
-                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
+                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff', whiteSpace: 'nowrap' }}
                 >
                   {savingEnhancementPrice ? 'Accepting...' : 'Accept Enhancement'}
                 </button>

@@ -147,7 +147,7 @@ const Customization = {
 
       // When admin accepts an enhancement, reset amount_paid to 0 so revenue
       // analytics don't double-count payments from the original order.
-      if (pricingFactors.enhancementAdminAccepted === true) {
+      if (pricingFactors.enhancementAdminAccepted === true && !pricingFactors.accessoriesPrice) {
         updates.push(`pricing_factors = JSON_SET(COALESCE(pricing_factors, '{}'), '$.amount_paid', '0')`);
       }
     }

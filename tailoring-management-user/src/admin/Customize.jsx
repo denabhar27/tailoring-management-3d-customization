@@ -10,7 +10,7 @@ import AdminHeader from './AdminHeader';
 
 import Sidebar from './Sidebar';
 
-import { getAllCustomizationOrders, updateCustomizationOrderItem, uploadGLBFile, getAllCustom3DModels, deleteCustom3DModel, updateCustom3DModel } from '../api/CustomizationApi';
+import { getAllCustomizationOrders, updateCustomizationOrderItem, uploadGLBFile, getAllCustom3DModels, deleteCustom3DModel, updateCustom3DModel, cancelEnhancement } from '../api/CustomizationApi';
 
 import { getUserRole } from '../api/AuthApi';
 
@@ -83,6 +83,9 @@ const Customize = () => {
   const [enhancementViewItem, setEnhancementViewItem] = useState(null);
   const [enhancementPriceItem, setEnhancementPriceItem] = useState(null);
   const [savingEnhancementPrice, setSavingEnhancementPrice] = useState(false);
+  const [showAccessoriesPriceModal, setShowAccessoriesPriceModal] = useState(false);
+  const [accessoriesPriceItem, setAccessoriesPriceItem] = useState(null);
+  const [accessoriesPrice, setAccessoriesPrice] = useState('');
 
   const [editForm, setEditForm] = useState({
 
@@ -492,8 +495,8 @@ const Customize = () => {
         : (item.pricing_factors || {});
 
       const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
-
-      const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
+      const isAccessoriesEnhancement = isEnhancementOrder && !!pricingFactors.accessoriesPrice;
+      const amountPaid = (isEnhancementOrder && !isAccessoriesEnhancement) ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
 
       const finalPrice = parseFloat(item.final_price || 0);
 
@@ -2591,13 +2594,10 @@ const Customize = () => {
         ? JSON.parse(item.pricing_factors || '{}')
 
         : (item.pricing_factors || {});
-
       const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
-
-      const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
-
+      const isAccessoriesEnhancement = isEnhancementOrder && !!pricingFactors.accessoriesPrice;
+      const amountPaid = (isEnhancementOrder && !isAccessoriesEnhancement) ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
       const finalPrice = parseFloat(item.final_price || 0);
-
       const remainingBalance = finalPrice - amountPaid;
 
       if (remainingBalance > 0.01) {
@@ -2932,11 +2932,21 @@ const Customize = () => {
   const handleEnhancementPriceConfirm = async (item) => {
     const target = item || enhancementPriceItem;
     if (!target) return;
+
+    const pricingFactors = typeof target.pricing_factors === 'string'
+      ? JSON.parse(target.pricing_factors || '{}')
+      : (target.pricing_factors || {});
+
+    if (pricingFactors.addAccessories === true) {
+      setAccessoriesPriceItem(target);
+      setAccessoriesPrice('');
+      setShowAccessoriesPriceModal(true);
+      setShowEnhancementViewModal(false);
+      return;
+    }
+
     try {
       setSavingEnhancementPrice(true);
-      const pricingFactors = typeof target.pricing_factors === 'string'
-        ? JSON.parse(target.pricing_factors || '{}')
-        : (target.pricing_factors || {});
       const result = await updateCustomizationOrderItem(target.item_id, {
         approvalStatus: 'accepted',
         finalPrice: parseFloat(target.final_price || 0),
@@ -2957,6 +2967,49 @@ const Customize = () => {
       }
     } catch (err) {
       showToast('Failed to accept enhancement', 'error');
+    } finally {
+      setSavingEnhancementPrice(false);
+    }
+  };
+
+  const handleAccessoriesPriceSubmit = async () => {
+    if (!accessoriesPriceItem) return;
+    const price = parseFloat(accessoriesPrice);
+    if (isNaN(price) || price <= 0) {
+      showToast('Please enter a valid accessories price', 'error');
+      return;
+    }
+    try {
+      setSavingEnhancementPrice(true);
+      const pricingFactors = typeof accessoriesPriceItem.pricing_factors === 'string'
+        ? JSON.parse(accessoriesPriceItem.pricing_factors || '{}')
+        : (accessoriesPriceItem.pricing_factors || {});
+      const baseFinalPrice = parseFloat(accessoriesPriceItem.final_price || 0);
+      const newFinalPrice = baseFinalPrice + price;
+      const result = await updateCustomizationOrderItem(accessoriesPriceItem.item_id, {
+        approvalStatus: 'price_confirmation',
+        finalPrice: newFinalPrice,
+        adminNotes: `Accessories price: \u20b1${price.toFixed(2)}`,
+        pricingFactors: {
+          ...pricingFactors,
+          enhancementAdminAccepted: false,
+          enhancementPendingAdminReview: false,
+          enhancementAdminAcceptedAt: new Date().toISOString(),
+          accessoriesPrice: price.toFixed(2),
+          accessoriesBasePrice: baseFinalPrice.toFixed(2)
+        }
+      });
+      if (result.success) {
+        setShowAccessoriesPriceModal(false);
+        setAccessoriesPriceItem(null);
+        setAccessoriesPrice('');
+        showToast('Accessories price sent for customer confirmation.', 'success');
+        loadCustomizationOrders();
+      } else {
+        showToast(result.message || 'Failed to submit accessories price', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to submit accessories price', 'error');
     } finally {
       setSavingEnhancementPrice(false);
     }
@@ -3838,11 +3891,9 @@ const Customize = () => {
                     : (item.pricing_factors || {});
 
                   const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
-
-                  const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
-
+                  const isAccessoriesEnhancement = isEnhancementOrder && !!pricingFactors.accessoriesPrice;
                   const finalPrice = parseFloat(item.final_price || 0);
-
+                  const amountPaid = (isEnhancementOrder && !isAccessoriesEnhancement) ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
                   const remainingBalance = finalPrice - amountPaid;
 
                   const isUniform = item.specific_data?.garmentType?.toLowerCase() === 'uniform' ||
@@ -3963,10 +4014,10 @@ const Customize = () => {
                           const pf = typeof item.pricing_factors === 'string'
                             ? JSON.parse(item.pricing_factors || '{}')
                             : (item.pricing_factors || {});
-                          if (pf.enhancementRequest && pf.enhancementAdminAccepted) {
+                          if (pf.enhancementRequest && (pf.enhancementAdminAccepted || pf.addAccessories)) {
                             return (
                               <div style={{ fontSize: '11px', color: '#673ab7', marginTop: '4px', fontWeight: '600' }}>
-                                ✨ Enhancement
+                                {pf.addAccessories && !pf.enhancementAdminAccepted ? 'Enhancement + Accessories' : 'Enhancement'}
                               </div>
                             );
                           }
@@ -4075,7 +4126,7 @@ const Customize = () => {
 
                             )}
 
-                            {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && !isEnhancementOrder && (
+                            {(item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation') && (!isEnhancementOrder || (pricingFactors.accessoriesPrice && remainingBalance > 0.01)) && (
 
                               <button
 
@@ -4195,21 +4246,20 @@ const Customize = () => {
                     <th>Fabric</th>
                     <th>Date</th>
                     <th>Price</th>
-                    <th>Payment Status</th>
-                    <th>Status</th>
+                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {getFilteredEnhancementItems().length === 0 ? (
-                    <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No enhancement requests</td></tr>
+                    <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No enhancement requests</td></tr>
                   ) : getFilteredEnhancementItems().map(item => {
                         const pf = typeof item.pricing_factors === 'string'
                           ? JSON.parse(item.pricing_factors || '{}')
                           : (item.pricing_factors || {});
-                        const amountPaid = parseFloat(pf.amount_paid || 0);
+
                         const finalPrice = parseFloat(item.final_price || 0);
-                        const remainingBalance = finalPrice - amountPaid;
+
                     return (
                       <tr key={item.item_id}>
                             <td><strong>#{item.order_id}</strong></td>
@@ -4226,14 +4276,6 @@ const Customize = () => {
                               return new Date(preferredDate).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
                             })()}</td>
                             <td>&#8369;{finalPrice.toLocaleString()}</td>
-                            <td>
-                              <div style={{ fontSize: '12px' }}>
-                                <div>Paid: &#8369;{amountPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                                <div style={{ color: remainingBalance > 0 ? '#ff9800' : '#4caf50', fontWeight: 'bold' }}>
-                                  Remaining: &#8369;{Math.max(0, remainingBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </div>
-                              </div>
-                            </td>
                             <td>
                               <span className="status-badge" style={{ backgroundColor: '#ede7f6', color: '#673ab7', border: '1px solid #ce93d8' }}>
                                 Enhancement Request
@@ -4254,7 +4296,7 @@ const Customize = () => {
                                 </button>
                                 <button
                                   className="icon-btn accept"
-                                  title="Accept Enhancement"
+                                  title={pf.addAccessories ? 'Set Accessories Price' : 'Accept Enhancement'}
                                   disabled={savingEnhancementPrice}
                                   onClick={() => handleEnhancementPriceConfirm(item)}
                                 >
@@ -4295,6 +4337,11 @@ const Customize = () => {
                 <div style={{ padding: '10px', backgroundColor: '#f3e5f5', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ce93d8' }}>
                   {pf.enhancementNotes || 'No notes provided'}
                 </div>
+                {pf.addAccessories && (
+                  <div style={{ padding: '8px 12px', backgroundColor: '#fff3e0', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ffcc80', fontSize: '13px', color: '#e65100', fontWeight: '600' }}>
+                    Customer requested to add accessories - price confirmation required.
+                  </div>
+                )}
                 <div className="detail-row">
                   <strong>Preferred Completion Date:</strong>
                   {pf.enhancementPreferredCompletionDate
@@ -4303,22 +4350,89 @@ const Customize = () => {
                 </div>
                 <div className="detail-row"><strong>Requested At:</strong> {pf.enhancementUpdatedAt ? new Date(pf.enhancementUpdatedAt).toLocaleString() : 'N/A'}</div>
                 <div className="detail-row"><strong>Current Price:</strong> ₱{parseFloat(enhancementViewItem.final_price || 0).toLocaleString()}</div>
+                {pf.accessoriesDeclineReason && (
+                  <div style={{ padding: '8px 12px', backgroundColor: '#ffebee', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ef9a9a', fontSize: '13px', color: '#c62828' }}>
+                    <strong>Customer Decline Reason:</strong> {pf.accessoriesDeclineReason}
+                  </div>
+                )}
               </div>
-              <div className="modal-footer">
-                <button className="btn-cancel" onClick={() => setShowEnhancementViewModal(false)}>Close</button>
+              <div className="modal-footer enhancement-view-footer">
+                <button
+                  className="btn-cancel"
+                  style={{ backgroundColor: '#f44336', color: 'white', border: 'none' }}
+                  disabled={savingEnhancementPrice}
+                  onClick={async () => {
+                    const confirmed = await confirm('Cancel this enhancement request?', 'Cancel Enhancement', 'warning');
+                    if (!confirmed) return;
+                    setSavingEnhancementPrice(true);
+                    const result = await cancelEnhancement(enhancementViewItem.item_id);
+                    setSavingEnhancementPrice(false);
+                    if (result.success) { setShowEnhancementViewModal(false); showToast('Enhancement cancelled.', 'success'); loadCustomizationOrders(); }
+                    else showToast(result.message || 'Failed to cancel enhancement', 'error');
+                  }}
+                >
+                  Cancel Enhancement
+                </button>
                 <button
                   className="btn-save"
                   disabled={savingEnhancementPrice}
                   onClick={() => handleEnhancementPriceConfirm(enhancementViewItem)}
-                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
+                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff', whiteSpace: 'nowrap' }}
                 >
-                  {savingEnhancementPrice ? 'Accepting...' : 'Accept Enhancement'}
+                  {savingEnhancementPrice ? 'Processing...' : pf.addAccessories ? 'Set Accessories Price' : 'Accept Enhancement'}
                 </button>
               </div>
             </div>
           </div>
         );
       })()}
+      {showAccessoriesPriceModal && accessoriesPriceItem && (
+        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowAccessoriesPriceModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <h2>Set Accessories Price</h2>
+              <span className="close-modal" onClick={() => setShowAccessoriesPriceModal(false)}>x</span>
+            </div>
+            <div className="modal-body">
+              <div className="detail-row"><strong>Order ID:</strong> #{accessoriesPriceItem.order_id}</div>
+              <div className="detail-row"><strong>Current Price:</strong> &#8369;{parseFloat(accessoriesPriceItem.final_price || 0).toLocaleString()}</div>
+              <div style={{ padding: '8px 12px', backgroundColor: '#fff3e0', borderRadius: '6px', margin: '10px 0', border: '1px solid #ffcc80', fontSize: '13px', color: '#e65100' }}>
+                Customer requested to add accessories. Enter the price below - the customer will be asked to confirm before proceeding.
+              </div>
+              <div className="payment-form-group" style={{ marginTop: '12px' }}>
+                <label>Accessories Price *</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={accessoriesPrice}
+                  onChange={(e) => setAccessoriesPrice(e.target.value)}
+                  placeholder="Enter accessories price"
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }}
+                  autoFocus
+                />
+              </div>
+              {accessoriesPrice && !isNaN(parseFloat(accessoriesPrice)) && parseFloat(accessoriesPrice) > 0 && (
+                <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '13px', color: '#1976d2' }}>
+                  New total: &#8369;{(parseFloat(accessoriesPriceItem.final_price || 0) + parseFloat(accessoriesPrice)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn-cancel" onClick={() => { setShowAccessoriesPriceModal(false); setAccessoriesPrice(''); }}>Cancel</button>
+              <button
+                className="btn-save"
+                disabled={savingEnhancementPrice}
+                onClick={handleAccessoriesPriceSubmit}
+                style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
+              >
+                {savingEnhancementPrice ? 'Sending...' : 'Send for Confirmation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showEnhanceModal && enhanceOrder && (
         <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowEnhanceModal(false)}>
           <div className="modal-content enhance-order-modal" style={{ maxWidth: '640px', width: '95vw' }}>

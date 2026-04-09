@@ -47,4 +47,6 @@ router.delete('/items/:itemId', orderController.deleteOrderItem);
 router.put('/items/:id/price', orderController.updateOrderItemPrice);
 router.get('/items/:id/price-history', orderController.getOrderItemPriceHistory);
 
+router.post('/items/:itemId/cancel-enhancement', orderController.cancelEnhancement);
+
 module.exports = router;

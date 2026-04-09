@@ -301,3 +301,14 @@ export async function updateCustom3DModel(modelId, modelData) {
     };
   }
 }
+
+export async function cancelEnhancement(itemId) {
+  try {
+    const response = await axios.post(`${BASE_URL}/orders/items/${itemId}/cancel-enhancement`, {}, {
+      headers: getAuthHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    return { success: false, message: error.response?.data?.message || 'Error cancelling enhancement' };
+  }
+}

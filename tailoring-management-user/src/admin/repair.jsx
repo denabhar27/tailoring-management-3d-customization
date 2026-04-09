@@ -6,7 +6,7 @@ import AdminHeader from './AdminHeader';
 
 import Sidebar from './Sidebar';
 
-import { getAllRepairOrders, getRepairOrdersByStatus, updateRepairOrderItem } from '../api/RepairOrderApi';
+import { getAllRepairOrders, getRepairOrdersByStatus, updateRepairOrderItem, cancelEnhancement } from '../api/RepairOrderApi';
 
 import ImagePreviewModal from '../components/ImagePreviewModal';
 
@@ -3031,10 +3031,10 @@ const Repair = () => {
                           const pf = typeof item.pricing_factors === 'string'
                             ? JSON.parse(item.pricing_factors || '{}')
                             : (item.pricing_factors || {});
-                          if (pf.enhancementRequest && pf.enhancementAdminAccepted) {
+                          if (pf.enhancementRequest && (pf.enhancementAdminAccepted || pf.addAccessories)) {
                             return (
                               <div style={{ fontSize: '11px', color: '#673ab7', marginTop: '4px', fontWeight: '600' }}>
-                                ✨ Enhancement
+                                {pf.addAccessories && !pf.enhancementAdminAccepted ? 'Enhancement + Accessories' : 'Enhancement'}
                               </div>
                             );
                           }
@@ -3513,21 +3513,21 @@ const Repair = () => {
                     <th>Damage Type</th>
                     <th>Date</th>
                     <th>Price</th>
-                    <th>Payment Status</th>
+
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {getFilteredEnhancementItems().length === 0 ? (
-                    <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No enhancement requests</td></tr>
+                    <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No enhancement requests</td></tr>
                   ) : getFilteredEnhancementItems().map(item => {
                         const pf = typeof item.pricing_factors === 'string'
                           ? JSON.parse(item.pricing_factors || '{}')
                           : (item.pricing_factors || {});
-                        const amountPaid = parseFloat(pf.amount_paid || 0);
+
                         const finalPrice = parseFloat(item.final_price || 0);
-                        const remainingBalance = finalPrice - amountPaid;
+
                         return (
                           <tr key={item.item_id}>
                             <td><strong>#{item.order_id}</strong></td>
@@ -3548,14 +3548,6 @@ const Repair = () => {
                               return new Date(pickupDate).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
                             })()}</td>
                             <td>&#8369;{finalPrice.toLocaleString()}</td>
-                            <td>
-                              <div style={{ fontSize: '12px' }}>
-                                <div>Paid: &#8369;{amountPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                                <div style={{ color: remainingBalance > 0 ? '#ff9800' : '#4caf50', fontWeight: 'bold' }}>
-                                  Remaining: &#8369;{Math.max(0, remainingBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </div>
-                              </div>
-                            </td>
                             <td>
                               <span className="status-badge" style={{ backgroundColor: '#ede7f6', color: '#673ab7', border: '1px solid #ce93d8' }}>
                                 Enhancement Request
@@ -3631,14 +3623,34 @@ const Repair = () => {
                 </div>
                 <div className="detail-row"><strong>Requested At:</strong> {pf.enhancementUpdatedAt ? new Date(pf.enhancementUpdatedAt).toLocaleString() : 'N/A'}</div>
                 <div className="detail-row"><strong>Current Price:</strong> ₱{parseFloat(enhancementViewItem.final_price || 0).toLocaleString()}</div>
+                {pf.accessoriesDeclineReason && (
+                  <div style={{ padding: '8px 12px', backgroundColor: '#ffebee', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ef9a9a', fontSize: '13px', color: '#c62828' }}>
+                    <strong>Customer Decline Reason:</strong> {pf.accessoriesDeclineReason}
+                  </div>
+                )}
               </div>
-              <div className="modal-footer">
-                <button className="btn-cancel" onClick={() => setShowEnhancementViewModal(false)}>Close</button>
+              <div className="modal-footer enhancement-view-footer">
+                <button
+                  className="btn-cancel"
+                  style={{ backgroundColor: '#f44336', color: 'white', border: 'none' }}
+                  disabled={savingEnhancementPrice}
+                  onClick={async () => {
+                    const confirmed = await confirm('Cancel this enhancement request?', 'Cancel Enhancement', 'warning');
+                    if (!confirmed) return;
+                    setSavingEnhancementPrice(true);
+                    const result = await cancelEnhancement(enhancementViewItem.item_id);
+                    setSavingEnhancementPrice(false);
+                    if (result.success) { setShowEnhancementViewModal(false); showToast('Enhancement cancelled.', 'success'); loadRepairOrders(); }
+                    else showToast(result.message || 'Failed to cancel enhancement', 'error');
+                  }}
+                >
+                  Cancel Enhancement
+                </button>
                 <button
                   className="btn-save"
                   disabled={savingEnhancementPrice}
                   onClick={() => handleEnhancementPriceConfirm(enhancementViewItem)}
-                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
+                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff', whiteSpace: 'nowrap' }}
                 >
                   {savingEnhancementPrice ? 'Processing...' : pf.addAccessories ? 'Set Accessories Price' : 'Accept Enhancement'}
                 </button>

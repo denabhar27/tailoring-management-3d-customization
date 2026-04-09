@@ -1490,6 +1490,12 @@ tbody tr.clickable-row:active {
   background: #FAFAFA;
 }
 
+.enhancement-view-footer .btn-cancel,
+.enhancement-view-footer .btn-save {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .btn-cancel {
   padding: 10px 20px;
   background: #f5f5f5;

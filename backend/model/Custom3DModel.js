@@ -1,6 +1,16 @@
 const db = require('../config/db');
 
 const Custom3DModel = {
+
+  _parseJSON: (value) => {
+    if (!value) return null;
+    if (typeof value === 'object') return value;
+    try {
+      return JSON.parse(value);
+    } catch (e) {
+      return null;
+    }
+  },
   
   getAll: (callback) => {
     const sql = `
@@ -8,7 +18,15 @@ const Custom3DModel = {
       WHERE is_active = 1 
       ORDER BY created_at DESC
     `;
-    db.query(sql, callback);
+    db.query(sql, (err, results) => {
+      if (err) return callback(err);
+      const parsed = (results || []).map((r) => ({
+        ...r,
+        measurement_fields: Custom3DModel._parseJSON(r.measurement_fields),
+        size_chart: Custom3DModel._parseJSON(r.size_chart)
+      }));
+      callback(null, parsed);
+    });
   },
 
   getByType: (modelType, callback) => {
@@ -17,7 +35,15 @@ const Custom3DModel = {
       WHERE model_type = ? AND is_active = 1 
       ORDER BY created_at DESC
     `;
-    db.query(sql, [modelType], callback);
+    db.query(sql, [modelType], (err, results) => {
+      if (err) return callback(err);
+      const parsed = (results || []).map((r) => ({
+        ...r,
+        measurement_fields: Custom3DModel._parseJSON(r.measurement_fields),
+        size_chart: Custom3DModel._parseJSON(r.size_chart)
+      }));
+      callback(null, parsed);
+    });
   },
 
   getByCategory: (category, callback) => {
@@ -26,7 +52,15 @@ const Custom3DModel = {
       WHERE garment_category = ? AND is_active = 1 
       ORDER BY created_at DESC
     `;
-    db.query(sql, [category], callback);
+    db.query(sql, [category], (err, results) => {
+      if (err) return callback(err);
+      const parsed = (results || []).map((r) => ({
+        ...r,
+        measurement_fields: Custom3DModel._parseJSON(r.measurement_fields),
+        size_chart: Custom3DModel._parseJSON(r.size_chart)
+      }));
+      callback(null, parsed);
+    });
   },
 
   getById: (modelId, callback) => {
@@ -37,7 +71,12 @@ const Custom3DModel = {
     db.query(sql, [modelId], (err, results) => {
       if (err) return callback(err, null);
       if (results.length === 0) return callback(null, null);
-      callback(null, results[0]);
+      const row = results[0];
+      callback(null, {
+        ...row,
+        measurement_fields: Custom3DModel._parseJSON(row.measurement_fields),
+        size_chart: Custom3DModel._parseJSON(row.size_chart)
+      });
     });
   },
 
@@ -52,7 +91,7 @@ const Custom3DModel = {
   },
 
   update: (modelId, updateData, callback) => {
-    const { model_name, model_type, file_path, file_url, garment_category, description, is_active } = updateData;
+    const { model_name, model_type, file_path, file_url, garment_category, description, is_active, measurement_fields, size_chart } = updateData;
     const updates = [];
     const values = [];
 
@@ -83,6 +122,14 @@ const Custom3DModel = {
     if (is_active !== undefined) {
       updates.push('is_active = ?');
       values.push(is_active);
+    }
+    if (measurement_fields !== undefined) {
+      updates.push('measurement_fields = ?');
+      values.push(measurement_fields ? JSON.stringify(measurement_fields) : null);
+    }
+    if (size_chart !== undefined) {
+      updates.push('size_chart = ?');
+      values.push(size_chart ? JSON.stringify(size_chart) : null);
     }
 
     if (updates.length === 0) {

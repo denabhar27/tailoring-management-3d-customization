@@ -286,3 +286,18 @@ export async function deleteCustom3DModel(modelId) {
     };
   }
 }
+
+export async function updateCustom3DModel(modelId, modelData) {
+  try {
+    const response = await axios.put(`${BASE_URL}/customization/custom-models/${modelId}`, modelData, {
+      headers: getAuthHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Update custom 3D model error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Error updating custom 3D model'
+    };
+  }
+}

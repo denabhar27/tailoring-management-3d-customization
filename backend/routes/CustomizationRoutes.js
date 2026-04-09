@@ -23,6 +23,7 @@ router.post('/upload-glb',
   CustomizationController.uploadGLBFile, 
   CustomizationController.handleGLBUpload
 );
+router.put('/custom-models/:modelId', CustomizationController.updateCustom3DModel);
 router.delete('/custom-models/:modelId', CustomizationController.deleteCustom3DModel);
 
 router.get('/:itemId', CustomizationController.getCustomizationOrderById);

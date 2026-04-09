@@ -86,17 +86,36 @@ const App = ({ setIsLoggedIn }) => {
     return { isValid: true };
   };
 
-  const validatePhoneNumber = (phoneNumber) => {
-    const digitsOnly = String(phoneNumber || '').replace(/\D/g, '');
+  const sanitizePhilippinePhone = (phoneNumber) => {
+    let digitsOnly = String(phoneNumber || '').replace(/\D/g, '');
 
-    if (digitsOnly.length !== 11) {
+    // Accept +63XXXXXXXXXX / 63XXXXXXXXXX / 09XXXXXXXXX / 9XXXXXXXXX and store as 9XXXXXXXXX for UI.
+    if (digitsOnly.startsWith('63')) {
+      digitsOnly = digitsOnly.slice(2);
+    }
+    if (digitsOnly.startsWith('0')) {
+      digitsOnly = digitsOnly.slice(1);
+    }
+
+    return digitsOnly.slice(0, 10);
+  };
+
+  const toLocalPhilippinePhone = (phoneNumber) => {
+    const mobileLocal = sanitizePhilippinePhone(phoneNumber);
+    return mobileLocal ? `0${mobileLocal}` : '';
+  };
+
+  const validatePhoneNumber = (phoneNumber) => {
+    const normalizedPhone = sanitizePhilippinePhone(phoneNumber);
+
+    if (!/^9\d{9}$/.test(normalizedPhone)) {
       return {
         isValid: false,
-        message: 'Phone number must be exactly 11 digits.'
+        message: 'Phone number must be a valid PH mobile number (e.g. +63 9XXXXXXXXX).'
       };
     }
 
-    return { isValid: true };
+    return { isValid: true, sanitizedPhone: normalizedPhone };
   };
 
   const handleLogin = async () => {
@@ -137,7 +156,9 @@ const App = ({ setIsLoggedIn }) => {
         }
       } else {
 
-        if (!signupFirstName || !signupLastName || !signupUsername || !signupEmail || !signupPassword || !signupPhone || !signupBirthdate) {
+        const sanitizedSignupPhone = sanitizePhilippinePhone(signupPhone);
+
+        if (!signupFirstName || !signupLastName || !signupUsername || !signupEmail || !signupPassword || !sanitizedSignupPhone || !signupBirthdate) {
           setAuthError('Please fill in all required fields');
           setIsLoading(false);
           return;
@@ -149,12 +170,14 @@ const App = ({ setIsLoggedIn }) => {
           return;
         }
 
-        const phoneValidation = validatePhoneNumber(signupPhone);
+        const phoneValidation = validatePhoneNumber(sanitizedSignupPhone);
         if (!phoneValidation.isValid) {
           setAuthError(phoneValidation.message);
           setIsLoading(false);
           return;
         }
+
+        setSignupPhone(phoneValidation.sanitizedPhone);
 
         const passwordValidation = validatePassword(signupPassword);
         if (!passwordValidation.isValid) {
@@ -171,7 +194,7 @@ const App = ({ setIsLoggedIn }) => {
             username: signupUsername.trim(),
             email: signupEmail.trim(),
             password: signupPassword,
-            phone_number: signupPhone.trim(),
+            phone_number: toLocalPhilippinePhone(phoneValidation.sanitizedPhone),
             birthdate: signupBirthdate
           });
 
@@ -555,7 +578,9 @@ const App = ({ setIsLoggedIn }) => {
           {!isLogin && (
             <>
               <div className="input-group">
+                <label htmlFor="signup-first-name" className="input-label">First Name</label>
                 <input
+                  id="signup-first-name"
                   type="text"
                   placeholder="First Name"
                   required
@@ -565,7 +590,9 @@ const App = ({ setIsLoggedIn }) => {
                 />
               </div>
               <div className="input-group">
+                <label htmlFor="signup-middle-name" className="input-label">Middle Name (Optional)</label>
                 <input
+                  id="signup-middle-name"
                   type="text"
                   placeholder="Middle Name (Optional)"
                   autoComplete="additional-name"
@@ -574,7 +601,9 @@ const App = ({ setIsLoggedIn }) => {
                 />
               </div>
               <div className="input-group">
+                <label htmlFor="signup-last-name" className="input-label">Last Name</label>
                 <input
+                  id="signup-last-name"
                   type="text"
                   placeholder="Last Name"
                   required
@@ -584,7 +613,9 @@ const App = ({ setIsLoggedIn }) => {
                 />
               </div>
               <div className="input-group">
+                <label htmlFor="signup-username" className="input-label">Username</label>
                 <input
+                  id="signup-username"
                   type="text"
                   placeholder="Username"
                   required
@@ -597,7 +628,9 @@ const App = ({ setIsLoggedIn }) => {
           )}
 
           <div className="input-group">
+            {!isLogin && <label htmlFor="signup-email" className="input-label">Email Address</label>}
             <input
+              id={isLogin ? undefined : 'signup-email'}
               type={isLogin ? "text" : "email"}
               placeholder={isLogin ? "Username" : "Email Address"}
               required
@@ -608,7 +641,9 @@ const App = ({ setIsLoggedIn }) => {
           </div>
 
           <div className="input-group">
+            {!isLogin && <label htmlFor="signup-password" className="input-label">Password</label>}
             <input
+              id={isLogin ? undefined : 'signup-password'}
               type="password"
               placeholder="Password"
               required
@@ -657,7 +692,9 @@ const App = ({ setIsLoggedIn }) => {
           {!isLogin && (
             <>
               <div className="input-group">
+                <label htmlFor="signup-confirm-password" className="input-label">Confirm Password</label>
                 <input
+                  id="signup-confirm-password"
                   type="password"
                   placeholder="Confirm Password"
                   required
@@ -682,18 +719,23 @@ const App = ({ setIsLoggedIn }) => {
                 )}
               </div>
               <div className="input-group">
-                <input
-                  type="tel"
-                  placeholder="Phone Number"
-                  required
-                  autoComplete="tel"
-                  inputMode="numeric"
-                  maxLength={11}
-                  pattern="[0-9]{11}"
-                  value={signupPhone}
-                  onChange={(e) => setSignupPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                />
-                {signupPhone && signupPhone.replace(/\D/g, '').length !== 11 && (
+                <label htmlFor="signup-phone" className="input-label">Phone Number</label>
+                <div className="phone-input-with-prefix">
+                  <span className="phone-prefix">+63</span>
+                  <input
+                    id="signup-phone"
+                    type="tel"
+                    placeholder="9XXXXXXXXX"
+                    required
+                    autoComplete="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    pattern="9[0-9]{9}"
+                    value={signupPhone}
+                    onChange={(e) => setSignupPhone(sanitizePhilippinePhone(e.target.value))}
+                  />
+                </div>
+                {signupPhone && !/^9\d{9}$/.test(sanitizePhilippinePhone(signupPhone)) && (
                   <div style={{
                     fontSize: '11px',
                     marginTop: '5px',
@@ -703,7 +745,7 @@ const App = ({ setIsLoggedIn }) => {
                     gap: '6px'
                   }}>
                     <span style={{ fontSize: '14px' }}>✗</span>
-                    Phone number must be exactly 11 digits.
+                    Use a valid PH mobile number (e.g. +63 9XXXXXXXXX).
                   </div>
                 )}
               </div>

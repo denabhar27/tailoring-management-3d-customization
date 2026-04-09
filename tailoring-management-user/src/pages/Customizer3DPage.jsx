@@ -49,6 +49,26 @@ const Customizer3DPage = () => {
     font: 'Serif',
     size: 0.8,
   });
+  const getUploadedGarmentTypeNavItems = () => {
+    if (!Array.isArray(garmentTypes) || garmentTypes.length === 0) return [];
+
+    const builtInCodes = new Set(['coat-men', 'coat-men-plain', 'coat-women', 'coat-women-plain', 'coat-teal', 'barong', 'suit-1', 'suit-2', 'pants']);
+    const seenCodes = new Set();
+
+    return garmentTypes
+      .filter((type) => (type?.is_active === 1 || type?.is_active === '1' || type?.is_active === true) && type?.garment_code)
+      .map((type) => ({
+        code: String(type.garment_code).trim().toLowerCase(),
+        name: String(type.garment_name || type.garment_code).trim()
+      }))
+      .filter((type) => {
+        if (!type.code || builtInCodes.has(type.code)) return false;
+        if (seenCodes.has(type.code)) return false;
+        seenCodes.add(type.code);
+        return true;
+      });
+  };
+
   const [designImage, setDesignImage] = useState(null);
   const [notes, setNotes] = useState('');
   const [buttons, setButtons] = useState([]);
@@ -550,24 +570,6 @@ const Customizer3DPage = () => {
     navigate('/user-home');
   };
 
-  const getCustomGarmentNavItems = () => {
-    if (!customModels || customModels.length === 0) return [];
-
-    const uniqueModels = customModels
-      .filter(model => model.model_type === 'garment')
-      .reduce((acc, model) => {
-        const exists = acc.find(m => m.model_name.toLowerCase() === model.model_name.toLowerCase());
-        if (!exists) acc.push(model);
-        return acc;
-      }, []);
-
-    return uniqueModels;
-  };
-
-  const isCustomModelActive = (modelId) => {
-    return garment === `custom-${modelId}`;
-  };
-
   return (
     <div className="app">
       <div className="nav">
@@ -595,17 +597,16 @@ const Customizer3DPage = () => {
         >
           Pants
         </button>
-        {getCustomGarmentNavItems().map(model => (
+        {getUploadedGarmentTypeNavItems().map((type) => (
           <button
-            key={model.model_id}
-            className={isCustomModelActive(model.model_id) ? 'active custom-model-btn' : 'custom-model-btn'}
-            onClick={() => setGarment(`custom-${model.model_id}`)}
-            title={model.description || model.model_name}
+            key={type.code}
+            className={garment === type.code ? 'active' : ''}
+            onClick={() => setGarment(type.code)}
+            title={type.name}
           >
-            {model.model_name}
+            {type.name}
           </button>
         ))}
-
         <button
           className="save-btn"
           onClick={handleSaveDesign}

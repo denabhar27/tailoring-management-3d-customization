@@ -26,11 +26,9 @@ const ensureTableExists = (callback) => {
 
     const insertDefaultSlotsSQL = `
       INSERT IGNORE INTO time_slots (time_slot, capacity, is_active) VALUES
-      ('08:00:00', 5, 1), ('08:30:00', 5, 1), ('09:00:00', 5, 1), ('09:30:00', 5, 1),
-      ('10:00:00', 5, 1), ('10:30:00', 5, 1), ('11:00:00', 5, 1), ('11:30:00', 5, 1),
-      ('12:00:00', 5, 1), ('12:30:00', 5, 1), ('13:00:00', 5, 1), ('13:30:00', 5, 1),
-      ('14:00:00', 5, 1), ('14:30:00', 5, 1), ('15:00:00', 5, 1), ('15:30:00', 5, 1),
-      ('16:00:00', 5, 1), ('16:30:00', 5, 1), ('17:00:00', 5, 1)
+      ('08:30:00', 5, 1), ('09:30:00', 5, 1), ('10:30:00', 5, 1), ('11:30:00', 5, 1),
+      ('12:30:00', 5, 1), ('13:30:00', 5, 1), ('14:30:00', 5, 1), ('15:30:00', 5, 1),
+      ('16:30:00', 5, 1)
     `;
     
     db.query(insertDefaultSlotsSQL, (err) => {
@@ -38,6 +36,22 @@ const ensureTableExists = (callback) => {
         console.error('Error inserting default time slots:', err);
         
       }
+
+      const normalizeIntervalSQL = `
+        UPDATE time_slots
+        SET is_active = CASE
+          WHEN MINUTE(time_slot) = 30 THEN 1
+          WHEN MINUTE(time_slot) = 0 THEN 0
+          ELSE is_active
+        END
+        WHERE MINUTE(time_slot) IN (0, 30)
+      `;
+
+      db.query(normalizeIntervalSQL, (normalizeErr) => {
+        if (normalizeErr) {
+          console.error('Error normalizing time slot interval to 1 hour:', normalizeErr);
+        }
+      });
 
       const createAppointmentSlotsSQL = `
         CREATE TABLE IF NOT EXISTS appointment_slots (

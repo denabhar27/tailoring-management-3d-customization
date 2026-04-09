@@ -71,6 +71,33 @@ const getAvailableSizeKeys = (sizeOptions = {}) => {
   });
 };
 
+const sanitizePhilippineMobile = (phoneNumber) => {
+  let digitsOnly = String(phoneNumber || '').replace(/\D/g, '');
+
+  if (digitsOnly.startsWith('63')) {
+    digitsOnly = digitsOnly.slice(2);
+  }
+  if (digitsOnly.startsWith('0')) {
+    digitsOnly = digitsOnly.slice(1);
+  }
+
+  return digitsOnly.slice(0, 10);
+};
+
+const toLocalPhoneForSubmission = (phoneNumber) => {
+  const mobileLocal = sanitizePhilippineMobile(phoneNumber);
+  return mobileLocal ? `0${mobileLocal}` : '';
+};
+
+const isValidPhilippineMobile = (phoneNumber) => /^9\d{9}$/.test(sanitizePhilippineMobile(phoneNumber));
+
+const buildWalkInCustomerName = (firstName, middleName, lastName) => {
+  return [firstName, middleName, lastName]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join(' ');
+};
+
 const WalkInOrders = () => {
   const { alert } = useAlert();
   const [serviceType, setServiceType] = useState('dry_cleaning');
@@ -78,6 +105,7 @@ const WalkInOrders = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const [customerFirstName, setCustomerFirstName] = useState('');
+  const [customerMiddleName, setCustomerMiddleName] = useState('');
   const [customerLastName, setCustomerLastName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -252,10 +280,13 @@ const WalkInOrders = () => {
   };
 
   const handlePhoneChange = async (phone) => {
-    setCustomerPhone(phone);
-    if (phone.length >= 3) {
+    const sanitizedPhone = sanitizePhilippineMobile(phone);
+    setCustomerPhone(sanitizedPhone);
+
+    const searchPhone = toLocalPhoneForSubmission(sanitizedPhone);
+    if (sanitizedPhone.length >= 3) {
       try {
-        const result = await searchWalkInCustomers(phone);
+        const result = await searchWalkInCustomers(searchPhone);
         if (result.success && result.customers) {
           setCustomerSearchResults(result.customers);
           setShowCustomerSearch(result.customers.length > 0);
@@ -271,11 +302,13 @@ const WalkInOrders = () => {
   const selectCustomer = (customer) => {
     const nameParts = (customer.name || '').trim().split(' ');
     const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ') || '';
+    const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
     setCustomerFirstName(firstName);
+    setCustomerMiddleName(middleName);
     setCustomerLastName(lastName);
     setCustomerEmail(customer.email || '');
-    setCustomerPhone(customer.phone);
+    setCustomerPhone(sanitizePhilippineMobile(customer.phone || ''));
     setShowCustomerSearch(false);
     setCustomerSearchResults([]);
   };
@@ -576,8 +609,15 @@ const WalkInOrders = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    const normalizedCustomerPhone = toLocalPhoneForSubmission(customerPhone);
+
     if (!customerFirstName || !customerLastName || !customerPhone) {
       alert('Please enter customer first name, last name, and phone number');
+      return;
+    }
+
+    if (!isValidPhilippineMobile(customerPhone)) {
+      alert('Please enter a valid PH mobile number (e.g. +63 9XXXXXXXXX).');
       return;
     }
 
@@ -638,15 +678,16 @@ const WalkInOrders = () => {
 
     try {
       let result;
+      const walkInCustomerName = buildWalkInCustomerName(customerFirstName, customerMiddleName, customerLastName);
 
       if (serviceType === 'dry_cleaning') {
         const totalPrice = parseFloat(estimatedDryCleaningPrice);
         const qty = parseInt(quantity, 10);
         const pricePerItem = qty > 0 ? (totalPrice / qty) : 0;
         result = await createWalkInDryCleaningOrder({
-          customerName: `${customerFirstName} ${customerLastName}`.trim(),
+          customerName: walkInCustomerName,
           customerEmail,
-          customerPhone,
+          customerPhone: normalizedCustomerPhone,
           garmentType,
           quantity: qty,
           specialInstructions,
@@ -659,9 +700,9 @@ const WalkInOrders = () => {
         });
       } else if (serviceType === 'repair') {
         result = await createWalkInRepairOrder({
-          customerName: `${customerFirstName} ${customerLastName}`.trim(),
+          customerName: walkInCustomerName,
           customerEmail,
-          customerPhone,
+          customerPhone: normalizedCustomerPhone,
           garmentType: repairGarmentType,
           damageLevel,
           description: repairDescription,
@@ -677,9 +718,9 @@ const WalkInOrders = () => {
         };
 
         result = await createWalkInCustomizationOrder({
-          customerName: `${customerFirstName} ${customerLastName}`.trim(),
+          customerName: walkInCustomerName,
           customerEmail,
-          customerPhone,
+          customerPhone: normalizedCustomerPhone,
           garmentType: customGarmentType,
           fabricType,
           patternType,
@@ -727,9 +768,9 @@ const WalkInOrders = () => {
           .filter((entry) => entry.quantity > 0);
 
         result = await createWalkInRentalOrder({
-          customerName: `${customerFirstName} ${customerLastName}`.trim(),
+          customerName: walkInCustomerName,
           customerEmail,
-          customerPhone,
+          customerPhone: normalizedCustomerPhone,
           rentalItemIds: selectedRentalItems.map(item => item.item_id),
           rentalItemSelections,
           rentalDuration: parseInt(rentalDuration),
@@ -746,6 +787,7 @@ const WalkInOrders = () => {
         alert('Walk-in order created successfully!', 'success');
 
         setCustomerFirstName('');
+        setCustomerMiddleName('');
         setCustomerLastName('');
         setCustomerEmail('');
         setCustomerPhone('');
@@ -810,14 +852,25 @@ const WalkInOrders = () => {
 
                 <div className="form-group">
                   <label>Phone Number *</label>
-                  <input
-                    type="tel"
-                    value={customerPhone}
-                    onChange={(e) => handlePhoneChange(e.target.value)}
-                    className="form-control"
-                    placeholder="Enter phone number"
-                    required
-                  />
+                  <div className="phone-input-with-prefix walkin-phone-input">
+                    <span className="phone-prefix">+63</span>
+                    <input
+                      type="tel"
+                      value={customerPhone}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      className="form-control"
+                      placeholder="9XXXXXXXXX"
+                      inputMode="numeric"
+                      maxLength={10}
+                      pattern="9[0-9]{9}"
+                      required
+                    />
+                  </div>
+                  {customerPhone && !isValidPhilippineMobile(customerPhone) && (
+                    <div style={{ fontSize: '12px', color: '#d32f2f', marginTop: '6px' }}>
+                      Use a valid PH mobile number (e.g. +63 9XXXXXXXXX).
+                    </div>
+                  )}
                   {showCustomerSearch && customerSearchResults.length > 0 && (
                     <div className="customer-search-results">
                       {customerSearchResults.map(customer => (
@@ -834,30 +887,39 @@ const WalkInOrders = () => {
                   )}
                 </div>
 
-                <div className="form-row-compact">
-                  <div className="form-group">
-                    <label>First Name *</label>
-                    <input
-                      type="text"
-                      value={customerFirstName}
-                      onChange={(e) => setCustomerFirstName(e.target.value)}
-                      className="form-control"
-                      placeholder="First name"
-                      required
-                    />
-                  </div>
+                <div className="form-group">
+                  <label>First Name *</label>
+                  <input
+                    type="text"
+                    value={customerFirstName}
+                    onChange={(e) => setCustomerFirstName(e.target.value)}
+                    className="form-control"
+                    placeholder="First name"
+                    required
+                  />
+                </div>
 
-                  <div className="form-group">
-                    <label>Last Name *</label>
-                    <input
-                      type="text"
-                      value={customerLastName}
-                      onChange={(e) => setCustomerLastName(e.target.value)}
-                      className="form-control"
-                      placeholder="Last name"
-                      required
-                    />
-                  </div>
+                <div className="form-group">
+                  <label>Middle Name</label>
+                  <input
+                    type="text"
+                    value={customerMiddleName}
+                    onChange={(e) => setCustomerMiddleName(e.target.value)}
+                    className="form-control"
+                    placeholder="Middle name (optional)"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Last Name *</label>
+                  <input
+                    type="text"
+                    value={customerLastName}
+                    onChange={(e) => setCustomerLastName(e.target.value)}
+                    className="form-control"
+                    placeholder="Last name"
+                    required
+                  />
                 </div>
 
                 <div className="form-group">
@@ -1606,6 +1668,34 @@ const WalkInOrders = () => {
           border: 1px solid #ddd;
           border-radius: 4px;
           font-size: 14px;
+        }
+        .walk-in-orders-page .phone-input-with-prefix {
+          display: flex;
+          align-items: center;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          background: #fff;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .walk-in-orders-page .phone-input-with-prefix:focus-within {
+          border-color: #8B4513;
+          box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.12);
+        }
+        .walk-in-orders-page .phone-input-with-prefix .phone-prefix {
+          padding: 0 12px;
+          font-weight: 600;
+          color: #2f3542;
+          border-right: 1px solid #e7e9ee;
+          flex: 0 0 auto;
+        }
+        .walk-in-orders-page .walkin-phone-input input.form-control {
+          border: none;
+          border-radius: 0 4px 4px 0;
+          box-shadow: none;
+        }
+        .walk-in-orders-page .walkin-phone-input input.form-control:focus {
+          outline: none;
+          box-shadow: none;
         }
         .form-row {
           display: grid;

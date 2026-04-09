@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from './CustomizationPanel.module.css';
 import { API_BASE_URL } from '../../api/config';
 
@@ -79,9 +79,55 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
   };
 
   const matchedGarmentType = getMatchingGarmentType();
+  const selectedCustomGarmentModel = garment.startsWith('custom-')
+    ? customGarmentModels.find((m) => String(m.model_id) === garment.replace('custom-', ''))
+    : null;
+
+  const normalizeSizeKey = (value) => String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, '-')
+    .replace(/-+/g, '-');
+
+  const normalizeMeasurementFields = (value) => {
+    if (!value) return [];
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return normalizeMeasurementFields(parsed);
+      } catch (e) {
+        return [];
+      }
+    }
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'object') {
+      return Object.entries(value).map(([field, config]) => ({
+        field,
+        label: config?.label || field.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        unit: config?.unit || 'inches'
+      }));
+    }
+    return [];
+  };
+
+  const normalizeSizeChart = (value) => {
+    if (!value) return null;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    return typeof value === 'object' ? value : null;
+  };
+
+  const activeMeasurementFields = selectedCustomGarmentModel?.measurement_fields ?? matchedGarmentType?.measurement_fields;
+  const activeSizeChart = normalizeSizeChart(selectedCustomGarmentModel?.size_chart) || normalizeSizeChart(matchedGarmentType?.size_chart);
 
   const getAvailableSizes = () => {
-    const chart = matchedGarmentType?.size_chart;
+    const chart = activeSizeChart;
     if (chart && typeof chart === 'object') {
       const keys = Object.keys(chart).filter(Boolean);
       if (keys.length > 0) return keys;
@@ -89,17 +135,44 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
     return ['small', 'medium', 'large'];
   };
 
+  const resolveSizeKey = (targetSize, availableSizeKeys) => {
+    const normalizedTarget = normalizeSizeKey(targetSize);
+    return availableSizeKeys.find((key) => normalizeSizeKey(key) === normalizedTarget) || null;
+  };
+
+  const availableSizes = getAvailableSizes();
+  const selectedSizeKey = resolveSizeKey(size, availableSizes) || availableSizes[0] || size;
+
+  useEffect(() => {
+    if (availableSizes.length > 0 && size !== selectedSizeKey) {
+      setSize(selectedSizeKey);
+    }
+  }, [availableSizes.join('|'), selectedSizeKey, setSize, size]);
+
   const getSizeLabel = (sizeKey) => {
     if (!sizeKey) return 'Size';
     return sizeKey
+      .replace(/_/g, '-')
       .split('-')
       .map(part => part.charAt(0).toUpperCase() + part.slice(1))
       .join(' ');
   };
 
+  const getActiveSizeValues = () => {
+    const chart = activeSizeChart;
+    if (!chart || typeof chart !== 'object') return null;
+
+    const targetKey = normalizeSizeKey(selectedSizeKey);
+    const matchedKey = Object.keys(chart).find((key) => normalizeSizeKey(key) === targetKey);
+    if (!matchedKey) return null;
+
+    return chart[matchedKey] && typeof chart[matchedKey] === 'object' ? chart[matchedKey] : null;
+  };
+
   const getSizeMeasurement = (field) => {
-    if (matchedGarmentType?.size_chart?.[size]?.[field] !== undefined) {
-      const val = matchedGarmentType.size_chart[size][field];
+    const activeSizeValues = getActiveSizeValues();
+    if (activeSizeValues && activeSizeValues[field] !== undefined) {
+      const val = activeSizeValues[field];
       return (val !== '' && val !== null) ? val : '--';
     }
 
@@ -153,8 +226,25 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
   };
 
   const getGarmentMeasurements = () => {
-    if (matchedGarmentType?.measurement_fields && matchedGarmentType.measurement_fields.length > 0) {
-      return matchedGarmentType.measurement_fields;
+    const dynamicFields = normalizeMeasurementFields(activeMeasurementFields);
+    if (dynamicFields.length > 0) {
+      return dynamicFields;
+    }
+
+    const sizeChart = activeSizeChart;
+    if (sizeChart && typeof sizeChart === 'object') {
+      const firstSize = Object.keys(sizeChart)[0];
+      const firstSizeValues = firstSize ? sizeChart[firstSize] : null;
+      if (firstSizeValues && typeof firstSizeValues === 'object') {
+        const derivedFields = Object.keys(firstSizeValues).map((field) => ({
+          field,
+          label: field.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+          unit: 'inches'
+        }));
+        if (derivedFields.length > 0) {
+          return derivedFields;
+        }
+      }
     }
     if (garment.startsWith('coat') || isCoatType) {
       return [
@@ -335,6 +425,27 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
 
   const isPantsType = garment === 'pants' || isCustomModelWithCategory('pants');
 
+  const builtInGarmentPrefixes = ['coat-', 'suit-', 'barong', 'pants'];
+  const activeGarmentCategoryCode = (() => {
+    if (garment.startsWith('custom-')) {
+      const modelId = garment.replace('custom-', '');
+      const model = customGarmentModels.find(m => String(m.model_id) === modelId);
+      return (model?.garment_category || '').toLowerCase();
+    }
+    return (garment || '').toLowerCase();
+  })();
+  const isDynamicGarmentType = Boolean(
+    activeGarmentCategoryCode &&
+    !builtInGarmentPrefixes.some(prefix => activeGarmentCategoryCode === prefix || activeGarmentCategoryCode.startsWith(prefix))
+  );
+  const dynamicGarmentLabel = matchedGarmentType?.garment_name || activeGarmentCategoryCode;
+  const normalizeOptionLabel = (value) => String(value || '').trim().toLowerCase();
+  const dynamicCustomModelOptions = customGarmentModels.filter((model, index, self) => {
+    const category = (model.garment_category || '').toLowerCase();
+    if (category !== activeGarmentCategoryCode) return false;
+    return index === self.findIndex((m) => m.model_name.toLowerCase() === model.model_name.toLowerCase());
+  }).filter((model) => normalizeOptionLabel(model.model_name) !== normalizeOptionLabel(dynamicGarmentLabel));
+
   return (
     <div className="group">
       {(garment.startsWith('coat-') || isCoatType) && (
@@ -382,8 +493,8 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
               <div className="row">
                 <label className={styles.sizeLabel}>Size
                   <div className={styles.sizeFieldRow}>
-                    <select value={size} onChange={e => setSize(e.target.value)}>
-                      {getAvailableSizes().map(s => (
+                    <select value={selectedSizeKey} onChange={e => setSize(e.target.value)}>
+                      {availableSizes.map(s => (
                         <option key={s} value={s}>{getSizeLabel(s)}</option>
                       ))}
                     </select>
@@ -391,7 +502,7 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                 </label>
               </div>
               <h3 onClick={() => toggleSection('sizeDetails')} className={styles.collapsibleHeader}>
-                <span>{getSizeLabel(size)} Size Details</span>
+                <span>{getSizeLabel(selectedSizeKey)} Size Details</span>
                 <span className={styles.toggleIcon}>{expandedSections.sizeDetails ? '−' : '+'}</span>
               </h3>
               {expandedSections.sizeDetails && (
@@ -461,8 +572,8 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
               <div className="row">
                 <label className={styles.sizeLabel}>Size
                   <div className={styles.sizeFieldRow}>
-                    <select value={size} onChange={e => setSize(e.target.value)}>
-                      {getAvailableSizes().map(s => (
+                    <select value={selectedSizeKey} onChange={e => setSize(e.target.value)}>
+                      {availableSizes.map(s => (
                         <option key={s} value={s}>{getSizeLabel(s)}</option>
                       ))}
                     </select>
@@ -470,7 +581,7 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                 </label>
               </div>
               <h3 onClick={() => toggleSection('sizeDetails')} className={styles.collapsibleHeader}>
-                <span>{getSizeLabel(size)} Size Details</span>
+                <span>{getSizeLabel(selectedSizeKey)} Size Details</span>
                 <span className={styles.toggleIcon}>{expandedSections.sizeDetails ? '−' : '+'}</span>
               </h3>
               {expandedSections.sizeDetails && (
@@ -539,8 +650,8 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
               <div className="row">
                 <label className={styles.sizeLabel}>Size
                   <div className={styles.sizeFieldRow}>
-                    <select value={size} onChange={e => setSize(e.target.value)}>
-                      {getAvailableSizes().map(s => (
+                    <select value={selectedSizeKey} onChange={e => setSize(e.target.value)}>
+                      {availableSizes.map(s => (
                         <option key={s} value={s}>{getSizeLabel(s)}</option>
                       ))}
                     </select>
@@ -548,7 +659,7 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                 </label>
               </div>
               <h3 onClick={() => toggleSection('sizeDetails')} className={styles.collapsibleHeader}>
-                <span>{getSizeLabel(size)} Size Details</span>
+                <span>{getSizeLabel(selectedSizeKey)} Size Details</span>
                 <span className={styles.toggleIcon}>{expandedSections.sizeDetails ? '−' : '+'}</span>
               </h3>
               {expandedSections.sizeDetails && (
@@ -616,6 +727,72 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
                   </select>
                 </label>
               </div>
+              <div className="row">
+                <label>Fit
+                  <select value={fit} onChange={e => setFit(e.target.value)}>
+                    <option value="regular">Regular</option>
+                    <option value="loose">Loose</option>
+                    <option value="fitted">Fitted</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {isDynamicGarmentType && (
+        <>
+          <h3 onClick={() => toggleSection('garmentType')} className={styles.collapsibleHeader}>
+            <span>{dynamicGarmentLabel} Settings</span>
+            <span className={styles.toggleIcon}>{expandedSections.garmentType ? '−' : '+'}</span>
+          </h3>
+          {expandedSections.garmentType && (
+            <div className={styles.sectionContent}>
+              <div className="row">
+                <label>Select Type
+                  <select
+                    value={garment.startsWith('custom-') ? garment : activeGarmentCategoryCode}
+                    onChange={(e) => setGarment(e.target.value)}
+                  >
+                    <option value={activeGarmentCategoryCode}>{dynamicGarmentLabel}</option>
+                    {dynamicCustomModelOptions.map((model) => (
+                      <option key={model.model_id} value={`custom-${model.model_id}`}>
+                        {model.model_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="row">
+                <label className={styles.sizeLabel}>Size
+                  <div className={styles.sizeFieldRow}>
+                    <select value={selectedSizeKey} onChange={e => setSize(e.target.value)}>
+                      {availableSizes.map(s => (
+                        <option key={s} value={s}>{getSizeLabel(s)}</option>
+                      ))}
+                    </select>
+                  </div>
+                </label>
+              </div>
+              <h3 onClick={() => toggleSection('sizeDetails')} className={styles.collapsibleHeader}>
+                <span>{getSizeLabel(selectedSizeKey)} Size Details</span>
+                <span className={styles.toggleIcon}>{expandedSections.sizeDetails ? '−' : '+'}</span>
+              </h3>
+              {expandedSections.sizeDetails && (
+                <div className={styles.sectionContent} style={{ marginTop: '0', paddingTop: '0' }}>
+                  <div className={styles.measurementDetails}>
+                    {getGarmentMeasurements().map((measurement) => (
+                      <div key={measurement.field} className={styles.measurementDetail}>
+                        <span className={styles.measurementName}>{measurement.label}:</span>
+                        <span className={styles.measurementValue}>
+                          {getSizeMeasurement(measurement.field)} {measurement.unit}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="row">
                 <label>Fit
                   <select value={fit} onChange={e => setFit(e.target.value)}>
@@ -729,7 +906,7 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
         <div className={styles.sectionContent}>
           <div className={styles.accessoryRow}>
             <label>Button Model
-              <select value={selectedButtonModel} onChange={e => setSelectedButtonModel(e.target.value)}>
+              <select className={styles.modelTypeSelect} value={selectedButtonModel} onChange={e => setSelectedButtonModel(e.target.value)}>
                 {availableButtonModels.map(model => (
                   <option key={model.path} value={model.path}>{model.name}</option>
                 ))}
@@ -788,7 +965,7 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
         <div className={styles.sectionContent}>
           <div className={styles.accessoryRow}>
             <label>Accessory Type
-              <select value={selectedAccessoryModel} onChange={e => setSelectedAccessoryModel(e.target.value)}>
+              <select className={styles.modelTypeSelect} value={selectedAccessoryModel} onChange={e => setSelectedAccessoryModel(e.target.value)}>
                 {availableAccessoryModels.map(model => (
                   <option key={model.path} value={model.path}>{model.name}</option>
                 ))}

@@ -662,8 +662,29 @@ const ensureTableExists = (callback) => {
       console.error('Error creating custom_3d_models table:', err);
       return callback(err);
     }
-    console.log('✓ custom_3d_models table ensured');
-    callback(null);
+
+    const schemaUpdates = [
+      `ALTER TABLE custom_3d_models ADD COLUMN measurement_fields JSON NULL AFTER description`,
+      `ALTER TABLE custom_3d_models ADD COLUMN size_chart JSON NULL AFTER measurement_fields`
+    ];
+
+    let index = 0;
+    const applyNext = () => {
+      if (index >= schemaUpdates.length) {
+        console.log('✓ custom_3d_models table ensured');
+        callback(null);
+        return;
+      }
+      db.query(schemaUpdates[index], (alterErr) => {
+        index += 1;
+        if (alterErr && !String(alterErr.message).includes('Duplicate column')) {
+          console.warn('custom_3d_models schema update note:', alterErr.message);
+        }
+        applyNext();
+      });
+    };
+
+    applyNext();
   });
 };
 
@@ -920,6 +941,56 @@ exports.deleteCustom3DModel = (req, res) => {
       res.json({
         success: true,
         message: 'Model deleted successfully'
+      });
+    });
+  });
+};
+
+exports.updateCustom3DModel = (req, res) => {
+  const { modelId } = req.params;
+  const { model_name, model_type, garment_category, description, is_active, measurement_fields, size_chart } = req.body || {};
+
+  ensureTableExists((err) => {
+    if (err) {
+      return res.status(500).json({
+        success: false,
+        message: 'Database error. Please contact administrator.'
+      });
+    }
+
+    const updateData = {
+      model_name,
+      model_type,
+      garment_category,
+      description,
+      is_active,
+      measurement_fields: measurement_fields === undefined
+        ? undefined
+        : (Array.isArray(measurement_fields) ? measurement_fields : null),
+      size_chart: size_chart === undefined
+        ? undefined
+        : (size_chart && typeof size_chart === 'object' ? size_chart : null)
+    };
+
+    Custom3DModel.update(modelId, updateData, (updateErr, result) => {
+      if (updateErr) {
+        console.error('Update custom 3D model error:', updateErr);
+        return res.status(500).json({
+          success: false,
+          message: 'Error updating custom 3D model'
+        });
+      }
+
+      if (!result || result.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Custom 3D model not found'
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Custom 3D model updated successfully'
       });
     });
   });

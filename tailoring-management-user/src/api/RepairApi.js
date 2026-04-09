@@ -168,7 +168,8 @@ export async function addRepairToCart(repairData) {
       pricingFactors: {
         damageLevel: repairData.damageLevel,
         estimatedTime: repairData.estimatedTime,
-        pickupDate: repairData.pickupDate
+        pickupDate: repairData.pickupDate,
+        addAccessories: repairData.addAccessories || false
       },
       specificData: {
         serviceName: repairData.serviceName,
@@ -179,6 +180,7 @@ export async function addRepairToCart(repairData) {
 
         garments: repairData.garments || [],
         isMultipleGarments: repairData.isMultipleGarments || false,
+        addAccessories: repairData.addAccessories || false,
 
         damageLevel: repairData.garments?.[0]?.damageLevel || repairData.damageLevel,
         damageLevelDescription: repairData.garments?.[0]?.damageLevelDescription || repairData.damageLevelDescription,

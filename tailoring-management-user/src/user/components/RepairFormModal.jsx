@@ -34,6 +34,8 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', size: '', customSize: '', notes: '' }
   ]);
 
+  const [addAccessories, setAddAccessories] = useState(false);
+
   const [formData, setFormData] = useState({
     date: '',
     time: ''
@@ -179,6 +181,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       setGarments([
         { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', size: '', customSize: '', notes: '' }
       ]);
+      setAddAccessories(false);
       setAllTimeSlots([]);
       setAvailableTimeSlots([]);
       setIsShopOpen(true);
@@ -510,7 +513,8 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         imageUrl: imageUrls.length > 0 ? imageUrls[0] : 'no-image',
         imageUrls: imageUrls.length > 0 ? imageUrls : [],
         garments: garmentsData,
-        isMultipleGarments: garments.length > 1
+        isMultipleGarments: garments.length > 1,
+        addAccessories: addAccessories
       };
 
       console.log('Repair data to send:', repairData);
@@ -565,6 +569,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
     setGarments([
       { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', size: '', customSize: '', notes: '' }
     ]);
+    setAddAccessories(false);
     setImageFiles([]);
     setImagePreviews([]);
     setCurrentImageIndex(0);
@@ -717,6 +722,23 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           >
             + Add Another Garment
           </button>
+
+          <div className="form-group-shared" style={{ marginTop: '8px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '500' }}>
+              <input
+                type="checkbox"
+                checked={addAccessories}
+                onChange={(e) => setAddAccessories(e.target.checked)}
+                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              Add Accessories (optional)
+            </label>
+            {addAccessories && (
+              <p className="help-text-shared" style={{ marginTop: '4px', color: '#e65100' }}>
+                ⚠️ Adding accessories requires additional payment. The admin will provide the price for your confirmation.
+              </p>
+            )}
+          </div>
 
           <div className="form-group-shared">
             <label htmlFor="image" className="form-label-shared"><i className="fas fa-camera"></i> Upload Damage Photos (Recommended)</label>

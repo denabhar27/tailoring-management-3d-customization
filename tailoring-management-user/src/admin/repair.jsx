@@ -121,6 +121,9 @@ const Repair = () => {
   const [enhancementViewItem, setEnhancementViewItem] = useState(null);
   const [enhancementPriceItem, setEnhancementPriceItem] = useState(null);
   const [savingEnhancementPrice, setSavingEnhancementPrice] = useState(false);
+  const [showAccessoriesPriceModal, setShowAccessoriesPriceModal] = useState(false);
+  const [accessoriesPriceItem, setAccessoriesPriceItem] = useState(null);
+  const [accessoriesPrice, setAccessoriesPrice] = useState('');
 
   const [editForm, setEditForm] = useState({
 
@@ -401,8 +404,8 @@ const Repair = () => {
         : (item.pricing_factors || {});
 
       const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
-
-      const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
+      const isAccessoriesEnhancement = isEnhancementOrder && !!pricingFactors.accessoriesPrice;
+      const amountPaid = (isEnhancementOrder && !isAccessoriesEnhancement) ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
 
       const finalPrice = parseFloat(item.final_price || 0);
 
@@ -1772,8 +1775,8 @@ const Repair = () => {
         : (item.pricing_factors || {});
 
       const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
-
-      const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
+      const isAccessoriesEnhancement = isEnhancementOrder && !!pricingFactors.accessoriesPrice;
+      const amountPaid = (isEnhancementOrder && !isAccessoriesEnhancement) ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
 
       const finalPrice = parseFloat(item.final_price || 0);
 
@@ -2271,11 +2274,23 @@ const Repair = () => {
   const handleEnhancementPriceConfirm = async (item) => {
     const target = item || enhancementPriceItem;
     if (!target) return;
+
+    const pricingFactors = typeof target.pricing_factors === 'string'
+      ? JSON.parse(target.pricing_factors || '{}')
+      : (target.pricing_factors || {});
+
+    // If addAccessories is true, open accessories price modal instead
+    if (pricingFactors.addAccessories === true) {
+      setAccessoriesPriceItem(target);
+      setAccessoriesPrice('');
+      setShowAccessoriesPriceModal(true);
+      setShowEnhancementViewModal(false);
+      return;
+    }
+
+    // No accessories — go directly to accepted
     try {
       setSavingEnhancementPrice(true);
-      const pricingFactors = typeof target.pricing_factors === 'string'
-        ? JSON.parse(target.pricing_factors || '{}')
-        : (target.pricing_factors || {});
       const result = await updateRepairOrderItem(target.item_id, {
         approvalStatus: 'accepted',
         finalPrice: parseFloat(target.final_price || 0),
@@ -2296,6 +2311,49 @@ const Repair = () => {
       }
     } catch (err) {
       showToast('Failed to accept enhancement', 'error');
+    } finally {
+      setSavingEnhancementPrice(false);
+    }
+  };
+
+  const handleAccessoriesPriceSubmit = async () => {
+    if (!accessoriesPriceItem) return;
+    const price = parseFloat(accessoriesPrice);
+    if (isNaN(price) || price <= 0) {
+      showToast('Please enter a valid accessories price', 'error');
+      return;
+    }
+    try {
+      setSavingEnhancementPrice(true);
+      const pricingFactors = typeof accessoriesPriceItem.pricing_factors === 'string'
+        ? JSON.parse(accessoriesPriceItem.pricing_factors || '{}')
+        : (accessoriesPriceItem.pricing_factors || {});
+      const baseFinalPrice = parseFloat(accessoriesPriceItem.final_price || 0);
+      const newFinalPrice = baseFinalPrice + price;
+      const result = await updateRepairOrderItem(accessoriesPriceItem.item_id, {
+        approvalStatus: 'price_confirmation',
+        finalPrice: newFinalPrice,
+        adminNotes: `Accessories price: ₱${price.toFixed(2)}`,
+        pricingFactors: {
+          ...pricingFactors,
+          enhancementAdminAccepted: false,
+          enhancementPendingAdminReview: false,
+          enhancementAdminAcceptedAt: new Date().toISOString(),
+          accessoriesPrice: price.toFixed(2),
+          accessoriesBasePrice: baseFinalPrice.toFixed(2)
+        }
+      });
+      if (result.success) {
+        setShowAccessoriesPriceModal(false);
+        setAccessoriesPriceItem(null);
+        setAccessoriesPrice('');
+        showToast('Accessories price sent for customer confirmation.', 'success');
+        loadRepairOrders();
+      } else {
+        showToast(result.message || 'Failed to submit accessories price', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to submit accessories price', 'error');
     } finally {
       setSavingEnhancementPrice(false);
     }
@@ -2826,7 +2884,9 @@ const Repair = () => {
 
                   const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
 
-                  const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
+                  const isAccessoriesEnhancement = isEnhancementOrder && !!pricingFactors.accessoriesPrice;
+
+                  const amountPaid = (isEnhancementOrder && !isAccessoriesEnhancement) ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
 
                   const finalPrice = parseFloat(item.final_price || 0);
 
@@ -3287,7 +3347,7 @@ const Repair = () => {
 
                                 )}
 
-                                {!isEnhancementOrder && (
+                                {(!isEnhancementOrder || (pricingFactors.accessoriesPrice && remainingBalance > 0.01)) && (
                                   <button
                                     className="icon-btn"
                                     onClick={(e) => {
@@ -3516,7 +3576,7 @@ const Repair = () => {
                                 </button>
                                 <button
                                   className="icon-btn accept"
-                                  title="Accept Enhancement"
+                                  title={pf.addAccessories ? 'Set Accessories Price' : 'Accept Enhancement'}
                                   disabled={savingEnhancementPrice}
                                   onClick={() => handleEnhancementPriceConfirm(item)}
                                 >
@@ -3558,6 +3618,11 @@ const Repair = () => {
                 <div style={{ padding: '10px', backgroundColor: '#f3e5f5', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ce93d8' }}>
                   {pf.enhancementNotes || 'No notes provided'}
                 </div>
+                {pf.addAccessories && (
+                  <div style={{ padding: '8px 12px', backgroundColor: '#fff3e0', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ffcc80', fontSize: '13px', color: '#e65100', fontWeight: '600' }}>
+                    ⚠️ Customer requested to add accessories — price confirmation required.
+                  </div>
+                )}
                 <div className="detail-row">
                   <strong>Preferred Completion Date:</strong>
                   {pf.enhancementPreferredCompletionDate
@@ -3575,7 +3640,7 @@ const Repair = () => {
                   onClick={() => handleEnhancementPriceConfirm(enhancementViewItem)}
                   style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
                 >
-                  {savingEnhancementPrice ? 'Accepting...' : 'Accept Enhancement'}
+                  {savingEnhancementPrice ? 'Processing...' : pf.addAccessories ? 'Set Accessories Price' : 'Accept Enhancement'}
                 </button>
               </div>
             </div>
@@ -5604,6 +5669,53 @@ const Repair = () => {
                   <button className="btn-save" onClick={handleSettleCompensation}>Mark as Paid</button>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAccessoriesPriceModal && accessoriesPriceItem && (
+        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowAccessoriesPriceModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <h2>Set Accessories Price</h2>
+              <span className="close-modal" onClick={() => setShowAccessoriesPriceModal(false)}>×</span>
+            </div>
+            <div className="modal-body">
+              <div className="detail-row"><strong>Order ID:</strong> #{accessoriesPriceItem.order_id}</div>
+              <div className="detail-row"><strong>Current Price:</strong> ₱{parseFloat(accessoriesPriceItem.final_price || 0).toLocaleString()}</div>
+              <div style={{ padding: '8px 12px', backgroundColor: '#fff3e0', borderRadius: '6px', margin: '10px 0', border: '1px solid #ffcc80', fontSize: '13px', color: '#e65100' }}>
+                Customer requested to add accessories. Enter the price below — the customer will be asked to confirm before proceeding.
+              </div>
+              <div className="payment-form-group" style={{ marginTop: '12px' }}>
+                <label>Accessories Price (₱) *</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={accessoriesPrice}
+                  onChange={(e) => setAccessoriesPrice(e.target.value)}
+                  placeholder="Enter accessories price"
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }}
+                  autoFocus
+                />
+              </div>
+              {accessoriesPrice && !isNaN(parseFloat(accessoriesPrice)) && parseFloat(accessoriesPrice) > 0 && (
+                <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '13px', color: '#1976d2' }}>
+                  New total: ₱{(parseFloat(accessoriesPriceItem.final_price || 0) + parseFloat(accessoriesPrice)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn-cancel" onClick={() => { setShowAccessoriesPriceModal(false); setAccessoriesPrice(''); }}>Cancel</button>
+              <button
+                className="btn-save"
+                disabled={savingEnhancementPrice}
+                onClick={handleAccessoriesPriceSubmit}
+                style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
+              >
+                {savingEnhancementPrice ? 'Sending...' : 'Send for Confirmation'}
+              </button>
             </div>
           </div>
         </div>

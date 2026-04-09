@@ -41,6 +41,7 @@ const Profile = () => {
   const [itemToEnhance, setItemToEnhance] = useState(null);
   const [enhanceNotes, setEnhanceNotes] = useState('');
   const [enhancePreferredDate, setEnhancePreferredDate] = useState('');
+  const [enhanceAddAccessories, setEnhanceAddAccessories] = useState(false);
   const [submittingEnhancement, setSubmittingEnhancement] = useState(false);
   const [submittingLiabilityDecision, setSubmittingLiabilityDecision] = useState(false);
   const [compensationIncidentsByItem, setCompensationIncidentsByItem] = useState({});
@@ -648,8 +649,8 @@ const Profile = () => {
       return;
     }
     setItemToEnhance(item);
-    setEnhanceNotes('');
     setEnhancePreferredDate('');
+    setEnhanceAddAccessories(false);
     setEnhanceModalOpen(true);
   };
 
@@ -663,7 +664,7 @@ const Profile = () => {
 
     try {
       setSubmittingEnhancement(true);
-      const result = await requestEnhancement(itemToEnhance.order_item_id, notes, enhancePreferredDate || null);
+      const result = await requestEnhancement(itemToEnhance.order_item_id, notes, enhancePreferredDate || null, enhanceAddAccessories);
       if (result.success) {
         await alert('Enhancement request submitted. The admin will review and confirm the price.', 'Success', 'success');
         const ordersResult = await getUserOrderTracking();
@@ -4279,6 +4280,22 @@ const Profile = () => {
                   }}
                 />
               </div>
+              <div style={{ marginTop: '14px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600', color: '#333' }}>
+                  <input
+                    type="checkbox"
+                    checked={enhanceAddAccessories}
+                    onChange={(e) => setEnhanceAddAccessories(e.target.checked)}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  Add Accessories (optional)
+                </label>
+                {enhanceAddAccessories && (
+                  <p style={{ marginTop: '6px', fontSize: '13px', color: '#e65100' }}>
+                    Adding accessories requires additional payment. The admin will provide the price for your confirmation.
+                  </p>
+                )}
+              </div>
             </div>
             <div className="details-modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button
@@ -4288,6 +4305,7 @@ const Profile = () => {
                   setItemToEnhance(null);
                   setEnhanceNotes('');
                   setEnhancePreferredDate('');
+                  setEnhanceAddAccessories(false);
                 }}
                 disabled={submittingEnhancement}
               >

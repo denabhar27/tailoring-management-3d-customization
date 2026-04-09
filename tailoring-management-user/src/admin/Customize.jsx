@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
@@ -4412,11 +4412,6 @@ const Customize = () => {
                   autoFocus
                 />
               </div>
-              {accessoriesPrice && !isNaN(parseFloat(accessoriesPrice)) && parseFloat(accessoriesPrice) > 0 && (
-                <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '13px', color: '#1976d2' }}>
-                  New total: &#8369;{(parseFloat(accessoriesPriceItem.final_price || 0) + parseFloat(accessoriesPrice)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-              )}
             </div>
             <div className="modal-footer">
               <button className="btn-cancel" onClick={() => { setShowAccessoriesPriceModal(false); setAccessoriesPrice(''); }}>Cancel</button>

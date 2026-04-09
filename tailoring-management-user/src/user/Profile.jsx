@@ -2409,7 +2409,8 @@ const Profile = () => {
                 const isEnhancementOrder = pricingFactors.enhancementRequest === true && pricingFactors.enhancementAdminAccepted === true;
                 const isEnhancementPending = pricingFactors.enhancementRequest === true && pricingFactors.enhancementPendingAdminReview === true;
                 const isAccessoriesEnhancement = pricingFactors.enhancementRequest === true && pricingFactors.addAccessories === true && !pricingFactors.enhancementAdminAccepted;
-                const isEnhancementCancelledByAdmin = pricingFactors.enhancementCancelledByAdmin === true;
+                const isEnhancementCancelledByAdmin = pricingFactors.enhancementCancelledByAdmin === true
+                  && pricingFactors.enhancementRequest !== true;
 
                 const displayStatusClass = hasCompensationIncident
                   ? (isLiabilityRejectedIncident ? 'cancelled' : (isCompensationPaid && !customerWantsToProceed ? 'completed' : isCompensationPaid ? getStatusBadgeClass(item.status) : 'pending'))

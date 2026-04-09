@@ -2258,7 +2258,7 @@ exports.recordRentalPayment = (req, res) => {
           previous_payment_status: previousPaymentStatus,
           new_payment_status: newPaymentStatus,
           payment_method: paymentMethod || 'cash',
-          notes: `${actorName} recorded payment of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}.`,
+          notes: `${actorName} recorded payment of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}. Cash received: ₱${cashTendered.toFixed(2)}. Change: ₱${changeAmount.toFixed(2)}. Method: ${paymentMethod || 'cash'}. Customer: ${customerName}`,
           created_by: actorName
         }, (transLogErr, transLogResult) => {
           if (transLogErr) {

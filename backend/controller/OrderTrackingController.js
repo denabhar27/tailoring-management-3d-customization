@@ -521,7 +521,9 @@ exports.requestEnhancement = (req, res) => {
           enhancementNotes,
           enhancementPreferredCompletionDate: preferredCompletionDate || null,
           enhancementUpdatedAt: new Date().toISOString(),
-          addAccessories: addAccessories === true
+          addAccessories: addAccessories === true,
+          enhancementCancelledByAdmin: false,
+          enhancementCancelledAt: null
         }
       };
 

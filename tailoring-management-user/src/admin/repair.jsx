@@ -413,10 +413,12 @@ const Repair = () => {
 
       const incident = getIncidentForItem(item.item_id);
       const hasPaidCompensation = isPaidCompensationIncident(incident);
+      const proceedChoice = String(incident?.customer_proceed_choice || '').toLowerCase();
+      const compensationBypassesPayment = hasPaidCompensation && proceedChoice !== 'proceed';
 
 
 
-      if (remainingBalance > 0.01 && !hasPaidCompensation) {
+      if (remainingBalance > 0.01 && !compensationBypassesPayment) {
 
         return null;
 
@@ -1784,10 +1786,12 @@ const Repair = () => {
 
       const incident = getIncidentForItem(item.item_id);
       const hasPaidCompensation = isPaidCompensationIncident(incident);
+      const proceedChoiceForUpdate = String(incident?.customer_proceed_choice || '').toLowerCase();
+      const compensationBypassesPaymentForUpdate = hasPaidCompensation && proceedChoiceForUpdate !== 'proceed';
 
 
 
-      if (remainingBalance > 0.01 && !hasPaidCompensation) {
+      if (remainingBalance > 0.01 && !compensationBypassesPaymentForUpdate) {
 
         await alert(
 
@@ -5712,11 +5716,6 @@ const Repair = () => {
                   autoFocus
                 />
               </div>
-              {accessoriesPrice && !isNaN(parseFloat(accessoriesPrice)) && parseFloat(accessoriesPrice) > 0 && (
-                <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '13px', color: '#1976d2' }}>
-                  New total: ₱{(parseFloat(accessoriesPriceItem.final_price || 0) + parseFloat(accessoriesPrice)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-              )}
             </div>
             <div className="modal-footer">
               <button className="btn-cancel" onClick={() => { setShowAccessoriesPriceModal(false); setAccessoriesPrice(''); }}>Cancel</button>

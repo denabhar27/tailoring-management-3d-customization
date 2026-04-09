@@ -332,7 +332,9 @@ exports.getRevenueByService = async (req, res) => {
   try {
     let dateCondition = '';
     if (startDate && endDate) {
-      dateCondition = `AND DATE(COALESCE(tl.created_at, o.order_date)) BETWEEN '${startDate}' AND '${endDate}'`;
+      dateCondition = `AND DATE((
+        SELECT MAX(tl2.created_at) FROM transaction_logs tl2 WHERE tl2.order_item_id = oi.item_id
+      )) BETWEEN '${startDate}' AND '${endDate}'`;
     }
 
     // Include paid/partial orders and incidents with paid compensation.
@@ -377,7 +379,6 @@ exports.getRevenueByService = async (req, res) => {
         COALESCE(AVG(${revenueExpr}), 0) AS avg_order_value
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
-      LEFT JOIN transaction_logs tl ON oi.item_id = tl.order_item_id
       WHERE 1=1
         ${paymentCondition}
         ${dateCondition}
@@ -429,7 +430,9 @@ exports.getTopServices = async (req, res) => {
   try {
     let dateCondition = '';
     if (startDate && endDate) {
-      dateCondition = `AND DATE(COALESCE(tl.created_at, o.order_date)) BETWEEN '${startDate}' AND '${endDate}'`;
+      dateCondition = `AND DATE((
+        SELECT MAX(tl2.created_at) FROM transaction_logs tl2 WHERE tl2.order_item_id = oi.item_id
+      )) BETWEEN '${startDate}' AND '${endDate}'`;
     }
 
     let serviceTypeCondition = '';
@@ -467,7 +470,6 @@ exports.getTopServices = async (req, res) => {
         COALESCE(AVG(${revenueExpr}), 0) AS avg_order_value
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
-      LEFT JOIN transaction_logs tl ON oi.item_id = tl.order_item_id
       WHERE ${paidCondition}
         ${dateCondition}
         ${serviceTypeCondition}
@@ -515,7 +517,9 @@ exports.getNetLossByService = async (req, res) => {
   try {
     let dateCondition = '';
     if (startDate && endDate) {
-      dateCondition = `AND DATE(COALESCE(tl.created_at, o.order_date)) BETWEEN '${startDate}' AND '${endDate}'`;
+      dateCondition = `AND DATE((
+        SELECT MAX(tl2.created_at) FROM transaction_logs tl2 WHERE tl2.order_item_id = oi.item_id
+      )) BETWEEN '${startDate}' AND '${endDate}'`;
     }
 
     let serviceTypeCondition = '';
@@ -549,7 +553,6 @@ exports.getNetLossByService = async (req, res) => {
         SUM(CASE WHEN ${getHasPaidCompensationExpression()} THEN 1 ELSE 0 END) AS incident_count
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
-      LEFT JOIN transaction_logs tl ON oi.item_id = tl.order_item_id
       WHERE 1=1
         ${dateCondition}
         ${serviceTypeCondition}

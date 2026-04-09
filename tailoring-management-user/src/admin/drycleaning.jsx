@@ -641,10 +641,12 @@ const DryCleaning = () => {
 
       const incident = getIncidentForItem(item.item_id);
       const hasPaidCompensation = isPaidCompensationIncident(incident);
+      const proceedChoice = String(incident?.customer_proceed_choice || '').toLowerCase();
+      const compensationBypassesPayment = hasPaidCompensation && proceedChoice !== 'proceed';
 
 
 
-      if (remainingBalance > 0.01 && !hasPaidCompensation) {
+      if (remainingBalance > 0.01 && !compensationBypassesPayment) {
 
         return null;
 
@@ -1644,10 +1646,12 @@ const DryCleaning = () => {
 
       const incident = getIncidentForItem(item.item_id);
       const hasPaidCompensation = isPaidCompensationIncident(incident);
+      const proceedChoiceForUpdate = String(incident?.customer_proceed_choice || '').toLowerCase();
+      const compensationBypassesPaymentForUpdate = hasPaidCompensation && proceedChoiceForUpdate !== 'proceed';
 
 
 
-      if (remainingBalance > 0.01 && !hasPaidCompensation) {
+      if (remainingBalance > 0.01 && !compensationBypassesPaymentForUpdate) {
 
         showToast(`Cannot mark as completed. Payment is not complete. Remaining balance: ₱${remainingBalance.toFixed(2)}`, "error");
 
@@ -2631,6 +2635,8 @@ const DryCleaning = () => {
                   const isCompensatedIncident = incident && liabilityStatus === 'approved' && compensationStatus === 'paid';
                   const isDamagePendingIncident = incident && liabilityStatus === 'pending';
                   const isForCompensationIncident = incident && liabilityStatus === 'approved' && compensationStatus !== 'paid';
+                  const customerProceedChoice = String(incident?.customer_proceed_choice || '').toLowerCase();
+                  const customerWantsToProceed = isCompensatedIncident && customerProceedChoice === 'proceed';
 
 
 
@@ -2739,7 +2745,7 @@ const DryCleaning = () => {
                         const isDamagePending = normalizeIncidentStatus(incident?.liability_status) === 'pending';
                         return (
                           <span
-                            className={`status-badge ${hasApprovedDamage ? (isCompensationPaid ? 'completed' : 'rejected') : isDamagePending ? 'rejected' : getStatusClass(item.approval_status || 'pending')}`}
+                            className={`status-badge ${hasApprovedDamage ? (isCompensationPaid ? (customerWantsToProceed ? getStatusClass(item.approval_status || 'pending') : 'completed') : 'rejected') : isDamagePending ? 'rejected' : getStatusClass(item.approval_status || 'pending')}`}
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -2748,7 +2754,7 @@ const DryCleaning = () => {
                               lineHeight: '1',
                               padding: '3px 7px',
                               fontWeight: 600,
-                              ...(hasApprovedDamage ? {
+                              ...(hasApprovedDamage && !customerWantsToProceed ? {
                               backgroundColor: isCompensationPaid ? '#e8f5e9' : '#ffebee',
                               color: isCompensationPaid ? '#1b5e20' : '#c62828',
                               border: `1px solid ${isCompensationPaid ? '#a5d6a7' : '#ef9a9a'}`
@@ -2760,7 +2766,7 @@ const DryCleaning = () => {
                             }}
                           >
                             {hasApprovedDamage
-                              ? (isCompensationPaid ? 'Compensated' : 'For Compensation')
+                              ? (isCompensationPaid ? (customerWantsToProceed ? getStatusText(item.approval_status || 'pending') : 'Compensated') : 'For Compensation')
                               : isDamagePending
                               ? 'Damage Reported'
                               : getStatusText(item.approval_status || 'pending')}
@@ -2864,19 +2870,6 @@ const DryCleaning = () => {
                             </div>
                           ) : isCompensatedIncident && (
                             <>
-                              {item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'dry_cleaning', item) && (
-                                <button
-                                  className="icon-btn next-status"
-                                  onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'dry_cleaning', item))}
-                                  title={`Move to ${getNextStatusLabel(item.approval_status, 'dry_cleaning', item)}`}
-                                  style={{ backgroundColor: '#4CAF50', color: 'white' }}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="9 18 15 12 9 6"></polyline>
-                                  </svg>
-                                </button>
-                              )}
-
                               <button
                                 className="icon-btn"
                                 onClick={(e) => {
@@ -2910,7 +2903,27 @@ const DryCleaning = () => {
                             </>
                           )}
 
-                          {!isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'dry_cleaning', item) && (() => {
+                          {customerWantsToProceed && item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'dry_cleaning', item) && (
+                            <button
+                              className="icon-btn next-status"
+                              onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'dry_cleaning', item))}
+                              title={`Move to ${getNextStatusLabel(item.approval_status, 'dry_cleaning', item)}`}
+                              style={{ backgroundColor: '#4CAF50', color: 'white' }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                            </button>
+                          )}
+                          {customerWantsToProceed && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
+                            <button
+                              className="icon-btn"
+                              onClick={(e) => { e.stopPropagation(); setSelectedOrder(item); const fp = parseFloat(item.final_price || 0); setPaymentAmount((fp * 0.5).toFixed(2)); setCashReceived(''); setShowPaymentModal(true); }}
+                              title="Record Payment"
+                              style={{ backgroundColor: '#2196F3', color: 'white' }}
+                            >
+                              💰
+                            </button>
+                          )}
+                          {!customerWantsToProceed && !isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'dry_cleaning', item) && (() => {
                             const nextStatus = getNextStatus(item.approval_status, 'dry_cleaning', item);
                             const isMovingToInProgress = nextStatus === 'confirmed';
                             const halfPrice = finalPrice * 0.5;
@@ -2934,7 +2947,7 @@ const DryCleaning = () => {
                             );
                           })()}
 
-                          {!isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && (
+                          {!customerWantsToProceed && !isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && (
 
                             <>
 
@@ -3174,7 +3187,7 @@ const DryCleaning = () => {
 
                               )}
 
-                              {isAdminUser && !isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && (
+                              {isAdminUser && !customerWantsToProceed && !isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && (
                               <button
 
                                 className="icon-btn delete"

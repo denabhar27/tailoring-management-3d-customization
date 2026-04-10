@@ -103,50 +103,26 @@ const declinePrice = async (req, res) => {
   try {
     const { itemId } = req.params;
     const userId = req.user.id;
+    const { reason } = req.body || {};
 
     console.log("Declining price for item:", itemId, "by user:", userId);
 
     Order.getOrderItemById(itemId, (err, item) => {
       if (err) {
         console.error("Error fetching order item:", err);
-        return res.status(500).json({
-          success: false,
-          message: 'Error fetching order item'
-        });
+        return res.status(500).json({ success: false, message: 'Error fetching order item' });
       }
-
       if (!item) {
-        console.error("Order item not found:", itemId);
-        return res.status(404).json({
-          success: false,
-          message: 'Order item not found'
-        });
+        return res.status(404).json({ success: false, message: 'Order item not found' });
       }
 
       Order.getById(item.order_id, (orderErr, orderResult) => {
-        if (orderErr) {
-          console.error("Error fetching order:", orderErr);
-          return res.status(500).json({
-            success: false,
-            message: 'Error fetching order'
-          });
-        }
-
-        if (!orderResult || orderResult.length === 0) {
-          return res.status(404).json({
-            success: false,
-            message: 'Order not found'
-          });
-        }
+        if (orderErr) return res.status(500).json({ success: false, message: 'Error fetching order' });
+        if (!orderResult || orderResult.length === 0) return res.status(404).json({ success: false, message: 'Order not found' });
 
         const order = orderResult[0];
-
         if (order.user_id !== userId) {
-          console.error("User unauthorized:", userId, "Order owner:", order.user_id);
-          return res.status(403).json({
-            success: false,
-            message: 'Unauthorized access to this order'
-          });
+          return res.status(403).json({ success: false, message: 'Unauthorized access to this order' });
         }
 
         const serviceType = String(item.service_type || '').toLowerCase().trim();
@@ -160,32 +136,48 @@ const declinePrice = async (req, res) => {
           updateFunction = Order.updateRepairOrderItem;
         }
 
-        updateFunction(itemId, {
-          approvalStatus: 'price_declined'
-        }, (updateErr, result) => {
-          if (updateErr) {
-            console.error("Error updating order status:", updateErr);
-            return res.status(500).json({
-              success: false,
-              message: 'Error updating order status'
-            });
-          }
+        // Check if this is an accessories enhancement decline
+        let pricingFactors = {};
+        try {
+          pricingFactors = item.pricing_factors
+            ? (typeof item.pricing_factors === 'string' ? JSON.parse(item.pricing_factors) : item.pricing_factors)
+            : {};
+        } catch (e) {}
 
-          insertTracking(itemId, 'price_declined', 'Price declined by customer.', userId);
-          console.log("Successfully updated order status to price_declined for service type:", serviceType);
-          res.json({
-            success: true,
-            message: 'Price declined. Order has been cancelled.'
+        const isAccessoriesDecline = pricingFactors.addAccessories === true && pricingFactors.enhancementRequest === true;
+
+        if (isAccessoriesDecline) {
+          // Restore final_price to the base price before accessories were added
+          const basePrice = parseFloat(pricingFactors.accessoriesBasePrice || item.final_price || 0);
+          // Send back to pending for admin to adjust/cancel
+          updateFunction(itemId, {
+            approvalStatus: 'pending',
+            finalPrice: basePrice,
+            pricingFactors: {
+              ...pricingFactors,
+              enhancementPendingAdminReview: true,
+              accessoriesDeclineReason: reason || 'Customer declined the accessories price.',
+              accessoriesDeclinedAt: new Date().toISOString(),
+              accessoriesPrice: null,
+              accessoriesBasePrice: null
+            }
+          }, (updateErr) => {
+            if (updateErr) return res.status(500).json({ success: false, message: 'Error updating order status' });
+            insertTracking(itemId, 'pending', `Customer declined accessories price. Reason: ${reason || 'No reason provided'}`, userId);
+            res.json({ success: true, message: 'Accessories price declined. Admin will review and adjust.', isAccessoriesDecline: true });
           });
-        });
+        } else {
+          updateFunction(itemId, { approvalStatus: 'price_declined' }, (updateErr) => {
+            if (updateErr) return res.status(500).json({ success: false, message: 'Error updating order status' });
+            insertTracking(itemId, 'price_declined', `Price declined by customer.${reason ? ' Reason: ' + reason : ''}`, userId);
+            res.json({ success: true, message: 'Price declined. Order has been cancelled.' });
+          });
+        }
       });
     });
   } catch (error) {
     console.error('Decline price error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 

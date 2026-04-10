@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
@@ -10,7 +10,7 @@ import AdminHeader from './AdminHeader';
 
 import Sidebar from './Sidebar';
 
-import { getAllCustomizationOrders, updateCustomizationOrderItem, uploadGLBFile, getAllCustom3DModels, deleteCustom3DModel } from '../api/CustomizationApi';
+import { getAllCustomizationOrders, updateCustomizationOrderItem, uploadGLBFile, getAllCustom3DModels, deleteCustom3DModel, updateCustom3DModel, cancelEnhancement } from '../api/CustomizationApi';
 
 import { getUserRole } from '../api/AuthApi';
 
@@ -29,6 +29,8 @@ import { useAlert } from '../context/AlertContext';
 import { recordPayment } from '../api/PaymentApi';
 
 import { deleteOrderItem, updateOrderItemPrice } from '../api/OrderApi';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faXmark } from '@fortawesome/free-solid-svg-icons';
 
 import CustomizationPriceEditModal from '../components/admin/CustomizationPriceEditModal';
 
@@ -60,6 +62,7 @@ const Customize = () => {
   const [timeFilter, setTimeFilter] = useState('');
 
   const [viewFilter, setViewFilter] = useState("all");
+  const [tableView, setTableView] = useState('orders');
 
   const [showDetailModal, setShowDetailModal] = useState(false);
 
@@ -80,6 +83,9 @@ const Customize = () => {
   const [enhancementViewItem, setEnhancementViewItem] = useState(null);
   const [enhancementPriceItem, setEnhancementPriceItem] = useState(null);
   const [savingEnhancementPrice, setSavingEnhancementPrice] = useState(false);
+  const [showAccessoriesPriceModal, setShowAccessoriesPriceModal] = useState(false);
+  const [accessoriesPriceItem, setAccessoriesPriceItem] = useState(null);
+  const [accessoriesPrice, setAccessoriesPrice] = useState('');
 
   const [editForm, setEditForm] = useState({
 
@@ -242,6 +248,7 @@ const Customize = () => {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showSizeModal, setShowSizeModal] = useState(false);
   const [sizeModalGarmentId, setSizeModalGarmentId] = useState('');
+  const [sizeModalModelId, setSizeModalModelId] = useState('');
   const [sizeModalMeasurements, setSizeModalMeasurements] = useState([]);
   const [sizeModalSizeChart, setSizeModalSizeChart] = useState({});
   const [sizeModalNewSize, setSizeModalNewSize] = useState('');
@@ -488,8 +495,8 @@ const Customize = () => {
         : (item.pricing_factors || {});
 
       const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
-
-      const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
+      const isAccessoriesEnhancement = isEnhancementOrder && !!pricingFactors.accessoriesPrice;
+      const amountPaid = (isEnhancementOrder && !isAccessoriesEnhancement) ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
 
       const finalPrice = parseFloat(item.final_price || 0);
 
@@ -573,7 +580,7 @@ const Customize = () => {
 
       'price_confirmation': 'Price Confirm',
 
-      'confirmed': 'Start Progress',
+      'confirmed': 'Next',
 
       'ready_for_pickup': 'Ready for Pickup',
 
@@ -1028,14 +1035,54 @@ const Customize = () => {
     }
   };
 
+  const normalizeMeasurementFields = (value) => {
+    const parsed = parseJSONField(value, []);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && typeof parsed === 'object') {
+      return Object.entries(parsed).map(([field, config]) => ({
+        field,
+        label: config?.label || field.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        unit: config?.unit || 'inches'
+      }));
+    }
+    return [];
+  };
+
   const getSelectedSizeModalGarment = () => garmentTypes.find(g => String(g.garment_id) === String(sizeModalGarmentId));
+
+  const getSizeModalGarmentModels = () => {
+    const selectedGarment = getSelectedSizeModalGarment();
+    if (!selectedGarment?.garment_code) return [];
+    const category = String(selectedGarment.garment_code).toLowerCase();
+    return (customModels || []).filter((m) =>
+      m &&
+      m.is_active &&
+      String(m.model_type || '').toLowerCase() === 'garment' &&
+      String(m.garment_category || '').toLowerCase() === category
+    );
+  };
+
+  const getSelectedSizeModalModel = () => {
+    if (!sizeModalModelId) return null;
+    return getSizeModalGarmentModels().find((m) => String(m.model_id) === String(sizeModalModelId)) || null;
+  };
+
+  const loadSizeModalProfile = (garment, model = null) => {
+    if (model) {
+      setSizeModalMeasurements(normalizeMeasurementFields(model.measurement_fields));
+      setSizeModalSizeChart(parseJSONField(model.size_chart, {}));
+      return;
+    }
+    setSizeModalMeasurements(normalizeMeasurementFields(garment?.measurement_fields));
+    setSizeModalSizeChart(parseJSONField(garment?.size_chart, {}));
+  };
 
   const openSizeModal = (garmentId = '') => {
     const selectedId = garmentId || (garmentTypes[0]?.garment_id ? String(garmentTypes[0].garment_id) : '');
     setSizeModalGarmentId(selectedId);
+    setSizeModalModelId('');
     const selectedGarment = garmentTypes.find(g => String(g.garment_id) === String(selectedId));
-    setSizeModalMeasurements(parseJSONField(selectedGarment?.measurement_fields, []));
-    setSizeModalSizeChart(parseJSONField(selectedGarment?.size_chart, {}));
+    loadSizeModalProfile(selectedGarment, null);
     setSizeModalNewSize('');
     setSizeModalCustomLabel('');
     setSizeModalCustomUnit('inches');
@@ -1044,9 +1091,20 @@ const Customize = () => {
 
   const onChangeSizeModalGarment = (garmentId) => {
     setSizeModalGarmentId(garmentId);
+    setSizeModalModelId('');
     const selectedGarment = garmentTypes.find(g => String(g.garment_id) === String(garmentId));
-    setSizeModalMeasurements(parseJSONField(selectedGarment?.measurement_fields, []));
-    setSizeModalSizeChart(parseJSONField(selectedGarment?.size_chart, {}));
+    loadSizeModalProfile(selectedGarment, null);
+  };
+
+  const onChangeSizeModalModel = (modelId) => {
+    setSizeModalModelId(modelId);
+    const selectedGarment = getSelectedSizeModalGarment();
+    if (!modelId) {
+      loadSizeModalProfile(selectedGarment, null);
+      return;
+    }
+    const model = getSizeModalGarmentModels().find((m) => String(m.model_id) === String(modelId));
+    loadSizeModalProfile(selectedGarment, model || null);
   };
 
   const addMeasurementToSizeModal = (measurement) => {
@@ -1110,22 +1168,35 @@ const Customize = () => {
       return;
     }
     try {
-      const payload = {
-        garment_name: selectedGarment.garment_name,
-        garment_price: selectedGarment.garment_price,
-        garment_code: selectedGarment.garment_code || '',
-        description: selectedGarment.description || '',
-        is_active: selectedGarment.is_active,
-        measurement_fields: sizeModalMeasurements,
-        size_chart: sizeModalSizeChart
-      };
-      const result = await updateGarmentType(selectedGarment.garment_id, payload);
+      const selectedModel = getSelectedSizeModalModel();
+      let result;
+
+      if (selectedModel) {
+        result = await updateCustom3DModel(selectedModel.model_id, {
+          measurement_fields: sizeModalMeasurements,
+          size_chart: sizeModalSizeChart
+        });
+      } else {
+        const payload = {
+          garment_name: selectedGarment.garment_name,
+          garment_price: selectedGarment.garment_price,
+          garment_code: selectedGarment.garment_code || '',
+          description: selectedGarment.description || '',
+          is_active: selectedGarment.is_active,
+          measurement_fields: sizeModalMeasurements,
+          size_chart: sizeModalSizeChart
+        };
+        result = await updateGarmentType(selectedGarment.garment_id, payload);
+      }
+
       if (!result.success) {
         showToast(result.message || 'Failed to save sizes', 'error');
         return;
       }
-      showToast('Sizes and measurements saved successfully!', 'success');
+
+      showToast(selectedModel ? 'Model sizes and measurements saved successfully!' : 'Sizes and measurements saved successfully!', 'success');
       await loadGarmentTypes();
+      await loadCustom3DModels();
       setShowSizeModal(false);
     } catch (err) {
       console.error('Save size modal error:', err);
@@ -2265,6 +2336,79 @@ const Customize = () => {
 
   };
 
+  const getFilteredEnhancementItems = () => {
+    let items = allItems.filter(item => {
+      const pf = typeof item.pricing_factors === 'string'
+        ? JSON.parse(item.pricing_factors || '{}')
+        : (item.pricing_factors || {});
+      return pf.enhancementRequest === true && pf.enhancementPendingAdminReview === true
+        && (item.approval_status === 'pending' || item.approval_status === 'pending_review');
+    });
+
+    items = items.filter(item =>
+      !searchTerm ||
+      item.order_id?.toString().includes(searchTerm.toLowerCase()) ||
+      `${item.first_name} ${item.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.walk_in_customer_name && item.walk_in_customer_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      item.specific_data?.garmentType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (Array.isArray(item.specific_data?.garments) && item.specific_data.garments.some(g =>
+        (g?.garmentType || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (g?.fabricType || '').toLowerCase().includes(searchTerm.toLowerCase())
+      )) ||
+      item.specific_data?.fabricType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.walk_in_customer_email && item.walk_in_customer_email.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+
+    if (todayAppointmentsOnly) {
+      items = items.filter(isTodayAppointment);
+    }
+
+    if (dateRangeStart || dateRangeEnd) {
+      items = items.filter(item => {
+        const specificData = parseMaybeObject(item?.specific_data);
+        const appointmentDate = item?.appointment_date || item?.appointmentDate || specificData?.appointment_date || specificData?.appointmentDate || specificData?.pickupDate || specificData?.preferredDate || specificData?.date;
+        if (!appointmentDate) return false;
+        const itemDate = new Date(appointmentDate);
+        itemDate.setHours(0, 0, 0, 0);
+        if (dateRangeStart && dateRangeEnd) {
+          const start = new Date(dateRangeStart);
+          const end = new Date(dateRangeEnd);
+          start.setHours(0, 0, 0, 0);
+          end.setHours(23, 59, 59, 999);
+          return itemDate >= start && itemDate <= end;
+        } else if (dateRangeStart) {
+          const start = new Date(dateRangeStart);
+          start.setHours(0, 0, 0, 0);
+          return itemDate >= start;
+        } else if (dateRangeEnd) {
+          const end = new Date(dateRangeEnd);
+          end.setHours(23, 59, 59, 999);
+          return itemDate <= end;
+        }
+        return true;
+      });
+    }
+
+    if (timeFilter) {
+      items = items.filter(item => {
+        const specificData = parseMaybeObject(item?.specific_data);
+        const pricingFactors = parseMaybeObject(item?.pricing_factors);
+        const preferredTime = specificData?.preferredTime;
+        if (preferredTime) {
+          const t = String(preferredTime).includes('T') ? String(preferredTime).split('T')[1]?.slice(0, 5) : String(preferredTime).slice(0, 5);
+          return t === timeFilter;
+        }
+        const apptDate = specificData?.pickupDate || pricingFactors?.pickupDate || item?.appointment_date || specificData?.appointment_date;
+        if (!apptDate) return false;
+        const timeStr = String(apptDate).split('T')[1]?.slice(0, 5);
+        return timeStr === timeFilter;
+      });
+    }
+
+    return items;
+  };
+
   const handleAccept = async (itemId) => {
 
     const item = allItems.find(i => i.item_id === itemId);
@@ -2450,13 +2594,10 @@ const Customize = () => {
         ? JSON.parse(item.pricing_factors || '{}')
 
         : (item.pricing_factors || {});
-
       const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
-
-      const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
-
+      const isAccessoriesEnhancement = isEnhancementOrder && !!pricingFactors.accessoriesPrice;
+      const amountPaid = (isEnhancementOrder && !isAccessoriesEnhancement) ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
       const finalPrice = parseFloat(item.final_price || 0);
-
       const remainingBalance = finalPrice - amountPaid;
 
       if (remainingBalance > 0.01) {
@@ -2791,11 +2932,21 @@ const Customize = () => {
   const handleEnhancementPriceConfirm = async (item) => {
     const target = item || enhancementPriceItem;
     if (!target) return;
+
+    const pricingFactors = typeof target.pricing_factors === 'string'
+      ? JSON.parse(target.pricing_factors || '{}')
+      : (target.pricing_factors || {});
+
+    if (pricingFactors.addAccessories === true) {
+      setAccessoriesPriceItem(target);
+      setAccessoriesPrice('');
+      setShowAccessoriesPriceModal(true);
+      setShowEnhancementViewModal(false);
+      return;
+    }
+
     try {
       setSavingEnhancementPrice(true);
-      const pricingFactors = typeof target.pricing_factors === 'string'
-        ? JSON.parse(target.pricing_factors || '{}')
-        : (target.pricing_factors || {});
       const result = await updateCustomizationOrderItem(target.item_id, {
         approvalStatus: 'accepted',
         finalPrice: parseFloat(target.final_price || 0),
@@ -2816,6 +2967,49 @@ const Customize = () => {
       }
     } catch (err) {
       showToast('Failed to accept enhancement', 'error');
+    } finally {
+      setSavingEnhancementPrice(false);
+    }
+  };
+
+  const handleAccessoriesPriceSubmit = async () => {
+    if (!accessoriesPriceItem) return;
+    const price = parseFloat(accessoriesPrice);
+    if (isNaN(price) || price <= 0) {
+      showToast('Please enter a valid accessories price', 'error');
+      return;
+    }
+    try {
+      setSavingEnhancementPrice(true);
+      const pricingFactors = typeof accessoriesPriceItem.pricing_factors === 'string'
+        ? JSON.parse(accessoriesPriceItem.pricing_factors || '{}')
+        : (accessoriesPriceItem.pricing_factors || {});
+      const baseFinalPrice = parseFloat(accessoriesPriceItem.final_price || 0);
+      const newFinalPrice = baseFinalPrice + price;
+      const result = await updateCustomizationOrderItem(accessoriesPriceItem.item_id, {
+        approvalStatus: 'price_confirmation',
+        finalPrice: newFinalPrice,
+        adminNotes: `Accessories price: \u20b1${price.toFixed(2)}`,
+        pricingFactors: {
+          ...pricingFactors,
+          enhancementAdminAccepted: false,
+          enhancementPendingAdminReview: false,
+          enhancementAdminAcceptedAt: new Date().toISOString(),
+          accessoriesPrice: price.toFixed(2),
+          accessoriesBasePrice: baseFinalPrice.toFixed(2)
+        }
+      });
+      if (result.success) {
+        setShowAccessoriesPriceModal(false);
+        setAccessoriesPriceItem(null);
+        setAccessoriesPrice('');
+        showToast('Accessories price sent for customer confirmation.', 'success');
+        loadCustomizationOrders();
+      } else {
+        showToast(result.message || 'Failed to submit accessories price', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to submit accessories price', 'error');
     } finally {
       setSavingEnhancementPrice(false);
     }
@@ -3485,6 +3679,27 @@ const Customize = () => {
 
         </div>
 
+        <div className="order-view-tabs" role="tablist" aria-label="Order view selection">
+          <button
+            type="button"
+            className={`order-view-tab ${tableView === 'orders' ? 'active' : ''}`}
+            onClick={() => setTableView('orders')}
+            role="tab"
+            aria-selected={tableView === 'orders'}
+          >
+            Order List
+          </button>
+          <button
+            type="button"
+            className={`order-view-tab ${tableView === 'enhancements' ? 'active' : ''}`}
+            onClick={() => setTableView('enhancements')}
+            role="tab"
+            aria-selected={tableView === 'enhancements'}
+          >
+            Enhancement Request
+          </button>
+        </div>
+
         <div className="search-container">
 
           <input
@@ -3499,6 +3714,7 @@ const Customize = () => {
 
           />
 
+          {tableView === 'orders' && (
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
 
             <option value="">All Status</option>
@@ -3520,6 +3736,7 @@ const Customize = () => {
             <option value="cancelled">Rejected</option>
 
           </select>
+          )}
 
         </div>
 
@@ -3602,26 +3819,15 @@ const Customize = () => {
                   style={{ padding: '4px 8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px' }}
                 >
                   <option value="">All Times</option>
-                  <option value="08:00">8:00 AM</option>
                   <option value="08:30">8:30 AM</option>
-                  <option value="09:00">9:00 AM</option>
                   <option value="09:30">9:30 AM</option>
-                  <option value="10:00">10:00 AM</option>
                   <option value="10:30">10:30 AM</option>
-                  <option value="11:00">11:00 AM</option>
                   <option value="11:30">11:30 AM</option>
-                  <option value="12:00">12:00 PM</option>
                   <option value="12:30">12:30 PM</option>
-                  <option value="13:00">1:00 PM</option>
                   <option value="13:30">1:30 PM</option>
-                  <option value="14:00">2:00 PM</option>
                   <option value="14:30">2:30 PM</option>
-                  <option value="15:00">3:00 PM</option>
                   <option value="15:30">3:30 PM</option>
-                  <option value="16:00">4:00 PM</option>
                   <option value="16:30">4:30 PM</option>
-                  <option value="17:00">5:00 PM</option>
-                  <option value="17:30">5:30 PM</option>
                 </select>
                 {timeFilter && (
                   <button
@@ -3632,6 +3838,7 @@ const Customize = () => {
               </div>
         </div>
 
+        {tableView === 'orders' && (
         <div className="table-container">
 
           <div className="table-scroll-viewport">
@@ -3684,11 +3891,9 @@ const Customize = () => {
                     : (item.pricing_factors || {});
 
                   const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
-
-                  const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
-
+                  const isAccessoriesEnhancement = isEnhancementOrder && !!pricingFactors.accessoriesPrice;
                   const finalPrice = parseFloat(item.final_price || 0);
-
+                  const amountPaid = (isEnhancementOrder && !isAccessoriesEnhancement) ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
                   const remainingBalance = finalPrice - amountPaid;
 
                   const isUniform = item.specific_data?.garmentType?.toLowerCase() === 'uniform' ||
@@ -3809,10 +4014,10 @@ const Customize = () => {
                           const pf = typeof item.pricing_factors === 'string'
                             ? JSON.parse(item.pricing_factors || '{}')
                             : (item.pricing_factors || {});
-                          if (pf.enhancementRequest && pf.enhancementAdminAccepted) {
+                          if (pf.enhancementRequest && (pf.enhancementAdminAccepted || pf.addAccessories)) {
                             return (
                               <div style={{ fontSize: '11px', color: '#673ab7', marginTop: '4px', fontWeight: '600' }}>
-                                ✨ Enhancement
+                                {pf.addAccessories && !pf.enhancementAdminAccepted ? 'Enhancement + Accessories' : 'Enhancement'}
                               </div>
                             );
                           }
@@ -3861,7 +4066,7 @@ const Customize = () => {
                               const halfPrice = finalPrice * 0.5;
                               const hasHalfPayment = amountPaid >= halfPrice - 0.01;
                               
-                              if (isMovingToInProgress && !hasHalfPayment && !isEnhancementOrder) {
+                              if (isMovingToInProgress && !hasHalfPayment && !isEnhancementOrder && item.approval_status !== 'accepted') {
                                 return null;
                               }
                               
@@ -3921,7 +4126,7 @@ const Customize = () => {
 
                             )}
 
-                            {item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && !isEnhancementOrder && (
+                            {(item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation') && (!isEnhancementOrder || (pricingFactors.accessoriesPrice && remainingBalance > 0.01)) && (
 
                               <button
 
@@ -4027,52 +4232,36 @@ const Customize = () => {
           </div>
 
         </div>
+        )}
 
-        {/* Enhancement Requests Table */}
-        {(() => {
-          const enhancementItems = allItems.filter(item => {
-            const pf = typeof item.pricing_factors === 'string'
-              ? JSON.parse(item.pricing_factors || '{}')
-              : (item.pricing_factors || {});
-            return pf.enhancementRequest === true && pf.enhancementPendingAdminReview === true
-              && (item.approval_status === 'pending' || item.approval_status === 'pending_review');
-          });
-          return (
-            <div style={{ marginTop: '40px' }}>
-              <div className="dashboard-title" style={{ marginBottom: '12px' }}>
-                <div>
-                  <h2 style={{ color: '#673ab7' }}>Enhancement Requests</h2>
-                  <p>Customer-requested enhancements pending admin review</p>
-                </div>
-              </div>
-              <div className="table-container">
-                <div className="table-scroll-viewport">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Order ID</th>
-                        <th>Customer</th>
-                        <th>Garment</th>
-                        <th>Fabric</th>
-                        <th>Date</th>
-                        <th>Price</th>
-                        <th>Payment Status</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {enhancementItems.length === 0 ? (
-                        <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No enhancement requests</td></tr>
-                      ) : enhancementItems.map(item => {
+        {tableView === 'enhancements' && (
+          <div className="table-container">
+            <div className="table-scroll-viewport">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Order ID</th>
+                    <th>Customer</th>
+                    <th>Garment</th>
+                    <th>Fabric</th>
+                    <th>Date</th>
+                    <th>Price</th>
+                     <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getFilteredEnhancementItems().length === 0 ? (
+                    <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No enhancement requests</td></tr>
+                  ) : getFilteredEnhancementItems().map(item => {
                         const pf = typeof item.pricing_factors === 'string'
                           ? JSON.parse(item.pricing_factors || '{}')
                           : (item.pricing_factors || {});
-                        const amountPaid = parseFloat(pf.amount_paid || 0);
+
                         const finalPrice = parseFloat(item.final_price || 0);
-                        const remainingBalance = finalPrice - amountPaid;
-                        return (
-                          <tr key={item.item_id}>
+
+                    return (
+                      <tr key={item.item_id}>
                             <td><strong>#{item.order_id}</strong></td>
                             <td>
                               {item.order_type === 'walk_in'
@@ -4087,14 +4276,6 @@ const Customize = () => {
                               return new Date(preferredDate).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
                             })()}</td>
                             <td>&#8369;{finalPrice.toLocaleString()}</td>
-                            <td>
-                              <div style={{ fontSize: '12px' }}>
-                                <div>Paid: &#8369;{amountPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                                <div style={{ color: remainingBalance > 0 ? '#ff9800' : '#4caf50', fontWeight: 'bold' }}>
-                                  Remaining: &#8369;{Math.max(0, remainingBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </div>
-                              </div>
-                            </td>
                             <td>
                               <span className="status-badge" style={{ backgroundColor: '#ede7f6', color: '#673ab7', border: '1px solid #ce93d8' }}>
                                 Enhancement Request
@@ -4115,7 +4296,7 @@ const Customize = () => {
                                 </button>
                                 <button
                                   className="icon-btn accept"
-                                  title="Accept Enhancement"
+                                  title={pf.addAccessories ? 'Set Accessories Price' : 'Accept Enhancement'}
                                   disabled={savingEnhancementPrice}
                                   onClick={() => handleEnhancementPriceConfirm(item)}
                                 >
@@ -4123,16 +4304,14 @@ const Customize = () => {
                                 </button>
                               </div>
                             </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          );
-        })()}
+          </div>
+        )}
 
       </div>
       {showEnhancementViewModal && enhancementViewItem && (() => {
@@ -4158,6 +4337,11 @@ const Customize = () => {
                 <div style={{ padding: '10px', backgroundColor: '#f3e5f5', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ce93d8' }}>
                   {pf.enhancementNotes || 'No notes provided'}
                 </div>
+                {pf.addAccessories && (
+                  <div style={{ padding: '8px 12px', backgroundColor: '#fff3e0', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ffcc80', fontSize: '13px', color: '#e65100', fontWeight: '600' }}>
+                    Customer requested to add accessories - price confirmation required.
+                  </div>
+                )}
                 <div className="detail-row">
                   <strong>Preferred Completion Date:</strong>
                   {pf.enhancementPreferredCompletionDate
@@ -4166,22 +4350,84 @@ const Customize = () => {
                 </div>
                 <div className="detail-row"><strong>Requested At:</strong> {pf.enhancementUpdatedAt ? new Date(pf.enhancementUpdatedAt).toLocaleString() : 'N/A'}</div>
                 <div className="detail-row"><strong>Current Price:</strong> ₱{parseFloat(enhancementViewItem.final_price || 0).toLocaleString()}</div>
+                {pf.accessoriesDeclineReason && (
+                  <div style={{ padding: '8px 12px', backgroundColor: '#ffebee', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ef9a9a', fontSize: '13px', color: '#c62828' }}>
+                    <strong>Customer Decline Reason:</strong> {pf.accessoriesDeclineReason}
+                  </div>
+                )}
               </div>
-              <div className="modal-footer">
-                <button className="btn-cancel" onClick={() => setShowEnhancementViewModal(false)}>Close</button>
+              <div className="modal-footer enhancement-view-footer">
+                <button
+                  className="btn-cancel"
+                  style={{ backgroundColor: '#f44336', color: 'white', border: 'none' }}
+                  disabled={savingEnhancementPrice}
+                  onClick={async () => {
+                    const confirmed = await confirm('Cancel this enhancement request?', 'Cancel Enhancement', 'warning');
+                    if (!confirmed) return;
+                    setSavingEnhancementPrice(true);
+                    const result = await cancelEnhancement(enhancementViewItem.item_id);
+                    setSavingEnhancementPrice(false);
+                    if (result.success) { setShowEnhancementViewModal(false); showToast('Enhancement cancelled.', 'success'); loadCustomizationOrders(); }
+                    else showToast(result.message || 'Failed to cancel enhancement', 'error');
+                  }}
+                >
+                  Cancel Enhancement
+                </button>
                 <button
                   className="btn-save"
                   disabled={savingEnhancementPrice}
                   onClick={() => handleEnhancementPriceConfirm(enhancementViewItem)}
-                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
+                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff', whiteSpace: 'nowrap' }}
                 >
-                  {savingEnhancementPrice ? 'Accepting...' : 'Accept Enhancement'}
+                  {savingEnhancementPrice ? 'Processing...' : pf.addAccessories ? 'Set Accessories Price' : 'Accept Enhancement'}
                 </button>
               </div>
             </div>
           </div>
         );
       })()}
+      {showAccessoriesPriceModal && accessoriesPriceItem && (
+        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowAccessoriesPriceModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <h2>Set Accessories Price</h2>
+              <span className="close-modal" onClick={() => setShowAccessoriesPriceModal(false)}>x</span>
+            </div>
+            <div className="modal-body">
+              <div className="detail-row"><strong>Order ID:</strong> #{accessoriesPriceItem.order_id}</div>
+              <div className="detail-row"><strong>Current Price:</strong> &#8369;{parseFloat(accessoriesPriceItem.final_price || 0).toLocaleString()}</div>
+              <div style={{ padding: '8px 12px', backgroundColor: '#fff3e0', borderRadius: '6px', margin: '10px 0', border: '1px solid #ffcc80', fontSize: '13px', color: '#e65100' }}>
+                Customer requested to add accessories. Enter the price below - the customer will be asked to confirm before proceeding.
+              </div>
+              <div className="payment-form-group" style={{ marginTop: '12px' }}>
+                <label>Accessories Price *</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={accessoriesPrice}
+                  onChange={(e) => setAccessoriesPrice(e.target.value)}
+                  placeholder="Enter accessories price"
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-cancel" onClick={() => { setShowAccessoriesPriceModal(false); setAccessoriesPrice(''); }}>Cancel</button>
+              <button
+                className="btn-save"
+                disabled={savingEnhancementPrice}
+                onClick={handleAccessoriesPriceSubmit}
+                style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
+              >
+                {savingEnhancementPrice ? 'Sending...' : 'Send for Confirmation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showEnhanceModal && enhanceOrder && (
         <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowEnhanceModal(false)}>
           <div className="modal-content enhance-order-modal" style={{ maxWidth: '640px', width: '95vw' }}>
@@ -6602,19 +6848,32 @@ const Customize = () => {
 
             <div className="customize-modal-body">
 
-              <div className="customize-form-group">
-                <label>Garment Type *</label>
-                <select value={sizeModalGarmentId} onChange={(e) => onChangeSizeModalGarment(e.target.value)}>
-                  <option value="">Select Garment Type</option>
-                  {garmentTypes.map(g => (
-                    <option key={g.garment_id} value={g.garment_id}>{g.garment_name}</option>
-                  ))}
-                </select>
+              <div className="size-modal-select-row">
+                <div className="customize-form-group size-modal-select-group">
+                  <label>Garment Type *</label>
+                  <select value={sizeModalGarmentId} onChange={(e) => onChangeSizeModalGarment(e.target.value)}>
+                    <option value="">Select Garment Type</option>
+                    {garmentTypes.map(g => (
+                      <option key={g.garment_id} value={g.garment_id}>{g.garment_name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="customize-form-group size-modal-select-group">
+                  <label>3D Model (Optional)</label>
+                  <select value={sizeModalModelId} onChange={(e) => onChangeSizeModalModel(e.target.value)} disabled={!sizeModalGarmentId}>
+                    <option value="">Base Garment Type (default profile)</option>
+                    {getSizeModalGarmentModels().map((model) => (
+                      <option key={model.model_id} value={model.model_id}>{model.model_name}</option>
+                    ))}
+                  </select>
+                  <small>Choose a model to set size details specifically for that 3D model variant.</small>
+                </div>
               </div>
 
-              <div className="customize-form-group" style={{ borderTop: '1px solid #e0e0e0', paddingTop: '16px' }}>
+              <div className="customize-form-group size-modal-section">
                 <label>Measurement Fields</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px', marginBottom: '10px' }}>
+                <div className="size-modal-measurement-chips">
                   {COMMON_MEASUREMENTS.map(m => {
                     const active = sizeModalMeasurements.some(x => x.field === m.field);
                     return (
@@ -6623,12 +6882,6 @@ const Customize = () => {
                         type="button"
                         onClick={() => active ? removeMeasurementFromSizeModal(m.field) : addMeasurementToSizeModal(m)}
                         className={`size-modal-measurement-btn ${active ? 'active' : ''}`}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: '14px',
-                          fontSize: '12px',
-                          cursor: 'pointer'
-                        }}
                       >
                         {active ? '✓ ' : '+ '}{m.label}
                       </button>
@@ -6636,8 +6889,8 @@ const Customize = () => {
                   })}
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                  <div style={{ flex: '1', minWidth: '150px' }}>
+                <div className="size-modal-custom-row">
+                  <div className="size-modal-custom-label-col">
                     <small>Custom Label</small>
                     <input
                       type="text"
@@ -6646,7 +6899,7 @@ const Customize = () => {
                       placeholder="e.g., Armhole"
                     />
                   </div>
-                  <div style={{ minWidth: '100px' }}>
+                  <div className="size-modal-custom-unit-col">
                     <small>Unit</small>
                     <select value={sizeModalCustomUnit} onChange={(e) => setSizeModalCustomUnit(e.target.value)}>
                       <option value="inches">inches</option>
@@ -6654,59 +6907,68 @@ const Customize = () => {
                       <option value="mm">mm</option>
                     </select>
                   </div>
-                  <button type="button" className="fabric-edit-btn" onClick={addCustomMeasurementToSizeModal}>Add</button>
+                  <button type="button" className="fabric-edit-btn size-modal-add-custom-btn" onClick={addCustomMeasurementToSizeModal}>Add</button>
                 </div>
               </div>
 
-              <div className="customize-form-group" style={{ borderTop: '1px solid #e0e0e0', paddingTop: '16px' }}>
+              <div className="customize-form-group size-modal-section">
                 <label>Add Size</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div className="size-modal-add-size-row">
                   <input
                     type="text"
                     value={sizeModalNewSize}
                     onChange={(e) => setSizeModalNewSize(e.target.value)}
-                    placeholder="e.g., Extra Small"
+                    placeholder="e.g., Extra Small, S, M, L..."
+                    className="size-modal-size-input"
                   />
-                  <button type="button" className="fabric-edit-btn" onClick={addSizeToSizeModal}>+ Add Size</button>
+                  <button type="button" className="fabric-edit-btn size-modal-add-size-btn" onClick={addSizeToSizeModal}>+ Add size</button>
                 </div>
               </div>
 
               {sizeModalMeasurements.length > 0 && Object.keys(sizeModalSizeChart).length > 0 && (
-                <div className="customize-form-group">
+                <div className="customize-form-group size-modal-section">
                   <label>Size Details</label>
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '450px' }}>
+                  <div className="size-modal-table-wrap">
+                    <table className="size-modal-table">
                       <thead>
-                        <tr style={{ backgroundColor: '#f5f5f5' }}>
-                          <th style={{ padding: '8px', borderBottom: '1px solid #ddd', textAlign: 'left' }}>Size</th>
-                          {sizeModalMeasurements.map(m => (
-                            <th key={m.field} style={{ padding: '8px', borderBottom: '1px solid #ddd', textAlign: 'center' }}>
+                        <tr>
+                          <th>Size</th>
+                          {sizeModalMeasurements.map((m) => (
+                            <th key={m.field}>
                               {m.label}
                               <br />
                               <small>({m.unit})</small>
                             </th>
                           ))}
-                          <th style={{ padding: '8px', borderBottom: '1px solid #ddd' }}></th>
+                          <th></th>
                         </tr>
                       </thead>
                       <tbody>
-                        {Object.keys(sizeModalSizeChart).map(sizeKey => (
-                          <tr key={sizeKey} style={{ borderBottom: '1px solid #eee' }}>
-                            <td style={{ padding: '8px', fontWeight: '600' }}>{sizeKey.replace(/-/g, ' ')}</td>
-                            {sizeModalMeasurements.map(m => (
-                              <td key={m.field} style={{ padding: '6px' }}>
+                        {Object.keys(sizeModalSizeChart).map((sizeKey) => (
+                          <tr key={sizeKey}>
+                            <td className="size-modal-size-name">{sizeKey.replace(/-/g, ' ')}</td>
+                            {sizeModalMeasurements.map((m) => (
+                              <td key={m.field}>
                                 <input
                                   type="number"
                                   min="0"
                                   step="0.5"
                                   value={sizeModalSizeChart?.[sizeKey]?.[m.field] ?? ''}
                                   onChange={(e) => updateSizeModalValue(sizeKey, m.field, e.target.value)}
-                                  style={{ width: '100%', textAlign: 'center' }}
+                                  className="size-modal-value-input"
                                 />
                               </td>
                             ))}
-                            <td style={{ padding: '6px' }}>
-                              <button type="button" className="fabric-delete-btn" onClick={() => removeSizeFromSizeModal(sizeKey)}>Remove</button>
+                            <td>
+                              <button
+                                type="button"
+                                className="size-modal-remove-btn"
+                                onClick={() => removeSizeFromSizeModal(sizeKey)}
+                                aria-label={`Remove ${sizeKey} size`}
+                                title="Remove size"
+                              >
+                                <FontAwesomeIcon icon={faXmark} />
+                              </button>
                             </td>
                           </tr>
                         ))}

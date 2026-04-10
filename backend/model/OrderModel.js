@@ -1,4 +1,4 @@
-﻿const db = require('../config/db');
+const db = require('../config/db');
 
 function parseJsonSafely(value, fallback = {}) {
   if (value === null || value === undefined) return fallback;
@@ -952,7 +952,7 @@ const Order = {
         updates.push(`pricing_factors = JSON_SET(COALESCE(pricing_factors, '{}'), '$.${key}', ?)`);
         values.push(pricingFactors[key]);
       });
-      if (pricingFactors.enhancementAdminAccepted === true) {
+      if (pricingFactors.enhancementAdminAccepted === true && !pricingFactors.accessoriesPrice) {
         updates.push(`pricing_factors = JSON_SET(COALESCE(pricing_factors, '{}'), '$.amount_paid', '0')`);
       }
     }

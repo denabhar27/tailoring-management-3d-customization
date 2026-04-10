@@ -465,7 +465,7 @@ exports.updateTrackingStatus = (req, res) => {
 exports.requestEnhancement = (req, res) => {
   const userId = req.user.id;
   const orderItemId = req.params.id;
-  const { notes, preferredCompletionDate } = req.body || {};
+  const { notes, preferredCompletionDate, addAccessories } = req.body || {};
 
   const enhancementNotes = String(notes || '').trim();
   if (!enhancementNotes) {
@@ -520,7 +520,10 @@ exports.requestEnhancement = (req, res) => {
           enhancementRequestedBy: 'customer',
           enhancementNotes,
           enhancementPreferredCompletionDate: preferredCompletionDate || null,
-          enhancementUpdatedAt: new Date().toISOString()
+          enhancementUpdatedAt: new Date().toISOString(),
+          addAccessories: addAccessories === true,
+          enhancementCancelledByAdmin: false,
+          enhancementCancelledAt: null
         }
       };
 

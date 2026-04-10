@@ -286,3 +286,29 @@ export async function deleteCustom3DModel(modelId) {
     };
   }
 }
+
+export async function updateCustom3DModel(modelId, modelData) {
+  try {
+    const response = await axios.put(`${BASE_URL}/customization/custom-models/${modelId}`, modelData, {
+      headers: getAuthHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Update custom 3D model error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Error updating custom 3D model'
+    };
+  }
+}
+
+export async function cancelEnhancement(itemId) {
+  try {
+    const response = await axios.post(`${BASE_URL}/orders/items/${itemId}/cancel-enhancement`, {}, {
+      headers: getAuthHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    return { success: false, message: error.response?.data?.message || 'Error cancelling enhancement' };
+  }
+}

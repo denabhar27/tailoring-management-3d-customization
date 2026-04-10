@@ -63,6 +63,7 @@ const DryCleaning = () => {
   const [dateRangeStart, setDateRangeStart] = useState('');
   const [dateRangeEnd, setDateRangeEnd] = useState('');
   const [timeFilter, setTimeFilter] = useState('');
+  const [tableView, setTableView] = useState('orders');
 
   const [viewFilter, setViewFilter] = useState("all");
 
@@ -154,15 +155,15 @@ const DryCleaning = () => {
   const [damageTargetItem, setDamageTargetItem] = useState(null);
   const [activeDamageIncident, setActiveDamageIncident] = useState(null);
   const [damageForm, setDamageForm] = useState({
-    damageType: '',
-    damageDescription: '',
-    responsibleParty: '',
-    totalQuantity: '1',
-    damagedQuantity: '1',
-    affectedGarments: [],
-    compensationAmount: '',
-    compensationType: 'money',
-    clotheDescription: ''
+      damageType: '',
+      damageDescription: '',
+      responsibleParty: '',
+      totalQuantity: '1',
+      damagedQuantity: '1',
+      affectedGarments: [],
+      compensationAmount: '',
+      compensationType: 'money',
+      clotheDescription: ''
   });
   const [liabilityForm, setLiabilityForm] = useState({
     decision: 'approved',
@@ -640,10 +641,12 @@ const DryCleaning = () => {
 
       const incident = getIncidentForItem(item.item_id);
       const hasPaidCompensation = isPaidCompensationIncident(incident);
+      const proceedChoice = String(incident?.customer_proceed_choice || '').toLowerCase();
+      const compensationBypassesPayment = hasPaidCompensation && proceedChoice !== 'proceed';
 
 
 
-      if (remainingBalance > 0.01 && !hasPaidCompensation) {
+      if (remainingBalance > 0.01 && !compensationBypassesPayment) {
 
         return null;
 
@@ -893,7 +896,7 @@ const DryCleaning = () => {
       damagedQuantity: '1',
       affectedGarments: [],
       compensationAmount: '',
-      compensationType: 'money',
+      compensationType: 'both',
       clotheDescription: ''
     });
     setShowDamageReportModal(true);
@@ -930,10 +933,21 @@ const DryCleaning = () => {
       showToast('Damaged quantity must match the total of affected garment quantities', 'error');
       return;
     }
+    const selectedCompensationType = damageForm.compensationType || '';
+    const hasMoneyType = selectedCompensationType === 'money' || selectedCompensationType === 'both';
+    const hasClotheType = selectedCompensationType === 'clothe' || selectedCompensationType === 'both';
     const hasMoneyOffer = Number.isFinite(compensationAmount) && compensationAmount > 0;
     const hasClotheOffer = damageForm.clotheDescription.trim().length > 0;
-    if (!hasMoneyOffer && !hasClotheOffer) {
-      showToast('Please provide at least one compensation option (money amount or clothe description)', 'error');
+    if (!hasMoneyType && !hasClotheType) {
+      showToast('Please select at least one compensation type', 'error');
+      return;
+    }
+    if (hasMoneyType && !hasMoneyOffer) {
+      showToast('Please enter a compensation amount greater than 0', 'error');
+      return;
+    }
+    if (hasClotheType && !hasClotheOffer) {
+      showToast('Please provide a clothe compensation description', 'error');
       return;
     }
 
@@ -952,9 +966,9 @@ const DryCleaning = () => {
       total_quantity: totalQuantity,
       damaged_quantity: damagedQuantity,
       damaged_garment_type: damagedGarmentSummary || null,
-      compensation_amount: compensationAmount,
-      compensation_type: hasMoneyOffer && hasClotheOffer ? 'both' : hasMoneyOffer ? 'money' : 'clothe',
-      clothe_description: hasClotheOffer ? damageForm.clotheDescription.trim() : null,
+      compensation_amount: hasMoneyType ? compensationAmount : 0,
+      compensation_type: hasMoneyType && hasClotheType ? 'both' : hasMoneyType ? 'money' : 'clothe',
+      clothe_description: hasClotheType ? damageForm.clotheDescription.trim() : null,
       notes: 'Reported from Dry Cleaning management'
     });
 
@@ -1305,6 +1319,85 @@ const DryCleaning = () => {
 
   };
 
+  const getFilteredEnhancementItems = () => {
+    let items = allItems.filter(item => {
+      const pf = typeof item.pricing_factors === 'string'
+        ? JSON.parse(item.pricing_factors || '{}')
+        : (item.pricing_factors || {});
+      return pf.enhancementRequest === true && pf.enhancementPendingAdminReview === true
+        && (item.approval_status === 'pending' || item.approval_status === 'pending_review');
+    });
+
+    items = items.filter(item => {
+      if (!searchTerm) return true;
+      const searchLower = searchTerm.toLowerCase();
+      const customerName = item.order_type === 'walk_in'
+        ? (item.walk_in_customer_name || '').toLowerCase()
+        : `${item.first_name || ''} ${item.last_name || ''}`.toLowerCase();
+      const customerEmail = item.order_type === 'walk_in'
+        ? (item.walk_in_customer_email || '').toLowerCase()
+        : (item.email || '').toLowerCase();
+      const garmentSummary = item.specific_data?.garments && item.specific_data.garments.length > 0
+        ? item.specific_data.garments.map(g => g.garmentType || 'Unknown').join(', ').toLowerCase()
+        : (item.specific_data?.garmentType || '').toLowerCase();
+
+      return (
+        item.order_id?.toString().includes(searchLower) ||
+        customerName.includes(searchLower) ||
+        garmentSummary.includes(searchLower) ||
+        customerEmail.includes(searchLower)
+      );
+    });
+
+    if (todayAppointmentsOnly) {
+      items = items.filter(isTodayAppointment);
+    }
+
+    if (dateRangeStart || dateRangeEnd) {
+      items = items.filter(item => {
+        const specificData = parseMaybeObject(item?.specific_data);
+        const appointmentDate = item?.appointment_date || item?.appointmentDate || specificData?.appointment_date || specificData?.appointmentDate || specificData?.pickupDate || specificData?.preferredDate || specificData?.date;
+        if (!appointmentDate) return false;
+        const itemDate = new Date(appointmentDate);
+        itemDate.setHours(0, 0, 0, 0);
+        if (dateRangeStart && dateRangeEnd) {
+          const start = new Date(dateRangeStart);
+          const end = new Date(dateRangeEnd);
+          start.setHours(0, 0, 0, 0);
+          end.setHours(23, 59, 59, 999);
+          return itemDate >= start && itemDate <= end;
+        } else if (dateRangeStart) {
+          const start = new Date(dateRangeStart);
+          start.setHours(0, 0, 0, 0);
+          return itemDate >= start;
+        } else if (dateRangeEnd) {
+          const end = new Date(dateRangeEnd);
+          end.setHours(23, 59, 59, 999);
+          return itemDate <= end;
+        }
+        return true;
+      });
+    }
+
+    if (timeFilter) {
+      items = items.filter(item => {
+        const specificData = parseMaybeObject(item?.specific_data);
+        const pricingFactors = parseMaybeObject(item?.pricing_factors);
+        const preferredTime = specificData?.preferredTime;
+        if (preferredTime) {
+          const t = String(preferredTime).includes('T') ? String(preferredTime).split('T')[1]?.slice(0, 5) : String(preferredTime).slice(0, 5);
+          return t === timeFilter;
+        }
+        const apptDate = specificData?.pickupDate || pricingFactors?.pickupDate || item?.appointment_date || specificData?.appointment_date;
+        if (!apptDate) return false;
+        const timeStr = String(apptDate).split('T')[1]?.slice(0, 5);
+        return timeStr === timeFilter;
+      });
+    }
+
+    return items;
+  };
+
 
 
   const handleAccept = async (itemId) => {
@@ -1321,23 +1414,7 @@ const DryCleaning = () => {
 
 
 
-    // Check if garment type is "Others" - requires price confirmation
-
-    const hasOthersGarment = (() => {
-
-      if (item.specific_data?.garments && item.specific_data.garments.length > 0) {
-
-        return item.specific_data.garments.some(g => g.isEstimated === true);
-
-      }
-
-      return false;
-
-    })();
-
-
-
-    // Walk-in orders skip price confirmation modal
+    // Walk-in orders are accepted directly.
 
     if (item.order_type === 'walk_in') {
 
@@ -1381,27 +1458,7 @@ const DryCleaning = () => {
 
 
 
-    // If garment type is "Others", show price confirmation modal
-
-    if (hasOthersGarment) {
-
-      const estimatedPrice = getEstimatedPrice(item) || parseFloat(item.final_price || 0);
-
-      setPriceConfirmationItem(item);
-
-      setPriceConfirmationPrice(estimatedPrice.toFixed(2));
-
-      setPriceConfirmationReason(item.pricing_factors?.adminNotes || '');
-
-      setShowPriceConfirmationModal(true);
-
-      return;
-
-    }
-
-
-
-    // Standard garments with fixed prices - accept directly
+    // All online dry cleaning orders are accepted directly.
 
     openConfirmModal(
 
@@ -1595,10 +1652,12 @@ const DryCleaning = () => {
 
       const incident = getIncidentForItem(item.item_id);
       const hasPaidCompensation = isPaidCompensationIncident(incident);
+      const proceedChoiceForUpdate = String(incident?.customer_proceed_choice || '').toLowerCase();
+      const compensationBypassesPaymentForUpdate = hasPaidCompensation && proceedChoiceForUpdate !== 'proceed';
 
 
 
-      if (remainingBalance > 0.01 && !hasPaidCompensation) {
+      if (remainingBalance > 0.01 && !compensationBypassesPaymentForUpdate) {
 
         showToast(`Cannot mark as completed. Payment is not complete. Remaining balance: ₱${remainingBalance.toFixed(2)}`, "error");
 
@@ -2372,6 +2431,27 @@ const DryCleaning = () => {
 
         </div>
 
+        <div className="order-view-tabs" role="tablist" aria-label="Order view selection">
+          <button
+            type="button"
+            className={`order-view-tab ${tableView === 'orders' ? 'active' : ''}`}
+            onClick={() => setTableView('orders')}
+            role="tab"
+            aria-selected={tableView === 'orders'}
+          >
+            Order List
+          </button>
+          <button
+            type="button"
+            className={`order-view-tab ${tableView === 'enhancements' ? 'active' : ''}`}
+            onClick={() => setTableView('enhancements')}
+            role="tab"
+            aria-selected={tableView === 'enhancements'}
+          >
+            Enhancement Request
+          </button>
+        </div>
+
         <div className="search-container">
 
           <input
@@ -2386,13 +2466,12 @@ const DryCleaning = () => {
 
           />
 
+          {tableView === 'orders' && (
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
 
             <option value="">All Status</option>
 
             <option value="pending">Pending</option>
-
-            <option value="price_confirmation">Price Confirmation</option>
 
             <option value="accepted">Accepted</option>
 
@@ -2407,6 +2486,7 @@ const DryCleaning = () => {
             <option value="estimated-today">Estimated Release Today</option>
 
           </select>
+          )}
 
         </div>
 
@@ -2488,26 +2568,15 @@ const DryCleaning = () => {
                   style={{ padding: '4px 8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px' }}
                 >
                   <option value="">All Times</option>
-                  <option value="08:00">8:00 AM</option>
                   <option value="08:30">8:30 AM</option>
-                  <option value="09:00">9:00 AM</option>
                   <option value="09:30">9:30 AM</option>
-                  <option value="10:00">10:00 AM</option>
                   <option value="10:30">10:30 AM</option>
-                  <option value="11:00">11:00 AM</option>
                   <option value="11:30">11:30 AM</option>
-                  <option value="12:00">12:00 PM</option>
                   <option value="12:30">12:30 PM</option>
-                  <option value="13:00">1:00 PM</option>
                   <option value="13:30">1:30 PM</option>
-                  <option value="14:00">2:00 PM</option>
                   <option value="14:30">2:30 PM</option>
-                  <option value="15:00">3:00 PM</option>
                   <option value="15:30">3:30 PM</option>
-                  <option value="16:00">4:00 PM</option>
                   <option value="16:30">4:30 PM</option>
-                  <option value="17:00">5:00 PM</option>
-                  <option value="17:30">5:30 PM</option>
                 </select>
 
                 {timeFilter && (
@@ -2519,6 +2588,7 @@ const DryCleaning = () => {
               </div>
         </div>
 
+        {tableView === 'orders' && (
         <div className="table-container">
 
           <div className="table-scroll-viewport">
@@ -2571,6 +2641,8 @@ const DryCleaning = () => {
                   const isCompensatedIncident = incident && liabilityStatus === 'approved' && compensationStatus === 'paid';
                   const isDamagePendingIncident = incident && liabilityStatus === 'pending';
                   const isForCompensationIncident = incident && liabilityStatus === 'approved' && compensationStatus !== 'paid';
+                  const customerProceedChoice = String(incident?.customer_proceed_choice || '').toLowerCase();
+                  const customerWantsToProceed = isCompensatedIncident && customerProceedChoice === 'proceed';
 
 
 
@@ -2679,7 +2751,7 @@ const DryCleaning = () => {
                         const isDamagePending = normalizeIncidentStatus(incident?.liability_status) === 'pending';
                         return (
                           <span
-                            className={`status-badge ${hasApprovedDamage ? (isCompensationPaid ? 'completed' : 'rejected') : isDamagePending ? 'rejected' : getStatusClass(item.approval_status || 'pending')}`}
+                            className={`status-badge ${hasApprovedDamage ? (isCompensationPaid ? (customerWantsToProceed ? getStatusClass(item.approval_status || 'pending') : 'completed') : 'rejected') : isDamagePending ? 'rejected' : getStatusClass(item.approval_status || 'pending')}`}
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -2688,7 +2760,7 @@ const DryCleaning = () => {
                               lineHeight: '1',
                               padding: '3px 7px',
                               fontWeight: 600,
-                              ...(hasApprovedDamage ? {
+                              ...(hasApprovedDamage && !customerWantsToProceed ? {
                               backgroundColor: isCompensationPaid ? '#e8f5e9' : '#ffebee',
                               color: isCompensationPaid ? '#1b5e20' : '#c62828',
                               border: `1px solid ${isCompensationPaid ? '#a5d6a7' : '#ef9a9a'}`
@@ -2700,7 +2772,7 @@ const DryCleaning = () => {
                             }}
                           >
                             {hasApprovedDamage
-                              ? (isCompensationPaid ? 'Compensated' : 'For Compensation')
+                              ? (isCompensationPaid ? (customerWantsToProceed ? getStatusText(item.approval_status || 'pending') : 'Compensated') : 'For Compensation')
                               : isDamagePending
                               ? 'Damage Reported'
                               : getStatusText(item.approval_status || 'pending')}
@@ -2804,19 +2876,6 @@ const DryCleaning = () => {
                             </div>
                           ) : isCompensatedIncident && (
                             <>
-                              {item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'dry_cleaning', item) && (
-                                <button
-                                  className="icon-btn next-status"
-                                  onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'dry_cleaning', item))}
-                                  title={`Move to ${getNextStatusLabel(item.approval_status, 'dry_cleaning', item)}`}
-                                  style={{ backgroundColor: '#4CAF50', color: 'white' }}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="9 18 15 12 9 6"></polyline>
-                                  </svg>
-                                </button>
-                              )}
-
                               <button
                                 className="icon-btn"
                                 onClick={(e) => {
@@ -2850,7 +2909,27 @@ const DryCleaning = () => {
                             </>
                           )}
 
-                          {!isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'dry_cleaning', item) && (() => {
+                          {customerWantsToProceed && item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'dry_cleaning', item) && (
+                            <button
+                              className="icon-btn next-status"
+                              onClick={() => updateStatus(item.item_id, getNextStatus(item.approval_status, 'dry_cleaning', item))}
+                              title={`Move to ${getNextStatusLabel(item.approval_status, 'dry_cleaning', item)}`}
+                              style={{ backgroundColor: '#4CAF50', color: 'white' }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                            </button>
+                          )}
+                          {customerWantsToProceed && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
+                            <button
+                              className="icon-btn"
+                              onClick={(e) => { e.stopPropagation(); setSelectedOrder(item); const fp = parseFloat(item.final_price || 0); setPaymentAmount((fp * 0.5).toFixed(2)); setCashReceived(''); setShowPaymentModal(true); }}
+                              title="Record Payment"
+                              style={{ backgroundColor: '#2196F3', color: 'white' }}
+                            >
+                              💰
+                            </button>
+                          )}
+                          {!customerWantsToProceed && !isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'dry_cleaning', item) && (() => {
                             const nextStatus = getNextStatus(item.approval_status, 'dry_cleaning', item);
                             const isMovingToInProgress = nextStatus === 'confirmed';
                             const halfPrice = finalPrice * 0.5;
@@ -2874,7 +2953,7 @@ const DryCleaning = () => {
                             );
                           })()}
 
-                          {!isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && (
+                          {!customerWantsToProceed && !isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && (
 
                             <>
 
@@ -3084,7 +3163,7 @@ const DryCleaning = () => {
 
                           )}
 
-                          {!isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && (item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
+                          {(item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
 
                             <>
 
@@ -3114,7 +3193,7 @@ const DryCleaning = () => {
 
                               )}
 
-                              {isAdminUser && (
+                              {isAdminUser && !customerWantsToProceed && !isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && (
                               <button
 
                                 className="icon-btn delete"
@@ -3173,45 +3252,29 @@ const DryCleaning = () => {
           </div>
 
         </div>
+        )}
 
-        {/* Enhancement Requests Table */}
-        {(() => {
-          const enhancementItems = allItems.filter(item => {
-            const pf = typeof item.pricing_factors === 'string'
-              ? JSON.parse(item.pricing_factors || '{}')
-              : (item.pricing_factors || {});
-            return pf.enhancementRequest === true && pf.enhancementPendingAdminReview === true
-              && (item.approval_status === 'pending' || item.approval_status === 'pending_review');
-          });
-
-          return (
-            <div style={{ marginTop: '40px' }}>
-              <div className="dashboard-title" style={{ marginBottom: '12px' }}>
-                <div>
-                  <h2 style={{ color: '#673ab7' }}>Enhancement Requests</h2>
-                  <p>Customer-requested enhancements pending admin review</p>
-                </div>
-              </div>
-              <div className="table-container">
-                <div className="table-scroll-viewport">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Order ID</th>
-                        <th>Customer</th>
-                        <th>Garment</th>
-                        <th>Service</th>
-                        <th>Date</th>
-                        <th>Price</th>
-                        <th>Payment Status</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {enhancementItems.length === 0 ? (
-                        <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No enhancement requests</td></tr>
-                      ) : enhancementItems.map(item => {
+        {tableView === 'enhancements' && (
+          <div className="table-container">
+            <div className="table-scroll-viewport">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Order ID</th>
+                    <th>Customer</th>
+                    <th>Garment</th>
+                    <th>Service</th>
+                    <th>Date</th>
+                    <th>Price</th>
+                    <th>Payment Status</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getFilteredEnhancementItems().length === 0 ? (
+                    <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No enhancement requests</td></tr>
+                  ) : getFilteredEnhancementItems().map(item => {
                         const pf = typeof item.pricing_factors === 'string'
                           ? JSON.parse(item.pricing_factors || '{}')
                           : (item.pricing_factors || {});
@@ -3277,14 +3340,12 @@ const DryCleaning = () => {
                             </td>
                           </tr>
                         );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                  })}
+                </tbody>
+              </table>
             </div>
-          );
-        })()}
+          </div>
+        )}
 
       </div>
 
@@ -3492,7 +3553,7 @@ const DryCleaning = () => {
 
                             if (priceChanged) {
 
-                              newStatus = isWalkIn ? 'accepted' : 'price_confirmation';
+                              newStatus = 'accepted';
 
                             }
 
@@ -3703,13 +3764,12 @@ const DryCleaning = () => {
                 <div className="detail-row"><strong>Requested At:</strong> {pf.enhancementUpdatedAt ? new Date(pf.enhancementUpdatedAt).toLocaleString() : 'N/A'}</div>
                 <div className="detail-row"><strong>Current Price:</strong> ₱{parseFloat(enhancementViewItem.final_price || 0).toLocaleString()}</div>
               </div>
-              <div className="modal-footer">
-                <button className="btn-cancel" onClick={() => setShowEnhancementViewModal(false)}>Close</button>
+              <div className="modal-footer enhancement-view-footer">
                 <button
                   className="btn-save"
                   disabled={savingEnhancementPrice}
                   onClick={() => handleEnhancementPriceConfirm(enhancementViewItem)}
-                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
+                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff', whiteSpace: 'nowrap' }}
                 >
                   {savingEnhancementPrice ? 'Accepting...' : 'Accept Enhancement'}
                 </button>
@@ -4839,7 +4899,17 @@ const DryCleaning = () => {
               <span className="close-modal" onClick={() => setShowDamageReportModal(false)}>×</span>
             </div>
             <div className="modal-body damage-compensation-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left' }}>
-              <div className="incident-detail-card" style={{ width: '100%', gridColumn: '1 / -1' }}>
+              <div
+                className="incident-detail-card"
+                style={{
+                  width: '100%',
+                  gridColumn: '1 / -1',
+                  border: 'none',
+                  borderRadius: 0,
+                  padding: 0,
+                  background: 'transparent'
+                }}
+              >
                 <div className="incident-detail-item"><span className="incident-detail-label">Order ID</span><span className="incident-detail-value">#{damageTargetItem.order_id || 'N/A'}</span></div>
                 <div className="incident-detail-item"><span className="incident-detail-label">Order Item ID</span><span className="incident-detail-value">#{damageTargetItem.item_id || 'N/A'}</span></div>
                 <div className="incident-detail-item"><span className="incident-detail-label">Customer Name</span><span className="incident-detail-value">{getCustomerNameFromItem(damageTargetItem)}</span></div>
@@ -5037,31 +5107,74 @@ const DryCleaning = () => {
               </div>
 
               <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
-                <label>Compensation Amount (PHP)</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                  min="0"
-                  step="0.01"
-                  value={damageForm.compensationAmount}
-                  onChange={(e) => setDamageForm({ ...damageForm, compensationAmount: e.target.value })}
-                />
+                <label>Compensation Type *</label>
+                <div className="compensation-type-options" style={{ marginTop: '6px' }}>
+                  <label className="compensation-type-option" style={{ cursor: 'pointer' }}>
+                    <input
+                      className="compensation-type-checkbox"
+                      type="checkbox"
+                      value="money"
+                      checked={damageForm.compensationType === 'money' || damageForm.compensationType === 'both'}
+                      onChange={(e) => {
+                        const current = damageForm.compensationType || '';
+                        const nextType = e.target.checked
+                          ? (current === 'clothe' || current === 'both' ? 'both' : 'money')
+                          : (current === 'both' ? 'clothe' : '');
+                        setDamageForm({ ...damageForm, compensationType: nextType });
+                      }}
+                    />
+                    <span>Compensation</span>
+                  </label>
+                  <label className="compensation-type-option" style={{ cursor: 'pointer' }}>
+                    <input
+                      className="compensation-type-checkbox"
+                      type="checkbox"
+                      value="clothe"
+                      checked={damageForm.compensationType === 'clothe' || damageForm.compensationType === 'both'}
+                      onChange={(e) => {
+                        const current = damageForm.compensationType || '';
+                        const nextType = e.target.checked
+                          ? (current === 'money' || current === 'both' ? 'both' : 'clothe')
+                          : (current === 'both' ? 'money' : '');
+                        setDamageForm({ ...damageForm, compensationType: nextType });
+                      }}
+                    />
+                    <span>Replacement</span>
+                  </label>
+                </div>
               </div>
 
-              <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
-                <label>Clothe Compensation Description</label>
-                <textarea
-                  rows={3}
-                  className="form-control"
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                  placeholder="Describe the replacement clothe (e.g. same barong, size L, white). Leave blank if not offering clothe."
-                  value={damageForm.clotheDescription}
-                  onChange={(e) => setDamageForm({ ...damageForm, clotheDescription: e.target.value })}
-                />
-              </div>
+              {(damageForm.compensationType === 'money' || damageForm.compensationType === 'both') && (
+                <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
+                  <label>Compensation Amount (PHP)</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    min="0"
+                    step="0.01"
+                    placeholder="Enter amount"
+                    value={damageForm.compensationAmount}
+                    onChange={(e) => setDamageForm({ ...damageForm, compensationAmount: e.target.value })}
+                  />
+                </div>
+              )}
+
+              {(damageForm.compensationType === 'clothe' || damageForm.compensationType === 'both') && (
+                <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
+                  <label>Clothe Compensation Description</label>
+                  <textarea
+                    rows={3}
+                    className="form-control"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    placeholder="Describe the replacement clothe (e.g. same barong, size L, white)."
+                    value={damageForm.clotheDescription}
+                    onChange={(e) => setDamageForm({ ...damageForm, clotheDescription: e.target.value })}
+                  />
+                </div>
+              )}
               <div style={{ fontSize: '12px', color: '#666', gridColumn: '1 / -1' }}>
-                ℹ️ Fill in one or both options. The customer will choose which compensation they prefer.
+                ℹ️ Select one or both compensation types for this damage report.
               </div>
             </div>
             <div className="modal-footer-centered" style={{ justifyContent: 'flex-end' }}>

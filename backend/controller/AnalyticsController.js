@@ -519,56 +519,69 @@ exports.getNetLossByService = async (req, res) => {
   const { startDate, endDate, serviceTypes } = req.query;
 
   try {
-    let dateCondition = '';
+    const params = [];
+    const whereConditions = [
+      "dcr.liability_status = 'approved'",
+      "dcr.compensation_status = 'paid'",
+      "LOWER(COALESCE(dcr.service_type, oi.service_type, '')) IN ('repair', 'dry_cleaning', 'dry-cleaning', 'drycleaning', 'dry cleaning')"
+    ];
+
     if (startDate && endDate) {
-      dateCondition = `AND DATE(${getAnalyticsActivityDateExpression()}) BETWEEN '${startDate}' AND '${endDate}'`;
+      whereConditions.push("DATE(COALESCE(dcr.compensation_paid_at, dcr.updated_at, dcr.created_at)) BETWEEN ? AND ?");
+      params.push(startDate, endDate);
     }
 
-    let serviceTypeCondition = '';
     if (serviceTypes) {
       const types = Array.isArray(serviceTypes) ? serviceTypes : [serviceTypes];
-      if (types.length > 0) {
-        const mappedTypes = types.map(t => {
-          const lower = t.toLowerCase();
-          if (lower === 'customization') return "'customize', 'customization'";
-          if (lower === 'dry cleaning') return "'dry_cleaning', 'dry-cleaning', 'drycleaning', 'dry cleaning'";
-          if (lower === 'repair') return "'repair'";
-          if (lower === 'rental') return "'rental'";
-          return `'${lower}'`;
-        });
-        serviceTypeCondition = `AND LOWER(oi.service_type) IN (${mappedTypes.join(', ')})`;
+      const mappedTypes = [];
+
+      types.forEach((type) => {
+        const lower = String(type || '').toLowerCase();
+        if (lower === 'customization') {
+          mappedTypes.push('customize', 'customization');
+        } else if (lower === 'dry cleaning') {
+          mappedTypes.push('dry_cleaning', 'dry-cleaning', 'drycleaning', 'dry cleaning');
+        } else if (lower === 'repair') {
+          mappedTypes.push('repair');
+        } else if (lower === 'rental') {
+          mappedTypes.push('rental');
+        } else if (lower) {
+          mappedTypes.push(lower);
+        }
+      });
+
+      if (mappedTypes.length > 0) {
+        const placeholders = mappedTypes.map(() => '?').join(', ');
+        whereConditions.push(`LOWER(COALESCE(dcr.service_type, oi.service_type, '')) IN (${placeholders})`);
+        params.push(...mappedTypes);
       }
     }
-
-    const lossExpr = getNetCompensationLossExpression();
 
     const lossData = await query(`
       SELECT
         CASE
-          WHEN LOWER(oi.service_type) IN ('customize', 'customization') THEN 'Customization'
-          WHEN LOWER(oi.service_type) IN ('dry_cleaning', 'dry-cleaning', 'drycleaning', 'dry cleaning') THEN 'Dry Cleaning'
-          WHEN LOWER(oi.service_type) = 'repair' THEN 'Repair'
-          WHEN LOWER(oi.service_type) = 'rental' THEN 'Rental'
+          WHEN LOWER(COALESCE(dcr.service_type, oi.service_type, '')) IN ('customize', 'customization') THEN 'Customization'
+          WHEN LOWER(COALESCE(dcr.service_type, oi.service_type, '')) IN ('dry_cleaning', 'dry-cleaning', 'drycleaning', 'dry cleaning') THEN 'Dry Cleaning'
+          WHEN LOWER(COALESCE(dcr.service_type, oi.service_type, '')) = 'repair' THEN 'Repair'
+          WHEN LOWER(COALESCE(dcr.service_type, oi.service_type, '')) = 'rental' THEN 'Rental'
           ELSE 'Other'
         END AS service_type,
-        COALESCE(SUM(${lossExpr}), 0) AS total_loss,
-        SUM(CASE WHEN ${getHasPaidCompensationExpression()} THEN 1 ELSE 0 END) AS incident_count
-      FROM order_items oi
-      JOIN orders o ON oi.order_id = o.order_id
-      WHERE 1=1
-        ${dateCondition}
-        ${serviceTypeCondition}
+        COALESCE(SUM(COALESCE(dcr.compensation_amount, 0)), 0) AS total_loss,
+        COUNT(DISTINCT dcr.id) AS incident_count
+      FROM damage_compensation_records dcr
+      LEFT JOIN order_items oi ON oi.item_id = dcr.order_item_id
+      WHERE ${whereConditions.join(' AND ')}
       GROUP BY
         CASE
-          WHEN LOWER(oi.service_type) IN ('customize', 'customization') THEN 'Customization'
-          WHEN LOWER(oi.service_type) IN ('dry_cleaning', 'dry-cleaning', 'drycleaning', 'dry cleaning') THEN 'Dry Cleaning'
-          WHEN LOWER(oi.service_type) = 'repair' THEN 'Repair'
-          WHEN LOWER(oi.service_type) = 'rental' THEN 'Rental'
+          WHEN LOWER(COALESCE(dcr.service_type, oi.service_type, '')) IN ('customize', 'customization') THEN 'Customization'
+          WHEN LOWER(COALESCE(dcr.service_type, oi.service_type, '')) IN ('dry_cleaning', 'dry-cleaning', 'drycleaning', 'dry cleaning') THEN 'Dry Cleaning'
+          WHEN LOWER(COALESCE(dcr.service_type, oi.service_type, '')) = 'repair' THEN 'Repair'
+          WHEN LOWER(COALESCE(dcr.service_type, oi.service_type, '')) = 'rental' THEN 'Rental'
           ELSE 'Other'
         END
       HAVING total_loss > 0
       ORDER BY total_loss DESC
-    `);
+    `, params);
 
     res.json({
       success: true,

@@ -5,20 +5,36 @@ import { getAllRepairGarmentTypes } from '../../api/RepairGarmentTypeApi';
 import '../../styles/RepairFormModal.css';
 import '../../styles/SharedModal.css';
 
+const USER_ALLOWED_SLOT_TIMES = new Set([
+  '08:30', '09:30', '10:30', '11:30', '12:30', '13:30', '14:30', '15:30', '16:30'
+]);
+
+const isUserAllowedSlotTime = (timeValue) => {
+  const normalized = String(timeValue || '').trim().substring(0, 5);
+  return USER_ALLOWED_SLOT_TIMES.has(normalized);
+};
+
+const filterUserAllowedSlots = (slots) => {
+  return (Array.isArray(slots) ? slots : []).filter((slot) => {
+    return isUserAllowedSlotTime(slot?.time_slot);
+  });
+};
+
 const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const defaultDamageLevels = [];
   const sizeOptions = [
-    { value: 'S', label: 'S (Small)' },
-    { value: 'M', label: 'M (Medium)' },
-    { value: 'L', label: 'L (Large)' },
-    { value: 'XL', label: 'XL (Extra-large)' },
-    { value: 'XXL', label: 'XXL' }
+    { value: 'Small', label: 'Small' },
+    { value: 'Medium', label: 'Medium' },
+    { value: 'Large', label: 'Large' },
+    { value: 'Others', label: 'Others' }
   ];
 
   const [garments, setGarments] = useState([
-    { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', size: '', notes: '' }
+    { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', size: '', customSize: '', notes: '' }
   ]);
+
+  const [addAccessories, setAddAccessories] = useState(false);
 
   const [formData, setFormData] = useState({
     date: '',
@@ -128,8 +144,9 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                     setAvailableTimeSlots([]);
                   } else {
                     setIsShopOpen(true);
-                    setAllTimeSlots(result.slots || []);
-                    const available = (result.slots || [])
+                    const filteredSlots = filterUserAllowedSlots(result.slots);
+                    setAllTimeSlots(filteredSlots);
+                    const available = filteredSlots
                       .filter(slot => slot.isClickable)
                       .map(slot => ({
                         value: slot.time_slot,
@@ -162,8 +179,9 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         time: ''
       });
       setGarments([
-        { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', size: '', notes: '' }
+        { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', size: '', customSize: '', notes: '' }
       ]);
+      setAddAccessories(false);
       setAllTimeSlots([]);
       setAvailableTimeSlots([]);
       setIsShopOpen(true);
@@ -205,7 +223,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
   const addGarment = () => {
     const newId = Math.max(...garments.map(g => g.id)) + 1;
-    setGarments([...garments, { id: newId, garmentType: '', damageLevel: '', damageLevelId: '', size: '', notes: '' }]);
+    setGarments([...garments, { id: newId, garmentType: '', damageLevel: '', damageLevelId: '', size: '', customSize: '', notes: '' }]);
   };
 
   const removeGarment = (id) => {
@@ -220,6 +238,14 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
 
       if (field === 'garmentType') {
         return { ...g, garmentType: value, damageLevel: '', damageLevelId: '' };
+      }
+
+      if (field === 'size') {
+        return {
+          ...g,
+          size: value,
+          customSize: value === 'Others' ? g.customSize : ''
+        };
       }
 
       return { ...g, [field]: value };
@@ -274,9 +300,10 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         }
 
         setIsShopOpen(true);
-        setAllTimeSlots(result.slots || []);
+        const filteredSlots = filterUserAllowedSlots(result.slots);
+        setAllTimeSlots(filteredSlots);
 
-        const available = (result.slots || [])
+        const available = filteredSlots
           .filter(slot => slot.isClickable)
           .map(slot => ({
             value: slot.time_slot,
@@ -393,6 +420,9 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       if (!garment.size) {
         newErrors[`garment_${garment.id}_size`] = 'Please select a size';
       }
+      if (garment.size === 'Others' && !String(garment.customSize || '').trim()) {
+        newErrors[`garment_${garment.id}_customSize`] = 'Please input your size';
+      }
       if (!garment.notes || garment.notes.trim() === '') {
         newErrors[`garment_${garment.id}_notes`] = 'Please provide a detailed description';
       }
@@ -468,7 +498,7 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           damageLevelId: garment.damageLevelId || null,
           damageLevelDescription: damageLevel?.level_description || '',
           garmentType: garment.garmentType,
-          size: garment.size,
+          size: garment.size === 'Others' ? String(garment.customSize || '').trim() : garment.size,
           notes: garment.notes,
           basePrice: basePrice
         };
@@ -483,7 +513,8 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         imageUrl: imageUrls.length > 0 ? imageUrls[0] : 'no-image',
         imageUrls: imageUrls.length > 0 ? imageUrls : [],
         garments: garmentsData,
-        isMultipleGarments: garments.length > 1
+        isMultipleGarments: garments.length > 1,
+        addAccessories: addAccessories
       };
 
       console.log('Repair data to send:', repairData);
@@ -536,8 +567,9 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
       time: ''
     });
     setGarments([
-      { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', size: '', notes: '' }
+      { id: 1, garmentType: '', damageLevel: '', damageLevelId: '', size: '', customSize: '', notes: '' }
     ]);
+    setAddAccessories(false);
     setImageFiles([]);
     setImagePreviews([]);
     setCurrentImageIndex(0);
@@ -649,6 +681,20 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 {errors[`garment_${garment.id}_size`] && (
                   <span className="error-message-shared">{errors[`garment_${garment.id}_size`]}</span>
                 )}
+                {garment.size === 'Others' && (
+                  <div style={{ marginTop: '10px' }}>
+                    <input
+                      type="text"
+                      value={garment.customSize || ''}
+                      onChange={(e) => updateGarment(garment.id, 'customSize', e.target.value)}
+                      placeholder="Enter your size"
+                      className={`form-input-shared ${errors[`garment_${garment.id}_customSize`] ? 'error' : ''}`}
+                    />
+                    {errors[`garment_${garment.id}_customSize`] && (
+                      <span className="error-message-shared">{errors[`garment_${garment.id}_customSize`]}</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="form-group-shared">
@@ -676,6 +722,23 @@ const RepairFormModal = ({ isOpen, onClose, onCartUpdate }) => {
           >
             + Add Another Garment
           </button>
+
+          <div className="form-group-shared" style={{ marginTop: '8px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '500' }}>
+              <input
+                type="checkbox"
+                checked={addAccessories}
+                onChange={(e) => setAddAccessories(e.target.checked)}
+                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              Add Accessories (optional)
+            </label>
+            {addAccessories && (
+              <p className="help-text-shared" style={{ marginTop: '4px', color: '#e65100' }}>
+                ⚠️ Adding accessories requires additional payment. The admin will provide the price for your confirmation.
+              </p>
+            )}
+          </div>
 
           <div className="form-group-shared">
             <label htmlFor="image" className="form-label-shared"><i className="fas fa-camera"></i> Upload Damage Photos (Recommended)</label>

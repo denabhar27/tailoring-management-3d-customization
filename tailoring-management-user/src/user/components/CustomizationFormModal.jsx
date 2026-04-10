@@ -7,6 +7,21 @@ import { getAllFabricTypes } from '../../api/FabricTypeApi';
 import { getAllGarmentTypes } from '../../api/GarmentTypeApi';
 import { getAllSlotsWithAvailability, bookSlot } from '../../api/AppointmentSlotApi';
 
+const USER_ALLOWED_SLOT_TIMES = new Set([
+  '08:30', '09:30', '10:30', '11:30', '12:30', '13:30', '14:30', '15:30', '16:30'
+]);
+
+const isUserAllowedSlotTime = (timeValue) => {
+  const normalized = String(timeValue || '').trim().substring(0, 5);
+  return USER_ALLOWED_SLOT_TIMES.has(normalized);
+};
+
+const filterUserAllowedSlots = (slots) => {
+  return (Array.isArray(slots) ? slots : []).filter((slot) => {
+    return isUserAllowedSlotTime(slot?.time_slot);
+  });
+};
+
 const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   const navigate = useNavigate();
   const MODAL_STATE_KEY = 'customizationModalState';
@@ -306,7 +321,7 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         }
 
         setIsShopOpen(true);
-        setAllTimeSlots(result.slots || []);
+        setAllTimeSlots(filterUserAllowedSlots(result.slots));
         setErrors(prev => ({ ...prev, preferredDate: null }));
       } else {
         setErrors(prev => ({ ...prev, preferredDate: result.message || 'Error loading time slots' }));

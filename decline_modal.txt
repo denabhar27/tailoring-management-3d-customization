@@ -1,0 +1,45 @@
+      {declineReasonModalOpen && itemToDecline && (
+        <div className="details-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setDeclineReasonModalOpen(false); setItemToDecline(null); setDeclineReasonText(''); } }}>
+          <div className="details-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px' }}>
+            <div className="details-modal-header">
+              <h3>Decline Accessories Price</h3>
+              <button className="details-modal-close" onClick={() => { setDeclineReasonModalOpen(false); setItemToDecline(null); setDeclineReasonText(''); }}>x</button>
+            </div>
+            <div className="details-modal-content">
+              <p style={{ marginBottom: '14px', color: '#666', fontSize: '14px' }}>
+                The admin will be notified and can adjust the accessories price or cancel the enhancement request.
+              </p>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
+                  Reason for declining (optional)
+                </label>
+                <textarea
+                  value={declineReasonText}
+                  onChange={(e) => setDeclineReasonText(e.target.value)}
+                  placeholder="e.g. Price is too high, I changed my mind..."
+                  rows={3}
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+            <div className="details-modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button className="btn-secondary" onClick={() => { setDeclineReasonModalOpen(false); setItemToDecline(null); setDeclineReasonText(''); }} disabled={submittingDecline}>
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  await submitDeclinePrice(itemToDecline, declineReasonText.trim());
+                  setDeclineReasonModalOpen(false);
+                  setItemToDecline(null);
+                  setDeclineReasonText('');
+                }}
+                disabled={submittingDecline}
+                style={{ padding: '10px 18px', backgroundColor: '#f44336', color: 'white', border: 'none', borderRadius: '6px', cursor: submittingDecline ? 'not-allowed' : 'pointer', opacity: submittingDecline ? 0.7 : 1 }}
+              >
+                {submittingDecline ? 'Submitting...' : 'Decline Price'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+

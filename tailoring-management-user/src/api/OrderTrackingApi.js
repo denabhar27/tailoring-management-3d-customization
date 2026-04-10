@@ -138,11 +138,11 @@ export async function cancelOrderItem(orderItemId, reason) {
   }
 }
 
-export async function requestEnhancement(orderItemId, notes, preferredCompletionDate = null) {
+export async function requestEnhancement(orderItemId, notes, preferredCompletionDate = null, addAccessories = false) {
   try {
     const response = await axios.post(
       `${BASE_URL}/tracking/request-enhancement/${orderItemId}`,
-      { notes, preferredCompletionDate },
+      { notes, preferredCompletionDate, addAccessories },
       { headers: getAuthHeaders() }
     );
     return response.data;

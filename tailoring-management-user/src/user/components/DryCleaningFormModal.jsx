@@ -5,6 +5,21 @@ import { getAllDCGarmentTypes } from '../../api/DryCleaningGarmentTypeApi';
 import '../../styles/DryCleaningFormModal.css';
 import '../../styles/SharedModal.css';
 
+const USER_ALLOWED_SLOT_TIMES = new Set([
+  '08:30', '09:30', '10:30', '11:30', '12:30', '13:30', '14:30', '15:30', '16:30'
+]);
+
+const isUserAllowedSlotTime = (timeValue) => {
+  const normalized = String(timeValue || '').trim().substring(0, 5);
+  return USER_ALLOWED_SLOT_TIMES.has(normalized);
+};
+
+const filterUserAllowedSlots = (slots) => {
+  return (Array.isArray(slots) ? slots : []).filter((slot) => {
+    return isUserAllowedSlotTime(slot?.time_slot);
+  });
+};
+
 const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   
   const [garmentTypes, setGarmentTypes] = useState({});
@@ -115,8 +130,9 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                     setAvailableTimeSlots([]);
                   } else {
                     setIsShopOpen(true);
-                    setAllTimeSlots(result.slots || []);
-                    const available = (result.slots || [])
+                    const filteredSlots = filterUserAllowedSlots(result.slots);
+                    setAllTimeSlots(filteredSlots);
+                    const available = filteredSlots
                       .filter(slot => slot.isClickable)
                       .map(slot => ({
                         value: slot.time_slot,
@@ -175,9 +191,10 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
         }
         
         setIsShopOpen(true);
-        setAllTimeSlots(result.slots || []);
+        const filteredSlots = filterUserAllowedSlots(result.slots);
+        setAllTimeSlots(filteredSlots);
 
-        const available = (result.slots || [])
+        const available = filteredSlots
           .filter(slot => slot.isClickable)
           .map(slot => ({
             value: slot.time_slot,

@@ -569,7 +569,8 @@ exports.updateRepairOrderItem = (req, res) => {
         const isPriceChanged = !Number.isNaN(nextPrice) && Math.abs(nextPrice - prevPrice) > 0.01;
         const hasReason = String(updateData.adminNotes || '').trim().length > 0;
 
-        if (isPriceChanged && !hasReason) {
+        const isCancellingEnhancement = updateData.pricingFactors && updateData.pricingFactors.enhancementRequest === false;
+        if (isPriceChanged && !hasReason && !isCancellingEnhancement) {
           return res.status(400).json({
             success: false,
             message: "A reason is required when changing the repair price"
@@ -2257,7 +2258,7 @@ exports.recordRentalPayment = (req, res) => {
           previous_payment_status: previousPaymentStatus,
           new_payment_status: newPaymentStatus,
           payment_method: paymentMethod || 'cash',
-          notes: `${actorName} recorded payment of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}.`,
+          notes: `${actorName} recorded payment of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}. Cash received: ₱${cashTendered.toFixed(2)}. Change: ₱${changeAmount.toFixed(2)}. Method: ${paymentMethod || 'cash'}. Customer: ${customerName}`,
           created_by: actorName
         }, (transLogErr, transLogResult) => {
           if (transLogErr) {
@@ -2916,3 +2917,32 @@ exports.getOrderItemPriceHistory = (req, res) => {
   });
 };
 
+
+exports.cancelEnhancement = (req, res) => {
+  const { itemId } = req.params;
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
+    return res.status(403).json({ success: false, message: 'Access denied. Admin only.' });
+  }
+  Order.getOrderItemById(itemId, (getErr, item) => {
+    if (getErr || !item) return res.status(404).json({ success: false, message: 'Order item not found' });
+    let pricingFactors = {};
+    try { pricingFactors = item.pricing_factors ? (typeof item.pricing_factors === 'string' ? JSON.parse(item.pricing_factors) : item.pricing_factors) : {}; } catch (e) {}
+    const originalPrice = parseFloat(pricingFactors.accessoriesBasePrice || item.final_price || 0);
+    const actualAmountPaid = String(pricingFactors.amount_paid || '0');
+    const updatedPf = { ...pricingFactors, enhancementRequest: false, enhancementPendingAdminReview: false, addAccessories: false, accessoriesPrice: null, accessoriesDeclineReason: null, amount_paid: actualAmountPaid, enhancementCancelledByAdmin: true, enhancementCancelledAt: new Date().toISOString() };
+    const sql = `UPDATE order_items SET final_price = ?, approval_status = 'completed', pricing_factors = ? WHERE item_id = ?`;
+    db.query(sql, [originalPrice, JSON.stringify(updatedPf), itemId], (err) => {
+      if (err) return res.status(500).json({ success: false, message: 'Error cancelling enhancement', error: err });
+      // Also sync the order_tracking table back to 'completed'
+      const OrderTracking = require('../model/OrderTrackingModel');
+      OrderTracking.getByOrderItemId(itemId, (trackErr, existingTracking) => {
+        if (!trackErr && existingTracking && existingTracking.length > 0) {
+          OrderTracking.updateStatus(itemId, 'completed', 'Enhancement cancelled by admin. Order restored to completed.', null, () => {});
+        } else {
+          OrderTracking.addTracking(itemId, 'completed', 'Enhancement cancelled by admin. Order restored to completed.', null, () => {});
+        }
+      });
+      res.json({ success: true, message: 'Enhancement cancelled. Price restored.' });
+    });
+  });
+};

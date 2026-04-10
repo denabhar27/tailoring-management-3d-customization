@@ -6,7 +6,7 @@ import AdminHeader from './AdminHeader';
 
 import Sidebar from './Sidebar';
 
-import { getAllRepairOrders, getRepairOrdersByStatus, updateRepairOrderItem } from '../api/RepairOrderApi';
+import { getAllRepairOrders, getRepairOrdersByStatus, updateRepairOrderItem, cancelEnhancement } from '../api/RepairOrderApi';
 
 import ImagePreviewModal from '../components/ImagePreviewModal';
 
@@ -85,6 +85,7 @@ const Repair = () => {
   const [dateRangeStart, setDateRangeStart] = useState('');
   const [dateRangeEnd, setDateRangeEnd] = useState('');
   const [timeFilter, setTimeFilter] = useState('');
+  const [tableView, setTableView] = useState('orders');
 
   const [viewFilter, setViewFilter] = useState("all");
 
@@ -120,6 +121,9 @@ const Repair = () => {
   const [enhancementViewItem, setEnhancementViewItem] = useState(null);
   const [enhancementPriceItem, setEnhancementPriceItem] = useState(null);
   const [savingEnhancementPrice, setSavingEnhancementPrice] = useState(false);
+  const [showAccessoriesPriceModal, setShowAccessoriesPriceModal] = useState(false);
+  const [accessoriesPriceItem, setAccessoriesPriceItem] = useState(null);
+  const [accessoriesPrice, setAccessoriesPrice] = useState('');
 
   const [editForm, setEditForm] = useState({
 
@@ -400,8 +404,8 @@ const Repair = () => {
         : (item.pricing_factors || {});
 
       const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
-
-      const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
+      const isAccessoriesEnhancement = isEnhancementOrder && !!pricingFactors.accessoriesPrice;
+      const amountPaid = (isEnhancementOrder && !isAccessoriesEnhancement) ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
 
       const finalPrice = parseFloat(item.final_price || 0);
 
@@ -409,10 +413,12 @@ const Repair = () => {
 
       const incident = getIncidentForItem(item.item_id);
       const hasPaidCompensation = isPaidCompensationIncident(incident);
+      const proceedChoice = String(incident?.customer_proceed_choice || '').toLowerCase();
+      const compensationBypassesPayment = hasPaidCompensation && proceedChoice !== 'proceed';
 
 
 
-      if (remainingBalance > 0.01 && !hasPaidCompensation) {
+      if (remainingBalance > 0.01 && !compensationBypassesPayment) {
 
         return null;
 
@@ -442,7 +448,7 @@ const Repair = () => {
 
       'price_confirmation': 'Price Confirm',
 
-      'confirmed': 'Start Progress',
+      'confirmed': 'Next',
 
       'ready_for_pickup': 'Ready for Pickup',
 
@@ -1109,7 +1115,7 @@ const Repair = () => {
       damagedQuantity: '1',
       affectedGarments: [],
       compensationAmount: '',
-      compensationType: 'money',
+      compensationType: 'both',
       clotheDescription: ''
     });
     setShowDamageReportModal(true);
@@ -1146,10 +1152,21 @@ const Repair = () => {
       showToast('Damaged quantity must match the total of affected garment quantities', 'error');
       return;
     }
+    const selectedCompensationType = damageForm.compensationType || '';
+    const hasMoneyType = selectedCompensationType === 'money' || selectedCompensationType === 'both';
+    const hasClotheType = selectedCompensationType === 'clothe' || selectedCompensationType === 'both';
     const hasMoneyOffer = Number.isFinite(compensationAmount) && compensationAmount > 0;
     const hasClotheOffer = damageForm.clotheDescription.trim().length > 0;
-    if (!hasMoneyOffer && !hasClotheOffer) {
-      showToast('Please provide at least one compensation option (money amount or clothe description)', 'error');
+    if (!hasMoneyType && !hasClotheType) {
+      showToast('Please select at least one compensation type', 'error');
+      return;
+    }
+    if (hasMoneyType && !hasMoneyOffer) {
+      showToast('Please enter a compensation amount greater than 0', 'error');
+      return;
+    }
+    if (hasClotheType && !hasClotheOffer) {
+      showToast('Please provide a clothe compensation description', 'error');
       return;
     }
 
@@ -1168,9 +1185,9 @@ const Repair = () => {
       total_quantity: totalQuantity,
       damaged_quantity: damagedQuantity,
       damaged_garment_type: damagedGarmentSummary || null,
-      compensation_amount: compensationAmount,
-      compensation_type: hasMoneyOffer && hasClotheOffer ? 'both' : hasMoneyOffer ? 'money' : 'clothe',
-      clothe_description: hasClotheOffer ? damageForm.clotheDescription.trim() : null,
+      compensation_amount: hasMoneyType ? compensationAmount : 0,
+      compensation_type: hasMoneyType && hasClotheType ? 'both' : hasMoneyType ? 'money' : 'clothe',
+      clothe_description: hasClotheType ? damageForm.clotheDescription.trim() : null,
       notes: 'Reported from Repair management'
     });
 
@@ -1474,6 +1491,85 @@ const Repair = () => {
 
   };
 
+  const getFilteredEnhancementItems = () => {
+    let items = allItems.filter(item => {
+      const pf = typeof item.pricing_factors === 'string'
+        ? JSON.parse(item.pricing_factors || '{}')
+        : (item.pricing_factors || {});
+      return pf.enhancementRequest === true && pf.enhancementPendingAdminReview === true
+        && (item.approval_status === 'pending' || item.approval_status === 'pending_review');
+    });
+
+    items = items.filter(item => {
+      if (!searchTerm) return true;
+      const searchLower = searchTerm.toLowerCase();
+      const customerName = item.order_type === 'walk_in'
+        ? (item.walk_in_customer_name || '').toLowerCase()
+        : `${item.first_name || ''} ${item.last_name || ''}`.toLowerCase();
+      const customerEmail = item.order_type === 'walk_in'
+        ? (item.walk_in_customer_email || '').toLowerCase()
+        : (item.email || '').toLowerCase();
+      const garmentSummary = item.specific_data?.garments && item.specific_data.garments.length > 0
+        ? item.specific_data.garments.map(g => formatGarmentWithSize(g)).join(', ').toLowerCase()
+        : ((item.specific_data?.size ? `${item.specific_data?.garmentType || 'N/A'} (${item.specific_data.size})` : (item.specific_data?.garmentType || ''))).toLowerCase();
+
+      return (
+        item.order_id?.toString().includes(searchLower) ||
+        customerName.includes(searchLower) ||
+        garmentSummary.includes(searchLower) ||
+        customerEmail.includes(searchLower)
+      );
+    });
+
+    if (todayAppointmentsOnly) {
+      items = items.filter(isTodayAppointment);
+    }
+
+    if (dateRangeStart || dateRangeEnd) {
+      items = items.filter(item => {
+        const specificData = parseMaybeObject(item?.specific_data);
+        const appointmentDate = item?.appointment_date || item?.appointmentDate || specificData?.appointment_date || specificData?.appointmentDate || specificData?.pickupDate || specificData?.preferredDate || specificData?.date;
+        if (!appointmentDate) return false;
+        const itemDate = new Date(appointmentDate);
+        itemDate.setHours(0, 0, 0, 0);
+        if (dateRangeStart && dateRangeEnd) {
+          const start = new Date(dateRangeStart);
+          const end = new Date(dateRangeEnd);
+          start.setHours(0, 0, 0, 0);
+          end.setHours(23, 59, 59, 999);
+          return itemDate >= start && itemDate <= end;
+        } else if (dateRangeStart) {
+          const start = new Date(dateRangeStart);
+          start.setHours(0, 0, 0, 0);
+          return itemDate >= start;
+        } else if (dateRangeEnd) {
+          const end = new Date(dateRangeEnd);
+          end.setHours(23, 59, 59, 999);
+          return itemDate <= end;
+        }
+        return true;
+      });
+    }
+
+    if (timeFilter) {
+      items = items.filter(item => {
+        const specificData = parseMaybeObject(item?.specific_data);
+        const pricingFactors = parseMaybeObject(item?.pricing_factors);
+        const preferredTime = specificData?.preferredTime;
+        if (preferredTime) {
+          const t = String(preferredTime).includes('T') ? String(preferredTime).split('T')[1]?.slice(0, 5) : String(preferredTime).slice(0, 5);
+          return t === timeFilter;
+        }
+        const apptDate = specificData?.pickupDate || pricingFactors?.pickupDate || item?.appointment_date || specificData?.appointment_date;
+        if (!apptDate) return false;
+        const timeStr = String(apptDate).split('T')[1]?.slice(0, 5);
+        return timeStr === timeFilter;
+      });
+    }
+
+    return items;
+  };
+
 
 
   const handleAccept = async (itemId) => {
@@ -1687,8 +1783,8 @@ const Repair = () => {
         : (item.pricing_factors || {});
 
       const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
-
-      const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
+      const isAccessoriesEnhancement = isEnhancementOrder && !!pricingFactors.accessoriesPrice;
+      const amountPaid = (isEnhancementOrder && !isAccessoriesEnhancement) ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
 
       const finalPrice = parseFloat(item.final_price || 0);
 
@@ -1696,10 +1792,12 @@ const Repair = () => {
 
       const incident = getIncidentForItem(item.item_id);
       const hasPaidCompensation = isPaidCompensationIncident(incident);
+      const proceedChoiceForUpdate = String(incident?.customer_proceed_choice || '').toLowerCase();
+      const compensationBypassesPaymentForUpdate = hasPaidCompensation && proceedChoiceForUpdate !== 'proceed';
 
 
 
-      if (remainingBalance > 0.01 && !hasPaidCompensation) {
+      if (remainingBalance > 0.01 && !compensationBypassesPaymentForUpdate) {
 
         await alert(
 
@@ -2186,11 +2284,23 @@ const Repair = () => {
   const handleEnhancementPriceConfirm = async (item) => {
     const target = item || enhancementPriceItem;
     if (!target) return;
+
+    const pricingFactors = typeof target.pricing_factors === 'string'
+      ? JSON.parse(target.pricing_factors || '{}')
+      : (target.pricing_factors || {});
+
+    // If addAccessories is true, open accessories price modal instead
+    if (pricingFactors.addAccessories === true) {
+      setAccessoriesPriceItem(target);
+      setAccessoriesPrice('');
+      setShowAccessoriesPriceModal(true);
+      setShowEnhancementViewModal(false);
+      return;
+    }
+
+    // No accessories — go directly to accepted
     try {
       setSavingEnhancementPrice(true);
-      const pricingFactors = typeof target.pricing_factors === 'string'
-        ? JSON.parse(target.pricing_factors || '{}')
-        : (target.pricing_factors || {});
       const result = await updateRepairOrderItem(target.item_id, {
         approvalStatus: 'accepted',
         finalPrice: parseFloat(target.final_price || 0),
@@ -2211,6 +2321,49 @@ const Repair = () => {
       }
     } catch (err) {
       showToast('Failed to accept enhancement', 'error');
+    } finally {
+      setSavingEnhancementPrice(false);
+    }
+  };
+
+  const handleAccessoriesPriceSubmit = async () => {
+    if (!accessoriesPriceItem) return;
+    const price = parseFloat(accessoriesPrice);
+    if (isNaN(price) || price <= 0) {
+      showToast('Please enter a valid accessories price', 'error');
+      return;
+    }
+    try {
+      setSavingEnhancementPrice(true);
+      const pricingFactors = typeof accessoriesPriceItem.pricing_factors === 'string'
+        ? JSON.parse(accessoriesPriceItem.pricing_factors || '{}')
+        : (accessoriesPriceItem.pricing_factors || {});
+      const baseFinalPrice = parseFloat(accessoriesPriceItem.final_price || 0);
+      const newFinalPrice = baseFinalPrice + price;
+      const result = await updateRepairOrderItem(accessoriesPriceItem.item_id, {
+        approvalStatus: 'price_confirmation',
+        finalPrice: newFinalPrice,
+        adminNotes: `Accessories price: ₱${price.toFixed(2)}`,
+        pricingFactors: {
+          ...pricingFactors,
+          enhancementAdminAccepted: false,
+          enhancementPendingAdminReview: false,
+          enhancementAdminAcceptedAt: new Date().toISOString(),
+          accessoriesPrice: price.toFixed(2),
+          accessoriesBasePrice: baseFinalPrice.toFixed(2)
+        }
+      });
+      if (result.success) {
+        setShowAccessoriesPriceModal(false);
+        setAccessoriesPriceItem(null);
+        setAccessoriesPrice('');
+        showToast('Accessories price sent for customer confirmation.', 'success');
+        loadRepairOrders();
+      } else {
+        showToast(result.message || 'Failed to submit accessories price', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to submit accessories price', 'error');
     } finally {
       setSavingEnhancementPrice(false);
     }
@@ -2507,6 +2660,27 @@ const Repair = () => {
 
         </div>
 
+        <div className="order-view-tabs" role="tablist" aria-label="Order view selection">
+          <button
+            type="button"
+            className={`order-view-tab ${tableView === 'orders' ? 'active' : ''}`}
+            onClick={() => setTableView('orders')}
+            role="tab"
+            aria-selected={tableView === 'orders'}
+          >
+            Order List
+          </button>
+          <button
+            type="button"
+            className={`order-view-tab ${tableView === 'enhancements' ? 'active' : ''}`}
+            onClick={() => setTableView('enhancements')}
+            role="tab"
+            aria-selected={tableView === 'enhancements'}
+          >
+            Enhancement Request
+          </button>
+        </div>
+
         <div className="search-container">
 
           <input
@@ -2521,6 +2695,7 @@ const Repair = () => {
 
           />
 
+          {tableView === 'orders' && (
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
 
             <option value="">All Status</option>
@@ -2542,6 +2717,7 @@ const Repair = () => {
             <option value="estimated-today">Estimated Release Today</option>
 
           </select>
+          )}
 
         </div>
 
@@ -2623,26 +2799,15 @@ const Repair = () => {
                   style={{ padding: '4px 8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px' }}
                 >
                   <option value="">All Times</option>
-                  <option value="08:00">8:00 AM</option>
                   <option value="08:30">8:30 AM</option>
-                  <option value="09:00">9:00 AM</option>
                   <option value="09:30">9:30 AM</option>
-                  <option value="10:00">10:00 AM</option>
                   <option value="10:30">10:30 AM</option>
-                  <option value="11:00">11:00 AM</option>
                   <option value="11:30">11:30 AM</option>
-                  <option value="12:00">12:00 PM</option>
                   <option value="12:30">12:30 PM</option>
-                  <option value="13:00">1:00 PM</option>
                   <option value="13:30">1:30 PM</option>
-                  <option value="14:00">2:00 PM</option>
                   <option value="14:30">2:30 PM</option>
-                  <option value="15:00">3:00 PM</option>
                   <option value="15:30">3:30 PM</option>
-                  <option value="16:00">4:00 PM</option>
                   <option value="16:30">4:30 PM</option>
-                  <option value="17:00">5:00 PM</option>
-                  <option value="17:30">5:30 PM</option>
                 </select>
 
                 {timeFilter && (
@@ -2654,6 +2819,7 @@ const Repair = () => {
               </div>
         </div>
 
+        {tableView === 'orders' && (
         <div className="table-container">
 
           <div className="table-scroll-viewport">
@@ -2728,7 +2894,9 @@ const Repair = () => {
 
                   const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
 
-                  const amountPaid = isEnhancementOrder ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
+                  const isAccessoriesEnhancement = isEnhancementOrder && !!pricingFactors.accessoriesPrice;
+
+                  const amountPaid = (isEnhancementOrder && !isAccessoriesEnhancement) ? parseFloat(item.final_price || 0) : parseFloat(pricingFactors.amount_paid || 0);
 
                   const finalPrice = parseFloat(item.final_price || 0);
 
@@ -2873,10 +3041,10 @@ const Repair = () => {
                           const pf = typeof item.pricing_factors === 'string'
                             ? JSON.parse(item.pricing_factors || '{}')
                             : (item.pricing_factors || {});
-                          if (pf.enhancementRequest && pf.enhancementAdminAccepted) {
+                          if (pf.enhancementRequest && (pf.enhancementAdminAccepted || pf.addAccessories)) {
                             return (
                               <div style={{ fontSize: '11px', color: '#673ab7', marginTop: '4px', fontWeight: '600' }}>
-                                ✨ Enhancement
+                                {pf.addAccessories && !pf.enhancementAdminAccepted ? 'Enhancement + Accessories' : 'Enhancement'}
                               </div>
                             );
                           }
@@ -2941,7 +3109,7 @@ const Repair = () => {
                                 </svg>
                               </button>
                             )}
-                            {customerWantsToProceed && !isEnhancementOrder && (
+                            {customerWantsToProceed && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && !isEnhancementOrder && (
                               <button
                                 className="icon-btn"
                                 onClick={(e) => {
@@ -2956,6 +3124,19 @@ const Repair = () => {
                                 style={{ backgroundColor: '#2196F3', color: 'white' }}
                               >
                                 💰
+                              </button>
+                            )}
+                            {item.approval_status === 'completed' && (
+                              <button
+                                className="icon-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEnhanceModal(item);
+                                }}
+                                title="Enhance Order"
+                                style={{ backgroundColor: '#673ab7', color: 'white' }}
+                              >
+                                <i className="fas fa-wand-magic-sparkles"></i>
                               </button>
                             )}
                             <button
@@ -3026,7 +3207,7 @@ const Repair = () => {
                               const halfPrice = finalPrice * 0.5;
                               const hasHalfPayment = amountPaid >= halfPrice - 0.01;
                               
-                              if (isMovingToInProgress && !hasHalfPayment && !isEnhancementOrder) {
+                              if (isMovingToInProgress && !hasHalfPayment && !isEnhancementOrder && item.approval_status !== 'accepted') {
                                 return null;
                               }
                               
@@ -3176,7 +3357,7 @@ const Repair = () => {
 
                                 )}
 
-                                {!isEnhancementOrder && (
+                                {(!isEnhancementOrder || (pricingFactors.accessoriesPrice && remainingBalance > 0.01)) && (
                                   <button
                                     className="icon-btn"
                                     onClick={(e) => {
@@ -3239,7 +3420,7 @@ const Repair = () => {
 
                             )}
 
-                            {!isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && (item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
+                            {(item.approval_status === 'completed' || item.approval_status === 'cancelled') && (
 
                               <>
 
@@ -3269,7 +3450,7 @@ const Repair = () => {
 
                                 )}
 
-                                {isAdminUser && (
+                                {isAdminUser && !isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && (
                                 <button
 
                                   className="icon-btn delete"
@@ -3328,50 +3509,35 @@ const Repair = () => {
           </div>
 
         </div>
+        )}
 
-        {/* Enhancement Requests Table */}
-        {(() => {
-          const enhancementItems = allItems.filter(item => {
-            const pf = typeof item.pricing_factors === 'string'
-              ? JSON.parse(item.pricing_factors || '{}')
-              : (item.pricing_factors || {});
-            return pf.enhancementRequest === true && pf.enhancementPendingAdminReview === true
-              && (item.approval_status === 'pending' || item.approval_status === 'pending_review');
-          });
-          return (
-            <div style={{ marginTop: '40px' }}>
-              <div className="dashboard-title" style={{ marginBottom: '12px' }}>
-                <div>
-                  <h2 style={{ color: '#673ab7' }}>Enhancement Requests</h2>
-                  <p>Customer-requested enhancements pending admin review</p>
-                </div>
-              </div>
-              <div className="table-container">
-                <div className="table-scroll-viewport">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Order ID</th>
-                        <th>Customer</th>
-                        <th>Garment</th>
-                        <th>Damage Type</th>
-                        <th>Date</th>
-                        <th>Price</th>
-                        <th>Payment Status</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {enhancementItems.length === 0 ? (
-                        <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No enhancement requests</td></tr>
-                      ) : enhancementItems.map(item => {
+        {tableView === 'enhancements' && (
+          <div className="table-container">
+            <div className="table-scroll-viewport">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Order ID</th>
+                    <th>Customer</th>
+                    <th>Garment</th>
+                    <th>Damage Type</th>
+                    <th>Date</th>
+                    <th>Price</th>
+
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getFilteredEnhancementItems().length === 0 ? (
+                    <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No enhancement requests</td></tr>
+                  ) : getFilteredEnhancementItems().map(item => {
                         const pf = typeof item.pricing_factors === 'string'
                           ? JSON.parse(item.pricing_factors || '{}')
                           : (item.pricing_factors || {});
-                        const amountPaid = parseFloat(pf.amount_paid || 0);
+
                         const finalPrice = parseFloat(item.final_price || 0);
-                        const remainingBalance = finalPrice - amountPaid;
+
                         return (
                           <tr key={item.item_id}>
                             <td><strong>#{item.order_id}</strong></td>
@@ -3393,14 +3559,6 @@ const Repair = () => {
                             })()}</td>
                             <td>&#8369;{finalPrice.toLocaleString()}</td>
                             <td>
-                              <div style={{ fontSize: '12px' }}>
-                                <div>Paid: &#8369;{amountPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                                <div style={{ color: remainingBalance > 0 ? '#ff9800' : '#4caf50', fontWeight: 'bold' }}>
-                                  Remaining: &#8369;{Math.max(0, remainingBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </div>
-                              </div>
-                            </td>
-                            <td>
                               <span className="status-badge" style={{ backgroundColor: '#ede7f6', color: '#673ab7', border: '1px solid #ce93d8' }}>
                                 Enhancement Request
                               </span>
@@ -3420,7 +3578,7 @@ const Repair = () => {
                                 </button>
                                 <button
                                   className="icon-btn accept"
-                                  title="Accept Enhancement"
+                                  title={pf.addAccessories ? 'Set Accessories Price' : 'Accept Enhancement'}
                                   disabled={savingEnhancementPrice}
                                   onClick={() => handleEnhancementPriceConfirm(item)}
                                 >
@@ -3430,14 +3588,12 @@ const Repair = () => {
                             </td>
                           </tr>
                         );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                  })}
+                </tbody>
+              </table>
             </div>
-          );
-        })()}
+          </div>
+        )}
 
       </div>
 
@@ -3464,6 +3620,11 @@ const Repair = () => {
                 <div style={{ padding: '10px', backgroundColor: '#f3e5f5', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ce93d8' }}>
                   {pf.enhancementNotes || 'No notes provided'}
                 </div>
+                {pf.addAccessories && (
+                  <div style={{ padding: '8px 12px', backgroundColor: '#fff3e0', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ffcc80', fontSize: '13px', color: '#e65100', fontWeight: '600' }}>
+                    ⚠️ Customer requested to add accessories — price confirmation required.
+                  </div>
+                )}
                 <div className="detail-row">
                   <strong>Preferred Completion Date:</strong>
                   {pf.enhancementPreferredCompletionDate
@@ -3472,16 +3633,36 @@ const Repair = () => {
                 </div>
                 <div className="detail-row"><strong>Requested At:</strong> {pf.enhancementUpdatedAt ? new Date(pf.enhancementUpdatedAt).toLocaleString() : 'N/A'}</div>
                 <div className="detail-row"><strong>Current Price:</strong> ₱{parseFloat(enhancementViewItem.final_price || 0).toLocaleString()}</div>
+                {pf.accessoriesDeclineReason && (
+                  <div style={{ padding: '8px 12px', backgroundColor: '#ffebee', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ef9a9a', fontSize: '13px', color: '#c62828' }}>
+                    <strong>Customer Decline Reason:</strong> {pf.accessoriesDeclineReason}
+                  </div>
+                )}
               </div>
-              <div className="modal-footer">
-                <button className="btn-cancel" onClick={() => setShowEnhancementViewModal(false)}>Close</button>
+              <div className="modal-footer enhancement-view-footer">
+                <button
+                  className="btn-cancel"
+                  style={{ backgroundColor: '#f44336', color: 'white', border: 'none' }}
+                  disabled={savingEnhancementPrice}
+                  onClick={async () => {
+                    const confirmed = await confirm('Cancel this enhancement request?', 'Cancel Enhancement', 'warning');
+                    if (!confirmed) return;
+                    setSavingEnhancementPrice(true);
+                    const result = await cancelEnhancement(enhancementViewItem.item_id);
+                    setSavingEnhancementPrice(false);
+                    if (result.success) { setShowEnhancementViewModal(false); showToast('Enhancement cancelled.', 'success'); loadRepairOrders(); }
+                    else showToast(result.message || 'Failed to cancel enhancement', 'error');
+                  }}
+                >
+                  Cancel Enhancement
+                </button>
                 <button
                   className="btn-save"
                   disabled={savingEnhancementPrice}
                   onClick={() => handleEnhancementPriceConfirm(enhancementViewItem)}
-                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
+                  style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff', whiteSpace: 'nowrap' }}
                 >
-                  {savingEnhancementPrice ? 'Accepting...' : 'Accept Enhancement'}
+                  {savingEnhancementPrice ? 'Processing...' : pf.addAccessories ? 'Set Accessories Price' : 'Accept Enhancement'}
                 </button>
               </div>
             </div>
@@ -5027,7 +5208,17 @@ const Repair = () => {
               <span className="close-modal" onClick={() => setShowDamageReportModal(false)}>×</span>
             </div>
             <div className="modal-body damage-compensation-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left' }}>
-              <div className="incident-detail-card" style={{ width: '100%', gridColumn: '1 / -1' }}>
+              <div
+                className="incident-detail-card"
+                style={{
+                  width: '100%',
+                  gridColumn: '1 / -1',
+                  border: 'none',
+                  borderRadius: 0,
+                  padding: 0,
+                  background: 'transparent'
+                }}
+              >
                 <div className="incident-detail-item"><span className="incident-detail-label">Order ID</span><span className="incident-detail-value">#{damageTargetItem.order_id || 'N/A'}</span></div>
                 <div className="incident-detail-item"><span className="incident-detail-label">Order Item ID</span><span className="incident-detail-value">#{damageTargetItem.item_id || 'N/A'}</span></div>
                 <div className="incident-detail-item"><span className="incident-detail-label">Customer Name</span><span className="incident-detail-value">{getCustomerNameFromItem(damageTargetItem)}</span></div>
@@ -5230,32 +5421,74 @@ const Repair = () => {
               </div>
 
               <div className="payment-form-group" style={{ marginTop: 0, width: '100%', gridColumn: '1 / -1' }}>
-                <label>Compensation Amount (PHP)</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                  min="0"
-                  step="0.01"
-                  placeholder="Leave 0 if not offering money"
-                  value={damageForm.compensationAmount}
-                  onChange={(e) => setDamageForm({ ...damageForm, compensationAmount: e.target.value })}
-                />
+                <label>Compensation Type *</label>
+                <div className="compensation-type-options" style={{ marginTop: '6px' }}>
+                  <label className="compensation-type-option" style={{ cursor: 'pointer' }}>
+                    <input
+                      className="compensation-type-checkbox"
+                      type="checkbox"
+                      value="money"
+                      checked={damageForm.compensationType === 'money' || damageForm.compensationType === 'both'}
+                      onChange={(e) => {
+                        const current = damageForm.compensationType || '';
+                        const nextType = e.target.checked
+                          ? (current === 'clothe' || current === 'both' ? 'both' : 'money')
+                          : (current === 'both' ? 'clothe' : '');
+                        setDamageForm({ ...damageForm, compensationType: nextType });
+                      }}
+                    />
+                    <span>Compensation</span>
+                  </label>
+                  <label className="compensation-type-option" style={{ cursor: 'pointer' }}>
+                    <input
+                      className="compensation-type-checkbox"
+                      type="checkbox"
+                      value="clothe"
+                      checked={damageForm.compensationType === 'clothe' || damageForm.compensationType === 'both'}
+                      onChange={(e) => {
+                        const current = damageForm.compensationType || '';
+                        const nextType = e.target.checked
+                          ? (current === 'money' || current === 'both' ? 'both' : 'clothe')
+                          : (current === 'both' ? 'money' : '');
+                        setDamageForm({ ...damageForm, compensationType: nextType });
+                      }}
+                    />
+                    <span>Replacement</span>
+                  </label>
+                </div>
               </div>
 
-              <div className="payment-form-group" style={{ marginTop: 0, width: '100%', gridColumn: '1 / -1' }}>
-                <label>Clothe Compensation Description</label>
-                <textarea
-                  rows={3}
-                  className="form-control"
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                  placeholder="Describe the replacement clothe (e.g. same jacket, size M, black). Leave blank if not offering clothe."
-                  value={damageForm.clotheDescription}
-                  onChange={(e) => setDamageForm({ ...damageForm, clotheDescription: e.target.value })}
-                />
-              </div>
+              {(damageForm.compensationType === 'money' || damageForm.compensationType === 'both') && (
+                <div className="payment-form-group" style={{ marginTop: 0, width: '100%', gridColumn: '1 / -1' }}>
+                  <label>Compensation Amount (PHP)</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    min="0"
+                    step="0.01"
+                    placeholder="Enter amount"
+                    value={damageForm.compensationAmount}
+                    onChange={(e) => setDamageForm({ ...damageForm, compensationAmount: e.target.value })}
+                  />
+                </div>
+              )}
+
+              {(damageForm.compensationType === 'clothe' || damageForm.compensationType === 'both') && (
+                <div className="payment-form-group" style={{ marginTop: 0, width: '100%', gridColumn: '1 / -1' }}>
+                  <label>Clothe Compensation Description</label>
+                  <textarea
+                    rows={3}
+                    className="form-control"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    placeholder="Describe the replacement clothe (e.g. same jacket, size M, black)."
+                    value={damageForm.clotheDescription}
+                    onChange={(e) => setDamageForm({ ...damageForm, clotheDescription: e.target.value })}
+                  />
+                </div>
+              )}
               <div style={{ fontSize: '12px', color: '#666', gridColumn: '1 / -1' }}>
-                ℹ️ Fill in one or both options. The customer will choose which compensation they prefer.
+                ℹ️ Select one or both compensation types for this damage report.
               </div>
             </div>
             <div className="modal-footer-centered" style={{ justifyContent: 'flex-end' }}>
@@ -5470,6 +5703,48 @@ const Repair = () => {
                   <button className="btn-save" onClick={handleSettleCompensation}>Mark as Paid</button>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAccessoriesPriceModal && accessoriesPriceItem && (
+        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowAccessoriesPriceModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <h2>Set Accessories Price</h2>
+              <span className="close-modal" onClick={() => setShowAccessoriesPriceModal(false)}>×</span>
+            </div>
+            <div className="modal-body">
+              <div className="detail-row"><strong>Order ID:</strong> #{accessoriesPriceItem.order_id}</div>
+              <div className="detail-row"><strong>Current Price:</strong> ₱{parseFloat(accessoriesPriceItem.final_price || 0).toLocaleString()}</div>
+              <div style={{ padding: '8px 12px', backgroundColor: '#fff3e0', borderRadius: '6px', margin: '10px 0', border: '1px solid #ffcc80', fontSize: '13px', color: '#e65100' }}>
+                Customer requested to add accessories. Enter the price below — the customer will be asked to confirm before proceeding.
+              </div>
+              <div className="payment-form-group" style={{ marginTop: '12px' }}>
+                <label>Accessories Price (₱) *</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={accessoriesPrice}
+                  onChange={(e) => setAccessoriesPrice(e.target.value)}
+                  placeholder="Enter accessories price"
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-cancel" onClick={() => { setShowAccessoriesPriceModal(false); setAccessoriesPrice(''); }}>Cancel</button>
+              <button
+                className="btn-save"
+                disabled={savingEnhancementPrice}
+                onClick={handleAccessoriesPriceSubmit}
+                style={{ background: '#8b4513', borderColor: '#6d3510', color: '#fff' }}
+              >
+                {savingEnhancementPrice ? 'Sending...' : 'Send for Confirmation'}
+              </button>
             </div>
           </div>
         </div>

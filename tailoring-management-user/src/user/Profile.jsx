@@ -41,7 +41,12 @@ const Profile = () => {
   const [itemToEnhance, setItemToEnhance] = useState(null);
   const [enhanceNotes, setEnhanceNotes] = useState('');
   const [enhancePreferredDate, setEnhancePreferredDate] = useState('');
+  const [enhanceAddAccessories, setEnhanceAddAccessories] = useState(false);
   const [submittingEnhancement, setSubmittingEnhancement] = useState(false);
+  const [declineReasonModalOpen, setDeclineReasonModalOpen] = useState(false);
+  const [declineReasonText, setDeclineReasonText] = useState('');
+  const [itemToDecline, setItemToDecline] = useState(null);
+  const [submittingDecline, setSubmittingDecline] = useState(false);
   const [submittingLiabilityDecision, setSubmittingLiabilityDecision] = useState(false);
   const [compensationIncidentsByItem, setCompensationIncidentsByItem] = useState({});
   const [compensationModalOpen, setCompensationModalOpen] = useState(false);
@@ -577,50 +582,50 @@ const Profile = () => {
       console.error('Error accepting price:', error);
     }
   };
-
   const handleDeclinePrice = async (item) => {
+    const pricingFactors = item.pricing_factors || {};
+    const isAccessoriesDecline = pricingFactors.addAccessories === true && pricingFactors.enhancementRequest === true;
+    if (isAccessoriesDecline) {
+      setItemToDecline(item);
+      setDeclineReasonText('');
+      setDeclineReasonModalOpen(true);
+      return;
+    }
+    const isConfirmed = await confirm(
+      'Declining the updated price will cancel this order. Do you want to continue?',
+      'Confirm Price Decline', 'warning',
+      { confirmText: 'Decline Price', cancelText: 'Keep Order' }
+    );
+    if (!isConfirmed) return;
+    await submitDeclinePrice(item, '');
+  };
+
+  const submitDeclinePrice = async (item, reason) => {
     try {
-      const isConfirmed = await confirm(
-        'Declining the updated price will cancel this order. Do you want to continue?',
-        'Confirm Price Decline',
-        'warning',
-        {
-          confirmText: 'Decline Price',
-          cancelText: 'Keep Order'
-        }
-      );
-
-      if (!isConfirmed) {
-        return;
-      }
-
+      setSubmittingDecline(true);
       const response = await fetch(`${API_URL}/orders/${item.order_item_id}/decline-price`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({ reason })
       });
-
       const result = await response.json();
-
       if (result.success) {
-        await alert('Price declined. Your order has been cancelled.', 'Success', 'success');
-
-        const ordersResult = await getUserOrderTracking();
-        if (ordersResult.success) {
-          setOrders(ordersResult.data);
+        if (result.isAccessoriesDecline) {
+          await alert('Accessories price declined. The admin will review and adjust.', 'Success', 'success');
+        } else {
+          await alert('Price declined. Your order has been cancelled.', 'Success', 'success');
         }
+        const ordersResult = await getUserOrderTracking();
+        if (ordersResult.success) setOrders(ordersResult.data);
       } else {
         await alert(result.message || 'Failed to decline price', 'Error', 'error');
-        console.error('Failed to decline price:', result);
       }
     } catch (error) {
       await alert('Error declining price. Please try again.', 'Error', 'error');
-      console.error('Error declining price:', error);
+    } finally {
+      setSubmittingDecline(false);
     }
   };
-
   const closeDetailsModal = () => {
     setSelectedItem(null);
     setDetailsModalOpen(false);
@@ -648,8 +653,8 @@ const Profile = () => {
       return;
     }
     setItemToEnhance(item);
-    setEnhanceNotes('');
     setEnhancePreferredDate('');
+    setEnhanceAddAccessories(false);
     setEnhanceModalOpen(true);
   };
 
@@ -663,7 +668,7 @@ const Profile = () => {
 
     try {
       setSubmittingEnhancement(true);
-      const result = await requestEnhancement(itemToEnhance.order_item_id, notes, enhancePreferredDate || null);
+      const result = await requestEnhancement(itemToEnhance.order_item_id, notes, enhancePreferredDate || null, enhanceAddAccessories);
       if (result.success) {
         await alert('Enhancement request submitted. The admin will review and confirm the price.', 'Success', 'success');
         const ordersResult = await getUserOrderTracking();
@@ -2403,6 +2408,9 @@ const Profile = () => {
 
                 const isEnhancementOrder = pricingFactors.enhancementRequest === true && pricingFactors.enhancementAdminAccepted === true;
                 const isEnhancementPending = pricingFactors.enhancementRequest === true && pricingFactors.enhancementPendingAdminReview === true;
+                const isAccessoriesEnhancement = pricingFactors.enhancementRequest === true && pricingFactors.addAccessories === true && !pricingFactors.enhancementAdminAccepted;
+                const isEnhancementCancelledByAdmin = pricingFactors.enhancementCancelledByAdmin === true
+                  && pricingFactors.enhancementRequest !== true;
 
                 const displayStatusClass = hasCompensationIncident
                   ? (isLiabilityRejectedIncident ? 'cancelled' : (isCompensationPaid && !customerWantsToProceed ? 'completed' : isCompensationPaid ? getStatusBadgeClass(item.status) : 'pending'))
@@ -2445,9 +2453,14 @@ const Profile = () => {
                           ✨ Enhancement Pending Review
                         </span>
                       )}
-                      {isEnhancementOrder && (item.status === 'accepted' || item.status === 'price_confirmation' || item.status === 'confirmed' || item.status === 'in_progress') && (
+                      {isEnhancementCancelledByAdmin && (
+                        <span className="status-badge" style={{ backgroundColor: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', fontSize: '11px' }}>
+                          ❌ Enhancement Cancelled
+                        </span>
+                      )}
+                      {(isEnhancementOrder || isAccessoriesEnhancement) && (item.status === 'accepted' || item.status === 'price_confirmation' || item.status === 'confirmed' || item.status === 'in_progress') && (
                         <span className="status-badge" style={{ backgroundColor: '#ede7f6', color: '#673ab7', border: '1px solid #ce93d8', fontSize: '11px' }}>
-                          ✨ Enhancement
+                          {isAccessoriesEnhancement ? 'Enhancement + Accessories' : 'Enhancement'}
                         </span>
                       )}
                       {isRental && (
@@ -2561,6 +2574,19 @@ const Profile = () => {
                       }
                       return null;
                     })()}
+                    {isEnhancementCancelledByAdmin && (
+                      <div style={{ margin: '10px 0', padding: '12px 14px', backgroundColor: '#ffebee', border: '1px solid #ef9a9a', borderRadius: '8px', fontSize: '13px', color: '#c62828' }}>
+                        <strong>❌ Enhancement Request Cancelled</strong>
+                        <p style={{ margin: '4px 0 0 0', color: '#555' }}>
+                          The admin has cancelled your enhancement request. Your order has been restored to its completed status. You may submit a new enhancement request if needed.
+                        </p>
+                        {pricingFactors.enhancementCancelledAt && (
+                          <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#888' }}>
+                            Cancelled on: {formatDate(pricingFactors.enhancementCancelledAt)}
+                          </p>
+                        )}
+                      </div>
+                    )}
                     {(estimatedPrice > 0 || item.final_price > 0) && (
                       <div className="price-comparison">
                         {isRental && item.status === 'rented' ? (
@@ -4279,6 +4305,22 @@ const Profile = () => {
                   }}
                 />
               </div>
+              <div style={{ marginTop: '14px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600', color: '#333' }}>
+                  <input
+                    type="checkbox"
+                    checked={enhanceAddAccessories}
+                    onChange={(e) => setEnhanceAddAccessories(e.target.checked)}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  Add Accessories (optional)
+                </label>
+                {enhanceAddAccessories && (
+                  <p style={{ marginTop: '6px', fontSize: '13px', color: '#e65100' }}>
+                    Adding accessories requires additional payment. The admin will provide the price for your confirmation.
+                  </p>
+                )}
+              </div>
             </div>
             <div className="details-modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button
@@ -4288,6 +4330,7 @@ const Profile = () => {
                   setItemToEnhance(null);
                   setEnhanceNotes('');
                   setEnhancePreferredDate('');
+                  setEnhanceAddAccessories(false);
                 }}
                 disabled={submittingEnhancement}
               >
@@ -4312,6 +4355,51 @@ const Profile = () => {
           </div>
         </div>
       )}
+      {declineReasonModalOpen && itemToDecline && (
+        <div className="details-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setDeclineReasonModalOpen(false); setItemToDecline(null); setDeclineReasonText(''); } }}>
+          <div className="details-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px' }}>
+            <div className="details-modal-header">
+              <h3>Decline Accessories Price</h3>
+              <button className="details-modal-close" onClick={() => { setDeclineReasonModalOpen(false); setItemToDecline(null); setDeclineReasonText(''); }}>x</button>
+            </div>
+            <div className="details-modal-content">
+              <p style={{ marginBottom: '14px', color: '#666', fontSize: '14px' }}>
+                The admin will be notified and can adjust the accessories price or cancel the enhancement request.
+              </p>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
+                  Reason for declining (optional)
+                </label>
+                <textarea
+                  value={declineReasonText}
+                  onChange={(e) => setDeclineReasonText(e.target.value)}
+                  placeholder="e.g. Price is too high, I changed my mind..."
+                  rows={3}
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+            <div className="details-modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button className="btn-secondary" onClick={() => { setDeclineReasonModalOpen(false); setItemToDecline(null); setDeclineReasonText(''); }} disabled={submittingDecline}>
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  await submitDeclinePrice(itemToDecline, declineReasonText.trim());
+                  setDeclineReasonModalOpen(false);
+                  setItemToDecline(null);
+                  setDeclineReasonText('');
+                }}
+                disabled={submittingDecline}
+                style={{ padding: '10px 18px', backgroundColor: '#f44336', color: 'white', border: 'none', borderRadius: '6px', cursor: submittingDecline ? 'not-allowed' : 'pointer', opacity: submittingDecline ? 0.7 : 1 }}
+              >
+                {submittingDecline ? 'Submitting...' : 'Decline Price'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {cancelModalOpen && itemToCancel && (
         <div
           className="details-modal-overlay"

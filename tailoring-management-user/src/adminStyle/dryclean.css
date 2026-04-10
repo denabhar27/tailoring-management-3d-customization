@@ -3134,6 +3134,30 @@ tbody td {
   margin: 0 !important;
 }
 
+.modal-content.damage-compensation-modal .payment-form-group .compensation-type-options {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+}
+
+.modal-content.damage-compensation-modal .payment-form-group .compensation-type-option {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: auto !important;
+  gap: 10px !important;
+  margin: 0 !important;
+}
+
+.modal-content.damage-compensation-modal .payment-form-group .compensation-type-radio {
+  width: 18px !important;
+  height: 18px !important;
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+}
+
 .modal-content.damage-compensation-modal .payment-form-group input,
 .modal-content.damage-compensation-modal .payment-form-group textarea,
 .modal-content.damage-compensation-modal .payment-form-group select,
@@ -3444,4 +3468,37 @@ tbody td {
   font-size: 12px;
   font-weight: 600;
   text-transform: none;
+}
+
+.order-view-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border: 1px solid #d8c0ab;
+  border-radius: 999px;
+  background: #f9efe7;
+  margin-bottom: 12px;
+}
+
+.order-view-tab {
+  border: none;
+  background: transparent;
+  color: #7a5a44;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.order-view-tab:hover {
+  color: #5a3f2e;
+}
+
+.order-view-tab.active {
+  background: #8b4513;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(139, 69, 19, 0.24);
 }

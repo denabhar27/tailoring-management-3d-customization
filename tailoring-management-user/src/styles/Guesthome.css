@@ -52,8 +52,8 @@ body {
   height: auto;
   min-height: 70px;
   transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .logo {
@@ -893,8 +893,8 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   padding: 20px;
   overflow-y: auto;
   animation: fadeIn 0.3s ease-out;
@@ -1032,6 +1032,43 @@ flex-shrink: 0;
   transition: all 0.3s;
   box-sizing: border-box;
   color: #333;
+}
+
+.phone-input-with-prefix {
+  display: flex;
+  align-items: center;
+  border: 2px solid #ddd;
+  border-radius: 16px;
+  background: white;
+  transition: all 0.3s;
+}
+
+.phone-input-with-prefix .phone-prefix {
+  flex: 0 0 auto;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #5a4636;
+  padding: 0 12px 0 16px;
+  border-right: 1px solid #e2d8d0;
+}
+
+.phone-input-with-prefix input {
+  border: none;
+  border-radius: 0 16px 16px 0;
+  padding: 18px 16px 18px 12px;
+}
+
+.phone-input-with-prefix:focus-within {
+  border-color: #8B4513;
+  box-shadow: 0 0 0 5px rgba(139, 69, 19, 0.15);
+  transform: translateY(-2px);
+}
+
+.phone-input-with-prefix input:focus {
+  outline: none;
+  border: none;
+  box-shadow: none;
+  transform: none;
 }
 
 .input-group input::placeholder {

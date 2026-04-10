@@ -7,7 +7,7 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD || '',            
   database: process.env.DB_NAME || 'pet_management',
   waitForConnections: true,
-  connectionLimit: 5,
+  connectionLimit: 2,
   queueLimit: 0
 });
 

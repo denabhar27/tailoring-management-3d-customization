@@ -80,13 +80,31 @@ const OrderTracking = {
            ORDER BY ot.created_at DESC 
            LIMIT 1), 
           o.order_date
+        ) as tracking_status_updated_at,
+        GREATEST(
+          COALESCE((
+            SELECT MAX(ot.created_at)
+            FROM order_tracking ot
+            WHERE ot.order_item_id = oi.item_id
+          ), '1970-01-01 00:00:00'),
+          COALESCE((
+            SELECT MAX(al.created_at)
+            FROM action_logs al
+            WHERE al.order_item_id = oi.item_id
+          ), '1970-01-01 00:00:00'),
+          COALESCE((
+            SELECT MAX(tl.created_at)
+            FROM transaction_logs tl
+            WHERE tl.order_item_id = oi.item_id
+          ), '1970-01-01 00:00:00'),
+          COALESCE(o.order_date, '1970-01-01 00:00:00')
         ) as status_updated_at,
         o.order_date,
         o.total_price
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
       WHERE o.user_id = ?
-      ORDER BY o.order_date DESC, oi.item_id DESC
+      ORDER BY status_updated_at DESC, oi.item_id DESC
     `;
     db.query(sql, [userId], callback);
   },

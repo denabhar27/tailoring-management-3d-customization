@@ -755,6 +755,23 @@ function Rental() {
 
   };
 
+  const getRentalActivityTimestamp = (rental) => {
+    const candidates = [
+      rental?.status_updated_at,
+      rental?.updated_at,
+      rental?.payment_date,
+      rental?.order_date,
+      rental?.created_at
+    ];
+
+    for (const candidate of candidates) {
+      const ts = new Date(candidate || 0).getTime();
+      if (Number.isFinite(ts) && ts > 0) return ts;
+    }
+
+    return 0;
+  };
+
 
 
   const filteredRentals = getFilteredRentalsByView().filter(rental => {
@@ -806,21 +823,13 @@ function Rental() {
     return matchesSearch && matchesStatus;
 
   }).sort((a, b) => {
+    const activityDiff = getRentalActivityTimestamp(b) - getRentalActivityTimestamp(a);
+    if (activityDiff !== 0) return activityDiff;
 
+    const orderDiff = Number(b.order_id || 0) - Number(a.order_id || 0);
+    if (orderDiff !== 0) return orderDiff;
 
-
-    const isPendingA = a.approval_status === 'pending' || a.approval_status === 'pending_review' || !a.approval_status;
-
-    const isPendingB = b.approval_status === 'pending' || b.approval_status === 'pending_review' || !b.approval_status;
-
-
-
-    if (isPendingA && !isPendingB) return -1;
-
-    if (!isPendingA && isPendingB) return 1;
-
-    return 0;
-
+    return Number(b.item_id || 0) - Number(a.item_id || 0);
   });
 
 

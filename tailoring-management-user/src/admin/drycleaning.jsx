@@ -1319,6 +1319,15 @@ const DryCleaning = () => {
 
   const todayAppointmentsCount = allItems.filter(isTodayAppointment).length;
 
+  const getItemActivityTimestamp = (item) => {
+    const candidates = [item?.updated_at, item?.status_updated_at, item?.order_date];
+    for (const candidate of candidates) {
+      const ts = new Date(candidate || 0).getTime();
+      if (Number.isFinite(ts) && ts > 0) return ts;
+    }
+    return 0;
+  };
+
 
 
   const getFilteredItems = () => {
@@ -1475,19 +1484,13 @@ const DryCleaning = () => {
 
 
     items.sort((a, b) => {
+      const activityDiff = getItemActivityTimestamp(b) - getItemActivityTimestamp(a);
+      if (activityDiff !== 0) return activityDiff;
 
-      const isPendingA = a.approval_status === 'pending' || a.approval_status === 'pending_review' || a.approval_status === 'price_confirmation' || !a.approval_status;
+      const orderDiff = Number(b.order_id || 0) - Number(a.order_id || 0);
+      if (orderDiff !== 0) return orderDiff;
 
-      const isPendingB = b.approval_status === 'pending' || b.approval_status === 'pending_review' || b.approval_status === 'price_confirmation' || !b.approval_status;
-
-
-
-      if (isPendingA && !isPendingB) return -1;
-
-      if (!isPendingA && isPendingB) return 1;
-
-      return 0;
-
+      return Number(b.item_id || 0) - Number(a.item_id || 0);
     });
 
 
@@ -2830,11 +2833,20 @@ const DryCleaning = () => {
               ) : (
 
                 (() => {
-                  const groupedItems = [...getFilteredItems()].sort((a, b) => {
-                    const orderDiff = Number(a.order_id || 0) - Number(b.order_id || 0);
-                    if (orderDiff !== 0) return orderDiff;
-                    return Number(a.item_id || 0) - Number(b.item_id || 0);
-                  });
+                  const orderedItems = [...getFilteredItems()];
+                  const groupedMap = orderedItems.reduce((acc, entry) => {
+                    const key = String(entry?.order_id || '');
+                    if (!key) return acc;
+                    if (!acc.has(key)) {
+                      acc.set(key, []);
+                    }
+                    acc.get(key).push(entry);
+                    return acc;
+                  }, new Map());
+
+                  const groupedItems = Array.from(groupedMap.values()).flatMap((group) =>
+                    group.sort((a, b) => Number(a.item_id || 0) - Number(b.item_id || 0))
+                  );
 
                   const parentItemCounts = groupedItems.reduce((counts, groupedItem) => {
                     const key = String(groupedItem?.order_id || '');
@@ -2904,7 +2916,7 @@ const DryCleaning = () => {
                               minHeight: '30px'
                             }}
                           >
-                            {isCollapsed ? '▶' : '▼'} Parent Order #{parentOrderId}
+                            {isCollapsed ? '▶' : '▼'} ORD#{parentOrderId}
                           </button>
                         </td>
                       </tr>
@@ -2913,7 +2925,7 @@ const DryCleaning = () => {
                   <tr className="clickable-row" onClick={() => handleViewDetails(item)}>
 
                     <td>
-                      <strong>Parent #{item.order_id}</strong>
+                      <strong>ORD#{item.order_id}</strong>
                       <div style={{ fontSize: '11px', color: '#777', marginTop: '2px' }}>Child #{item.item_id}</div>
                     </td>
 
@@ -3444,7 +3456,7 @@ const DryCleaning = () => {
                         return (
                           <tr key={item.item_id}>
                             <td>
-                              <strong>Parent #{item.order_id}</strong>
+                              <strong>ORD#{item.order_id}</strong>
                               <div style={{ fontSize: '11px', color: '#777', marginTop: '2px' }}>Child #{item.item_id}</div>
                             </td>
                             <td>

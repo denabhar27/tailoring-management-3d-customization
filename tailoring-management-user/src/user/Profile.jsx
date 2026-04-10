@@ -2362,11 +2362,22 @@ const Profile = () => {
           ) : (
             <div className="order-cards">
               {(() => {
-                const groupedItems = [...getAllOrderItems()].sort((a, b) => {
-                  const orderDiff = Number(a.parent_order_id || a.order_id || 0) - Number(b.parent_order_id || b.order_id || 0);
-                  if (orderDiff !== 0) return orderDiff;
-                  return Number(a.child_order_id || a.order_item_id || 0) - Number(b.child_order_id || b.order_item_id || 0);
-                });
+                const orderedItems = [...getAllOrderItems()];
+                const groupedMap = orderedItems.reduce((acc, entry) => {
+                  const key = String(entry.parent_order_id || entry.order_id || '');
+                  if (!key) return acc;
+                  if (!acc.has(key)) {
+                    acc.set(key, []);
+                  }
+                  acc.get(key).push(entry);
+                  return acc;
+                }, new Map());
+
+                const groupedItems = Array.from(groupedMap.values()).flatMap((group) =>
+                  group.sort((a, b) =>
+                    Number(a.child_order_id || a.order_item_id || 0) - Number(b.child_order_id || b.order_item_id || 0)
+                  )
+                );
 
                 const parentItemCounts = groupedItems.reduce((counts, groupedItem) => {
                   const key = String(groupedItem.parent_order_id || groupedItem.order_id || '');
@@ -2507,7 +2518,7 @@ const Profile = () => {
                         justifyContent: 'space-between',
                         alignItems: 'center'
                       }}>
-                        <span>Parent Order #{parentOrderId}</span>
+                        <span>ORD#{parentOrderId}</span>
                         <button
                           type="button"
                           onClick={() => toggleParentOrderCollapse(parentOrderId)}
@@ -2540,7 +2551,7 @@ const Profile = () => {
                   <div className="order-card">
                     <div className="order-header">
                       <div className="order-info">
-                        <h3 className="order-id">Parent ORD-{item.parent_order_id || item.order_id}</h3>
+                        <h3 className="order-id">ORD#{item.parent_order_id || item.order_id}</h3>
                         <div style={{ fontSize: '12px', color: '#777', marginTop: '4px' }}>Child #{item.child_order_id || item.order_item_id}</div>
                         <span className="service-type">
                           {formatServiceType(item.service_type)}

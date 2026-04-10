@@ -302,9 +302,9 @@ export async function updateCustom3DModel(modelId, modelData) {
   }
 }
 
-export async function cancelEnhancement(itemId) {
+export async function cancelEnhancement(itemId, reason = '') {
   try {
-    const response = await axios.post(`${BASE_URL}/orders/items/${itemId}/cancel-enhancement`, {}, {
+    const response = await axios.post(`${BASE_URL}/orders/items/${itemId}/cancel-enhancement`, { reason }, {
       headers: getAuthHeaders()
     });
     return response.data;

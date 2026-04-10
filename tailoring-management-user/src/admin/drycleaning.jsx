@@ -8,7 +8,7 @@ import AdminHeader from './AdminHeader';
 
 import Sidebar from './Sidebar';
 
-import { getAllDryCleaningOrders, updateDryCleaningOrderItem } from '../api/DryCleaningOrderApi';
+import { getAllDryCleaningOrders, updateDryCleaningOrderItem, cancelEnhancement } from '../api/DryCleaningOrderApi';
 
 import { getUserRole } from '../api/AuthApi';
 
@@ -34,6 +34,7 @@ import {
   settleCompensationIncident,
   updateCompensationLiability
 } from '../api/DamageCompensationApi';
+import { useAlert } from '../context/AlertContext';
 import { createPortal } from 'react-dom';
 
 
@@ -49,6 +50,7 @@ const isAuthenticated = () => {
 const DryCleaning = () => {
 
   const navigate = useNavigate();
+  const { confirm, prompt } = useAlert();
 
   const [allItems, setAllItems] = useState([]);
 
@@ -3906,6 +3908,49 @@ const DryCleaning = () => {
                 <div className="detail-row"><strong>Current Price:</strong> ₱{parseFloat(enhancementViewItem.final_price || 0).toLocaleString()}</div>
               </div>
               <div className="modal-footer enhancement-view-footer">
+                <button
+                  className="btn-cancel"
+                  style={{ backgroundColor: '#f44336', color: 'white', border: 'none' }}
+                  disabled={savingEnhancementPrice}
+                  onClick={async () => {
+                    if (savingEnhancementPrice) return;
+
+                    const reasonInput = await prompt(
+                      'Please enter the reason for cancelling this enhancement request.',
+                      'Cancellation Reason',
+                      'e.g. requested changes cannot be applied to current garment setup',
+                      ''
+                    );
+                    if (reasonInput === null) return;
+
+                    const reason = String(reasonInput || '').trim();
+                    if (!reason) {
+                      showToast('Please provide a cancellation reason.', 'error');
+                      return;
+                    }
+
+                    const confirmed = await confirm(
+                      'Cancel this enhancement request?',
+                      'Cancel Enhancement',
+                      'warning',
+                      { confirmText: 'Confirm', cancelText: 'Cancel' }
+                    );
+                    if (!confirmed) return;
+
+                    setSavingEnhancementPrice(true);
+                    const result = await cancelEnhancement(enhancementViewItem.item_id, reason);
+                    setSavingEnhancementPrice(false);
+                    if (result.success) {
+                      setShowEnhancementViewModal(false);
+                      showToast('Enhancement cancelled.', 'success');
+                      loadDryCleaningOrders();
+                    } else {
+                      showToast(result.message || 'Failed to cancel enhancement', 'error');
+                    }
+                  }}
+                >
+                  Cancel Enhancement
+                </button>
                 <button
                   className="btn-save"
                   disabled={savingEnhancementPrice}

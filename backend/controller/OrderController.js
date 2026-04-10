@@ -2920,6 +2920,11 @@ exports.getOrderItemPriceHistory = (req, res) => {
 
 exports.cancelEnhancement = (req, res) => {
   const { itemId } = req.params;
+  const rawReason = String(req.body?.reason || '').trim();
+  if (!rawReason) {
+    return res.status(400).json({ success: false, message: 'Cancellation reason is required.' });
+  }
+  const cancellationReason = rawReason;
   if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({ success: false, message: 'Access denied. Admin only.' });
   }
@@ -2929,17 +2934,29 @@ exports.cancelEnhancement = (req, res) => {
     try { pricingFactors = item.pricing_factors ? (typeof item.pricing_factors === 'string' ? JSON.parse(item.pricing_factors) : item.pricing_factors) : {}; } catch (e) {}
     const originalPrice = parseFloat(pricingFactors.accessoriesBasePrice || item.final_price || 0);
     const actualAmountPaid = String(pricingFactors.amount_paid || '0');
-    const updatedPf = { ...pricingFactors, enhancementRequest: false, enhancementPendingAdminReview: false, addAccessories: false, accessoriesPrice: null, accessoriesDeclineReason: null, amount_paid: actualAmountPaid, enhancementCancelledByAdmin: true, enhancementCancelledAt: new Date().toISOString() };
+    const updatedPf = {
+      ...pricingFactors,
+      enhancementRequest: false,
+      enhancementPendingAdminReview: false,
+      addAccessories: false,
+      accessoriesPrice: null,
+      accessoriesDeclineReason: null,
+      amount_paid: actualAmountPaid,
+      enhancementCancelledByAdmin: true,
+      enhancementCancelledAt: new Date().toISOString(),
+      enhancementCancelReason: cancellationReason
+    };
     const sql = `UPDATE order_items SET final_price = ?, approval_status = 'completed', pricing_factors = ? WHERE item_id = ?`;
     db.query(sql, [originalPrice, JSON.stringify(updatedPf), itemId], (err) => {
       if (err) return res.status(500).json({ success: false, message: 'Error cancelling enhancement', error: err });
       // Also sync the order_tracking table back to 'completed'
       const OrderTracking = require('../model/OrderTrackingModel');
       OrderTracking.getByOrderItemId(itemId, (trackErr, existingTracking) => {
+        const trackingNote = `Enhancement cancelled by admin. Reason: ${cancellationReason}. Order restored to completed.`;
         if (!trackErr && existingTracking && existingTracking.length > 0) {
-          OrderTracking.updateStatus(itemId, 'completed', 'Enhancement cancelled by admin. Order restored to completed.', null, () => {});
+          OrderTracking.updateStatus(itemId, 'completed', trackingNote, null, () => {});
         } else {
-          OrderTracking.addTracking(itemId, 'completed', 'Enhancement cancelled by admin. Order restored to completed.', null, () => {});
+          OrderTracking.addTracking(itemId, 'completed', trackingNote, null, () => {});
         }
       });
       res.json({ success: true, message: 'Enhancement cancelled. Price restored.' });

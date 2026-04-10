@@ -56,3 +56,20 @@ export const updateDryCleaningOrderItem = async (itemId, updateData) => {
         return { success: false, message: 'Network error' };
     }
 };
+
+export const cancelEnhancement = async (itemId, reason = '') => {
+    try {
+        const response = await fetch(`${API_URL_ORDERS}/items/${itemId}/cancel-enhancement`, {
+            method: 'POST',
+            headers: getAuthHeader(),
+            body: JSON.stringify({ reason })
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error(`Error cancelling enhancement for dry cleaning item ${itemId}:`, error);
+        return { success: false, message: 'Network error' };
+    }
+};

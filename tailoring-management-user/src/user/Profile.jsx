@@ -676,6 +676,11 @@ const Profile = () => {
     setSelectedCompensationServiceType('');
   };
 
+  const isDryCleaningServiceType = (serviceType = '') => {
+    const normalized = String(serviceType || '').toLowerCase();
+    return ['dry_cleaning', 'drycleaning', 'dry-cleaning'].includes(normalized);
+  };
+
   const openEnhancementModal = (item) => {
     const serviceType = String(item?.service_type || '').toLowerCase();
     const isEnhanceableService = ['repair', 'customization', 'customize', 'dry_cleaning', 'drycleaning', 'dry-cleaning'].includes(serviceType);
@@ -692,6 +697,8 @@ const Profile = () => {
   const handleSubmitEnhancement = async () => {
     if (!itemToEnhance) return;
     const notes = String(enhanceNotes || '').trim();
+    const supportsAccessories = !isDryCleaningServiceType(itemToEnhance?.service_type);
+    const addAccessoriesFlag = supportsAccessories ? enhanceAddAccessories : false;
     if (!notes) {
       await alert('Please describe the issue or enhancement you want.', 'Notes Required', 'warning');
       return;
@@ -699,7 +706,7 @@ const Profile = () => {
 
     try {
       setSubmittingEnhancement(true);
-      const result = await requestEnhancement(itemToEnhance.order_item_id, notes, enhancePreferredDate || null, enhanceAddAccessories);
+      const result = await requestEnhancement(itemToEnhance.order_item_id, notes, enhancePreferredDate || null, addAccessoriesFlag);
       if (result.success) {
         await alert('Enhancement request submitted. The admin will review and confirm the price.', 'Success', 'success');
         const ordersResult = await getUserOrderTracking();
@@ -2685,6 +2692,11 @@ const Profile = () => {
                         <p style={{ margin: '4px 0 0 0', color: '#555' }}>
                           The admin has cancelled your enhancement request. Your order has been restored to its completed status. You may submit a new enhancement request if needed.
                         </p>
+                        {String(pricingFactors.enhancementCancelReason || '').trim() && (
+                          <p style={{ margin: '6px 0 0 0', color: '#b71c1c', fontWeight: 600 }}>
+                            Reason: {String(pricingFactors.enhancementCancelReason).trim()}
+                          </p>
+                        )}
                         {pricingFactors.enhancementCancelledAt && (
                           <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#888' }}>
                             Cancelled on: {formatDate(pricingFactors.enhancementCancelledAt)}
@@ -4419,22 +4431,24 @@ const Profile = () => {
                   }}
                 />
               </div>
-              <div style={{ marginTop: '14px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600', color: '#333' }}>
-                  <input
-                    type="checkbox"
-                    checked={enhanceAddAccessories}
-                    onChange={(e) => setEnhanceAddAccessories(e.target.checked)}
-                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                  />
-                  Add Accessories (optional)
-                </label>
-                {enhanceAddAccessories && (
-                  <p style={{ marginTop: '6px', fontSize: '13px', color: '#e65100' }}>
-                    Adding accessories requires additional payment. The admin will provide the price for your confirmation.
-                  </p>
-                )}
-              </div>
+              {!isDryCleaningServiceType(itemToEnhance?.service_type) && (
+                <div style={{ marginTop: '14px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600', color: '#333' }}>
+                    <input
+                      type="checkbox"
+                      checked={enhanceAddAccessories}
+                      onChange={(e) => setEnhanceAddAccessories(e.target.checked)}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                    />
+                    Add Accessories (optional)
+                  </label>
+                  {enhanceAddAccessories && (
+                    <p style={{ marginTop: '6px', fontSize: '13px', color: '#e65100' }}>
+                      Adding accessories requires additional payment. The admin will provide the price for your confirmation.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             <div className="details-modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button

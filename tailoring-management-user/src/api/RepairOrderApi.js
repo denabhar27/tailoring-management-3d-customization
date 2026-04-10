@@ -61,9 +61,9 @@ export async function updateRepairOrderItem(itemId, updateData) {
   }
 }
 
-export async function cancelEnhancement(itemId) {
+export async function cancelEnhancement(itemId, reason = '') {
   try {
-    const response = await axios.post(`${BASE_URL}/orders/items/${itemId}/cancel-enhancement`, {}, {
+    const response = await axios.post(`${BASE_URL}/orders/items/${itemId}/cancel-enhancement`, { reason }, {
       headers: getAuthHeaders()
     });
     return response.data;

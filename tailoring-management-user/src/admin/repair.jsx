@@ -54,7 +54,7 @@ import { createPortal } from 'react-dom';
 
 const Repair = () => {
 
-  const { alert, confirm } = useAlert();
+  const { alert, confirm, prompt } = useAlert();
 
   const createEmptyDamageLevel = (sortOrder = 1) => ({
 
@@ -3786,10 +3786,24 @@ const Repair = () => {
                   style={{ backgroundColor: '#f44336', color: 'white', border: 'none' }}
                   disabled={savingEnhancementPrice}
                   onClick={async () => {
+                    const reasonInput = await prompt(
+                      'Please enter the reason for cancelling this enhancement request.',
+                      'Cancellation Reason',
+                      'e.g. requested changes are not feasible with this repair scope',
+                      ''
+                    );
+                    if (reasonInput === null) return;
+
+                    const reason = String(reasonInput || '').trim();
+                    if (!reason) {
+                      showToast('Please provide a cancellation reason.', 'error');
+                      return;
+                    }
+
                     const confirmed = await confirm('Cancel this enhancement request?', 'Cancel Enhancement', 'warning');
                     if (!confirmed) return;
                     setSavingEnhancementPrice(true);
-                    const result = await cancelEnhancement(enhancementViewItem.item_id);
+                    const result = await cancelEnhancement(enhancementViewItem.item_id, reason);
                     setSavingEnhancementPrice(false);
                     if (result.success) { setShowEnhancementViewModal(false); showToast('Enhancement cancelled.', 'success'); loadRepairOrders(); }
                     else showToast(result.message || 'Failed to cancel enhancement', 'error');

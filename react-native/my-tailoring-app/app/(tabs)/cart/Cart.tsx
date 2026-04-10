@@ -462,9 +462,12 @@ export default function CartScreen() {
         const selectedCartItems = cartItems.filter((item) =>
           selectedItems.includes(item.id)
         );
+        const childOrderIds = Array.isArray(response.childOrderIds) ? response.childOrderIds : [];
 
-        selectedCartItems.forEach((item) => {
+        selectedCartItems.forEach((item, index) => {
           orderStore.addOrder({
+            parentOrderId: response.orderId,
+            childOrderId: childOrderIds[index] || undefined,
             service: item.service,
             item: item.item,
             description: item.description,

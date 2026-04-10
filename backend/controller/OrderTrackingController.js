@@ -117,6 +117,7 @@ exports.getUserOrderTracking = (req, res) => {
         if (!orders[item.order_id]) {
           orders[item.order_id] = {
             order_id: item.order_id,
+            parent_order_id: item.parent_order_id || item.order_id,
             order_date: item.order_date,
             total_price: item.total_price,
             items: []
@@ -198,6 +199,8 @@ exports.getUserOrderTracking = (req, res) => {
 
       orders[item.order_id].items.push({
         order_item_id: item.order_item_id,
+      parent_order_id: item.parent_order_id || item.order_id,
+      child_order_id: item.child_order_id || item.order_item_id,
         service_type: item.service_type,
         base_price: item.base_price,
         final_price: item.final_price,

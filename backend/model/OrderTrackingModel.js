@@ -19,6 +19,8 @@ const OrderTracking = {
     const sql = `
       SELECT 
         oi.item_id as order_item_id,
+        o.order_id as parent_order_id,
+        oi.item_id as child_order_id,
         oi.order_id,
         oi.service_type,
         oi.final_price,
@@ -41,6 +43,8 @@ const OrderTracking = {
     const sql = `
       SELECT 
         oi.item_id as order_item_id,
+        o.order_id as parent_order_id,
+        oi.item_id as child_order_id,
         oi.order_id,
         oi.service_type,
         oi.base_price,

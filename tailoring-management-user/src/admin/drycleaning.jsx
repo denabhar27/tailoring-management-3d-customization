@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
@@ -215,6 +215,8 @@ const DryCleaning = () => {
 
   });
 
+  const [collapsedParentOrders, setCollapsedParentOrders] = useState({});
+
 
 
   const showToast = (message, type = 'success') => {
@@ -223,6 +225,13 @@ const DryCleaning = () => {
 
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
 
+  };
+
+  const toggleParentOrderCollapse = (orderId) => {
+    setCollapsedParentOrders((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId]
+    }));
   };
 
 
@@ -2633,7 +2642,21 @@ const DryCleaning = () => {
 
               ) : (
 
-                getFilteredItems().map(item => {
+                (() => {
+                  const groupedItems = [...getFilteredItems()].sort((a, b) => {
+                    const orderDiff = Number(a.order_id || 0) - Number(b.order_id || 0);
+                    if (orderDiff !== 0) return orderDiff;
+                    return Number(a.item_id || 0) - Number(b.item_id || 0);
+                  });
+
+                  const parentItemCounts = groupedItems.reduce((counts, groupedItem) => {
+                    const key = String(groupedItem?.order_id || '');
+                    if (!key) return counts;
+                    counts[key] = (counts[key] || 0) + 1;
+                    return counts;
+                  }, {});
+
+                  return groupedItems.map((item, index) => {
 
                   const incident = getIncidentForItem(item.item_id);
                   const liabilityStatus = normalizeIncidentStatus(incident?.liability_status);
@@ -2660,13 +2683,51 @@ const DryCleaning = () => {
 
                   const remainingBalance = finalPrice - amountPaid;
 
+                  const parentOrderId = item.order_id;
+                  const isFirstInParent = index === 0 || groupedItems[index - 1]?.order_id !== parentOrderId;
+                  const parentItemCount = parentItemCounts[String(parentOrderId || '')] || 0;
+                  const isAddAnotherGroup = parentItemCount > 1;
+                  const isCollapsed = isAddAnotherGroup && !!collapsedParentOrders[parentOrderId];
+
 
 
                   return (
 
-                  <tr key={item.item_id} className="clickable-row" onClick={() => handleViewDetails(item)}>
+                  <Fragment key={`parent-${parentOrderId}-child-${item.item_id}`}>
+                    {isAddAnotherGroup && isFirstInParent && (
+                      <tr>
+                        <td colSpan="9" style={{ backgroundColor: '#f7f2ef', fontWeight: 700, color: '#5D4037' }}>
+                          <button
+                            type="button"
+                            onClick={() => toggleParentOrderCollapse(parentOrderId)}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              color: '#5D4037',
+                              fontWeight: 700,
+                              fontSize: '13px',
+                              lineHeight: 1.2,
+                              padding: '6px 10px',
+                              borderRadius: '8px',
+                              textTransform: 'none',
+                              letterSpacing: 'normal',
+                              boxShadow: 'none',
+                              minHeight: '30px'
+                            }}
+                          >
+                            {isCollapsed ? '▶' : '▼'} Parent Order #{parentOrderId}
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+                    {(!isAddAnotherGroup || !isCollapsed) && (
+                  <tr className="clickable-row" onClick={() => handleViewDetails(item)}>
 
-                    <td><strong>#{item.order_id}</strong></td>
+                    <td>
+                      <strong>Parent #{item.order_id}</strong>
+                      <div style={{ fontSize: '11px', color: '#777', marginTop: '2px' }}>Child #{item.item_id}</div>
+                    </td>
 
                     <td>
 
@@ -3238,10 +3299,13 @@ const DryCleaning = () => {
                     </td>
 
                   </tr>
+                    )}
+                  </Fragment>
 
                   );
 
-                })
+                });
+                })()
 
               )}
 
@@ -3284,7 +3348,10 @@ const DryCleaning = () => {
 
                         return (
                           <tr key={item.item_id}>
-                            <td><strong>#{item.order_id}</strong></td>
+                            <td>
+                              <strong>Parent #{item.order_id}</strong>
+                              <div style={{ fontSize: '11px', color: '#777', marginTop: '2px' }}>Child #{item.item_id}</div>
+                            </td>
                             <td>
                               {item.order_type === 'walk_in'
                                 ? <span><span style={{ display: 'inline-block', backgroundColor: '#ff9800', color: 'white', padding: '2px 8px', borderRadius: '3px', fontSize: '0.75em', marginRight: '5px', fontWeight: 'bold' }}>WALK-IN</span>{item.walk_in_customer_name || 'Walk-in Customer'}</span>

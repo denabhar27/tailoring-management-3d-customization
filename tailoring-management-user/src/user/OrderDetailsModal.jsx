@@ -46,6 +46,8 @@ const OrderDetailsModal = ({ isOpen, onClose, orderItemId }) => {
             {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
             {order && (
               <div style={{ display: 'grid', gap: '12px' }}>
+                <div><strong>Parent Order ID:</strong> {order.parent_order_id || order.order_id}</div>
+                <div><strong>Child Order ID:</strong> {order.child_order_id || order.item_id}</div>
                 <div><strong>Order Item ID:</strong> {order.item_id}</div>
                 <div><strong>Service Type:</strong> {order.service_type ? order.service_type.charAt(0).toUpperCase() + order.service_type.slice(1).replace('_', ' ') : 'N/A'}</div>
                 <div><strong>Status:</strong> {order.approval_status ? order.approval_status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A'}</div>

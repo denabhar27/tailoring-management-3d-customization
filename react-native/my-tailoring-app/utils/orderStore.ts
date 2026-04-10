@@ -2,6 +2,8 @@
 export interface Order {
   id: string;
   orderNo: string;
+  parentOrderId?: number;
+  childOrderId?: number;
   service: string;
   item: string;
   date: string;
@@ -24,10 +26,11 @@ class OrderStore {
   private orderCounter = 1;
 
   addOrder(order: Omit<Order, 'id' | 'orderNo' | 'date'>) {
+    const orderIdLabel = order.childOrderId || order.parentOrderId || this.orderCounter;
     const newOrder: Order = {
       ...order,
       id: Date.now().toString(),
-      orderNo: `ORD-2025-${String(this.orderCounter).padStart(3, '0')}`,
+      orderNo: `ORD-${String(orderIdLabel)}`,
       date: new Date().toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',

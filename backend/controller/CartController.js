@@ -406,7 +406,8 @@ exports.submitCart = (req, res) => {
       res.json({
         success: true,
         message: "Order created successfully",
-        orderId: orderResult.orderId
+        orderId: orderResult.orderId,
+        childOrderIds: orderResult.childOrderIds || []
       });
     });
   });

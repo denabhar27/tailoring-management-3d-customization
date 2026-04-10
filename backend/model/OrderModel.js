@@ -202,39 +202,153 @@ function reserveRentalInventoryFromCartItems(cartItems, callback) {
   });
 }
 
+function toNumber(value, fallback = 0) {
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function buildPreparedOrderItemsFromCart(cartItems = []) {
+  const supportedServices = new Set(['dry_cleaning', 'repair', 'customization', 'customize']);
+  const preparedItems = [];
+
+  cartItems.forEach((rawItem) => {
+    if (!rawItem) return;
+
+    const specificData = parseJsonSafely(rawItem.specific_data, {});
+    const pricingFactors = parseJsonSafely(rawItem.pricing_factors, {});
+    const garments = Array.isArray(specificData.garments) ? specificData.garments.filter(Boolean) : [];
+    const sourceCartId = rawItem.cart_id || null;
+
+    if (!supportedServices.has(rawItem.service_type) || garments.length <= 1) {
+      preparedItems.push({
+        ...rawItem,
+        quantity: Math.max(1, parseInt(rawItem.quantity, 10) || 1),
+        base_price: toNumber(rawItem.base_price, toNumber(rawItem.final_price, 0)),
+        final_price: toNumber(rawItem.final_price, toNumber(rawItem.base_price, 0)),
+        pricing_factors: pricingFactors,
+        specific_data: {
+          ...specificData,
+          __sourceCartId: sourceCartId
+        }
+      });
+      return;
+    }
+
+    garments.forEach((garment, index) => {
+      const childSpecificData = {
+        ...specificData,
+        garments: [garment],
+        isMultipleGarments: false,
+        parentGarmentCount: garments.length,
+        childGarmentIndex: index + 1,
+        __sourceCartId: sourceCartId
+      };
+
+      const childPricingFactors = { ...pricingFactors };
+      let childQuantity = 1;
+      let childBasePrice = 0;
+      let childFinalPrice = 0;
+
+      if (rawItem.service_type === 'dry_cleaning') {
+        childQuantity = Math.max(1, parseInt(garment.quantity, 10) || 1);
+        const pricePerItem = toNumber(garment.pricePerItem, toNumber(childPricingFactors.pricePerItem, 0));
+        const splitFallback = toNumber(rawItem.final_price, 0) / Math.max(garments.length, 1);
+
+        childBasePrice = pricePerItem > 0 ? (pricePerItem * childQuantity) : splitFallback;
+        childFinalPrice = childBasePrice;
+
+        childSpecificData.garmentType = garment.garmentType || childSpecificData.garmentType;
+        childSpecificData.brand = garment.brand || childSpecificData.brand;
+        childSpecificData.quantity = childQuantity;
+        childSpecificData.pricePerItem = pricePerItem > 0 ? pricePerItem : (childSpecificData.pricePerItem || null);
+        childSpecificData.isEstimatedPrice = Boolean(garment.isEstimated || specificData.isEstimatedPrice);
+
+        childPricingFactors.quantity = childQuantity;
+        if (pricePerItem > 0) {
+          childPricingFactors.pricePerItem = pricePerItem;
+        }
+      } else if (rawItem.service_type === 'repair') {
+        const garmentBasePrice = toNumber(garment.basePrice, 0);
+        const splitFallback = toNumber(rawItem.final_price, 0) / Math.max(garments.length, 1);
+
+        childQuantity = 1;
+        childBasePrice = garmentBasePrice > 0 ? garmentBasePrice : splitFallback;
+        childFinalPrice = childBasePrice;
+
+        childSpecificData.garmentType = garment.garmentType || childSpecificData.garmentType;
+        childSpecificData.damageLevel = garment.damageLevel || childSpecificData.damageLevel;
+        childSpecificData.damageLevelId = garment.damageLevelId ?? childSpecificData.damageLevelId;
+        childSpecificData.damageLevelDescription = garment.damageLevelDescription || childSpecificData.damageLevelDescription;
+        childSpecificData.size = garment.size || childSpecificData.size;
+        childSpecificData.damageDescription = garment.notes || childSpecificData.damageDescription;
+        childSpecificData.notes = garment.notes || childSpecificData.notes;
+      } else {
+        const estimatedPrice = toNumber(garment.estimatedPrice, 0);
+        const splitFallback = toNumber(rawItem.final_price, 0) / Math.max(garments.length, 1);
+
+        childQuantity = 1;
+        childBasePrice = estimatedPrice > 0 ? estimatedPrice : splitFallback;
+        childFinalPrice = childBasePrice;
+
+        childSpecificData.fabricType = garment.fabricType || childSpecificData.fabricType;
+        childSpecificData.garmentType = garment.garmentType || childSpecificData.garmentType;
+        childSpecificData.imageUrl = garment.imageUrl || childSpecificData.imageUrl;
+        childSpecificData.designData = garment.designData || childSpecificData.designData || {};
+        childSpecificData.isUniform = garment.isUniform === true;
+
+        childPricingFactors.isUniform = garment.isUniform === true;
+      }
+
+      preparedItems.push({
+        ...rawItem,
+        quantity: childQuantity,
+        base_price: childBasePrice,
+        final_price: childFinalPrice,
+        pricing_factors: childPricingFactors,
+        specific_data: childSpecificData
+      });
+    });
+  });
+
+  return preparedItems;
+}
+
 const Order = {
   
   createFromCart: (userId, cartItems, totalPrice, notes, callback) => {
+    const preparedCartItems = buildPreparedOrderItemsFromCart(cartItems);
+    const normalizedTotalPrice = preparedCartItems.reduce((sum, item) => {
+      return sum + toNumber(item.final_price, 0);
+    }, 0);
+
     const orderSql = `
       INSERT INTO orders (user_id, total_price, status, order_date, notes)
       VALUES (?, ?, 'pending', NOW(), ?)
     `;
 
-    db.query(orderSql, [userId, totalPrice, notes], (err, orderResult) => {
+    db.query(orderSql, [userId, normalizedTotalPrice.toString(), notes], (err, orderResult) => {
       if (err) {
         return callback(err, null);
       }
 
       const orderId = orderResult.insertId;
 
-      const itemValues = cartItems.map(item => {
-        let pricingFactors = item.pricing_factors || '{}';
+      const itemValues = preparedCartItems.map(item => {
+        const specificData = parseJsonSafely(item.specific_data, {});
+        const factors = parseJsonSafely(item.pricing_factors, {});
 
         if (item.service_type === 'rental') {
           try {
-            const factors = typeof pricingFactors === 'string' ? JSON.parse(pricingFactors) : pricingFactors;
-            const totalPrice = parseFloat(item.final_price || 0);
-            const expectedDownpayment = totalPrice * 0.5;
+            const itemTotalPrice = parseFloat(item.final_price || 0);
+            const expectedDownpayment = itemTotalPrice * 0.5;
 
             factors.downpayment = expectedDownpayment.toString();
             factors.down_payment = expectedDownpayment.toString();
-            
-            pricingFactors = JSON.stringify(factors);
           } catch (e) {
             console.error('Error parsing pricing factors for rental:', e);
           }
         }
-        
+
         return [
           orderId,
           item.service_type,
@@ -245,8 +359,8 @@ const Order = {
           item.appointment_date,
           item.rental_start_date,
           item.rental_end_date,
-          pricingFactors,
-          item.specific_data || '{}'
+          JSON.stringify(factors),
+          JSON.stringify(specificData)
         ];
       });
 
@@ -262,9 +376,9 @@ const Order = {
           return callback(itemErr, null);
         }
 
-        reserveRentalInventoryFromCartItems(cartItems, (reserveErr) => {
+        reserveRentalInventoryFromCartItems(preparedCartItems, (reserveErr) => {
           console.log('[INVENTORY] ===== RENTAL INVENTORY RESERVATION =====');
-          console.log('[INVENTORY] Cart items:', JSON.stringify(cartItems.map(item => ({
+          console.log('[INVENTORY] Cart items:', JSON.stringify(preparedCartItems.map(item => ({
             service_type: item.service_type,
             service_id: item.service_id,
             quantity: item.quantity,
@@ -298,18 +412,29 @@ const Order = {
           const AppointmentSlot = require('./AppointmentSlotModel');
 
           let linkedCount = 0;
-          const totalAppointmentItems = cartItems.filter(item => 
+          const appointmentCartItems = (cartItems || []).filter(item =>
             ['dry_cleaning', 'repair', 'customization'].includes(item.service_type)
-          ).length;
+          );
+          const totalAppointmentItems = appointmentCartItems.length;
 
           const linkSlotPromises = [];
           
           if (!getItemsErr && orderItems) {
+            const orderItemBySourceCartId = new Map();
+
+            orderItems.forEach((orderItem) => {
+              const itemSpecificData = parseJsonSafely(orderItem.specific_data, {});
+              const sourceCartId = itemSpecificData.__sourceCartId;
+
+              if (sourceCartId !== null && sourceCartId !== undefined && sourceCartId !== '' && !orderItemBySourceCartId.has(Number(sourceCartId))) {
+                orderItemBySourceCartId.set(Number(sourceCartId), orderItem);
+              }
+            });
             
-            cartItems.forEach((cartItem, index) => {
+            appointmentCartItems.forEach((cartItem, index) => {
               if (!cartItem || !cartItem.cart_id) return;
               
-              const orderItem = orderItems[index];
+              const orderItem = orderItemBySourceCartId.get(Number(cartItem.cart_id)) || orderItems[index];
               if (!orderItem) return;
 
               if (['dry_cleaning', 'repair', 'customization'].includes(cartItem.service_type)) {
@@ -421,6 +546,7 @@ const Order = {
 
               callback(null, {
                 orderId: orderId,
+                childOrderIds: orderItems.map((item) => item.item_id),
                 orderResult: orderResult,
                 itemResult: itemResult
               });
@@ -429,6 +555,7 @@ const Order = {
               
               callback(null, {
                 orderId: orderId,
+                childOrderIds: orderItems.map((item) => item.item_id),
                 orderResult: orderResult,
                 itemResult: itemResult
               });
@@ -452,6 +579,7 @@ const Order = {
 
             callback(null, {
               orderId: orderId,
+              childOrderIds: orderItems ? orderItems.map((item) => item.item_id) : preparedCartItems.map((_, index) => itemResult.insertId + index),
               orderResult: orderResult,
               itemResult: itemResult
             });
@@ -557,8 +685,11 @@ const Order = {
           if (trackingErr) {
             console.error('Error initializing order tracking:', trackingErr);
           }
+            const childOrderIds = Array.isArray(cartItems)
+              ? cartItems.map((_, index) => itemResult.insertId + index)
+              : [];
           console.log('[ORDER MODEL] ✅ Order created successfully, orderId:', orderId);
-          callback(null, { orderId: orderId, orderResult: orderResult, itemResult: itemResult });
+            callback(null, { orderId: orderId, childOrderIds, orderResult: orderResult, itemResult: itemResult });
         });
       });
     });
@@ -619,10 +750,13 @@ const Order = {
     const sql = `
       SELECT 
         oi.*,
+        o.order_id as parent_order_id,
+        oi.item_id as child_order_id,
         DATE_FORMAT(oi.appointment_date, '%Y-%m-%d %H:%i:%s') as appointment_date,
         DATE_FORMAT(oi.rental_start_date, '%Y-%m-%d') as rental_start_date,
         DATE_FORMAT(oi.rental_end_date, '%Y-%m-%d') as rental_end_date
       FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
       WHERE oi.order_id = ?
       ORDER BY oi.item_id ASC
     `;
@@ -632,6 +766,8 @@ const Order = {
   getOrderItemById: (itemId, callback) => {
     const sql = `
       SELECT oi.*, o.user_id, DATE_FORMAT(o.order_date, '%Y-%m-%d %H:%i:%s') as order_date,
+             o.order_id as parent_order_id,
+             oi.item_id as child_order_id,
              u.first_name, u.last_name
       FROM order_items oi 
       JOIN orders o ON oi.order_id = o.order_id 

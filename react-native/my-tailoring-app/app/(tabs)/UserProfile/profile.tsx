@@ -859,6 +859,12 @@ export default function ProfileScreen() {
                       <View style={styles.orderHeader}>
                         <View style={styles.orderInfo}>
                           <Text style={styles.orderNo}>
+                            Parent Order #{item.parent_order_id || item.order_id}
+                          </Text>
+                          <Text style={styles.orderNo}>
+                            Child Order #{item.child_order_id || item.order_item_id}
+                          </Text>
+                          <Text style={styles.orderNo}>
                             {item.service_type === 'dry_cleaning' ? 'Dry Cleaning' : item.service_type.charAt(0).toUpperCase() + item.service_type.slice(1)} Service
                           </Text>
                         </View>

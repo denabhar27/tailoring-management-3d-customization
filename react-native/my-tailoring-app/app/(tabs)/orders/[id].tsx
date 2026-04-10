@@ -104,7 +104,7 @@ export default function OrderDetails() {
         for (const order of result.data) {
           const item = order.items.find((i: any) => i.order_item_id === parseInt(id));
           if (item) {
-            foundItem = { ...item, order_date: order.order_date };
+            foundItem = { ...item, order_date: order.order_date, parent_order_id: order.parent_order_id || order.order_id };
             break;
           }
         }
@@ -257,6 +257,8 @@ export default function OrderDetails() {
             </View>
           </View>
 
+          <Text style={styles.date}>Parent Order #{order.parent_order_id || order.order_id}</Text>
+          <Text style={styles.date}>Child Order #{order.child_order_id || order.order_item_id}</Text>
           <Text style={styles.date}>Placed on {formatDate(order.order_date)}</Text>
 
           <View style={styles.divider} />

@@ -24,6 +24,7 @@ const Profile = () => {
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [serviceFilter, setServiceFilter] = useState('all');
+  const [collapsedParentOrders, setCollapsedParentOrders] = useState({});
 
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState('');
@@ -38,6 +39,13 @@ const Profile = () => {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
   const [enhanceModalOpen, setEnhanceModalOpen] = useState(false);
+
+  const toggleParentOrderCollapse = (orderId) => {
+    setCollapsedParentOrders((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId]
+    }));
+  };
   const [itemToEnhance, setItemToEnhance] = useState(null);
   const [enhanceNotes, setEnhanceNotes] = useState('');
   const [enhancePreferredDate, setEnhancePreferredDate] = useState('');
@@ -1955,7 +1963,9 @@ const Profile = () => {
         if (matchesStatus && matchesService) {
           allItems.push({
             order_id: order.order_id,
+            parent_order_id: order.parent_order_id || order.order_id,
             order_item_id: item.order_item_id,
+            child_order_id: item.child_order_id || item.order_item_id,
             service_type: item.service_type,
             status: item.status,
             status_label: item.status_label,
@@ -2317,7 +2327,21 @@ const Profile = () => {
             <div className="no-orders">No orders found</div>
           ) : (
             <div className="order-cards">
-              {getAllOrderItems().map((item) => {
+              {(() => {
+                const groupedItems = [...getAllOrderItems()].sort((a, b) => {
+                  const orderDiff = Number(a.parent_order_id || a.order_id || 0) - Number(b.parent_order_id || b.order_id || 0);
+                  if (orderDiff !== 0) return orderDiff;
+                  return Number(a.child_order_id || a.order_item_id || 0) - Number(b.child_order_id || b.order_item_id || 0);
+                });
+
+                const parentItemCounts = groupedItems.reduce((counts, groupedItem) => {
+                  const key = String(groupedItem.parent_order_id || groupedItem.order_id || '');
+                  if (!key) return counts;
+                  counts[key] = (counts[key] || 0) + 1;
+                  return counts;
+                }, {});
+
+                return groupedItems.map((item, index) => {
                 const estimatedPrice = getEstimatedPrice(item.specific_data, item.service_type);
                 const priceChanged = hasPriceChanged(item.specific_data, item.final_price, item.service_type, item.pricing_factors);
 
@@ -2416,11 +2440,62 @@ const Profile = () => {
                   ? (isLiabilityRejectedIncident ? 'cancelled' : (isCompensationPaid && !customerWantsToProceed ? 'completed' : isCompensationPaid ? getStatusBadgeClass(item.status) : 'pending'))
                   : getStatusBadgeClass(item.status);
 
+                const parentOrderId = item.parent_order_id || item.order_id;
+                const isFirstInParent = index === 0 || (groupedItems[index - 1]?.parent_order_id || groupedItems[index - 1]?.order_id) !== parentOrderId;
+                const parentItemCount = parentItemCounts[String(parentOrderId || '')] || 0;
+                const isAddAnotherGroup = parentItemCount > 1;
+                const isCollapsed = isAddAnotherGroup && !!collapsedParentOrders[parentOrderId];
+
                 return (
-                  <div key={`${item.order_id}-${item.order_item_id}-${item.service_type}-${item.status_updated_at || Date.now()}`} className="order-card">
+                  <React.Fragment key={`${item.order_id}-${item.order_item_id}-${item.service_type}-${item.status_updated_at || Date.now()}`}>
+                    {isAddAnotherGroup && isFirstInParent && (
+                      <div style={{
+                        backgroundColor: '#f7f2ef',
+                        border: '1px solid #e0d3cc',
+                        borderRadius: '10px',
+                        padding: '10px 14px',
+                        marginBottom: '10px',
+                        fontWeight: 700,
+                        color: '#5D4037',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <span>Parent Order #{parentOrderId}</span>
+                        <button
+                          type="button"
+                          onClick={() => toggleParentOrderCollapse(parentOrderId)}
+                          style={{
+                            border: '1px solid #d7cbc3',
+                            background: '#fff',
+                            color: '#5D4037',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            fontSize: '13px',
+                            lineHeight: 1,
+                            padding: '7px 14px',
+                            borderRadius: '16px',
+                            minWidth: '116px',
+                            height: '34px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            textTransform: 'none',
+                            letterSpacing: 'normal',
+                            boxShadow: 'none',
+                            minHeight: '34px'
+                          }}
+                        >
+                          {isCollapsed ? 'Show items ▼' : 'Hide items ▲'}
+                        </button>
+                      </div>
+                    )}
+                    {(!isAddAnotherGroup || !isCollapsed) && (
+                  <div className="order-card">
                     <div className="order-header">
                       <div className="order-info">
-                        <h3 className="order-id">ORD-{item.order_id}</h3>
+                        <h3 className="order-id">Parent ORD-{item.parent_order_id || item.order_id}</h3>
+                        <div style={{ fontSize: '12px', color: '#777', marginTop: '4px' }}>Child #{item.child_order_id || item.order_item_id}</div>
                         <span className="service-type">
                           {formatServiceType(item.service_type)}
                           {item.specific_data?.serviceName && (
@@ -3347,8 +3422,11 @@ const Profile = () => {
                       </div>
                     </div>
                   </div>
+                    )}
+                  </React.Fragment>
                 );
-              })}
+                });
+              })()}
             </div>
           )
           }

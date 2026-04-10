@@ -20,6 +20,8 @@ const { width } = Dimensions.get("window");
 
 interface OrderItem {
   order_item_id: number;
+  parent_order_id?: number;
+  child_order_id?: number;
   service_type: string;
   status: string;
   base_price: string;
@@ -29,6 +31,7 @@ interface OrderItem {
 
 interface OrderData {
   order_id: number;
+  parent_order_id?: number;
   order_date: string;
   items: OrderItem[];
 }
@@ -37,7 +40,7 @@ export default function OrderHistoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [selectedFilter, setSelectedFilter] = useState<string>("All");
-  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,18 +52,19 @@ export default function OrderHistoryScreen() {
       setLoading(true);
       const result = await orderTrackingService.getUserOrderTracking();
       if (result.success && result.data) {
-
-        const allItems: OrderItem[] = [];
-        result.data.forEach((order: OrderData) => {
-          order.items.forEach((item: OrderItem) => {
-            allItems.push({
-              ...item,
-              order_date: order.order_date,
-              order_id: order.order_id
-            } as any);
-          });
-        });
-        setOrders(allItems);
+        const normalizedOrders = result.data.map((order: OrderData) => ({
+          ...order,
+          parent_order_id: order.parent_order_id || order.order_id,
+          items: (order.items || []).map((item: OrderItem) => ({
+            ...item,
+            parent_order_id: item.parent_order_id || order.parent_order_id || order.order_id,
+            child_order_id: item.child_order_id || item.order_item_id,
+            order_item_id: item.order_item_id || item.child_order_id || item.order_item_id,
+            order_date: order.order_date,
+            order_id: order.order_id
+          }))
+        }));
+        setOrders(normalizedOrders as any);
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -152,16 +156,14 @@ export default function OrderHistoryScreen() {
   };
 
   const filteredOrders = orders.filter((order: any) =>
-    matchesFilter(order.status, selectedFilter)
+    (order.items || []).some((item: any) => matchesFilter(item.status, selectedFilter))
   );
 
   const stats = {
-    total: orders.length,
-    active: orders.filter(
-      (o: any) => o.status?.toLowerCase() === "pending" || o.status?.toLowerCase() === "in_progress"
-    ).length,
-    completed: orders.filter((o: any) => o.status?.toLowerCase() === "completed").length,
-    toPickup: orders.filter((o: any) => o.status?.toLowerCase() === "ready_to_pickup" || o.status?.toLowerCase() === "ready").length,
+    total: orders.reduce((count, order: any) => count + (order.items || []).length, 0),
+    active: orders.reduce((count, order: any) => count + (order.items || []).filter((item: any) => item.status?.toLowerCase() === "pending" || item.status?.toLowerCase() === "in_progress").length, 0),
+    completed: orders.reduce((count, order: any) => count + (order.items || []).filter((item: any) => item.status?.toLowerCase() === "completed").length, 0),
+    toPickup: orders.reduce((count, order: any) => count + (order.items || []).filter((item: any) => item.status?.toLowerCase() === "ready_to_pickup" || item.status?.toLowerCase() === "ready").length, 0),
   };
 
   const formatDate = (dateString: string) => {
@@ -170,121 +172,114 @@ export default function OrderHistoryScreen() {
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  const renderOrder = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.orderCard}
-      onPress={() => router.push(`/orders/${item.order_item_id}`)}
-      activeOpacity={0.8}
-    >
-      <View style={styles.orderHeader}>
-        <View>
-          <Text style={styles.orderNo}>
-            {item.service_type === 'dry_cleaning' ? 'Dry Cleaning' : item.service_type?.charAt(0).toUpperCase() + item.service_type?.slice(1).replace('_', ' ')} Service
-          </Text>
-          <Text style={styles.orderDate}>{formatDate(item.order_date)}</Text>
+  const renderOrder = ({ item }: { item: any }) => {
+    const visibleItems = (item.items || []).filter((child: any) => matchesFilter(child.status, selectedFilter));
+
+    return (
+      <View style={styles.orderCard}>
+        <View style={styles.orderHeader}>
+          <View>
+            <Text style={styles.orderNo}>Parent Order #{item.parent_order_id || item.order_id}</Text>
+            <Text style={styles.orderDate}>{formatDate(item.order_date)} · {visibleItems.length} item{visibleItems.length === 1 ? '' : 's'}</Text>
+          </View>
         </View>
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: getStatusColor(item.status) + "20" },
-          ]}
-        >
-          <Ionicons
-            name={getStatusIcon(item.status) as any}
-            size={16}
-            color={getStatusColor(item.status)}
-          />
-          <Text
-            style={[styles.statusText, { color: getStatusColor(item.status) }]}
+
+        {visibleItems.map((child: any) => (
+          <TouchableOpacity
+            key={`${item.order_id}-${child.child_order_id || child.order_item_id}`}
+            style={styles.childOrderCard}
+            onPress={() => router.push(`/orders/${child.child_order_id || child.order_item_id}`)}
+            activeOpacity={0.85}
           >
-            {getStatusLabel(item.status)}
-          </Text>
-        </View>
-      </View>
+            <View style={styles.orderContent}>
+              <View style={styles.serviceIconContainer}>
+                <Ionicons
+                  name={
+                    child.service_type === "customize"
+                      ? "shirt-outline"
+                      : child.service_type === "rental"
+                      ? "business-outline"
+                      : child.service_type === "repair"
+                      ? "construct-outline"
+                      : "water-outline"
+                  }
+                  size={32}
+                  color="#94665B"
+                />
+              </View>
 
-      <View style={styles.orderContent}>
-        <View style={styles.serviceIconContainer}>
-          <Ionicons
-            name={
-              item.service_type === "customize"
-                ? "shirt-outline"
-                : item.service_type === "rental"
-                ? "business-outline"
-                : item.service_type === "repair"
-                ? "construct-outline"
-                : "water-outline"
-            }
-            size={32}
-            color="#94665B"
-          />
-        </View>
-
-        <View style={styles.orderDetails}>
-          <Text style={styles.orderService}>
-            {item.service_type?.charAt(0).toUpperCase() + item.service_type?.slice(1).replace('_', ' ')} Service
-          </Text>
-          <Text style={styles.orderItem}>
-            {item.specific_data?.serviceName || item.specific_data?.garmentType || 'Service Item'}
-          </Text>
-          {item.specific_data?.specialInstructions && (
-            <Text style={styles.orderDescription} numberOfLines={2}>
-              {item.specific_data.specialInstructions}
-            </Text>
-          )}
-          {item.specific_data?.pickupDate && item.status?.toLowerCase() !== "completed" && (
-            <View style={styles.estimated}>
-              <Ionicons name="calendar-outline" size={14} color="#6B7280" />
-              <Text style={styles.estimatedText}>
-                Pickup: {formatDate(item.specific_data.pickupDate)}
-              </Text>
+              <View style={styles.orderDetails}>
+                <Text style={styles.orderService}>
+                  {child.service_type?.charAt(0).toUpperCase() + child.service_type?.slice(1).replace('_', ' ')} Service
+                </Text>
+                <Text style={styles.orderItem}>
+                  Child Order #{child.child_order_id || child.order_item_id}
+                </Text>
+                <Text style={styles.orderItem}>
+                  {child.specific_data?.serviceName || child.specific_data?.garmentType || 'Service Item'}
+                </Text>
+                {child.specific_data?.specialInstructions && (
+                  <Text style={styles.orderDescription} numberOfLines={2}>
+                    {child.specific_data.specialInstructions}
+                  </Text>
+                )}
+                {child.specific_data?.pickupDate && child.status?.toLowerCase() !== "completed" && (
+                  <View style={styles.estimated}>
+                    <Ionicons name="calendar-outline" size={14} color="#6B7280" />
+                    <Text style={styles.estimatedText}>
+                      Pickup: {formatDate(child.specific_data.pickupDate)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              {(child.service_type === 'customize' || child.service_type === 'customization') && (
+               child.specific_data?.garmentType?.toLowerCase() === 'uniform' ||
+               child.specific_data?.isUniform === true ||
+               child.pricing_factors?.isUniform === true
+              ) ? (
+                parseFloat(child.final_price || child.base_price || '0') === 0 ? (
+                  <Text style={[styles.orderPrice, { color: '#e65100' }]}>Price varies</Text>
+                ) : (
+                  <Text style={[styles.orderPrice, { color: '#4caf50' }]}>₱{parseFloat(child.final_price || child.base_price || '0').toLocaleString()}</Text>
+                )
+              ) : (
+                <Text style={styles.orderPrice}>₱{parseFloat(child.final_price || child.base_price || '0').toLocaleString()}</Text>
+              )}
             </View>
-          )}
-        </View>
-        {(item.service_type === 'customize' || item.service_type === 'customization') && (
-         item.specific_data?.garmentType?.toLowerCase() === 'uniform' ||
-         item.specific_data?.isUniform === true ||
-         item.pricing_factors?.isUniform === true
-        ) ? (
-          parseFloat(item.final_price || item.base_price || '0') === 0 ? (
-            <Text style={[styles.orderPrice, { color: '#e65100' }]}>Price varies</Text>
-          ) : (
-            <Text style={[styles.orderPrice, { color: '#4caf50' }]}>₱{parseFloat(item.final_price || item.base_price || '0').toLocaleString()}</Text>
-          )
-        ) : (
-          <Text style={styles.orderPrice}>₱{parseFloat(item.final_price || item.base_price || '0').toLocaleString()}</Text>
-        )}
-      </View>
 
-      <View style={styles.orderActions}>
-        <TouchableOpacity
-          style={styles.transactionLogButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            router.push({
-              pathname: "/(tabs)/orders/TransactionLog",
-              params: { orderItemId: item.order_item_id?.toString() || item.id?.toString() },
-            });
-          }}
-        >
-          <Ionicons name="receipt-outline" size={16} color="#8B4513" />
-          <Text style={styles.transactionLogButtonText}>Transaction Log</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            router.push({
-              pathname: "/(tabs)/orders/[id]",
-              params: { id: item.order_item_id?.toString() || item.id?.toString() },
-            });
-          }}
-        >
-          <Text style={styles.actionText}>View Details</Text>
-          <Ionicons name="chevron-forward" size={16} color="#94665B" />
-        </TouchableOpacity>
+            <View style={styles.orderActions}>
+              <TouchableOpacity
+                style={styles.transactionLogButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  router.push({
+                    pathname: "/(tabs)/orders/TransactionLog",
+                    params: { orderItemId: (child.child_order_id || child.order_item_id)?.toString() },
+                  });
+                }}
+              >
+                <Ionicons name="receipt-outline" size={16} color="#8B4513" />
+                <Text style={styles.transactionLogButtonText}>Transaction Log</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  router.push({
+                    pathname: "/(tabs)/orders/[id]",
+                    params: { id: (child.child_order_id || child.order_item_id)?.toString() },
+                  });
+                }}
+              >
+                <Text style={styles.actionText}>View Details</Text>
+                <Ionicons name="chevron-forward" size={16} color="#94665B" />
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        ))}
       </View>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -323,8 +318,8 @@ export default function OrderHistoryScreen() {
         {filters.map((f) => {
           const count =
             f === "All"
-              ? orders.length
-              : orders.filter((o: any) => matchesFilter(o.status, f)).length;
+              ? orders.reduce((count, order: any) => count + (order.items || []).length, 0)
+              : orders.reduce((count, order: any) => count + (order.items || []).filter((item: any) => matchesFilter(item.status, f)).length, 0);
           const isActive = selectedFilter === f;
           return (
             <TouchableOpacity
@@ -353,7 +348,7 @@ export default function OrderHistoryScreen() {
       </ScrollView>
       <FlatList
         data={filteredOrders}
-        keyExtractor={(item: any) => `order-${item.order_item_id || item.id}`}
+        keyExtractor={(item: any) => `parent-${item.parent_order_id || item.order_id}`}
         renderItem={renderOrder}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
@@ -480,6 +475,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 6,
+  },
+  childOrderCard: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F3E4DF",
   },
   orderHeader: {
     flexDirection: "row",

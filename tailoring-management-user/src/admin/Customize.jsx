@@ -4066,7 +4066,7 @@ const Customize = () => {
                               const halfPrice = finalPrice * 0.5;
                               const hasHalfPayment = amountPaid >= halfPrice - 0.01;
                               
-                              if (isMovingToInProgress && !hasHalfPayment && !isEnhancementOrder && item.approval_status !== 'accepted') {
+                              if (isMovingToInProgress && !hasHalfPayment && !isEnhancementOrder) {
                                 return null;
                               }
                               

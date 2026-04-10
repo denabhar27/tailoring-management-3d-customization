@@ -1901,6 +1901,22 @@ const Repair = () => {
 
     console.log("Declining item:", itemId);
 
+    const reasonInput = await prompt(
+      'Please enter the reason for declining this repair request.',
+      'Decline Reason',
+      'e.g. repair request lacks required details',
+      ''
+    );
+    if (reasonInput === null) {
+      return;
+    }
+
+    const reason = String(reasonInput || '').trim();
+    if (!reason) {
+      await alert('Please provide a decline reason.', 'Required', 'warning');
+      return;
+    }
+
     const confirmed = await confirm("Decline this repair request?", "Decline Repair", "warning");
 
     if (confirmed) {
@@ -1909,7 +1925,12 @@ const Repair = () => {
 
         const result = await updateRepairOrderItem(itemId, {
 
-          approvalStatus: 'cancelled'
+          approvalStatus: 'cancelled',
+          adminNotes: reason,
+          pricingFactors: {
+            adminDeclineReason: reason,
+            adminDeclinedAt: new Date().toISOString()
+          }
 
         });
 
@@ -1918,6 +1939,7 @@ const Repair = () => {
         if (result.success) {
 
           loadRepairOrders();
+          showToast('Request declined', 'success');
 
         } else {
 

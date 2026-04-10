@@ -1066,13 +1066,14 @@ function Rental() {
 
 
 
-      console.log('[DECLINE] Updating rental with reason:', reason.trim());
+      const cleanReason = reason.trim();
+      console.log('[DECLINE] Updating rental with reason:', cleanReason);
 
       const result = await updateRentalOrderItem(rental.item_id, {
 
         approvalStatus: 'cancelled',
 
-        adminNotes: `Declined: ${reason.trim()}`
+        adminNotes: cleanReason
 
       });
 

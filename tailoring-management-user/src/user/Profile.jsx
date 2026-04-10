@@ -2417,6 +2417,15 @@ const Profile = () => {
                 const remainingAmount = Math.max(0, finalPrice - totalPaid);
                 const hasPayment = totalPaid > 0 && (isRental || isRepair || isDryCleaning || isCustomization);
                 const adminPriceReason = (pricingFactors?.adminNotes || item.specific_data?.adminNotes || '').toString().trim();
+                const statusLower = String(item.status || '').toLowerCase();
+                const isAdminDeclinedStatus = statusLower === 'cancelled' || statusLower === 'rejected';
+                const rawAdminDeclineReason = String(
+                  pricingFactors?.adminDeclineReason ||
+                  pricingFactors?.declineReason ||
+                  (isAdminDeclinedStatus ? adminPriceReason : '')
+                ).trim();
+                const adminDeclineReason = rawAdminDeclineReason.replace(/^declined:\s*/i, '').trim();
+                const showAdminDeclineReason = (isRental || isRepair || isDryCleaning || isCustomization) && isAdminDeclinedStatus && !!adminDeclineReason;
                 const previousPriceValue = (() => {
                   const bp = parseFloat(item.base_price ?? item.basePrice ?? 0);
                   const fallback = estimatedPrice;
@@ -2700,6 +2709,19 @@ const Profile = () => {
                         {pricingFactors.enhancementCancelledAt && (
                           <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#888' }}>
                             Cancelled on: {formatDate(pricingFactors.enhancementCancelledAt)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {showAdminDeclineReason && (
+                      <div style={{ margin: '10px 0', padding: '12px 14px', backgroundColor: '#ffebee', border: '1px solid #ef9a9a', borderRadius: '8px', fontSize: '13px', color: '#c62828' }}>
+                        <strong>❌ Request Declined by Admin</strong>
+                        <p style={{ margin: '6px 0 0 0', color: '#b71c1c', fontWeight: 600 }}>
+                          Reason: {adminDeclineReason}
+                        </p>
+                        {item.status_updated_at && (
+                          <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#888' }}>
+                            Updated on: {formatDate(item.status_updated_at)}
                           </p>
                         )}
                       </div>

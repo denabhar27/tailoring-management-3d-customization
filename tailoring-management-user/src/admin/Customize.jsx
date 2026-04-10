@@ -2701,7 +2701,21 @@ const Customize = () => {
 
   };
 
-  const handleDecline = (itemId) => {
+  const handleDecline = async (itemId) => {
+
+    const reasonInput = await prompt(
+      'Please enter the reason for declining this customization request.',
+      'Decline Reason',
+      'e.g. submitted design or measurements are incomplete',
+      ''
+    );
+    if (reasonInput === null) return;
+
+    const reason = String(reasonInput || '').trim();
+    if (!reason) {
+      showToast('Please provide a decline reason.', 'error');
+      return;
+    }
 
     openConfirmModal("Are you sure you want to decline this customization request?", async () => {
 
@@ -2709,7 +2723,12 @@ const Customize = () => {
 
         const result = await updateCustomizationOrderItem(itemId, {
 
-          approvalStatus: 'cancelled'
+          approvalStatus: 'cancelled',
+          adminNotes: reason,
+          pricingFactors: {
+            adminDeclineReason: reason,
+            adminDeclinedAt: new Date().toISOString()
+          }
 
         });
 

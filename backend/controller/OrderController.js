@@ -577,6 +577,25 @@ exports.updateRepairOrderItem = (req, res) => {
           });
         }
       }
+
+      const isPendingState = previousStatus === 'pending' || previousStatus === 'pending_review' || !previousStatus;
+      const isDecliningPendingRequest = updateData.approvalStatus === 'cancelled' && isPendingState;
+      if (isDecliningPendingRequest) {
+        const declineReason = String(updateData.adminNotes || updateData.pricingFactors?.adminDeclineReason || '').trim();
+        if (!declineReason) {
+          return res.status(400).json({
+            success: false,
+            message: 'Decline reason is required when rejecting a pending repair request'
+          });
+        }
+
+        updateData.adminNotes = declineReason;
+        updateData.pricingFactors = {
+          ...(updateData.pricingFactors || {}),
+          adminDeclineReason: declineReason,
+          adminDeclinedAt: updateData.pricingFactors?.adminDeclinedAt || new Date().toISOString()
+        };
+      }
       
       Order.updateRepairOrderItem(itemId, updateData, (err, result) => {
         console.log("Controller - Update result:", err, result);
@@ -1033,6 +1052,25 @@ exports.updateDryCleaningOrderItem = (req, res) => {
         if (isWalkIn && updateData.approvalStatus === 'price_confirmation') {
           updateData.approvalStatus = 'accepted';
         }
+      }
+
+      const isPendingState = previousStatus === 'pending' || previousStatus === 'pending_review' || !previousStatus;
+      const isDecliningPendingRequest = updateData.approvalStatus === 'cancelled' && isPendingState;
+      if (isDecliningPendingRequest) {
+        const declineReason = String(updateData.adminNotes || updateData.pricingFactors?.adminDeclineReason || '').trim();
+        if (!declineReason) {
+          return res.status(400).json({
+            success: false,
+            message: 'Decline reason is required when rejecting a pending dry cleaning request'
+          });
+        }
+
+        updateData.adminNotes = declineReason;
+        updateData.pricingFactors = {
+          ...(updateData.pricingFactors || {}),
+          adminDeclineReason: declineReason,
+          adminDeclinedAt: updateData.pricingFactors?.adminDeclinedAt || new Date().toISOString()
+        };
       }
       
       Order.updateDryCleaningOrderItem(itemId, updateData, (err, result) => {

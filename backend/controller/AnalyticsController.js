@@ -42,6 +42,13 @@ const getPaidCompensationAmountExpression = () => `
   )
 `;
 
+const getPaidRentalDamageAmountExpression = () => `
+  CASE
+    WHEN LOWER(oi.service_type) = 'rental' THEN ${getPaidCompensationAmountExpression()}
+    ELSE 0
+  END
+`;
+
 const getRevenueActivityCondition = () => `(
   oi.payment_status IN ('paid', 'fully_paid', 'down-payment', 'partial_payment', 'partial')
   OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)), 0) > 0
@@ -59,7 +66,7 @@ const getRevenueExpression = () => `
       ${getCollectedPaymentExpression()} - COALESCE(
         CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.deposit_refunded_amount')) AS DECIMAL(10,2)),
         0
-      )
+      ) + ${getPaidRentalDamageAmountExpression()}
     )
   END
 `;
@@ -75,7 +82,7 @@ const getOperationalRevenueExpression = () => `
       ${getCollectedPaymentExpression()} - COALESCE(
         CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.deposit_refunded_amount')) AS DECIMAL(10,2)),
         0
-      )
+      ) + ${getPaidRentalDamageAmountExpression()}
     )
   END
 `;
@@ -96,6 +103,14 @@ const getNetCompensationLossExpression = () => `
 // are reflected based on when payment was actually made, not when order was created.
 const getAnalyticsActivityDateExpression = () => `COALESCE(
   (SELECT MAX(tl.created_at) FROM transaction_logs tl WHERE tl.order_item_id = oi.item_id),
+  (
+    SELECT MAX(COALESCE(dcr.compensation_paid_at, dcr.updated_at, dcr.created_at))
+    FROM damage_compensation_records dcr
+    WHERE dcr.order_item_id = oi.item_id
+      AND dcr.liability_status = 'approved'
+      AND dcr.compensation_status = 'paid'
+      AND LOWER(COALESCE(dcr.service_type, oi.service_type, '')) = 'rental'
+  ),
   oi.updated_at,
   o.order_date
 )`;
@@ -113,13 +128,14 @@ exports.getRevenueOverview = async (req, res) => {
   const revenueExpr = getRevenueExpression();
 
   try {
-    
+    const activityDateExpr = getAnalyticsActivityDateExpression();
+
     const todayRevenue = await query(`
       SELECT COALESCE(SUM(${revenueExpr}), 0) AS total
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
       WHERE ${paidCondition}
-        AND DATE(o.order_date) = CURDATE()
+        AND DATE(${activityDateExpr}) = CURDATE()
     `);
 
     const yesterdayRevenue = await query(`
@@ -127,7 +143,7 @@ exports.getRevenueOverview = async (req, res) => {
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
       WHERE ${paidCondition}
-        AND DATE(o.order_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+        AND DATE(${activityDateExpr}) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
     `);
 
     const weeklyRevenue = await query(`
@@ -135,7 +151,7 @@ exports.getRevenueOverview = async (req, res) => {
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
       WHERE ${paidCondition}
-        AND YEARWEEK(o.order_date, 1) = YEARWEEK(CURDATE(), 1)
+        AND YEARWEEK(${activityDateExpr}, 1) = YEARWEEK(CURDATE(), 1)
     `);
 
     const lastWeekRevenue = await query(`
@@ -143,7 +159,7 @@ exports.getRevenueOverview = async (req, res) => {
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
       WHERE ${paidCondition}
-        AND YEARWEEK(o.order_date, 1) = YEARWEEK(DATE_SUB(CURDATE(), INTERVAL 1 WEEK), 1)
+        AND YEARWEEK(${activityDateExpr}, 1) = YEARWEEK(DATE_SUB(CURDATE(), INTERVAL 1 WEEK), 1)
     `);
 
     const monthlyRevenue = await query(`
@@ -151,8 +167,8 @@ exports.getRevenueOverview = async (req, res) => {
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
       WHERE ${paidCondition}
-        AND YEAR(o.order_date) = YEAR(CURDATE())
-        AND MONTH(o.order_date) = MONTH(CURDATE())
+        AND YEAR(${activityDateExpr}) = YEAR(CURDATE())
+        AND MONTH(${activityDateExpr}) = MONTH(CURDATE())
     `);
 
     const lastMonthRevenue = await query(`
@@ -160,8 +176,8 @@ exports.getRevenueOverview = async (req, res) => {
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
       WHERE ${paidCondition}
-        AND YEAR(o.order_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
-        AND MONTH(o.order_date) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
+        AND YEAR(${activityDateExpr}) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
+        AND MONTH(${activityDateExpr}) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
     `);
 
     const yearlyRevenue = await query(`
@@ -169,7 +185,7 @@ exports.getRevenueOverview = async (req, res) => {
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
       WHERE ${paidCondition}
-        AND YEAR(o.order_date) = YEAR(CURDATE())
+        AND YEAR(${activityDateExpr}) = YEAR(CURDATE())
     `);
 
     const lastYearRevenue = await query(`
@@ -177,7 +193,7 @@ exports.getRevenueOverview = async (req, res) => {
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
       WHERE ${paidCondition}
-        AND YEAR(o.order_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 YEAR))
+        AND YEAR(${activityDateExpr}) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 YEAR))
     `);
 
     const avgOrderValue = await query(`
@@ -245,35 +261,36 @@ exports.getRevenueTrend = async (req, res) => {
   const { period = 'monthly', startDate, endDate, serviceTypes } = req.query;
 
   try {
+    const activityDateExpr = getAnalyticsActivityDateExpression();
     let dateFormat, groupBy, dateCondition;
     
     switch (period) {
       case 'daily':
         dateFormat = '%Y-%m-%d';
-        groupBy = 'DATE(o.order_date)';
+        groupBy = `DATE(${activityDateExpr})`;
         dateCondition = startDate && endDate 
-          ? `AND DATE(o.order_date) BETWEEN '${startDate}' AND '${endDate}'`
-          : 'AND o.order_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)';
+          ? `AND DATE(${activityDateExpr}) BETWEEN '${startDate}' AND '${endDate}'`
+          : `AND ${activityDateExpr} >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)`;
         break;
       case 'weekly':
         dateFormat = '%Y-W%v';
-        groupBy = 'YEARWEEK(o.order_date, 1)';
+        groupBy = `YEARWEEK(${activityDateExpr}, 1)`;
         dateCondition = startDate && endDate 
-          ? `AND DATE(o.order_date) BETWEEN '${startDate}' AND '${endDate}'`
-          : 'AND o.order_date >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)';
+          ? `AND DATE(${activityDateExpr}) BETWEEN '${startDate}' AND '${endDate}'`
+          : `AND ${activityDateExpr} >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)`;
         break;
       case 'monthly':
       default:
         dateFormat = '%Y-%m';
-        groupBy = 'YEAR(o.order_date), MONTH(o.order_date)';
+        groupBy = `YEAR(${activityDateExpr}), MONTH(${activityDateExpr})`;
         dateCondition = startDate && endDate 
-          ? `AND DATE(o.order_date) BETWEEN '${startDate}' AND '${endDate}'`
-          : 'AND o.order_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)';
+          ? `AND DATE(${activityDateExpr}) BETWEEN '${startDate}' AND '${endDate}'`
+          : `AND ${activityDateExpr} >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`;
         break;
       case 'yearly':
         dateFormat = '%Y';
-        groupBy = 'YEAR(o.order_date)';
-        dateCondition = 'AND o.order_date >= DATE_SUB(CURDATE(), INTERVAL 5 YEAR)';
+        groupBy = `YEAR(${activityDateExpr})`;
+        dateCondition = `AND ${activityDateExpr} >= DATE_SUB(CURDATE(), INTERVAL 5 YEAR)`;
         break;
     }
 
@@ -295,7 +312,7 @@ exports.getRevenueTrend = async (req, res) => {
 
     const trendData = await query(`
       SELECT 
-        DATE_FORMAT(o.order_date, '${dateFormat}') AS period,
+        DATE_FORMAT(${activityDateExpr}, '${dateFormat}') AS period,
         ${groupBy} AS period_group,
         COALESCE(SUM(${revenueExpr}), 0) AS revenue,
         COUNT(*) AS order_count
@@ -612,28 +629,29 @@ exports.getRevenueComparison = async (req, res) => {
   const { period = 'monthly' } = req.query;
 
   try {
+    const activityDateExpr = getAnalyticsActivityDateExpression();
     let currentPeriodCondition, previousPeriodCondition, periodLabel;
 
     switch (period) {
       case 'daily':
-        currentPeriodCondition = 'DATE(o.order_date) = CURDATE()';
-        previousPeriodCondition = 'DATE(o.order_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)';
+        currentPeriodCondition = `DATE(${activityDateExpr}) = CURDATE()`;
+        previousPeriodCondition = `DATE(${activityDateExpr}) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`;
         periodLabel = { current: 'Today', previous: 'Yesterday' };
         break;
       case 'weekly':
-        currentPeriodCondition = 'YEARWEEK(o.order_date, 1) = YEARWEEK(CURDATE(), 1)';
-        previousPeriodCondition = 'YEARWEEK(o.order_date, 1) = YEARWEEK(DATE_SUB(CURDATE(), INTERVAL 1 WEEK), 1)';
+        currentPeriodCondition = `YEARWEEK(${activityDateExpr}, 1) = YEARWEEK(CURDATE(), 1)`;
+        previousPeriodCondition = `YEARWEEK(${activityDateExpr}, 1) = YEARWEEK(DATE_SUB(CURDATE(), INTERVAL 1 WEEK), 1)`;
         periodLabel = { current: 'This Week', previous: 'Last Week' };
         break;
       case 'monthly':
       default:
-        currentPeriodCondition = 'YEAR(o.order_date) = YEAR(CURDATE()) AND MONTH(o.order_date) = MONTH(CURDATE())';
-        previousPeriodCondition = 'YEAR(o.order_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND MONTH(o.order_date) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))';
+        currentPeriodCondition = `YEAR(${activityDateExpr}) = YEAR(CURDATE()) AND MONTH(${activityDateExpr}) = MONTH(CURDATE())`;
+        previousPeriodCondition = `YEAR(${activityDateExpr}) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND MONTH(${activityDateExpr}) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))`;
         periodLabel = { current: 'This Month', previous: 'Last Month' };
         break;
       case 'yearly':
-        currentPeriodCondition = 'YEAR(o.order_date) = YEAR(CURDATE())';
-        previousPeriodCondition = 'YEAR(o.order_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 YEAR))';
+        currentPeriodCondition = `YEAR(${activityDateExpr}) = YEAR(CURDATE())`;
+        previousPeriodCondition = `YEAR(${activityDateExpr}) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 YEAR))`;
         periodLabel = { current: 'This Year', previous: 'Last Year' };
         break;
     }

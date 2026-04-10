@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, Fragment, useRef } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
@@ -34,6 +34,7 @@ import {
   settleCompensationIncident,
   updateCompensationLiability
 } from '../api/DamageCompensationApi';
+import { createPortal } from 'react-dom';
 
 
 
@@ -216,6 +217,9 @@ const DryCleaning = () => {
   });
 
   const [collapsedParentOrders, setCollapsedParentOrders] = useState({});
+  const [openSecondaryMenuId, setOpenSecondaryMenuId] = useState(null);
+  const [secondaryMenuPosition, setSecondaryMenuPosition] = useState({ top: 0, left: 0 });
+  const secondaryMenuRef = useRef(null);
 
 
 
@@ -232,6 +236,168 @@ const DryCleaning = () => {
       ...prev,
       [orderId]: !prev[orderId]
     }));
+  };
+
+  useEffect(() => {
+    if (!openSecondaryMenuId) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      if (secondaryMenuRef.current && !secondaryMenuRef.current.contains(event.target)) {
+        setOpenSecondaryMenuId(null);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setOpenSecondaryMenuId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [openSecondaryMenuId]);
+
+  useEffect(() => {
+    if (!openSecondaryMenuId) {
+      return undefined;
+    }
+
+    const handleViewportChange = () => {
+      setOpenSecondaryMenuId(null);
+    };
+
+    window.addEventListener('scroll', handleViewportChange, true);
+    window.addEventListener('resize', handleViewportChange);
+
+    return () => {
+      window.removeEventListener('scroll', handleViewportChange, true);
+      window.removeEventListener('resize', handleViewportChange);
+    };
+  }, [openSecondaryMenuId]);
+
+  const toggleSecondaryMenu = (menuId, triggerElement) => {
+    if (openSecondaryMenuId === menuId) {
+      setOpenSecondaryMenuId(null);
+      return;
+    }
+
+    if (triggerElement && typeof window !== 'undefined') {
+      const rect = triggerElement.getBoundingClientRect();
+      const menuWidth = 170;
+      const viewportPadding = 8;
+      const left = Math.max(
+        viewportPadding,
+        Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - viewportPadding)
+      );
+      const top = Math.min(rect.bottom + 8, window.innerHeight - viewportPadding);
+
+      setSecondaryMenuPosition({ top, left });
+    }
+
+    setOpenSecondaryMenuId(menuId);
+  };
+
+  const closeSecondaryMenu = () => {
+    setOpenSecondaryMenuId(null);
+  };
+
+  const renderSecondaryActionMenu = ({
+    menuId,
+    showReportDamage = false,
+    showEditPrice = false,
+    showDelete = false,
+    onReportDamage,
+    onEditPrice,
+    onDelete
+  }) => {
+    if (!showReportDamage && !showEditPrice && !showDelete) {
+      return null;
+    }
+
+    const isOpen = openSecondaryMenuId === menuId;
+
+    return (
+      <div className={`secondary-actions-menu${isOpen ? ' open' : ''}`}>
+        <button
+          type="button"
+          className="icon-btn secondary-actions-trigger"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleSecondaryMenu(menuId, e.currentTarget);
+          }}
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
+          aria-label="Open more actions"
+        >
+          <span className="secondary-actions-dots" aria-hidden="true">⋯</span>
+        </button>
+
+        {isOpen && typeof document !== 'undefined' && createPortal(
+          <div
+            ref={secondaryMenuRef}
+            className="secondary-actions-dropdown secondary-actions-dropdown-portal"
+            role="menu"
+            style={{ top: `${secondaryMenuPosition.top}px`, left: `${secondaryMenuPosition.left}px` }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {showReportDamage && (
+              <button
+                type="button"
+                className="secondary-actions-item"
+                role="menuitem"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeSecondaryMenu();
+                  onReportDamage?.();
+                }}
+              >
+                Report Damage
+              </button>
+            )}
+
+            {showEditPrice && (
+              <button
+                type="button"
+                className="secondary-actions-item"
+                role="menuitem"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeSecondaryMenu();
+                  onEditPrice?.();
+                }}
+              >
+                Edit Price
+              </button>
+            )}
+
+            {showDelete && (
+              <button
+                type="button"
+                className="secondary-actions-item danger"
+                role="menuitem"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeSecondaryMenu();
+                  onDelete?.();
+                }}
+              >
+                Delete Order
+              </button>
+            )}
+          </div>,
+          document.body
+        )}
+      </div>
+    );
   };
 
 
@@ -2688,6 +2854,7 @@ const DryCleaning = () => {
                   const parentItemCount = parentItemCounts[String(parentOrderId || '')] || 0;
                   const isAddAnotherGroup = parentItemCount > 1;
                   const isCollapsed = isAddAnotherGroup && !!collapsedParentOrders[parentOrderId];
+                  const isSecondaryMenuOpenForRow = typeof openSecondaryMenuId === 'string' && openSecondaryMenuId.startsWith(`dc-${item.item_id}-`);
 
 
 
@@ -2804,7 +2971,10 @@ const DryCleaning = () => {
 
                     </td>
 
-                    <td onClick={(e) => e.stopPropagation()}>
+                    <td
+                      onClick={(e) => e.stopPropagation()}
+                      style={isSecondaryMenuOpenForRow ? { position: 'relative', zIndex: 5002 } : undefined}
+                    >
 
                       {(() => {
                         const hasApprovedDamage = normalizeIncidentStatus(incident?.liability_status) === 'approved';
@@ -2949,24 +3119,11 @@ const DryCleaning = () => {
                                 <i className="fas fa-receipt"></i>
                               </button>
 
-                              {isAdminUser && (
-                                <button
-                                  className="icon-btn delete"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteOrder(item);
-                                  }}
-                                  title="Delete Order"
-                                  style={{ backgroundColor: '#f44336', color: 'white' }}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="3 6 5 6 21 6"></polyline>
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                    <line x1="10" y1="11" x2="10" y2="17"></line>
-                                    <line x1="14" y1="11" x2="14" y2="17"></line>
-                                  </svg>
-                                </button>
-                              )}
+                              {renderSecondaryActionMenu({
+                                menuId: `dc-${item.item_id}-compensated`,
+                                showDelete: isAdminUser && !customerWantsToProceed,
+                                onDelete: () => handleDeleteOrder(item)
+                              })}
                             </>
                           )}
 
@@ -3017,28 +3174,6 @@ const DryCleaning = () => {
                           {!customerWantsToProceed && !isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && (
 
                             <>
-
-                              <button
-
-                                className="icon-btn"
-
-                                onClick={(e) => {
-
-                                  e.stopPropagation();
-
-                                  openDamageReportModal(item);
-
-                                }}
-
-                                title="Report Damage"
-
-                                style={{ backgroundColor: '#fff', color: '#c62828', border: '1px solid #ef9a9a' }}
-
-                              >
-
-                                <i className="fas fa-triangle-exclamation"></i>
-
-                              </button>
 
                               {incident && incident.liability_status === 'pending' && (
 
@@ -3180,46 +3315,6 @@ const DryCleaning = () => {
                               </button>
                               )}
 
-                              {item.approval_status === 'accepted' && item.order_type !== 'walk_in' && (
-                              <button
-
-                                className="icon-btn"
-
-                                onClick={(e) => {
-
-                                  e.stopPropagation();
-
-                                  setPriceEditOrder(item);
-
-                                  setShowPriceEditModal(true);
-
-                                }}
-
-                                title="Edit Price"
-
-                                style={{ backgroundColor: '#ff9800', color: 'white' }}
-
-                              >
-
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-
-                                  <circle cx="12" cy="12" r="10"></circle>
-
-                                  <line x1="12" y1="6" x2="12" y2="18"></line>
-
-                                  <line x1="9" y1="9" x2="9" y2="13"></line>
-
-                                  <line x1="15" y1="11" x2="15" y2="15"></line>
-
-                                  <path d="M9 13h6"></path>
-
-                                  <path d="M9 9h4a2 2 0 0 1 0 4H9"></path>
-
-                                </svg>
-
-                              </button>
-                              )}
-
                             </>
 
                           )}
@@ -3254,43 +3349,22 @@ const DryCleaning = () => {
 
                               )}
 
-                              {isAdminUser && !customerWantsToProceed && !isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && (
-                              <button
-
-                                className="icon-btn delete"
-
-                                onClick={(e) => {
-
-                                  e.stopPropagation();
-
-                                  handleDeleteOrder(item);
-
-                                }}
-
-                                title="Delete Order"
-
-                                style={{ backgroundColor: '#f44336', color: 'white' }}
-
-                              >
-
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-
-                                  <polyline points="3 6 5 6 21 6"></polyline>
-
-                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-
-                                  <line x1="10" y1="11" x2="10" y2="17"></line>
-
-                                  <line x1="14" y1="11" x2="14" y2="17"></line>
-
-                                </svg>
-
-                              </button>
-                              )}
-
                             </>
 
                           )}
+
+                          {renderSecondaryActionMenu({
+                            menuId: `dc-${item.item_id}-secondary`,
+                            showReportDamage: !customerWantsToProceed && !isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation',
+                            showEditPrice: !customerWantsToProceed && !isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && item.approval_status !== 'price_confirmation' && item.approval_status === 'accepted' && item.order_type !== 'walk_in',
+                            showDelete: (item.approval_status === 'completed' || item.approval_status === 'cancelled') && isAdminUser && !customerWantsToProceed && !isCompensatedIncident && !isDamagePendingIncident && !isForCompensationIncident,
+                            onReportDamage: () => openDamageReportModal(item),
+                            onEditPrice: () => {
+                              setPriceEditOrder(item);
+                              setShowPriceEditModal(true);
+                            },
+                            onDelete: () => handleDeleteOrder(item)
+                          })}
 
                         </div>
 

@@ -1447,7 +1447,6 @@ html {
 .table-scroll-viewport .action-buttons,
 .table-scroll-viewport .icon-btn {
   position: relative;
-  z-index: 1;
 }
 
 .table-scroll-viewport table,
@@ -1562,6 +1561,111 @@ tbody td {
 
   transform: scale(0.9);
 
+}
+
+.secondary-actions-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  z-index: 2;
+}
+
+.secondary-actions-menu.open {
+  z-index: 5003;
+}
+
+.secondary-actions-trigger {
+  width: 22px !important;
+  height: 22px !important;
+  border: 1px solid #d7cbc3 !important;
+  border-radius: 999px;
+  background: #ffffff !important;
+  color: #6b4f43 !important;
+  transform: none !important;
+  box-shadow: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+}
+
+.secondary-actions-dots {
+  font-size: 14px;
+  line-height: 1;
+  display: block;
+}
+
+.secondary-actions-trigger:hover {
+  background: #f9f4f1 !important;
+  color: #5d4037 !important;
+  transform: none !important;
+}
+
+.secondary-actions-trigger:focus-visible {
+  outline: 2px solid #b9856f;
+  outline-offset: 2px;
+}
+
+.secondary-actions-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 158px;
+  padding: 6px;
+  border: 1px solid #eadfd8;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(28, 22, 18, 0.14);
+  z-index: 5004;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.secondary-actions-dropdown.secondary-actions-dropdown-portal {
+  position: fixed;
+  right: auto;
+  z-index: 2147483000 !important;
+}
+
+.secondary-actions-item {
+  border: none;
+  background: transparent;
+  color: #4f3d34;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+  line-height: 1.2;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  box-shadow: none !important;
+}
+
+.secondary-actions-item:hover {
+  background: #f6eee9;
+}
+
+.secondary-actions-item:focus-visible {
+  outline: 2px solid #b9856f;
+  outline-offset: 1px;
+  background: #f6eee9;
+}
+
+.secondary-actions-item.danger {
+  color: #c62828;
+}
+
+.secondary-actions-item.danger:hover,
+.secondary-actions-item.danger:focus-visible {
+  background: #fdecec;
 }
 
 .icon-btn.accept {

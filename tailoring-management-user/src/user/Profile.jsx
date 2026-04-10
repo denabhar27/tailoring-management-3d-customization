@@ -60,6 +60,7 @@ const Profile = () => {
   const [compensationModalOpen, setCompensationModalOpen] = useState(false);
   const [selectedCompensationIncident, setSelectedCompensationIncident] = useState(null);
   const [selectedCompensationOrderItemId, setSelectedCompensationOrderItemId] = useState(null);
+  const [selectedCompensationServiceType, setSelectedCompensationServiceType] = useState('');
   const [customerCompensationChoice, setCustomerCompensationChoice] = useState({});
   const [customerProceedChoice, setCustomerProceedChoice] = useState({});
 
@@ -482,8 +483,28 @@ const Profile = () => {
     setDetailsModalOpen(true);
   };
 
+  const getOrderItemServiceType = (orderItemId) => {
+    const targetId = Number(orderItemId);
+    if (!targetId || !Array.isArray(orders)) return '';
+
+    for (const order of orders) {
+      const orderItems = Array.isArray(order?.items) ? order.items : [];
+      const matchedItem = orderItems.find((item) => Number(item?.order_item_id) === targetId || Number(item?.child_order_id) === targetId);
+      if (matchedItem) {
+        return String(matchedItem.service_type || '').toLowerCase();
+      }
+    }
+
+    return '';
+  };
+
   const handleCustomerLiabilityDecision = async (decision, targetIncident = selectedCompensationIncident, targetOrderItemId = selectedCompensationOrderItemId) => {
     if (!targetIncident?.id || !targetOrderItemId) return;
+
+    const incidentServiceType = String(targetIncident?.service_type || getOrderItemServiceType(targetOrderItemId) || '').toLowerCase();
+    const isRentalDamageCharge = incidentServiceType === 'rental';
+    const settlementWord = isRentalDamageCharge ? 'damage charge' : 'compensation';
+    const settlementWordTitle = isRentalDamageCharge ? 'Damage Charge' : 'Compensation';
 
     const isApprove = decision === 'approved';
     const compType = targetIncident.compensation_type || 'money';
@@ -495,9 +516,9 @@ const Profile = () => {
 
     const proceed = await confirm(
       isApprove
-        ? 'Do you agree with the reported liability and compensation?'
+        ? `Do you agree with the reported liability and ${settlementWord}?`
         : 'Do you want to reject this liability decision?',
-      isApprove ? 'Approve Liability' : 'Reject Liability',
+      isApprove ? `Approve ${settlementWordTitle}` : 'Reject Liability',
       isApprove ? 'question' : 'warning',
       {
         confirmText: isApprove ? 'Approve' : 'Reject',
@@ -522,8 +543,8 @@ const Profile = () => {
 
       await alert(
         decision === 'approved'
-          ? `Decision submitted. You chose ${chosenCompensation === 'clothe' ? 'clothe replacement' : 'money compensation'}. ${chosenProceed === 'proceed' ? 'Your order will proceed.' : 'Your order will not proceed.'} Please visit the store once notified.`
-          : 'Compensation declined. Admin will provide a revised amount for your review.',
+          ? `Decision submitted. You chose ${chosenCompensation === 'clothe' ? 'clothe replacement' : (isRentalDamageCharge ? 'damage payment' : 'money compensation')}. ${chosenProceed === 'proceed' ? 'Your order will proceed.' : 'Your order will not proceed.'} Please visit the store once notified.`
+          : `${settlementWordTitle} declined. Admin will provide a revised amount for your review.`,
         'Decision Submitted',
         'success'
       );
@@ -639,9 +660,10 @@ const Profile = () => {
     setDetailsModalOpen(false);
   };
 
-  const openCompensationModal = (incident, orderItemId) => {
+  const openCompensationModal = (incident, orderItemId, serviceType = '') => {
     setSelectedCompensationIncident(incident || null);
     setSelectedCompensationOrderItemId(orderItemId || null);
+    setSelectedCompensationServiceType(String(serviceType || incident?.service_type || '').toLowerCase());
     setCustomerCompensationChoice(prev => ({ ...prev, [orderItemId]: incident?.compensation_type === 'clothe' ? 'clothe' : 'money' }));
     setCustomerProceedChoice(prev => ({ ...prev, [orderItemId]: 'proceed' }));
     setCompensationModalOpen(true);
@@ -651,6 +673,7 @@ const Profile = () => {
     setCompensationModalOpen(false);
     setSelectedCompensationIncident(null);
     setSelectedCompensationOrderItemId(null);
+    setSelectedCompensationServiceType('');
   };
 
   const openEnhancementModal = (item) => {
@@ -2069,6 +2092,10 @@ const Profile = () => {
     return counts;
   };
 
+  const isRentalDamageChargeModal = String(selectedCompensationServiceType || selectedCompensationIncident?.service_type || '').toLowerCase() === 'rental';
+  const modalSettlementLabel = isRentalDamageChargeModal ? 'Damage Payment' : 'Compensation';
+  const modalAmountLabel = isRentalDamageChargeModal ? 'Damage Charge Amount' : 'Compensation Amount';
+
   return (
     <div className="profile-page">
       <div className="top-btn-wrapper">
@@ -2417,17 +2444,20 @@ const Profile = () => {
                 const isCompensationPendingPayment = hasApprovedDamageCompensation && compensationIncidentForItem?.compensation_status !== 'paid';
                 const customerProceedChoiceFromDB = String(compensationIncidentForItem?.customer_proceed_choice || '').toLowerCase();
                 const customerWantsToProceed = isCompensationPaid && customerProceedChoiceFromDB === 'proceed';
+                const isRentalDamageChargeFlow = hasCompensationIncident && isRental;
+                const settlementLabel = isRentalDamageChargeFlow ? 'Damage Payment' : 'Compensation';
+                const amountLabel = isRentalDamageChargeFlow ? 'Damage Charge Amount' : 'Compensation Amount';
 
                 const displayStatusLabel = hasCompensationIncident
                   ? (isLiabilityPendingIncident
-                    ? 'Compensation Review'
+                    ? (isRentalDamageChargeFlow ? 'Damage Review' : 'Compensation Review')
                     : isLiabilityRejectedIncident
-                      ? 'Compensation Rejected'
+                      ? (isRentalDamageChargeFlow ? 'Charge Disputed' : 'Compensation Rejected')
                       : isCompensationPaid && customerWantsToProceed
                         ? getStatusLabel(item.status)
                         : isCompensationPaid
-                          ? 'Compensated'
-                          : 'For Compensation')
+                          ? (isRentalDamageChargeFlow ? 'Damage Paid' : 'Compensated')
+                          : (isRentalDamageChargeFlow ? 'For Damage Payment' : 'For Compensation'))
                   : getStatusLabel(item.status);
 
                 const isEnhancementOrder = pricingFactors.enhancementRequest === true && pricingFactors.enhancementAdminAccepted === true;
@@ -3167,12 +3197,14 @@ const Profile = () => {
                         gap: '8px'
                       }}>
                         <div>
-                          {compensationIncidentForItem?.compensation_type === 'clothe' ? (
+                          {isRentalDamageChargeFlow ? (
+                            <>{amountLabel}: <strong>{formatCurrencyPHP(compensationIncidentForItem?.compensation_amount || 0)}</strong></>
+                          ) : compensationIncidentForItem?.compensation_type === 'clothe' ? (
                             <>Clothe Compensation: {compensationIncidentForItem?.clothe_description || 'Replacement garment'}</>
                           ) : compensationIncidentForItem?.compensation_type === 'both' && compensationIncidentForItem?.customer_compensation_choice === 'clothe' ? (
                             <>Clothe Compensation: {compensationIncidentForItem?.clothe_description || 'Replacement garment'}</>
                           ) : (
-                            <>Compensation Amount: <strong>{formatCurrencyPHP(compensationIncidentForItem?.compensation_amount || 0)}</strong></>
+                            <>{amountLabel}: <strong>{formatCurrencyPHP(compensationIncidentForItem?.compensation_amount || 0)}</strong></>
                           )}
                         </div>
                         {(() => {
@@ -3189,22 +3221,22 @@ const Profile = () => {
                           return null;
                         })()}
                         <div>
-                          Liability: {compensationIncidentForItem?.liability_status || 'N/A'} / Compensation: {compensationIncidentForItem?.compensation_status || 'N/A'}
+                          Liability: {compensationIncidentForItem?.liability_status || 'N/A'} / {settlementLabel}: {compensationIncidentForItem?.compensation_status || 'N/A'}
                         </div>
                         {isLiabilityPendingIncident && (
-                          <div>Please review and confirm this compensation.</div>
+                          <div>{isRentalDamageChargeFlow ? 'Please review and confirm this damage report.' : 'Please review and confirm this compensation.'}</div>
                         )}
                         {isCompensationPendingPayment && (
-                          <div>Compensation accepted. Please get your compensation payment at the shop.</div>
+                          <div>{isRentalDamageChargeFlow ? 'Damage charge is pending. Please settle payment at the shop.' : 'Compensation accepted. Please get your compensation payment at the shop.'}</div>
                         )}
                         {isLiabilityRejectedIncident && (
-                          <div>You declined this compensation. Waiting for admin to provide a revised amount.</div>
+                          <div>{isRentalDamageChargeFlow ? 'You disputed this damage charge. Waiting for admin to provide a revised decision.' : 'You declined this compensation. Waiting for admin to provide a revised amount.'}</div>
                         )}
                         {isCompensationPaid && customerWantsToProceed && (
-                          <div>Compensation settled. Your order is continuing as normal.</div>
+                          <div>{isRentalDamageChargeFlow ? 'Damage charge settled. Your rental order is continuing as normal.' : 'Compensation settled. Your order is continuing as normal.'}</div>
                         )}
                         {isCompensationPaid && !customerWantsToProceed && (
-                          <div>Compensation payment is ready and marked as paid by staff.</div>
+                          <div>{isRentalDamageChargeFlow ? 'Damage charge has been marked as paid by staff.' : 'Compensation payment is ready and marked as paid by staff.'}</div>
                         )}
                         <div style={{ marginTop: '8px', display: 'flex', alignItems: 'flex-start', gap: '10px', flexDirection: 'column' }}>
                           {isLiabilityPendingIncident && (() => {
@@ -3213,12 +3245,12 @@ const Profile = () => {
                             const isMoneyOnly = (compType === 'money' || compType === 'both') && !compensationIncidentForItem?.clothe_description;
                             const isClotheOnly = compType === 'clothe' && !parseFloat(compensationIncidentForItem?.compensation_amount || 0);
                             const showMoney = compType === 'money' || compType === 'both';
-                            const showClothe = compType === 'clothe' || compType === 'both';
+                            const showClothe = (compType === 'clothe' || compType === 'both') && !isRentalDamageChargeFlow;
                             return (
                               <>
                                 {/* Compensation choice */}
                                 <div style={{ width: '100%' }}>
-                                  <div style={{ fontWeight: '600', marginBottom: '6px', fontSize: '13px' }}>Choose compensation:</div>
+                                  <div style={{ fontWeight: '600', marginBottom: '6px', fontSize: '13px' }}>{isRentalDamageChargeFlow ? 'Confirm damage charge:' : 'Choose compensation:'}</div>
                                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                     {showMoney && (
                                       <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'normal', color: '#333' }}>
@@ -3229,7 +3261,7 @@ const Profile = () => {
                                           checked={(customerCompensationChoice[item.order_item_id] || 'money') === 'money'}
                                           onChange={(e) => { e.stopPropagation(); setCustomerCompensationChoice(prev => ({ ...prev, [item.order_item_id]: 'money' })); }}
                                         />
-                                        Money — {formatCurrencyPHP(compensationIncidentForItem?.compensation_amount || 0)}
+                                        {isRentalDamageChargeFlow ? 'Damage payment' : 'Money'} — {formatCurrencyPHP(compensationIncidentForItem?.compensation_amount || 0)}
                                       </label>
                                     )}
                                     {showClothe && (
@@ -3279,14 +3311,14 @@ const Profile = () => {
                                     disabled={submittingLiabilityDecision}
                                     style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#c62828', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
                                   >
-                                    {submittingLiabilityDecision ? 'Submitting...' : 'Decline Compensation'}
+                                    {submittingLiabilityDecision ? 'Submitting...' : (isRentalDamageChargeFlow ? 'Dispute Charge' : 'Decline Compensation')}
                                   </button>
                                   <button
                                     onClick={() => handleCustomerLiabilityDecision('approved', compensationIncidentForItem, item.order_item_id)}
                                     disabled={submittingLiabilityDecision}
                                     style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
                                   >
-                                    {submittingLiabilityDecision ? 'Submitting...' : 'Accept Compensation'}
+                                    {submittingLiabilityDecision ? 'Submitting...' : (isRentalDamageChargeFlow ? 'Accept Charge' : 'Accept Compensation')}
                                   </button>
                                 </div>
                               </>
@@ -3297,7 +3329,7 @@ const Profile = () => {
                             </div>
                           )}
                           <button
-                            onClick={() => openCompensationModal(compensationIncidentForItem, item.order_item_id)}
+                            onClick={() => openCompensationModal(compensationIncidentForItem, item.order_item_id, item.service_type)}
                             style={{
                               padding: '7px 10px',
                               borderRadius: '6px',
@@ -3311,7 +3343,7 @@ const Profile = () => {
                               marginLeft: 'auto'
                             }}
                           >
-                            View Compensation
+                            {isRentalDamageChargeFlow ? 'View Damage Charge' : 'View Compensation'}
                           </button>
                         </div>
                       </div>
@@ -3680,7 +3712,7 @@ const Profile = () => {
         >
           <div className="details-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px' }}>
             <div className="details-modal-header">
-              <h3>Compensation Details</h3>
+              <h3>{isRentalDamageChargeModal ? 'Damage Charge Details' : 'Compensation Details'}</h3>
               <button className="details-modal-close" onClick={closeCompensationModal}>×</button>
             </div>
             <div className="details-modal-content">
@@ -3702,7 +3734,9 @@ const Profile = () => {
                   }
                   return null;
                 })()}
-                {selectedCompensationIncident.compensation_type === 'clothe' ? (
+                {isRentalDamageChargeModal ? (
+                  <div><strong>{modalAmountLabel}:</strong> {formatCurrencyPHP(selectedCompensationIncident.compensation_amount || 0)}</div>
+                ) : selectedCompensationIncident.compensation_type === 'clothe' ? (
                   <div><strong>Compensation:</strong> Clothe — {selectedCompensationIncident.clothe_description || 'Replacement garment'}</div>
                 ) : selectedCompensationIncident.compensation_type === 'both' ? (
                   <>
@@ -3710,15 +3744,15 @@ const Profile = () => {
                     <div><strong>Clothe Option:</strong> {selectedCompensationIncident.clothe_description || 'Replacement garment'}</div>
                   </>
                 ) : (
-                  <div><strong>Compensation Amount:</strong> {formatCurrencyPHP(selectedCompensationIncident.compensation_amount || 0)}</div>
+                  <div><strong>{modalAmountLabel}:</strong> {formatCurrencyPHP(selectedCompensationIncident.compensation_amount || 0)}</div>
                 )}
                 {selectedCompensationIncident.damaged_garment_type && (
                   <div><strong>Damaged Garment:</strong> {selectedCompensationIncident.damaged_garment_type}</div>
                 )}
                 <div><strong>Liability Status:</strong> {String(selectedCompensationIncident.liability_status || 'pending').replace(/_/g, ' ')}</div>
-                <div><strong>Compensation Status:</strong> {String(selectedCompensationIncident.compensation_status || 'unpaid').replace(/_/g, ' ')}</div>
+                <div><strong>{modalSettlementLabel} Status:</strong> {String(selectedCompensationIncident.compensation_status || 'unpaid').replace(/_/g, ' ')}</div>
                 {selectedCompensationIncident.customer_compensation_choice && (
-                  <div><strong>Your Choice:</strong> {selectedCompensationIncident.customer_compensation_choice === 'clothe' ? 'Clothe replacement' : 'Money'}</div>
+                  <div><strong>Your Choice:</strong> {selectedCompensationIncident.customer_compensation_choice === 'clothe' ? 'Clothe replacement' : (isRentalDamageChargeModal ? 'Damage payment' : 'Money')}</div>
                 )}
                 {selectedCompensationIncident.customer_proceed_choice && (
                   <div><strong>Order Proceed:</strong> {selectedCompensationIncident.customer_proceed_choice === 'proceed' ? 'Proceed' : 'Don’t proceed'}</div>
@@ -3733,26 +3767,28 @@ const Profile = () => {
 
               {String(selectedCompensationIncident.compensation_status).toLowerCase() === 'paid' && (
                 <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '8px', background: '#e8f5e9', border: '1px solid #a5d6a7', color: '#1b5e20', fontWeight: 600 }}>
-                  Compensation has been marked as paid. Please claim it in-store.
+                  {isRentalDamageChargeModal
+                    ? 'Damage charge has been marked as paid by staff.'
+                    : 'Compensation has been marked as paid. Please claim it in-store.'}
                 </div>
               )}
 
               {String(selectedCompensationIncident.liability_status).toLowerCase() === 'pending' && (() => {
                 const compType = selectedCompensationIncident.compensation_type || 'money';
                 const showMoney = compType === 'money' || compType === 'both';
-                const showClothe = compType === 'clothe' || compType === 'both';
+                const showClothe = (compType === 'clothe' || compType === 'both') && !isRentalDamageChargeModal;
                 return (
                   <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {/* Compensation choice */}
                     <div>
-                      <div style={{ fontWeight: '600', marginBottom: '6px', fontSize: '13px' }}>Choose compensation:</div>
+                      <div style={{ fontWeight: '600', marginBottom: '6px', fontSize: '13px' }}>{isRentalDamageChargeModal ? 'Confirm damage charge:' : 'Choose compensation:'}</div>
                       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                         {showMoney && (
                           <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
                             <input type="radio" name="modal-comp-choice" value="money"
                               checked={(customerCompensationChoice[selectedCompensationOrderItemId] || 'money') === 'money'}
                               onChange={() => setCustomerCompensationChoice(prev => ({ ...prev, [selectedCompensationOrderItemId]: 'money' }))} />
-                            Money — {formatCurrencyPHP(selectedCompensationIncident.compensation_amount || 0)}
+                            {isRentalDamageChargeModal ? 'Damage payment' : 'Money'} — {formatCurrencyPHP(selectedCompensationIncident.compensation_amount || 0)}
                           </label>
                         )}
                         {showClothe && (
@@ -3789,14 +3825,14 @@ const Profile = () => {
                         disabled={submittingLiabilityDecision}
                         style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#c62828', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
                       >
-                        {submittingLiabilityDecision ? 'Submitting...' : 'Decline'}
+                        {submittingLiabilityDecision ? 'Submitting...' : (isRentalDamageChargeModal ? 'Dispute Charge' : 'Decline')}
                       </button>
                       <button
                         onClick={() => handleCustomerLiabilityDecision('approved', selectedCompensationIncident, selectedCompensationOrderItemId)}
                         disabled={submittingLiabilityDecision}
                         style={{ padding: '7px 10px', borderRadius: '6px', border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', lineHeight: 1.2 }}
                       >
-                        {submittingLiabilityDecision ? 'Submitting...' : 'Accept'}
+                        {submittingLiabilityDecision ? 'Submitting...' : (isRentalDamageChargeModal ? 'Accept Charge' : 'Accept')}
                       </button>
                     </div>
                   </div>

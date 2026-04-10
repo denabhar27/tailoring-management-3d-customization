@@ -685,8 +685,8 @@ const Order = {
           if (trackingErr) {
             console.error('Error initializing order tracking:', trackingErr);
           }
-            const childOrderIds = Array.isArray(cartItems)
-              ? cartItems.map((_, index) => itemResult.insertId + index)
+            const childOrderIds = Array.isArray(items)
+              ? items.map((_, index) => itemResult.insertId + index)
               : [];
           console.log('[ORDER MODEL] ✅ Order created successfully, orderId:', orderId);
             callback(null, { orderId: orderId, childOrderIds, orderResult: orderResult, itemResult: itemResult });

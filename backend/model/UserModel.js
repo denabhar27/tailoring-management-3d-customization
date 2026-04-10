@@ -26,7 +26,8 @@ const User = {
     const username = email.split('@')[0] + '_' + Date.now().toString().slice(-6);
    
     const sql = "INSERT INTO user (first_name, middle_name, last_name, username, email, password, phone_number, google_id, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    db.query(sql, [first_name, null, last_name, username, email, null, null, google_id, 'user'], callback);
+    // Keep password empty for Google-only accounts while satisfying NOT NULL database schemas.
+    db.query(sql, [first_name, null, last_name, username, email, '', null, google_id, 'user'], callback);
   },
 
   updateProfilePicture: (user_id, profile_picture_path, callback) => {

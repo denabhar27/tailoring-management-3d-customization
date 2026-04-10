@@ -23,6 +23,7 @@ import WalkInOrders from "./admin/WalkInOrders";
 import OrdersInventory from "./admin/OrdersInventory";
 import ClerkManagement from "./admin/ClerkManagement";
 import Customizer3DPage from "./pages/Customizer3DPage";
+import GoogleAuthCallback from "./components/auth/GoogleAuthCallback";
 
 const App = () => {
   return (
@@ -33,6 +34,7 @@ const App = () => {
         <Route path="/profile" element={<Profile />} />
         <Route path="/rentals" element={<RentalPage />} />
         <Route path="/orders/:orderItemId" element={<OrderDetails />} />
+        <Route path="/auth/callback" element={<GoogleAuthCallback />} />
         <Route path="/3d-customizer" element={<Customizer3DPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/rental" element={<Rental />} />

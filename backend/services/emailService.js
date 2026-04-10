@@ -2,8 +2,10 @@
 
 const sgMail = require('@sendgrid/mail');
 
+const getSendGridApiKey = () => String(process.env.SENDGRID_API_KEY || '').trim();
+
 const initializeSendGrid = () => {
-  const apiKey = process.env.SENDGRID_API_KEY;
+  const apiKey = getSendGridApiKey();
   if (!apiKey) {
     console.warn('[EMAIL SERVICE] SendGrid API key not configured. Email notifications will be disabled.');
     return false;
@@ -14,7 +16,7 @@ const initializeSendGrid = () => {
 };
 
 const isEmailServiceConfigured = () => {
-  return !!process.env.SENDGRID_API_KEY;
+  return !!getSendGridApiKey();
 };
 
 const getSenderInfo = () => ({

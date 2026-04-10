@@ -86,6 +86,52 @@ export async function getGoogleAuthUrl() {
   }
 }
 
+const decodeJwtPayload = (token) => {
+  try {
+    const payloadPart = String(token || '').split('.')[1];
+    if (!payloadPart) return null;
+
+    const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch (error) {
+    console.error('Failed to decode JWT payload:', error);
+    return null;
+  }
+};
+
+export function completeGoogleLogin(token, roleFromQuery) {
+  if (!token) {
+    return { success: false, message: 'Missing authentication token.' };
+  }
+
+  try {
+    const payload = decodeJwtPayload(token) || {};
+    const role = roleFromQuery || payload.role || 'user';
+
+    const user = {
+      id: payload.id,
+      first_name: payload.first_name || '',
+      middle_name: payload.middle_name || '',
+      last_name: payload.last_name || '',
+      email: payload.email || '',
+      phone_number: payload.phone_number || null,
+      profile_picture: payload.profile_picture || null,
+      role
+    };
+
+    localStorage.setItem('token', token);
+    localStorage.setItem('role', role);
+    localStorage.setItem('user', JSON.stringify(user));
+
+    return { success: true, role, user };
+  } catch (error) {
+    console.error('Error completing Google login:', error);
+    return { success: false, message: 'Failed to save Google login session.' };
+  }
+}
+
 export async function updateProfile(profileData) {
   try {
     const token = getToken();

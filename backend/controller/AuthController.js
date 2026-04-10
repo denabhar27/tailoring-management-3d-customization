@@ -220,23 +220,31 @@ exports.googleCallback = async (req, res) => {
       }
 
       if (results.length > 0) {
-    
+
         const user = results[0];
+        const userRole = user.role || 'user';
+
+        if (user.status === 'inactive' || user.status === 'suspended') {
+          return redirectWithError(res, 'Account is inactive. Please contact an admin.');
+        }
+
         try {
           const token = jwt.sign(
             {
               id: user.user_id,
-              role: 'user',
+              role: userRole,
               first_name: user.first_name,
+              middle_name: user.middle_name,
               last_name: user.last_name,
               email: user.email,
-              phone_number: user.phone_number || null
+              phone_number: user.phone_number || null,
+              profile_picture: user.profile_picture || null
             },
             process.env.JWT_SECRET || "secret",
             { expiresIn: '24h' }
           );
 
-          res.redirect(`${frontendUrl}/auth/callback?token=${token}&role=user`);
+          res.redirect(`${frontendUrl}/auth/callback?token=${encodeURIComponent(token)}&role=${encodeURIComponent(userRole)}`);
         } catch (jwtError) {
           console.error('JWT signing error:', jwtError);
           return redirectWithError(res, 'Failed to create authentication token');
@@ -263,19 +271,27 @@ exports.googleCallback = async (req, res) => {
                     return redirectWithError(res, 'Failed to create account. Please try again.');
                   }
                   const user = findResults[0];
+                  const userRole = user.role || 'user';
+
+                  if (user.status === 'inactive' || user.status === 'suspended') {
+                    return redirectWithError(res, 'Account is inactive. Please contact an admin.');
+                  }
+
                   const token = jwt.sign(
                     {
                       id: user.user_id,
-                      role: 'user',
+                      role: userRole,
                       first_name: user.first_name,
+                      middle_name: user.middle_name,
                       last_name: user.last_name,
                       email: user.email,
-                      phone_number: user.phone_number || null
+                      phone_number: user.phone_number || null,
+                      profile_picture: user.profile_picture || null
                     },
                     process.env.JWT_SECRET || "secret",
                     { expiresIn: '24h' }
                   );
-                  res.redirect(`${frontendUrl}/auth/callback?token=${token}&role=user`);
+                  res.redirect(`${frontendUrl}/auth/callback?token=${encodeURIComponent(token)}&role=${encodeURIComponent(userRole)}`);
                 });
               } else {
                 return redirectWithError(res, 'Failed to create account. Please try again.');
@@ -297,7 +313,7 @@ exports.googleCallback = async (req, res) => {
                 { expiresIn: '24h' }
               );
 
-              res.redirect(`${frontendUrl}/auth/callback?token=${token}&role=user`);
+              res.redirect(`${frontendUrl}/auth/callback?token=${encodeURIComponent(token)}&role=user`);
             } catch (jwtError) {
               console.error('JWT signing error:', jwtError);
               return redirectWithError(res, 'Failed to create authentication token');

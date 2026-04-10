@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import '../styles/Guesthome.css';
 import '../styles/Transitions.css';
 import { FiScissors, FiDroplet, FiChevronRight } from 'react-icons/fi';
+import { FcGoogle } from 'react-icons/fc';
 import { PiTShirtBold } from 'react-icons/pi';
 import { initScrollAnimations, initHeaderScroll } from '../utils/scrollAnimations';
 import logo from "../assets/logo.png";
@@ -16,7 +17,7 @@ import repairBg from "../assets/repair.png";
 import brown from "../assets/brown.png";
 import full from "../assets/full.png";
 import tuxedo from "../assets/tuxedo.png";
-import { loginUser, registerUser } from '../api/AuthApi';
+import { loginUser, registerUser, getGoogleAuthUrl } from '../api/AuthApi';
 import RentalClothes from './components/RentalClothes';
 import ForgotPassword from '../components/auth/ForgotPassword';
 
@@ -39,6 +40,7 @@ const App = ({ setIsLoggedIn }) => {
   const [signupBirthdate, setSignupBirthdate] = useState('');
   const [authError, setAuthError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   useEffect(() => {
     const scrollObserver = initScrollAnimations();
@@ -233,6 +235,24 @@ const App = ({ setIsLoggedIn }) => {
       setAuthError(errorMessage);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setAuthError('');
+    setIsGoogleLoading(true);
+
+    try {
+      const authUrl = await getGoogleAuthUrl();
+      if (!authUrl) {
+        throw new Error('Google authorization URL was not returned by the server.');
+      }
+
+      window.location.assign(authUrl);
+    } catch (error) {
+      console.error('Google login error:', error);
+      setAuthError(error.response?.data?.message || error.message || 'Unable to start Google sign-in. Please try again.');
+      setIsGoogleLoading(false);
     }
   };
 
@@ -777,11 +797,41 @@ const App = ({ setIsLoggedIn }) => {
               {authError}
             </div>
           )}
-          <button type="submit" className="auth-submit" onClick={handleLogin} disabled={isLoading}>
-            {isLoading ? 'Processing...' : (isLogin ? 'Login Now' : 'Create Account')}
-          </button>
+          {isLogin ? (
+            <>
+              <button
+                type="submit"
+                className="auth-submit auth-submit-login"
+                onClick={handleLogin}
+                disabled={isLoading || isGoogleLoading}
+              >
+                {isLoading ? 'Processing...' : 'Login Now'}
+              </button>
+              <div style={{ textAlign: 'center', color: '#888', margin: '10px 0 12px', fontSize: '13px' }}>or</div>
+              <button
+                type="button"
+                className="auth-submit auth-google-btn"
+                onClick={handleGoogleLogin}
+                disabled={isLoading || isGoogleLoading}
+              >
+                <span className="auth-google-icon" aria-hidden="true">
+                  <FcGoogle size={22} />
+                </span>
+                <span>{isGoogleLoading ? 'Redirecting to Google...' : 'Continue with Google'}</span>
+              </button>
+            </>
+          ) : (
+            <button
+              type="submit"
+              className="auth-submit"
+              onClick={handleLogin}
+              disabled={isLoading}
+            >
+              {isLoading ? 'Processing...' : 'Create Account'}
+            </button>
+          )}
         </form>
-        <div className="auth-footer">
+        <div className={`auth-footer ${isLogin ? 'auth-footer-login' : ''}`}>
           <p>
             {isLogin ? "Don't have an account? " : "Already have an account? "}
             <span onClick={() => setIsLogin(!isLogin)} className="toggle-link">

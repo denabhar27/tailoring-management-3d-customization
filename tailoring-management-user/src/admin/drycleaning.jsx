@@ -896,7 +896,7 @@ const DryCleaning = () => {
       damagedQuantity: '1',
       affectedGarments: [],
       compensationAmount: '',
-      compensationType: 'money',
+      compensationType: 'both',
       clotheDescription: ''
     });
     setShowDamageReportModal(true);
@@ -933,14 +933,20 @@ const DryCleaning = () => {
       showToast('Damaged quantity must match the total of affected garment quantities', 'error');
       return;
     }
-    const selectedCompensationType = damageForm.compensationType === 'clothe' ? 'clothe' : 'money';
+    const selectedCompensationType = damageForm.compensationType || '';
+    const hasMoneyType = selectedCompensationType === 'money' || selectedCompensationType === 'both';
+    const hasClotheType = selectedCompensationType === 'clothe' || selectedCompensationType === 'both';
     const hasMoneyOffer = Number.isFinite(compensationAmount) && compensationAmount > 0;
     const hasClotheOffer = damageForm.clotheDescription.trim().length > 0;
-    if (selectedCompensationType === 'money' && !hasMoneyOffer) {
+    if (!hasMoneyType && !hasClotheType) {
+      showToast('Please select at least one compensation type', 'error');
+      return;
+    }
+    if (hasMoneyType && !hasMoneyOffer) {
       showToast('Please enter a compensation amount greater than 0', 'error');
       return;
     }
-    if (selectedCompensationType === 'clothe' && !hasClotheOffer) {
+    if (hasClotheType && !hasClotheOffer) {
       showToast('Please provide a clothe compensation description', 'error');
       return;
     }
@@ -960,9 +966,9 @@ const DryCleaning = () => {
       total_quantity: totalQuantity,
       damaged_quantity: damagedQuantity,
       damaged_garment_type: damagedGarmentSummary || null,
-      compensation_amount: selectedCompensationType === 'money' ? compensationAmount : 0,
-      compensation_type: selectedCompensationType,
-      clothe_description: selectedCompensationType === 'clothe' ? damageForm.clotheDescription.trim() : null,
+      compensation_amount: hasMoneyType ? compensationAmount : 0,
+      compensation_type: hasMoneyType && hasClotheType ? 'both' : hasMoneyType ? 'money' : 'clothe',
+      clothe_description: hasClotheType ? damageForm.clotheDescription.trim() : null,
       notes: 'Reported from Dry Cleaning management'
     });
 
@@ -5105,30 +5111,40 @@ const DryCleaning = () => {
                 <div className="compensation-type-options" style={{ marginTop: '6px' }}>
                   <label className="compensation-type-option" style={{ cursor: 'pointer' }}>
                     <input
-                      className="compensation-type-radio"
-                      type="radio"
-                      name="damageCompensationTypeDry"
+                      className="compensation-type-checkbox"
+                      type="checkbox"
                       value="money"
-                      checked={damageForm.compensationType === 'money'}
-                      onChange={(e) => setDamageForm({ ...damageForm, compensationType: e.target.value })}
+                      checked={damageForm.compensationType === 'money' || damageForm.compensationType === 'both'}
+                      onChange={(e) => {
+                        const current = damageForm.compensationType || '';
+                        const nextType = e.target.checked
+                          ? (current === 'clothe' || current === 'both' ? 'both' : 'money')
+                          : (current === 'both' ? 'clothe' : '');
+                        setDamageForm({ ...damageForm, compensationType: nextType });
+                      }}
                     />
                     <span>Compensation</span>
                   </label>
                   <label className="compensation-type-option" style={{ cursor: 'pointer' }}>
                     <input
-                      className="compensation-type-radio"
-                      type="radio"
-                      name="damageCompensationTypeDry"
+                      className="compensation-type-checkbox"
+                      type="checkbox"
                       value="clothe"
-                      checked={damageForm.compensationType === 'clothe'}
-                      onChange={(e) => setDamageForm({ ...damageForm, compensationType: e.target.value })}
+                      checked={damageForm.compensationType === 'clothe' || damageForm.compensationType === 'both'}
+                      onChange={(e) => {
+                        const current = damageForm.compensationType || '';
+                        const nextType = e.target.checked
+                          ? (current === 'money' || current === 'both' ? 'both' : 'clothe')
+                          : (current === 'both' ? 'money' : '');
+                        setDamageForm({ ...damageForm, compensationType: nextType });
+                      }}
                     />
                     <span>Replacement</span>
                   </label>
                 </div>
               </div>
 
-              {damageForm.compensationType === 'money' ? (
+              {(damageForm.compensationType === 'money' || damageForm.compensationType === 'both') && (
                 <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
                   <label>Compensation Amount (PHP)</label>
                   <input
@@ -5142,7 +5158,9 @@ const DryCleaning = () => {
                     onChange={(e) => setDamageForm({ ...damageForm, compensationAmount: e.target.value })}
                   />
                 </div>
-              ) : (
+              )}
+
+              {(damageForm.compensationType === 'clothe' || damageForm.compensationType === 'both') && (
                 <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
                   <label>Clothe Compensation Description</label>
                   <textarea
@@ -5156,7 +5174,7 @@ const DryCleaning = () => {
                 </div>
               )}
               <div style={{ fontSize: '12px', color: '#666', gridColumn: '1 / -1' }}>
-                ℹ️ Select one compensation type for this damage report.
+                ℹ️ Select one or both compensation types for this damage report.
               </div>
             </div>
             <div className="modal-footer-centered" style={{ justifyContent: 'flex-end' }}>

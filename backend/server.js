@@ -519,6 +519,20 @@ try {
   console.error('[SERVER] Error initializing deposit migration:', err.message);
 }
 
+// Run dynamic rental size configuration migration
+try {
+  const { runDynamicRentalConfigMigration } = require('./migrations/runDynamicRentalConfigMigration');
+  runDynamicRentalConfigMigration()
+    .then(() => {
+      console.log('[SERVER] ✅ Dynamic rental configuration migration completed');
+    })
+    .catch((err) => {
+      console.error('[SERVER] Error running dynamic rental migration:', err.message);
+    });
+} catch (err) {
+  console.error('[SERVER] Error initializing dynamic rental migration:', err.message);
+}
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

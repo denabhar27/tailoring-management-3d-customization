@@ -6,6 +6,33 @@ import { API_URL } from './config';
 
 const BASE_URL = API_URL;
 
+const normalizeSizePayload = (rawSize) => {
+  if (!rawSize) return rawSize;
+
+  try {
+    const parsed = typeof rawSize === 'string' ? JSON.parse(rawSize) : rawSize;
+    if (!parsed || typeof parsed !== 'object') return rawSize;
+    if (!Array.isArray(parsed.size_entries)) return rawSize;
+
+    const normalizedEntries = parsed.size_entries.map((entry = {}) => ({
+      ...entry,
+      rental_duration: Number.isFinite(parseInt(entry.rental_duration, 10))
+        ? Math.max(1, Math.min(30, parseInt(entry.rental_duration, 10)))
+        : 3,
+      overdue_amount: Number.isFinite(parseFloat(entry.overdue_amount))
+        ? Math.max(0, parseFloat(entry.overdue_amount))
+        : 50
+    }));
+
+    return JSON.stringify({
+      ...parsed,
+      size_entries: normalizedEntries
+    });
+  } catch {
+    return rawSize;
+  }
+};
+
 
 
 const getAuthHeaders = () => {
@@ -122,7 +149,11 @@ export async function createRental(rentalData, imageFiles) {
 
       if (rentalData[key] !== null && rentalData[key] !== undefined) {
 
-        formData.append(key, rentalData[key]);
+        if (key === 'size') {
+          formData.append(key, normalizeSizePayload(rentalData[key]));
+        } else {
+          formData.append(key, rentalData[key]);
+        }
 
       }
 
@@ -206,7 +237,11 @@ export async function updateRental(item_id, rentalData, imageFiles) {
 
       if (rentalData[key] !== null && rentalData[key] !== undefined) {
 
-        formData.append(key, rentalData[key]);
+        if (key === 'size') {
+          formData.append(key, normalizeSizePayload(rentalData[key]));
+        } else {
+          formData.append(key, rentalData[key]);
+        }
 
       }
 

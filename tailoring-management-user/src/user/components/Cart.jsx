@@ -966,11 +966,43 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                         <p>Appointment: {new Date(item.appointment_date).toLocaleDateString()}</p>
                       )}
 
-                      {item.rental_start_date && item.rental_end_date && (
+                      {item.rental_start_date && (
                         <p style={{ color: '#000' }}>
-                          Rental: <span style={{ color: '#000', fontWeight: '600' }}>{new Date(item.rental_start_date).toLocaleDateString()}</span> - {' '}
-                          <span style={{ color: '#000', fontWeight: '600' }}>{new Date(item.rental_end_date).toLocaleDateString()}</span>
+                          Start Date: <span style={{ color: '#000', fontWeight: '600' }}>{new Date(item.rental_start_date).toLocaleDateString()}</span>
                         </p>
+                      )}
+
+                      {item.service_type === 'rental' && Array.isArray(item.specific_data?.selected_sizes) && item.specific_data.selected_sizes.some((s) => s?.due_date) && (
+                        <div style={{ marginTop: '4px' }}>
+                          {item.specific_data.selected_sizes
+                            .filter((s) => s?.due_date)
+                            .map((s, idx) => (
+                              <p key={`due-${item.cart_id}-${s.sizeKey || s.label || idx}`} style={{ margin: '2px 0', color: '#000' }}>
+                                End Date ({s.label || s.sizeKey || `Size ${idx + 1}`}):{' '}
+                                <span style={{ color: '#000', fontWeight: '600' }}>{new Date(s.due_date).toLocaleDateString()}</span>
+                              </p>
+                            ))}
+                        </div>
+                      )}
+
+                      {item.service_type === 'rental' && Array.isArray(item.specific_data?.bundle_items) && item.specific_data.bundle_items.length > 0 && (
+                        <div style={{ marginTop: '4px' }}>
+                          {item.specific_data.bundle_items.flatMap((bundleItem, bIdx) => {
+                            const itemLabel = bundleItem?.item_name || `Item ${bIdx + 1}`;
+                            const sizes = Array.isArray(bundleItem?.selected_sizes)
+                              ? bundleItem.selected_sizes
+                              : (Array.isArray(bundleItem?.selectedSizes) ? bundleItem.selectedSizes : []);
+
+                            return sizes
+                              .filter((s) => s?.due_date)
+                              .map((s, sIdx) => (
+                                <p key={`bundle-due-${item.cart_id}-${bIdx}-${s.sizeKey || s.label || sIdx}`} style={{ margin: '2px 0', color: '#000' }}>
+                                  End Date ({itemLabel} - {s.label || s.sizeKey || `Size ${sIdx + 1}`}):{' '}
+                                  <span style={{ color: '#000', fontWeight: '600' }}>{new Date(s.due_date).toLocaleDateString()}</span>
+                                </p>
+                              ));
+                          })}
+                        </div>
                       )}
                     </div>
 
@@ -1132,7 +1164,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                 borderRadius: '8px'
               }}>
                 <div>
-                  <span style={{ color: '#666', fontSize: '13px' }}>Rental Duration</span>
+                  <span style={{ color: '#666', fontSize: '13px' }}>Max Rental Duration</span>
                   <p style={{ margin: '4px 0 0', fontWeight: '600', color: '#333' }}>
                     {parentBundleData.pricing_factors?.duration || 'N/A'} days
                   </p>
@@ -1144,17 +1176,34 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                   </p>
                 </div>
                 <div>
-                  <span style={{ color: '#666', fontSize: '13px' }}>End Date</span>
-                  <p style={{ margin: '4px 0 0', fontWeight: '600', color: '#333' }}>
-                    {parentBundleData.rental_end_date ? new Date(parentBundleData.rental_end_date).toLocaleDateString() : 'N/A'}
-                  </p>
-                </div>
-                <div>
                   <span style={{ color: '#666', fontSize: '13px' }}>Total Price</span>
                   <p style={{ margin: '4px 0 0', fontWeight: '700', color: '#2d5a3d', fontSize: '16px' }}>
                     {formatPrice(parentBundleData.final_price)}
                   </p>
                 </div>
+              </div>
+            )}
+
+            {parentBundleData && Array.isArray(parentBundleData.specific_data?.bundle_items) && (
+              <div style={{ marginBottom: '16px', display: 'grid', gap: '6px' }}>
+                {parentBundleData.specific_data.bundle_items.flatMap((bundleItem, bIdx) => {
+                  const itemLabel = bundleItem?.item_name || `Item ${bIdx + 1}`;
+                  const sizes = Array.isArray(bundleItem?.selected_sizes)
+                    ? bundleItem.selected_sizes
+                    : (Array.isArray(bundleItem?.selectedSizes) ? bundleItem.selectedSizes : []);
+
+                  return sizes
+                    .filter((s) => s?.due_date)
+                    .map((s, sIdx) => (
+                      <div
+                        key={`bundle-modal-due-${bIdx}-${s.sizeKey || s.label || sIdx}`}
+                        style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}
+                      >
+                        <span style={{ color: '#666', fontSize: '13px' }}>End Date ({itemLabel} - {s.label || s.sizeKey || `Size ${sIdx + 1}`})</span>
+                        <span style={{ fontWeight: '600', color: '#333' }}>{new Date(s.due_date).toLocaleDateString()}</span>
+                      </div>
+                    ));
+                })}
               </div>
             )}
 
@@ -1375,7 +1424,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
 
               {(selectedBundleItem.price || selectedBundleItem.final_price || selectedBundleItem.pricing_factors?.base_price || selectedBundleItem.specific_data?.price || selectedBundleItem.specific_data?.final_price) ? (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#e8f4e8', borderRadius: '6px', marginTop: '10px' }}>
-                  <span style={{ fontWeight: '500', color: '#2d5a3d' }}>Base Price (per 3 days)</span>
+                  <span style={{ fontWeight: '500', color: '#2d5a3d' }}>Base Price</span>
                   <span style={{ fontWeight: '700', color: '#2d5a3d' }}>
                     {formatPrice(
                       selectedBundleItem.price ||
@@ -1501,7 +1550,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
               {selectedRentalItem.specific_data?.size && renderSizeMeasurements(selectedRentalItem.specific_data.size)}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
-                <span style={{ fontWeight: '500', color: '#666' }}>Rental Duration</span>
+                <span style={{ fontWeight: '500', color: '#666' }}>Max Rental Duration</span>
                 <span style={{ fontWeight: '600', color: '#333' }}>{selectedRentalItem.pricing_factors?.duration || selectedRentalItem.pricing_factors?.rental_days || 'N/A'} days</span>
               </div>
 
@@ -1510,10 +1559,21 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                 <span style={{ fontWeight: '600', color: '#333' }}>{selectedRentalItem.rental_start_date ? new Date(selectedRentalItem.rental_start_date).toLocaleDateString() : 'N/A'}</span>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
-                <span style={{ fontWeight: '500', color: '#666' }}>End Date</span>
-                <span style={{ fontWeight: '600', color: '#333' }}>{selectedRentalItem.rental_end_date ? new Date(selectedRentalItem.rental_end_date).toLocaleDateString() : 'N/A'}</span>
-              </div>
+              {Array.isArray(selectedRentalItem.specific_data?.selected_sizes) && selectedRentalItem.specific_data.selected_sizes.some((s) => s?.due_date) && (
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  {selectedRentalItem.specific_data.selected_sizes
+                    .filter((s) => s?.due_date)
+                    .map((s, idx) => (
+                      <div
+                        key={`modal-end-${s.sizeKey || s.label || idx}`}
+                        style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}
+                      >
+                        <span style={{ fontWeight: '500', color: '#666' }}>End Date ({s.label || s.sizeKey || `Size ${idx + 1}`})</span>
+                        <span style={{ fontWeight: '600', color: '#333' }}>{new Date(s.due_date).toLocaleDateString()}</span>
+                      </div>
+                    ))}
+                </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#e8f4e8', borderRadius: '6px' }}>
                 <span style={{ fontWeight: '500', color: '#2d5a3d' }}>Rental Price</span>

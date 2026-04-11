@@ -1,6 +1,142 @@
 const Order = require('../model/OrderModel');
 const db = require('../config/db');
 
+const DEFAULT_OVERDUE_RATE = 50;
+
+const parseMaybeJson = (value, fallback = {}) => {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+};
+
+const toDateOnly = (value) => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+};
+
+const addRentalDays = (startDate, duration) => {
+  const start = toDateOnly(startDate);
+  if (!start) return null;
+  const d = new Date(`${start}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const safeDuration = Math.max(1, parseInt(duration, 10) || 1);
+  d.setDate(d.getDate() + safeDuration - 1);
+  return d.toISOString().split('T')[0];
+};
+
+const dateDiffDays = (fromDate, toDate) => {
+  const from = new Date(`${fromDate}T00:00:00`);
+  const to = new Date(`${toDate}T00:00:00`);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 0;
+  return Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+};
+
+const normalizeDuration = (value) => {
+  const parsed = parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 3;
+  return Math.max(1, Math.min(30, parsed));
+};
+
+const normalizeOverdueRate = (value) => {
+  const parsed = parseFloat(value);
+  if (!Number.isFinite(parsed)) return DEFAULT_OVERDUE_RATE;
+  return Math.max(0, parsed);
+};
+
+const collectRentalSizeTerms = (orderItem) => {
+  const pricingFactors = parseMaybeJson(orderItem?.pricing_factors, {});
+  const specificData = parseMaybeJson(orderItem?.specific_data, {});
+  const fallbackStart = toDateOnly(orderItem?.rental_start_date || specificData?.rental_start_date);
+  const fallbackDuration = normalizeDuration(orderItem?.rental_duration ?? pricingFactors?.rental_duration ?? pricingFactors?.duration ?? 3);
+  const fallbackRate = normalizeOverdueRate(orderItem?.overdue_rate ?? pricingFactors?.overdue_rate ?? DEFAULT_OVERDUE_RATE);
+  const fallbackDue =
+    toDateOnly(orderItem?.due_date)
+    || toDateOnly(pricingFactors?.due_date)
+    || toDateOnly(orderItem?.rental_end_date)
+    || addRentalDays(fallbackStart, fallbackDuration);
+
+  const rows = [];
+
+  const pushTerms = (selectedSizes, startDate, fallbackLabel = 'Rental Size') => {
+    if (!Array.isArray(selectedSizes)) return;
+
+    selectedSizes.forEach((sizeEntry = {}) => {
+      const quantity = Math.max(1, parseInt(sizeEntry.quantity, 10) || 1);
+      const duration = normalizeDuration(sizeEntry.rental_duration ?? sizeEntry.duration ?? fallbackDuration);
+      const overdueRate = normalizeOverdueRate(sizeEntry.overdue_amount ?? sizeEntry.overdue_rate ?? fallbackRate);
+      const dueDate =
+        toDateOnly(sizeEntry.due_date)
+        || addRentalDays(startDate || fallbackStart, duration)
+        || fallbackDue;
+
+      rows.push({
+        label: sizeEntry.label || sizeEntry.sizeKey || sizeEntry.size_key || fallbackLabel,
+        quantity,
+        duration,
+        overdueRate,
+        dueDate
+      });
+    });
+  };
+
+  if (specificData?.is_bundle && Array.isArray(specificData.bundle_items)) {
+    specificData.bundle_items.forEach((bundleItem = {}) => {
+      const selectedSizes = bundleItem.selected_sizes || bundleItem.selectedSizes || [];
+      pushTerms(selectedSizes, bundleItem.rental_start_date || fallbackStart, bundleItem.item_name || 'Bundle Item');
+    });
+  } else {
+    const selectedSizes = specificData?.selected_sizes || specificData?.selectedSizes || [];
+    pushTerms(selectedSizes, fallbackStart, specificData?.item_name || 'Rental Size');
+  }
+
+  if (rows.length === 0 && fallbackDue) {
+    rows.push({
+      label: 'Rental',
+      quantity: 1,
+      duration: fallbackDuration,
+      overdueRate: fallbackRate,
+      dueDate: fallbackDue
+    });
+  }
+
+  return rows;
+};
+
+const calculateDynamicPenalty = (orderItem, referenceDate = new Date()) => {
+  const asOf = referenceDate.toISOString().split('T')[0];
+  const termRows = collectRentalSizeTerms(orderItem);
+
+  let penaltyAmount = 0;
+  let maxDaysOverdue = 0;
+  let primaryDueDate = null;
+
+  termRows.forEach((row) => {
+    const dueDate = toDateOnly(row.dueDate);
+    if (!dueDate) return;
+    const daysOverdue = Math.max(0, dateDiffDays(dueDate, asOf));
+    const linePenalty = daysOverdue * row.overdueRate * row.quantity;
+
+    penaltyAmount += linePenalty;
+    if (daysOverdue > maxDaysOverdue) {
+      maxDaysOverdue = daysOverdue;
+      primaryDueDate = dueDate;
+    }
+  });
+
+  return {
+    penaltyAmount: Math.max(0, parseFloat(penaltyAmount.toFixed(2))),
+    penaltyDays: maxDaysOverdue,
+    primaryDueDate: primaryDueDate || toDateOnly(orderItem?.due_date) || toDateOnly(orderItem?.rental_end_date) || null,
+    termRows
+  };
+};
+
 exports.getUserOrders = (req, res) => {
   const userId = req.user.id;
 
@@ -441,11 +577,18 @@ exports.getRepairOrders = (req, res) => {
       });
     }
 
-    const orders = results.map(item => ({
-      ...item,
-      pricing_factors: JSON.parse(item.pricing_factors || '{}'),
-      specific_data: JSON.parse(item.specific_data || '{}')
-    }));
+    const orders = results.map(item => {
+      const pricingFactors = parseMaybeJson(item.pricing_factors, {});
+      const specificData = parseMaybeJson(item.specific_data, {});
+      return {
+        ...item,
+        pricing_factors: pricingFactors,
+        specific_data: specificData,
+        rental_duration: item.rental_duration || pricingFactors.rental_duration || pricingFactors.duration || null,
+        overdue_rate: item.overdue_rate || pricingFactors.overdue_rate || null,
+        due_date: item.due_date || pricingFactors.due_date || item.rental_end_date || null
+      };
+    });
 
     res.json({
       success: true,
@@ -481,11 +624,18 @@ exports.getRepairOrdersByStatus = (req, res) => {
       });
     }
 
-    const orders = results.map(item => ({
-      ...item,
-      pricing_factors: JSON.parse(item.pricing_factors || '{}'),
-      specific_data: JSON.parse(item.specific_data || '{}')
-    }));
+    const orders = results.map(item => {
+      const pricingFactors = parseMaybeJson(item.pricing_factors, {});
+      const specificData = parseMaybeJson(item.specific_data, {});
+      return {
+        ...item,
+        pricing_factors: pricingFactors,
+        specific_data: specificData,
+        rental_duration: item.rental_duration || pricingFactors.rental_duration || pricingFactors.duration || null,
+        overdue_rate: item.overdue_rate || pricingFactors.overdue_rate || null,
+        due_date: item.due_date || pricingFactors.due_date || item.rental_end_date || null
+      };
+    });
 
     res.json({
       success: true,
@@ -1530,74 +1680,73 @@ exports.updateRentalOrderItem = (req, res) => {
 
     let penaltyAmount = 0;
     let penaltyDays = 0;
+    let penaltyDueDate = null;
     if (updateData.approvalStatus === 'returned' && previousStatus !== 'returned') {
-      const effectiveDueDate =
-        previousPaymentMode === 'flat_rate' && previousFlatRateUntilDate
-          ? previousFlatRateUntilDate
-          : item.rental_end_date;
+      const penaltySnapshot = calculateDynamicPenalty(item, new Date());
+      penaltyAmount = penaltySnapshot.penaltyAmount;
+      penaltyDays = penaltySnapshot.penaltyDays;
+      penaltyDueDate = penaltySnapshot.primaryDueDate || item.due_date || item.rental_end_date || null;
 
-      if (effectiveDueDate) {
-        const endDate = new Date(effectiveDueDate);
-        if (Number.isNaN(endDate.getTime())) {
-          console.warn(`[RENTAL PENALTY] Invalid due date for item ${itemId}: ${effectiveDueDate}`);
-        }
+      if (penaltyAmount > 0 && penaltyDays > 0) {
         const today = new Date();
-        today.setHours(0, 0, 0, 0); 
-        endDate.setHours(0, 0, 0, 0);
+        const todayDate = today.toISOString().split('T')[0];
+        console.log(
+          `[RENTAL PENALTY] Item ${itemId}: Due date: ${penaltyDueDate || 'N/A'}, Today: ${todayDate}, Days exceeded: ${penaltyDays}, Penalty: ₱${penaltyAmount}`
+        );
 
-        if (!Number.isNaN(endDate.getTime()) && today > endDate) {
-          const diffTime = today - endDate;
-          penaltyDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-          penaltyAmount = penaltyDays * 100; 
-          
-          console.log(`[RENTAL PENALTY] Item ${itemId}: Due date: ${effectiveDueDate}, Today: ${today.toISOString().split('T')[0]}, Days exceeded: ${penaltyDays}, Penalty: ₱${penaltyAmount}`);
-
-          const currentPricingFactors = item.pricing_factors ? (typeof item.pricing_factors === 'string' ? JSON.parse(item.pricing_factors) : item.pricing_factors) : {};
-          currentPricingFactors.penalty = penaltyAmount;
-          currentPricingFactors.penaltyDays = penaltyDays;
-          currentPricingFactors.penaltyAppliedDate = today.toISOString().split('T')[0];
-
-          const originalPrice = parseFloat(item.final_price || 0);
-          const newFinalPrice = originalPrice + penaltyAmount;
-          
-          updateData.finalPrice = newFinalPrice;
-          updateData.penaltyData = currentPricingFactors;
-          
-          console.log(`[RENTAL PENALTY] Original price: ₱${originalPrice}, Penalty: ₱${penaltyAmount}, New final price: ₱${newFinalPrice}`);
-
-          try {
-            const emailService = require('../services/emailService');
-            const db = require('../config/db');
-
-            const getUserSql = `SELECT u.email, u.first_name, u.last_name FROM user u JOIN orders o ON u.user_id = o.user_id WHERE o.order_id = ?`;
-            db.query(getUserSql, [item.order_id], async (userErr, userResults) => {
-              if (!userErr && userResults.length > 0) {
-                const user = userResults[0];
-                const itemName = item.specific_data ? 
-                  (typeof item.specific_data === 'string' ? JSON.parse(item.specific_data) : item.specific_data).item_name || 'Rental Item'
-                  : 'Rental Item';
-                
-                await emailService.sendPenaltyChargeEmail({
-                  userEmail: user.email,
-                  userName: `${user.first_name} ${user.last_name}`,
-                  itemName: itemName,
-                  rentalEndDate: effectiveDueDate,
-                  returnDate: new Date().toISOString().split('T')[0],
-                  daysOverdue: penaltyDays,
-                  penaltyAmount: penaltyAmount,
-                  originalPrice: originalPrice,
-                  totalAmount: newFinalPrice,
-                  itemId: itemId
-                });
-                console.log(`[RENTAL PENALTY] Penalty email sent to ${user.email}`);
-              }
-            });
-          } catch (emailErr) {
-            console.error('[RENTAL PENALTY] Error sending penalty email:', emailErr);
-          }
-        } else {
-          console.log(`[RENTAL PENALTY] Item ${itemId}: Returned on time, no penalty applied`);
+        const currentPricingFactors = item.pricing_factors
+          ? (typeof item.pricing_factors === 'string' ? JSON.parse(item.pricing_factors) : item.pricing_factors)
+          : {};
+        currentPricingFactors.penalty = penaltyAmount;
+        currentPricingFactors.penaltyDays = penaltyDays;
+        currentPricingFactors.penaltyAppliedDate = todayDate;
+        currentPricingFactors.overdue_rate = currentPricingFactors.overdue_rate || item.overdue_rate || null;
+        if (penaltyDueDate) {
+          currentPricingFactors.due_date = penaltyDueDate;
         }
+
+        const originalPrice = parseFloat(item.final_price || 0);
+        const newFinalPrice = originalPrice + penaltyAmount;
+
+        updateData.finalPrice = newFinalPrice;
+        updateData.penaltyData = currentPricingFactors;
+
+        console.log(
+          `[RENTAL PENALTY] Original price: ₱${originalPrice}, Penalty: ₱${penaltyAmount}, New final price: ₱${newFinalPrice}`
+        );
+
+        try {
+          const emailService = require('../services/emailService');
+          const db = require('../config/db');
+
+          const getUserSql = `SELECT u.email, u.first_name, u.last_name FROM user u JOIN orders o ON u.user_id = o.user_id WHERE o.order_id = ?`;
+          db.query(getUserSql, [item.order_id], async (userErr, userResults) => {
+            if (!userErr && userResults.length > 0) {
+              const user = userResults[0];
+              const itemName = item.specific_data
+                ? (typeof item.specific_data === 'string' ? JSON.parse(item.specific_data) : item.specific_data).item_name || 'Rental Item'
+                : 'Rental Item';
+
+              await emailService.sendPenaltyChargeEmail({
+                userEmail: user.email,
+                userName: `${user.first_name} ${user.last_name}`,
+                itemName: itemName,
+                rentalEndDate: penaltyDueDate,
+                returnDate: todayDate,
+                daysOverdue: penaltyDays,
+                penaltyAmount: penaltyAmount,
+                originalPrice: originalPrice,
+                totalAmount: newFinalPrice,
+                itemId: itemId
+              });
+              console.log(`[RENTAL PENALTY] Penalty email sent to ${user.email}`);
+            }
+          });
+        } catch (emailErr) {
+          console.error('[RENTAL PENALTY] Error sending penalty email:', emailErr);
+        }
+      } else {
+        console.log(`[RENTAL PENALTY] Item ${itemId}: Returned on time, no penalty applied`);
       }
     }
 
@@ -2118,7 +2267,7 @@ exports.updateRentalOrderItem = (req, res) => {
 
 exports.recordRentalPayment = (req, res) => {
   const itemId = req.params.id;
-  const { paymentAmount, cashReceived, paymentMethod } = req.body;
+  const { paymentAmount, cashReceived, paymentMethod, paymentKind } = req.body;
 
   if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
     return res.status(403).json({
@@ -2186,26 +2335,46 @@ exports.recordRentalPayment = (req, res) => {
       return total + (quantity * deposit);
     }, 0);
     const depositAmount = depositFromSizes > 0 ? depositFromSizes : parseFloat(pricingFactors.downpayment || specificData.downpayment || 0);
-    
-    const totalPaymentRequired = finalPrice + depositAmount;
+
+    const basePaymentRequired = finalPrice + depositAmount;
+    const serviceType = (item.service_type || '').toLowerCase().trim();
+    const penaltySnapshot = serviceType === 'rental' ? calculateDynamicPenalty(item, new Date()) : { penaltyAmount: 0 };
+    const totalOverdueDueNow = Math.max(0, parseFloat(penaltySnapshot.penaltyAmount || 0));
+    const overduePaidSoFar = Math.max(0, parseFloat(pricingFactors.overdue_paid || 0));
+    const outstandingOverdue = Math.max(0, totalOverdueDueNow - overduePaidSoFar);
+    const totalPaymentRequired = basePaymentRequired + outstandingOverdue;
+    const isOverduePayment = String(paymentKind || '').toLowerCase().trim() === 'overdue';
+
     const newAmountPaid = currentAmountPaid + amount;
+    const baseOutstandingBeforePayment = Math.max(0, basePaymentRequired - currentAmountPaid);
+    const paymentTowardOverdue = Math.max(0, amount - baseOutstandingBeforePayment);
+    const updatedOverduePaid = Math.min(totalOverdueDueNow, overduePaidSoFar + paymentTowardOverdue);
+    const overdueRemaining = Math.max(0, totalOverdueDueNow - updatedOverduePaid);
     const remainingBalance = totalPaymentRequired - newAmountPaid;
     const changeAmount = cashTendered - amount;
 
-    if (newAmountPaid > totalPaymentRequired) {
+    if (!isOverduePayment && newAmountPaid > totalPaymentRequired) {
       return res.status(400).json({
         success: false,
-        message: `Payment amount exceeds total payment required. Rental: ₱${finalPrice.toFixed(2)}, Deposit: ₱${depositAmount.toFixed(2)}, Total: ₱${totalPaymentRequired.toFixed(2)}, Already paid: ₱${currentAmountPaid.toFixed(2)}, Remaining: ₱${(totalPaymentRequired - currentAmountPaid).toFixed(2)}`
+        message: `Payment amount exceeds total payment required. Rental: ₱${finalPrice.toFixed(2)}, Deposit: ₱${depositAmount.toFixed(2)}, Overdue Due: ₱${outstandingOverdue.toFixed(2)}, Total: ₱${totalPaymentRequired.toFixed(2)}, Already paid: ₱${currentAmountPaid.toFixed(2)}, Remaining: ₱${(totalPaymentRequired - currentAmountPaid).toFixed(2)}`
       });
     }
 
     pricingFactors.amount_paid = newAmountPaid.toString();
-    pricingFactors.remaining_balance = remainingBalance.toString();
+    pricingFactors.remaining_balance = Math.max(0, remainingBalance).toString();
+    if (serviceType === 'rental') {
+      pricingFactors.overdue_total_due = totalOverdueDueNow.toString();
+      pricingFactors.overdue_paid = updatedOverduePaid.toString();
+      pricingFactors.overdue_remaining = overdueRemaining.toString();
+      pricingFactors.penalty = totalOverdueDueNow;
+      pricingFactors.penaltyDays = penaltySnapshot.penaltyDays || 0;
+      pricingFactors.penaltyDueDate = penaltySnapshot.primaryDueDate || null;
+      pricingFactors.penaltyLastUpdatedAt = new Date().toISOString();
+    }
 
     let newPaymentStatus = item.payment_status || 'unpaid';
-    const serviceType = (item.service_type || '').toLowerCase().trim();
     
-    if (newAmountPaid >= totalPaymentRequired) {
+    if (newAmountPaid >= totalPaymentRequired || isOverduePayment) {
       newPaymentStatus = serviceType === 'rental' ? 'fully_paid' : 'paid';
     } else if (newAmountPaid > 0) {
       if (serviceType === 'rental') {

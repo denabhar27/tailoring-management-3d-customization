@@ -751,7 +751,9 @@ const Profile = () => {
                       bundleItem.front_image && { url: bundleItem.front_image, label: 'Front' },
                       bundleItem.back_image && { url: bundleItem.back_image, label: 'Back' },
                       bundleItem.side_image && { url: bundleItem.side_image, label: 'Side' },
-                      bundleItem.image_url && bundleItem.image_url !== 'no-image' && { url: bundleItem.image_url, label: 'Main' }
+                      bundleItem.image_url && bundleItem.image_url !== 'no-image' && { url: bundleItem.image_url, label: 'Main' },
+                      bundleItem.imageUrl && bundleItem.imageUrl !== 'no-image' && { url: bundleItem.imageUrl, label: 'Main' },
+                      bundleItem.img && { url: bundleItem.img, label: 'Main' }
                     ].filter(Boolean);
 
                     return (
@@ -783,7 +785,9 @@ const Profile = () => {
                   specific_data.front_image && { url: specific_data.front_image, label: 'Front' },
                   specific_data.back_image && { url: specific_data.back_image, label: 'Back' },
                   specific_data.side_image && { url: specific_data.side_image, label: 'Side' },
-                  specific_data.image_url && specific_data.image_url !== 'no-image' && { url: specific_data.image_url, label: 'Main' }
+                  specific_data.image_url && specific_data.image_url !== 'no-image' && { url: specific_data.image_url, label: 'Main' },
+                  specific_data.imageUrl && specific_data.imageUrl !== 'no-image' && { url: specific_data.imageUrl, label: 'Main' },
+                  specific_data.img && { url: specific_data.img, label: 'Main' }
                 ].filter(Boolean);
 
                 if (singleItemImages.length > 0) {

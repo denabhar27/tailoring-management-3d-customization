@@ -84,6 +84,10 @@ const createDefaultSizeEntry = (sizeKey, extraId = '') => ({
 
   deposit: '',
 
+  rental_duration: '3',
+
+  overdue_amount: '50.00',
+
   activeTab: 'top',
 
   isOpen: false,
@@ -145,6 +149,10 @@ const parseSizeEntriesFromPayload = (rawSize) => {
           price: entry.price !== undefined ? String(entry.price) : '',
 
           deposit: entry.deposit !== undefined ? String(entry.deposit) : '',
+
+          rental_duration: entry.rental_duration !== undefined ? String(entry.rental_duration) : '3',
+
+          overdue_amount: entry.overdue_amount !== undefined ? String(entry.overdue_amount) : '50.00',
 
           activeTab: 'top',
 
@@ -219,6 +227,10 @@ const parseSizeEntriesFromPayload = (rawSize) => {
         price: opt.price !== undefined ? String(opt.price) : '',
 
         deposit: opt.deposit !== undefined ? String(opt.deposit) : '',
+
+        rental_duration: opt.rental_duration !== undefined ? String(opt.rental_duration) : '3',
+
+        overdue_amount: opt.overdue_amount !== undefined ? String(opt.overdue_amount) : '50.00',
 
         activeTab: 'top',
 
@@ -1199,6 +1211,16 @@ const PostRent = () => {
         validationErrors.push(`Size row ${rowNo}: deposit cannot be greater than price.`);
       }
 
+      const parsedRentalDuration = parseInt(entry.rental_duration, 10);
+      if (!Number.isInteger(parsedRentalDuration) || parsedRentalDuration < 1 || parsedRentalDuration > 30) {
+        validationErrors.push(`Size row ${rowNo}: duration must be a whole number between 1 and 30 days.`);
+      }
+
+      const parsedOverdueAmount = parseFloat(entry.overdue_amount);
+      if (!Number.isFinite(parsedOverdueAmount) || parsedOverdueAmount < 0) {
+        validationErrors.push(`Size row ${rowNo}: overdue amount must be 0 or greater.`);
+      }
+
       const isFieldFilled = (meas) => {
         const inchVal = String(meas?.inch ?? '').trim();
         const cmVal = String(meas?.cm ?? '').trim();
@@ -1284,6 +1306,10 @@ const PostRent = () => {
 
       deposit: parseFloat(entry.deposit) || 0,
 
+      rental_duration: Math.max(1, Math.min(30, parseInt(entry.rental_duration, 10) || 3)),
+
+      overdue_amount: Math.max(0, parseFloat(entry.overdue_amount) || 0),
+
       measurements: entry.measurements || {}
 
     }));
@@ -1298,7 +1324,13 @@ const PostRent = () => {
 
       const key = entry.sizeKey !== 'custom' ? entry.sizeKey : null;
 
-      if (key) normalizedSizeOptions[key] = { quantity: Math.max(0, parseInt(entry.quantity, 10) || 0) };
+      if (key) {
+        normalizedSizeOptions[key] = {
+          quantity: Math.max(0, parseInt(entry.quantity, 10) || 0),
+          rental_duration: Math.max(1, Math.min(30, parseInt(entry.rental_duration, 10) || 3)),
+          overdue_amount: Math.max(0, parseFloat(entry.overdue_amount) || 0)
+        };
+      }
 
     });
 
@@ -1986,7 +2018,7 @@ const PostRent = () => {
 
                     <p style={{ fontSize: '12px', color: '#666', marginTop: 0, marginBottom: '14px' }}>
 
-                      Set quantity per size. Expand a size row to add its garment measurements.
+                      Set quantity, pricing, and billing cycle duration per size. Expand a size row to add its garment measurements.
 
                     </p>
 
@@ -2000,7 +2032,7 @@ const PostRent = () => {
 
                         <div style={{
 
-                          display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px',
+                          display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', rowGap: '8px', padding: '10px 14px',
 
                           backgroundColor: entry.isOpen ? '#f0f7ff' : (idx % 2 === 0 ? '#fff' : '#fafafa')
 
@@ -2090,6 +2122,50 @@ const PostRent = () => {
 
                           />
 
+                          <label style={{ fontSize: '12px', color: '#555', whiteSpace: 'nowrap', marginLeft: '10px' }}>Duration:</label>
+
+                          <input
+
+                            type="number"
+
+                            min="1"
+
+                            max="30"
+
+                            value={entry.rental_duration || ''}
+
+                            onChange={(e) => handleEntryChange(entry.id, 'rental_duration', e.target.value)}
+
+                            placeholder="3"
+
+                            style={{ width: '70px', padding: '6px 8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000', fontSize: '13px' }}
+
+                          />
+
+                          <span style={{ fontSize: '10px', color: '#888', marginLeft: '2px' }}>days</span>
+
+                          <label style={{ fontSize: '12px', color: '#555', whiteSpace: 'nowrap', marginLeft: '10px' }}>Overdue:</label>
+
+                          <input
+
+                            type="number"
+
+                            min="0"
+
+                            step="0.01"
+
+                            value={entry.overdue_amount || ''}
+
+                            onChange={(e) => handleEntryChange(entry.id, 'overdue_amount', e.target.value)}
+
+                            placeholder="50.00"
+
+                            style={{ width: '80px', padding: '6px 8px', border: '1px solid #ddd', borderRadius: '4px', color: '#000', fontSize: '13px' }}
+
+                          />
+
+                          <span style={{ fontSize: '10px', color: '#888', marginLeft: '2px' }}>/day</span>
+
                           <button
 
                             type="button"
@@ -2098,7 +2174,7 @@ const PostRent = () => {
 
                             style={{
 
-                              marginLeft: 'auto', padding: '5px 14px', fontSize: '12px', whiteSpace: 'nowrap',
+                              marginLeft: 'auto', padding: '5px 14px', fontSize: '12px', whiteSpace: 'nowrap', flexShrink: 0,
 
                               border: `1px solid ${entry.isOpen ? '#8B4513' : '#A56A3F'}`, borderRadius: '14px',
 

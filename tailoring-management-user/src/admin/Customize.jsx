@@ -724,6 +724,16 @@ const Customize = () => {
     return null;
   };
 
+  const getPreferredCompletionDate = (item) => {
+    const specificData = parseMaybeObject(item?.specific_data);
+    return specificData?.preferredDate
+      || specificData?.preferred_date
+      || specificData?.appointmentDate
+      || specificData?.appointment_date
+      || item?.preferred_date
+      || '';
+  };
+
   const isTodayAppointment = (item) => getComputedStatus(item) === 'appointment-today';
 
   const getNextStatusLabel = (currentStatus, serviceType = 'customization', item = null) => {
@@ -3021,6 +3031,11 @@ const Customize = () => {
 
   const handleSaveEstimatedCompletionDateFromDetails = async () => {
     if (!selectedOrder) return;
+    const preferredDate = getPreferredCompletionDate(selectedOrder);
+    if (preferredDate && detailEstimatedCompletionDate && new Date(detailEstimatedCompletionDate) < new Date(preferredDate)) {
+      showToast('Estimated completion date cannot be earlier than the customer\'s preferred date.', 'error');
+      return;
+    }
     try {
       setSavingEstimatedDate(true);
       const result = await updateCustomizationOrderItem(selectedOrder.item_id, {
@@ -4139,12 +4154,12 @@ const Customize = () => {
                                 minHeight: '30px'
                               }}
                             >
-                              {isCollapsed ? '▶' : '▼'} ORD#{parentOrderId}
+                              {isCollapsed ? '▶' : '▼'} ORD#{parentOrderId} ({parentItemCount} child orders)
                             </button>
                           </td>
                         </tr>
                       )}
-                      {(!isAddAnotherGroup || !isCollapsed) && (
+                      {(!isAddAnotherGroup || !isCollapsed || isFirstInParent) && (
                     <tr className="clickable-row" onClick={() => handleViewDetails(item)}>
 
                       <td>
@@ -4667,6 +4682,7 @@ const Customize = () => {
                 <label>New Estimated Completion Date</label>
                 <input
                   type="date"
+                  min={getPreferredCompletionDate(selectedOrder) || ''}
                   value={enhanceForm.estimatedCompletionDate}
                   onChange={(e) => setEnhanceForm({ ...enhanceForm, estimatedCompletionDate: e.target.value })}
                   style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }}
@@ -4897,6 +4913,7 @@ const Customize = () => {
                   <label>Estimated Completion Date</label>
                   <input
                     type="date"
+                    min={getPreferredCompletionDate(selectedOrder) || ''}
                     value={editForm.pricingFactors?.estimatedCompletionDate || editForm.pricingFactors?.estimated_completion_date || ''}
                     onChange={(e) => {
                       const value = e.target.value;
@@ -5096,6 +5113,7 @@ const Customize = () => {
                   <strong>Estimated Completion Date:</strong>
                   <input
                     type="date"
+                    min={getPreferredCompletionDate(selectedOrder) || ''}
                     value={detailEstimatedCompletionDate || ''}
                     onChange={(e) => setDetailEstimatedCompletionDate(e.target.value)}
                     style={{ padding: '6px 8px', border: '1px solid #ddd', borderRadius: '4px' }}

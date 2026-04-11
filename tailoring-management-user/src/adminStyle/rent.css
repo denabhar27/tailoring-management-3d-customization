@@ -1282,7 +1282,6 @@ tbody tr.clickable-row:active {
   background: #e8f5e9;
   color: #2e7d32;
 }
-  transform: scale(0.92) translateY(-2px);
 .icon-btn.accept:hover {
   background: #c8e6c9;
 }
@@ -1443,4 +1442,10 @@ tbody tr.clickable-row:active {
   font-size: 12px;
   font-weight: 600;
   text-transform: none;
+}
+
+.rental-page .status-badge.unreturned {
+  background: #ffebee !important;
+  color: #c62828 !important;
+  border: 1px solid #ef9a9a !important;
 }

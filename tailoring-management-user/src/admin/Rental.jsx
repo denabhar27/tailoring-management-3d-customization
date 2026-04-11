@@ -33,6 +33,7 @@ function Rental() {
   const [statusFilter, setStatusFilter] = useState('');
 
   const [viewFilter, setViewFilter] = useState('all');
+  const [collapsedParentOrders, setCollapsedParentOrders] = useState({});
 
   const [showDetailModal, setShowDetailModal] = useState(false);
 
@@ -59,6 +60,8 @@ function Rental() {
   const [paymentAmount, setPaymentAmount] = useState('');
 
   const [cashReceived, setCashReceived] = useState('');
+
+  const [paymentModalMode, setPaymentModalMode] = useState('regular');
 
   const [requiredPaymentAmount, setRequiredPaymentAmount] = useState(0);
 
@@ -100,6 +103,85 @@ function Rental() {
     }
   };
 
+  const toDateOnly = (value) => {
+    if (!value) return null;
+    const raw = String(value).trim();
+    const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : null;
+  };
+
+  const getRentalSelectedSizes = (rental) => {
+    const specificData = rental?.specific_data || {};
+    if (specificData?.is_bundle && Array.isArray(specificData.bundle_items)) {
+      return specificData.bundle_items.flatMap((bundleItem) => bundleItem.selected_sizes || bundleItem.selectedSizes || []);
+    }
+    return specificData?.selected_sizes || specificData?.selectedSizes || [];
+  };
+
+  const getRentalPenaltySnapshot = (rental) => {
+    const pricingFactors = parsePricingFactors(rental?.pricing_factors);
+    const selectedSizes = getRentalSelectedSizes(rental);
+
+    const fallbackDueDate =
+      toDateOnly(rental?.due_date)
+      || toDateOnly(pricingFactors?.due_date)
+      || toDateOnly(rental?.rental_end_date)
+      || null;
+
+    const fallbackRate = Math.max(0, parseFloat(rental?.overdue_rate || pricingFactors?.overdue_rate || 50) || 0);
+
+    const rows = selectedSizes.length > 0
+      ? selectedSizes.map((size) => ({
+          dueDate: toDateOnly(size?.due_date) || fallbackDueDate,
+          rate: Math.max(0, parseFloat(size?.overdue_amount ?? size?.overdue_rate ?? fallbackRate) || 0),
+          quantity: Math.max(1, parseInt(size?.quantity, 10) || 1)
+        }))
+      : [{ dueDate: fallbackDueDate, rate: fallbackRate, quantity: 1 }];
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let nearestDueDiff = Number.POSITIVE_INFINITY;
+    let maxDaysOverdue = 0;
+    let totalPenalty = 0;
+    let maxRate = fallbackRate;
+    let nearestDueDate = fallbackDueDate;
+
+    rows.forEach((row) => {
+      if (!row.dueDate) return;
+      const dueDate = new Date(`${row.dueDate}T00:00:00`);
+      if (Number.isNaN(dueDate.getTime())) return;
+
+      const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const daysOverdue = Math.max(0, Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const linePenalty = daysOverdue * row.rate * row.quantity;
+
+      if (daysUntilDue < nearestDueDiff) {
+        nearestDueDiff = daysUntilDue;
+        nearestDueDate = row.dueDate;
+      }
+
+      if (daysOverdue > maxDaysOverdue) {
+        maxDaysOverdue = daysOverdue;
+      }
+
+      if (row.rate > maxRate) {
+        maxRate = row.rate;
+      }
+
+      totalPenalty += linePenalty;
+    });
+
+    return {
+      dueDate: nearestDueDate,
+      daysUntilDue: Number.isFinite(nearestDueDiff) ? nearestDueDiff : null,
+      daysOverdue: maxDaysOverdue,
+      overdueRate: maxRate,
+      totalPenalty: Math.max(0, parseFloat(totalPenalty.toFixed(2))),
+      fallbackRate
+    };
+  };
+
   const calcDepositFromRental = (rental) => {
     const pricingFactors = parsePricingFactors(rental?.pricing_factors);
     const isBundle = rental?.specific_data?.is_bundle || pricingFactors?.is_bundle;
@@ -130,6 +212,18 @@ function Rental() {
       totalPayment,
       requiredDepositNow: Math.max(0, depositAmount - amountPaid),
       remainingBalance: Math.max(0, totalPayment - amountPaid)
+    };
+  };
+
+  const getRentalOverdueOutstanding = (rental) => {
+    const paymentSnapshot = getRentalPaymentSnapshot(rental);
+    const penaltySnapshot = getRentalPenaltySnapshot(rental);
+    const overdueCollected = Math.max(0, paymentSnapshot.amountPaid - paymentSnapshot.totalPayment);
+    const overdueDueNow = Math.max(0, (penaltySnapshot.totalPenalty || 0) - overdueCollected);
+    return {
+      overdueDueNow,
+      penaltySnapshot,
+      paymentSnapshot
     };
   };
 
@@ -203,6 +297,7 @@ function Rental() {
     setCashReceived('');
     setRequiredPaymentAmount(0);
     setPendingRentedStatus(null);
+    setPaymentModalMode('regular');
   };
 
   const closeDepositReturnModal = () => {
@@ -832,6 +927,30 @@ function Rental() {
     return Number(b.item_id || 0) - Number(a.item_id || 0);
   });
 
+  const rentalsForTable = [...filteredRentals].sort((a, b) => {
+    const orderDiff = Number(b.order_id || 0) - Number(a.order_id || 0);
+    if (orderDiff !== 0) return orderDiff;
+    const activityDiff = getRentalActivityTimestamp(b) - getRentalActivityTimestamp(a);
+    if (activityDiff !== 0) return activityDiff;
+    return Number(b.item_id || 0) - Number(a.item_id || 0);
+  });
+
+  const orderCountsByParent = rentalsForTable.reduce((acc, rental) => {
+    const key = String(rental?.order_id || '');
+    if (!key) return acc;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const toggleParentOrderCollapse = (orderId) => {
+    const key = String(orderId || '');
+    if (!key) return;
+    setCollapsedParentOrders((prev) => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
 
 
   const handleAccept = async (rental) => {
@@ -1013,6 +1132,7 @@ function Rental() {
           const paymentSnapshot = getRentalPaymentSnapshot(updatedRental);
           if (paymentSnapshot.totalPayment > 0) {
             setSelectedRental(updatedRental);
+            setPaymentModalMode('regular');
             setPaymentAmount(paymentSnapshot.totalPayment.toFixed(2));
             setCashReceived('');
             setRequiredPaymentAmount(paymentSnapshot.totalPayment);
@@ -1435,6 +1555,8 @@ function Rental() {
 
           setShowEditModal(false);
 
+          setPaymentModalMode('regular');
+
           setPaymentAmount(paymentSnapshot.totalPayment.toFixed(2));
 
           setCashReceived('');
@@ -1558,6 +1680,8 @@ function Rental() {
 
 
           setSelectedRental(currentRental);
+
+          setPaymentModalMode('regular');
 
           setPaymentAmount(paymentSnapshot.totalPayment.toFixed(2));
 
@@ -1887,13 +2011,22 @@ function Rental() {
 
     try {
 
-      const result = await recordRentalPayment(selectedRental.item_id, amount, cashGiven, 'cash');
+      const result = await recordRentalPayment(
+        selectedRental.item_id,
+        amount,
+        cashGiven,
+        'cash',
+        paymentModalMode === 'overdue' ? 'overdue' : 'regular'
+      );
 
       if (result.success) {
 
         const changeAmount = parseFloat(result.payment?.change_amount || 0);
+        const isOverduePayment = paymentModalMode === 'overdue';
+        const paymentLabel = isOverduePayment ? 'Overdue payment' : 'Payment';
+        const remainingLabel = isOverduePayment ? 'Remaining overdue balance' : 'Remaining balance';
 
-        await alert(`Payment of ₱${amount.toFixed(2)} recorded successfully. Change: ₱${changeAmount.toFixed(2)}. Remaining balance: ₱${result.payment.remaining_balance.toFixed(2)}`, 'Success', 'success');
+        await alert(`${paymentLabel} of ₱${amount.toFixed(2)} recorded successfully. Change: ₱${changeAmount.toFixed(2)}. ${remainingLabel}: ₱${result.payment.remaining_balance.toFixed(2)}`, 'Success', 'success');
 
         setShowPaymentModal(false);
 
@@ -1902,6 +2035,8 @@ function Rental() {
         setCashReceived('');
 
         setRequiredPaymentAmount(0);
+
+        setPaymentModalMode('regular');
 
 
 
@@ -2022,6 +2157,8 @@ function Rental() {
 
       'rented': 'rented',
 
+      'unreturned': 'unreturned',
+
       'returned': 'returned',
 
       'completed': 'completed',
@@ -2065,6 +2202,8 @@ function Rental() {
       'picked_up': 'Picked Up',
 
       'rented': 'Rented',
+
+      'unreturned': 'Unreturned',
 
       'returned': 'Returned',
 
@@ -2410,7 +2549,7 @@ function Rental() {
 
               <tbody>
 
-                {filteredRentals.length === 0 ? (
+                {rentalsForTable.length === 0 ? (
 
                   <tr>
 
@@ -2424,7 +2563,13 @@ function Rental() {
 
                 ) : (
 
-                  filteredRentals.map(rental => {
+                  rentalsForTable.map((rental, index) => {
+
+                    const parentOrderId = String(rental?.order_id || '');
+                    const hasChildOrders = (orderCountsByParent[parentOrderId] || 0) > 1;
+                    const isFirstInParent = index === 0 || String(rentalsForTable[index - 1]?.order_id || '') !== parentOrderId;
+                    const isCollapsed = hasChildOrders && !!collapsedParentOrders[parentOrderId];
+                    const shouldHideChildRow = hasChildOrders && isCollapsed && !isFirstInParent;
 
                     const isPending = rental.approval_status === 'pending' || rental.approval_status === 'pending_review';
 
@@ -2443,13 +2588,67 @@ function Rental() {
 
                     const finalPrice = parseFloat(rental.final_price || 0);
 
+                    const rentalPenaltySnapshot = getRentalPenaltySnapshot(rental);
+
+                    const effectiveDueDate = rentalPenaltySnapshot.dueDate || rental.rental_end_date || null;
+                    const basePaymentRequired = finalPrice + calcDepositFromRental(rental);
+                    const derivedOverduePaidAmount = Math.max(0, amountPaid - basePaymentRequired);
+                    const overduePaidAmount = Math.max(
+                      0,
+                      parseFloat(pricingFactors.overdue_paid || derivedOverduePaidAmount)
+                    );
+                    const overdueTotalDue = Math.max(
+                      0,
+                      parseFloat(pricingFactors.overdue_total_due || rentalPenaltySnapshot.totalPenalty || derivedOverduePaidAmount)
+                    );
+                    const overdueIsSettled = overdueTotalDue > 0 && overduePaidAmount >= overdueTotalDue;
+
+                    const isOverdueNow =
+                      (rental.approval_status === 'rented' || rental.approval_status === 'picked_up')
+                      && rentalPenaltySnapshot.daysUntilDue !== null
+                      && rentalPenaltySnapshot.daysUntilDue < 0;
+
+                    const statusToDisplay = isOverdueNow ? 'unreturned' : (rental.approval_status || 'pending');
+
                     const remainingBalance = finalPrice - amountPaid;
 
 
 
                     return (
 
-                      <tr key={rental.item_id} className="clickable-row" onClick={() => handleViewDetails(rental)}>
+                      <React.Fragment key={`rental-row-${rental.item_id}`}>
+                        {isFirstInParent && hasChildOrders && (
+                          <tr>
+                            <td colSpan="8" style={{ backgroundColor: '#f7f2ef', fontWeight: 700, color: '#5D4037' }}>
+                              <button
+                                type="button"
+                                onClick={() => toggleParentOrderCollapse(parentOrderId)}
+                                style={{
+                                  border: 'none',
+                                  background: 'transparent',
+                                  cursor: 'pointer',
+                                  color: '#5D4037',
+                                  fontWeight: 700,
+                                  fontSize: '13px',
+                                  lineHeight: 1.2,
+                                  padding: '6px 10px',
+                                  borderRadius: '8px',
+                                  textTransform: 'none',
+                                  letterSpacing: 'normal',
+                                  boxShadow: 'none',
+                                  minHeight: '30px',
+                                  textAlign: 'left'
+                                }}
+                              >
+                                {isCollapsed ? '▶' : '▼'} ORD#{parentOrderId} ({orderCountsByParent[parentOrderId]} child orders)
+                              </button>
+                            </td>
+                          </tr>
+                        )}
+
+                        {!shouldHideChildRow && (
+
+                      <tr className="clickable-row" onClick={() => handleViewDetails(rental)}>
 
                         <td><strong>ORD-{rental.order_id}</strong></td>
 
@@ -2495,31 +2694,25 @@ function Rental() {
 
                         <td>
 
-                          {rental.rental_start_date && rental.rental_end_date ? (
+                          {rental.rental_start_date && effectiveDueDate ? (
 
                             <>
 
-                              <div>{rental.rental_start_date} to {rental.rental_end_date}</div>
+                              <div>{rental.rental_start_date} to {effectiveDueDate}</div>
 
-                              {(rental.approval_status === 'rented' || rental.approval_status === 'picked_up') && (() => {
+                              {(() => {
 
-                                const today = new Date();
+                                const diffDays = rentalPenaltySnapshot.daysUntilDue;
 
-                                today.setHours(0, 0, 0, 0);
+                                if (diffDays === null) return null;
 
-                                const endDate = new Date(rental.rental_end_date);
+                                const hasOverdueLabel = diffDays < 0 || overdueIsSettled || overdueTotalDue > 0;
+                                if (!hasOverdueLabel) return null;
 
-                                endDate.setHours(0, 0, 0, 0);
-
-                                const diffTime = endDate - today;
-
-                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-
-
-                                if (diffDays < 0) {
-
-                                  const daysOverdue = Math.abs(diffDays);
+                                if (overdueIsSettled) {
+                                  const settledPenaltyPreview = rentalPenaltySnapshot.totalPenalty > 0
+                                    ? rentalPenaltySnapshot.totalPenalty
+                                    : overdueTotalDue;
 
                                   return (
 
@@ -2541,13 +2734,71 @@ function Rental() {
 
                                     }}>
 
-                                      🚨 {daysOverdue}d OVERDUE (₱{daysOverdue * 100})
+                                      <span style={{ textDecoration: 'line-through' }}>
+                                        🚨 OVERDUE (₱{settledPenaltyPreview.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })})
+                                      </span>
+                                      <span style={{ marginLeft: '6px', fontWeight: '700', color: '#2e7d32' }}>
+                                        paid
+                                      </span>
+
+                                    </div>
+
+                                  );
+                                }
+
+                                const overdueStatusNote = rental.approval_status === 'returned' ? 'unpaid' : '';
+
+
+
+                                if (diffDays < 0) {
+
+                                  const daysOverdue = Math.abs(diffDays);
+
+                                  const penaltyPreview = rentalPenaltySnapshot.totalPenalty > 0
+
+                                    ? rentalPenaltySnapshot.totalPenalty
+
+                                    : (daysOverdue * (rentalPenaltySnapshot.overdueRate || 50));
+
+                                  return (
+
+                                    <div style={{
+
+                                      backgroundColor: '#f8d7da',
+
+                                      color: '#721c24',
+
+                                      fontSize: '11px',
+
+                                      padding: '4px 8px',
+
+                                      borderRadius: '4px',
+
+                                      marginTop: '4px',
+
+                                      fontWeight: '600'
+
+                                    }}>
+
+                                      <span style={{ textDecoration: overdueIsSettled ? 'line-through' : 'none' }}>
+                                        🚨 {daysOverdue}d OVERDUE (₱{penaltyPreview.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })})
+                                      </span>
+                                      {overdueStatusNote && (
+                                        <span style={{ marginLeft: '6px', fontWeight: '700', color: '#c62828' }}>
+                                          {overdueStatusNote}
+                                        </span>
+                                      )}
+                                      {overdueIsSettled && (
+                                        <span style={{ marginLeft: '6px', fontWeight: '700', color: '#2e7d32' }}>
+                                          paid
+                                        </span>
+                                      )}
 
                                     </div>
 
                                   );
 
-                                } else if (diffDays === 0) {
+                                } else if (diffDays === 0 && !overdueIsSettled) {
 
                                   return (
 
@@ -2575,7 +2826,7 @@ function Rental() {
 
                                   );
 
-                                } else if (diffDays <= 3) {
+                                } else if (diffDays <= 3 && !overdueIsSettled && rental.approval_status !== 'returned') {
 
                                   return (
 
@@ -2669,7 +2920,7 @@ function Rental() {
 
                           <span
 
-                            className={`status-badge ${getStatusClass(rental.approval_status || 'pending')}`}
+                            className={`status-badge ${getStatusClass(statusToDisplay)}`}
 
                             style={{
 
@@ -2687,7 +2938,7 @@ function Rental() {
 
                           >
 
-                            {getStatusLabel(rental.approval_status || 'pending')}
+                            {getStatusLabel(statusToDisplay)}
 
                           </span>
 
@@ -2959,10 +3210,19 @@ function Rental() {
                                       setSelectedRental(rental);
 
                                       const paymentSnapshot = getRentalPaymentSnapshot(rental);
+                                      const overdueSnapshot = getRentalOverdueOutstanding(rental);
+                                      const isOverduePayment = statusToDisplay === 'unreturned';
+                                      const initialAmount = isOverduePayment
+                                        ? overdueSnapshot.overdueDueNow
+                                        : paymentSnapshot.totalPayment;
 
-                                      setPaymentAmount(paymentSnapshot.totalPayment > 0 ? paymentSnapshot.totalPayment.toFixed(2) : '');
+                                      setPaymentModalMode(isOverduePayment ? 'overdue' : 'regular');
 
-                                      setRequiredPaymentAmount(paymentSnapshot.totalPayment);
+                                      setPaymentAmount(initialAmount > 0 ? initialAmount.toFixed(2) : '');
+
+                                      setRequiredPaymentAmount(isOverduePayment ? 0 : paymentSnapshot.totalPayment);
+
+                                      setPendingRentedStatus(null);
 
                                       setCashReceived('');
 
@@ -2970,11 +3230,11 @@ function Rental() {
 
                                     }}
 
-                                    title="Record Payment"
+                                    title={statusToDisplay === 'unreturned' ? 'Overdue Payment' : 'Record Payment'}
 
                                     style={{
 
-                                      backgroundColor: '#2196F3',
+                                      backgroundColor: statusToDisplay === 'unreturned' ? '#ef6c00' : '#2196F3',
 
                                       color: 'white'
 
@@ -3023,6 +3283,10 @@ function Rental() {
                         </td>
 
                       </tr>
+
+                        )}
+
+                      </React.Fragment>
 
                     );
 
@@ -3660,7 +3924,7 @@ function Rental() {
 
             <div className="modal-header">
 
-              <h2>Record Payment</h2>
+              <h2>{paymentModalMode === 'overdue' ? 'Overdue Payment' : 'Record Payment'}</h2>
 
               <span className="close-modal" onClick={closePaymentModal}>×</span>
 
@@ -3736,6 +4000,18 @@ function Rental() {
 
               </div>
 
+              {paymentModalMode === 'overdue' && (() => {
+                const overdueSnapshot = getRentalOverdueOutstanding(selectedRental);
+                return (
+                  <div className="detail-row" style={{ borderTop: '1px dashed #d7ccc8', paddingTop: '8px', marginTop: '8px' }}>
+                    <strong>Current Overdue Due:</strong>
+                    <span style={{ color: '#b71c1c', fontWeight: 'bold' }}>
+                      ₱{Math.max(0, overdueSnapshot.overdueDueNow).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                );
+              })()}
+
               {pendingRentedStatus && (
                 <div className="detail-row" style={{ borderTop: '1px dashed #d7ccc8', paddingTop: '8px', marginTop: '8px' }}>
                   <strong>Required Deposit To Proceed:</strong>
@@ -3749,7 +4025,7 @@ function Rental() {
 
               <div className="payment-form-group">
 
-                <label>Payment Amount *</label>
+                <label>{paymentModalMode === 'overdue' ? 'Overdue Amount *' : 'Payment Amount *'}</label>
 
                 <input
 
@@ -3773,7 +4049,11 @@ function Rental() {
 
                 <small style={{ color: '#666', marginTop: '5px', display: 'block' }}>
 
-                  {pendingRentedStatus ? 'Enter the deposit amount to collect before marking as rented' : 'Enter the amount the customer is paying now'}
+                  {pendingRentedStatus
+                    ? 'Enter the deposit amount to collect before marking as rented'
+                    : paymentModalMode === 'overdue'
+                      ? 'Enter the overdue amount being settled now'
+                      : 'Enter the amount the customer is paying now'}
 
                 </small>
 
@@ -3831,7 +4111,7 @@ function Rental() {
 
               <button className="btn-save" onClick={handleRecordPayment}>
 
-                Record Payment
+                {paymentModalMode === 'overdue' ? 'Record Overdue Payment' : 'Record Payment'}
 
               </button>
 
@@ -4687,9 +4967,9 @@ function Rental() {
 
                 <span>
 
-                  {selectedRental.rental_start_date && selectedRental.rental_end_date
+                  {selectedRental.rental_start_date && (getRentalPenaltySnapshot(selectedRental).dueDate || selectedRental.rental_end_date)
 
-                    ? `${selectedRental.rental_start_date} to ${selectedRental.rental_end_date}`
+                    ? `${selectedRental.rental_start_date} to ${getRentalPenaltySnapshot(selectedRental).dueDate || selectedRental.rental_end_date}`
 
                     : 'N/A'}
 
@@ -4697,21 +4977,77 @@ function Rental() {
 
               </div>
 
+              <div className="detail-row">
+
+                <strong>Rental Duration:</strong>
+
+                <span>
+
+                  {selectedRental.rental_duration
+
+                    || selectedRental.pricing_factors?.rental_duration
+
+                    || selectedRental.pricing_factors?.duration
+
+                    || 'N/A'} day(s)
+
+                </span>
+
+              </div>
+
+              <div className="detail-row">
+
+                <strong>Overdue Rate:</strong>
+
+                <span>
+
+                  ₱{(parseFloat(
+
+                    selectedRental.overdue_rate
+
+                    || selectedRental.pricing_factors?.overdue_rate
+
+                    || getRentalPenaltySnapshot(selectedRental).overdueRate
+
+                    || 50
+
+                  ) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/day
+
+                </span>
+
+              </div>
+
+              <div className="detail-row">
+
+                <strong>Due Date:</strong>
+
+                <span>
+
+                  {(() => {
+
+                    const dueDate = getRentalPenaltySnapshot(selectedRental).dueDate || selectedRental.rental_end_date;
+
+                    if (!dueDate) return 'N/A';
+
+                    return new Date(`${dueDate}T00:00:00`).toLocaleDateString();
+
+                  })()}
+
+                </span>
+
+              </div>
+
               {(selectedRental.approval_status === 'rented' || selectedRental.approval_status === 'picked_up') &&
 
-               selectedRental.rental_end_date && (() => {
+               (() => {
 
-                const today = new Date();
+                const penaltySnapshot = getRentalPenaltySnapshot(selectedRental);
 
-                today.setHours(0, 0, 0, 0);
+                const dueDate = penaltySnapshot.dueDate || selectedRental.rental_end_date;
 
-                const endDate = new Date(selectedRental.rental_end_date);
+                const diffDays = penaltySnapshot.daysUntilDue;
 
-                endDate.setHours(0, 0, 0, 0);
-
-                const diffTime = endDate - today;
-
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                if (!dueDate || diffDays === null) return null;
 
 
 
@@ -4719,7 +5055,11 @@ function Rental() {
 
                   const daysOverdue = Math.abs(diffDays);
 
-                  const currentPenalty = daysOverdue * 100;
+                  const currentPenalty = penaltySnapshot.totalPenalty > 0
+
+                    ? penaltySnapshot.totalPenalty
+
+                    : (daysOverdue * (penaltySnapshot.overdueRate || 50));
 
                   return (
 
@@ -4751,7 +5091,7 @@ function Rental() {
 
                           <div style={{ color: '#721c24', fontSize: '14px', marginTop: '4px' }}>
 
-                            Expected penalty: <strong>₱{currentPenalty.toLocaleString()}</strong> (₱100/day)
+                            Expected penalty: <strong>₱{currentPenalty.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> (up to ₱{(penaltySnapshot.overdueRate || 50).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/day)
 
                           </div>
 
@@ -4801,7 +5141,7 @@ function Rental() {
 
                           <div style={{ color: '#856404', fontSize: '13px', marginTop: '4px' }}>
 
-                            Late returns will incur a penalty of ₱100 per day starting tomorrow.
+                            Late returns will incur a penalty based on selected size terms (up to ₱{(penaltySnapshot.overdueRate || 50).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/day) starting tomorrow.
 
                           </div>
 
@@ -4839,7 +5179,7 @@ function Rental() {
 
                           <div style={{ color: '#004085', fontWeight: '600', fontSize: '15px' }}>
 
-                            Due in {diffDays} Day{diffDays > 1 ? 's' : ''} ({new Date(selectedRental.rental_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})
+                            Due in {diffDays} Day{diffDays > 1 ? 's' : ''} ({new Date(`${dueDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})
 
                           </div>
 

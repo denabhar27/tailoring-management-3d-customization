@@ -57,19 +57,16 @@ const Repair = () => {
   const { alert, confirm, prompt } = useAlert();
 
   const createEmptyDamageLevel = (sortOrder = 1) => ({
-
     repair_damage_level_id: null,
 
     level_name: '',
 
     level_description: '',
-
     base_price: '',
 
     sort_order: sortOrder,
 
     is_active: 1
-
   });
 
   const [allItems, setAllItems] = useState([]);
@@ -2123,6 +2120,12 @@ const Repair = () => {
 
     if (!selectedOrder) return;
 
+    const preferredDate = getPreferredCompletionDate(selectedOrder);
+    if (preferredDate && detailEstimatedCompletionDate && new Date(detailEstimatedCompletionDate) < new Date(preferredDate)) {
+      showToast('Estimated completion date cannot be earlier than the customer\'s preferred date.', 'error');
+      return;
+    }
+
     try {
 
       setSavingEstimatedDate(true);
@@ -3160,12 +3163,12 @@ const Repair = () => {
                                 minHeight: '30px'
                               }}
                             >
-                              {isCollapsed ? '▶' : '▼'} ORD#{parentOrderId}
+                              {isCollapsed ? '▶' : '▼'} ORD#{parentOrderId} ({parentItemCount} child orders)
                             </button>
                           </td>
                         </tr>
                       )}
-                      {(!isAddAnotherGroup || !isCollapsed) && (
+                      {(!isAddAnotherGroup || !isCollapsed || isFirstInParent) && (
                     <tr className="clickable-row" onClick={() => handleViewDetails(item)}>
 
                       <td>
@@ -3463,6 +3466,16 @@ const Repair = () => {
                               if (isMovingToInProgress && !hasHalfPayment && !isEnhancementOrder) {
                                 return null;
                               }
+
+                              const getPreferredCompletionDate = (item) => {
+                                const specificData = parseMaybeObject(item?.specific_data);
+                                return specificData?.preferredDate
+                                  || specificData?.preferred_date
+                                  || specificData?.appointmentDate
+                                  || specificData?.appointment_date
+                                  || item?.preferred_date
+                                  || '';
+                              };
                               
                               return (
                                 <button

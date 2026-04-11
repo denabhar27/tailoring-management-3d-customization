@@ -7,6 +7,19 @@ export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.
 console.log('Using API_BASE_URL:', API_BASE_URL);
 const REQUEST_TIMEOUT = parseInt(process.env.EXPO_PUBLIC_REQUEST_TIMEOUT || '10000', 10);
 
+const PUBLIC_AUTH_ENDPOINTS = [
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/verify-reset-code',
+  '/reset-password',
+  '/resend-reset-code',
+];
+
+const isPublicAuthEndpoint = (endpoint: string) => {
+  return PUBLIC_AUTH_ENDPOINTS.some(publicEndpoint => endpoint.startsWith(publicEndpoint));
+};
+
 // Simple auth event system (no Node.js 'events' dependency)
 type AuthListener = () => void;
 const authListeners: AuthListener[] = [];
@@ -68,26 +81,30 @@ export const isAuthenticated = async (): Promise<boolean> => {
   return true;
 };
 
-const getAuthHeaders = async () => {
+const getAuthHeaders = async (includeAuth = true) => {
   const token = await AsyncStorage.getItem('userToken');
 
   // Proactively check for expired token before sending the request
-  if (token && isTokenExpired(token)) {
+  if (includeAuth && token && isTokenExpired(token)) {
     console.warn('Token expired locally — clearing auth and redirecting to login');
     await handleAuthFailure();
     throw new Error('Session expired. Please log in again.');
   }
 
-  return {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Authorization': token ? `Bearer ${token}` : '',
   };
+  if (includeAuth && token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
 };
 
 const apiCall = async (endpoint: string, options: RequestInit = {}) => {
   try {
     const url = `${API_BASE_URL}${endpoint}`;
-    const headers = await getAuthHeaders();
+    const isPublicRequest = isPublicAuthEndpoint(endpoint);
+    const headers = await getAuthHeaders(!isPublicRequest);
 
     const config: RequestInit = {
       ...options,
@@ -116,9 +133,14 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
           errorData = await responseClone.json();
           console.log('API 401 Error Data:', errorData);
         } catch (_) {}
-        console.warn('Received 401 — clearing auth and redirecting to login');
-        await handleAuthFailure();
-        throw new Error('Session expired. Please log in again.');
+
+        if (!isPublicRequest) {
+          console.warn('Received 401 — clearing auth and redirecting to login');
+          await handleAuthFailure();
+          throw new Error('Session expired. Please log in again.');
+        }
+
+        throw new Error(errorData?.message || 'Unauthorized');
       }
 
       const responseClone = response.clone();

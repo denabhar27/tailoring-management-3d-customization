@@ -58,12 +58,13 @@ export async function updateRentalOrderItem(itemId, updateData) {
     }
 }
 
-export async function recordRentalPayment(itemId, paymentAmount, cashReceived = paymentAmount, paymentMethod = 'cash') {
+export async function recordRentalPayment(itemId, paymentAmount, cashReceived = paymentAmount, paymentMethod = 'cash', paymentKind = 'regular') {
     try {
         const response = await axios.post(`${BASE_URL}/orders/rental/items/${itemId}/payment`, {
             paymentAmount: paymentAmount,
             cashReceived: cashReceived,
-            paymentMethod: paymentMethod
+            paymentMethod: paymentMethod,
+            paymentKind: paymentKind
         }, {
             headers: getAuthHeaders()
         });
@@ -156,4 +157,64 @@ export async function recordRentalDepositReturn(itemId, refundAmount, damagedSiz
             message: error.response?.data?.message || "Error recording deposit return"
         };
     }
+}
+
+const toDateOnly = (value) => {
+    if (!value) return null;
+    const raw = String(value).trim();
+    const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : null;
+};
+
+export function getRentalOrderSelectedSizes(rentalOrder) {
+    const specificData = rentalOrder?.specific_data || {};
+    if (specificData?.is_bundle && Array.isArray(specificData.bundle_items)) {
+        return specificData.bundle_items.flatMap((bundleItem) => bundleItem.selected_sizes || bundleItem.selectedSizes || []);
+    }
+    return specificData?.selected_sizes || specificData?.selectedSizes || [];
+}
+
+export function getRentalOrderDueDate(rentalOrder, selectedSize = null) {
+    if (selectedSize && toDateOnly(selectedSize.due_date)) {
+        return toDateOnly(selectedSize.due_date);
+    }
+
+    const pricingFactors = rentalOrder?.pricing_factors || {};
+    return (
+        toDateOnly(rentalOrder?.due_date)
+        || toDateOnly(pricingFactors?.due_date)
+        || toDateOnly(rentalOrder?.rental_end_date)
+        || null
+    );
+}
+
+export function calculateOverdueAmount(rentalOrder, selectedSize = null, asOfDate = new Date()) {
+    const dueDate = getRentalOrderDueDate(rentalOrder, selectedSize);
+    if (!dueDate) {
+        return { dueDate: null, daysOverdue: 0, overdueRate: 0, overdueAmount: 0 };
+    }
+
+    const pricingFactors = rentalOrder?.pricing_factors || {};
+    const overdueRate = parseFloat(
+        selectedSize?.overdue_amount
+        ?? selectedSize?.overdue_rate
+        ?? rentalOrder?.overdue_rate
+        ?? pricingFactors?.overdue_rate
+        ?? 50
+    ) || 0;
+
+    const due = new Date(`${dueDate}T00:00:00`);
+    const today = new Date(asOfDate);
+    today.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.ceil((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+    const daysOverdue = Math.max(0, diffDays);
+    const overdueAmount = daysOverdue * Math.max(0, overdueRate);
+
+    return {
+        dueDate,
+        daysOverdue,
+        overdueRate: Math.max(0, overdueRate),
+        overdueAmount
+    };
 }

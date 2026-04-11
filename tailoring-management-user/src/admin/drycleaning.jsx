@@ -957,6 +957,16 @@ const DryCleaning = () => {
 
   };
 
+  const getPreferredCompletionDate = (item) => {
+    const specificData = parseMaybeObject(item?.specific_data);
+    return specificData?.preferredDate
+      || specificData?.preferred_date
+      || specificData?.pickupDate
+      || specificData?.pickup_date
+      || item?.preferred_date
+      || '';
+  };
+
   const isTodayAppointment = (item) => getComputedStatus(item) === 'appointment-today';
 
 
@@ -2125,6 +2135,12 @@ const DryCleaning = () => {
 
     if (!selectedOrder) return;
 
+    const preferredDate = getPreferredCompletionDate(selectedOrder);
+    if (preferredDate && detailEstimatedCompletionDate && new Date(detailEstimatedCompletionDate) < new Date(preferredDate)) {
+      showToast('Estimated completion date cannot be earlier than the customer\'s preferred date.', 'error');
+      return;
+    }
+
     try {
 
       setSavingEstimatedDate(true);
@@ -2916,12 +2932,12 @@ const DryCleaning = () => {
                               minHeight: '30px'
                             }}
                           >
-                            {isCollapsed ? '▶' : '▼'} ORD#{parentOrderId}
+                            {isCollapsed ? '▶' : '▼'} ORD#{parentOrderId} ({parentItemCount} child orders)
                           </button>
                         </td>
                       </tr>
                     )}
-                    {(!isAddAnotherGroup || !isCollapsed) && (
+                    {(!isAddAnotherGroup || !isCollapsed || isFirstInParent) && (
                   <tr className="clickable-row" onClick={() => handleViewDetails(item)}>
 
                     <td>
@@ -3855,6 +3871,8 @@ const DryCleaning = () => {
 
                     type="date"
 
+                    min={getPreferredCompletionDate(selectedOrder) || undefined}
+
                     value={editForm.estimatedCompletionDate || ''}
 
                     onChange={(e) => setEditForm({ ...editForm, estimatedCompletionDate: e.target.value })}
@@ -4066,6 +4084,8 @@ const DryCleaning = () => {
                 <input
 
                   type="date"
+
+                  min={getPreferredCompletionDate(selectedOrder) || undefined}
 
                   value={enhanceForm.estimatedCompletionDate}
 
@@ -4350,6 +4370,8 @@ const DryCleaning = () => {
                   <input
 
                     type="date"
+
+                    min={getPreferredCompletionDate(selectedOrder) || undefined}
 
                     value={detailEstimatedCompletionDate || ''}
 

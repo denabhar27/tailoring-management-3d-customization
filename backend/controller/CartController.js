@@ -92,6 +92,161 @@ const upload = multer({
   }
 });
 
+const parseMaybeJson = (value, fallback = {}) => {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+};
+
+const toDateOnly = (value) => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+};
+
+const normalizeDuration = (value) => {
+  const parsed = parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 3;
+  return Math.max(1, Math.min(30, parsed));
+};
+
+const normalizeOverdueRate = (value) => {
+  const parsed = parseFloat(value);
+  if (!Number.isFinite(parsed)) return 50;
+  return Math.max(0, parsed);
+};
+
+const addRentalDays = (startDate, duration) => {
+  const start = toDateOnly(startDate);
+  if (!start) return null;
+  const d = new Date(`${start}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const safeDuration = normalizeDuration(duration);
+  d.setDate(d.getDate() + safeDuration - 1);
+  return d.toISOString().split('T')[0];
+};
+
+const normalizeSelectedSizesForRental = (selectedSizes, startDate, fallbackDuration, fallbackRate, fallbackDueDate) => {
+  if (!Array.isArray(selectedSizes)) {
+    return { selectedSizes: [], durations: [], rates: [], dueDates: [] };
+  }
+
+  const durations = [];
+  const rates = [];
+  const dueDates = [];
+
+  const normalized = selectedSizes.map((entry = {}) => {
+    const rentalDuration = normalizeDuration(entry.rental_duration ?? entry.duration ?? fallbackDuration);
+    const overdueAmount = normalizeOverdueRate(entry.overdue_amount ?? entry.overdue_rate ?? fallbackRate);
+    const dueDate = toDateOnly(entry.due_date)
+      || addRentalDays(startDate, rentalDuration)
+      || toDateOnly(fallbackDueDate)
+      || null;
+
+    durations.push(rentalDuration);
+    rates.push(overdueAmount);
+    if (dueDate) dueDates.push(dueDate);
+
+    return {
+      ...entry,
+      rental_duration: rentalDuration,
+      overdue_amount: overdueAmount,
+      overdue_rate: overdueAmount,
+      due_date: dueDate
+    };
+  });
+
+  return { selectedSizes: normalized, durations, rates, dueDates };
+};
+
+const normalizeRentalCartPayload = (pricingFactorsRaw, specificDataRaw, rentalDatesRaw) => {
+  const pricingFactors = parseMaybeJson(pricingFactorsRaw, {});
+  const specificData = parseMaybeJson(specificDataRaw, {});
+  const rentalDates = parseMaybeJson(rentalDatesRaw, {});
+
+  const startDate = toDateOnly(rentalDates.startDate || specificData.rental_start_date || specificData.rentalDates?.startDate);
+  const fallbackDuration = normalizeDuration(pricingFactors.rental_duration ?? pricingFactors.duration ?? rentalDates.duration ?? 3);
+  const fallbackRate = normalizeOverdueRate(pricingFactors.overdue_rate ?? pricingFactors.overdue_amount ?? 50);
+  const fallbackDueDate = toDateOnly(rentalDates.endDate || specificData.rental_end_date || pricingFactors.due_date)
+    || addRentalDays(startDate, fallbackDuration);
+
+  const aggregateDurations = [];
+  const aggregateRates = [];
+  const aggregateDueDates = [];
+
+  if (specificData.is_bundle === true && Array.isArray(specificData.bundle_items)) {
+    specificData.bundle_items = specificData.bundle_items.map((bundleItem = {}) => {
+      const selectedSizes = bundleItem.selected_sizes || bundleItem.selectedSizes || [];
+      const normalized = normalizeSelectedSizesForRental(
+        selectedSizes,
+        bundleItem.rental_start_date || startDate,
+        fallbackDuration,
+        fallbackRate,
+        bundleItem.rental_end_date || fallbackDueDate
+      );
+
+      aggregateDurations.push(...normalized.durations);
+      aggregateRates.push(...normalized.rates);
+      aggregateDueDates.push(...normalized.dueDates);
+
+      const bundleDueDate = normalized.dueDates.length > 0
+        ? normalized.dueDates.reduce((latest, current) => (current > latest ? current : latest), normalized.dueDates[0])
+        : (toDateOnly(bundleItem.rental_end_date) || fallbackDueDate);
+
+      return {
+        ...bundleItem,
+        selected_sizes: normalized.selectedSizes,
+        selectedSizes: normalized.selectedSizes,
+        rental_duration: normalized.durations.length > 0 ? Math.max(...normalized.durations) : fallbackDuration,
+        overdue_rate: normalized.rates.length > 0 ? Math.max(...normalized.rates) : fallbackRate,
+        due_date: bundleDueDate,
+        rental_end_date: bundleDueDate
+      };
+    });
+  } else {
+    const selectedSizes = specificData.selected_sizes || specificData.selectedSizes || [];
+    const normalized = normalizeSelectedSizesForRental(selectedSizes, startDate, fallbackDuration, fallbackRate, fallbackDueDate);
+    specificData.selected_sizes = normalized.selectedSizes;
+    specificData.selectedSizes = normalized.selectedSizes;
+    aggregateDurations.push(...normalized.durations);
+    aggregateRates.push(...normalized.rates);
+    aggregateDueDates.push(...normalized.dueDates);
+  }
+
+  const duration = aggregateDurations.length > 0 ? Math.max(...aggregateDurations) : fallbackDuration;
+  const overdueRate = aggregateRates.length > 0 ? Math.max(...aggregateRates) : fallbackRate;
+  const endDate = aggregateDueDates.length > 0
+    ? aggregateDueDates.reduce((latest, current) => (current > latest ? current : latest), aggregateDueDates[0])
+    : (fallbackDueDate || addRentalDays(startDate, duration));
+
+  pricingFactors.duration = duration;
+  pricingFactors.rental_duration = duration;
+  pricingFactors.overdue_rate = overdueRate;
+  pricingFactors.due_date = endDate;
+
+  specificData.rental_duration = duration;
+  specificData.overdue_rate = overdueRate;
+  specificData.due_date = endDate;
+  specificData.rental_start_date = startDate;
+  specificData.rental_end_date = endDate;
+
+  return {
+    pricingFactors,
+    specificData,
+    rentalDates: {
+      ...rentalDates,
+      startDate,
+      endDate,
+      duration
+    }
+  };
+};
+
 exports.getUserCart = (req, res) => {
   const userId = req.user.id;
   
@@ -138,6 +293,17 @@ exports.addToCart = (req, res) => {
     });
   }
 
+  let normalizedPricingFactors = pricingFactors;
+  let normalizedSpecificData = specificData;
+  let normalizedRentalDates = rentalDates;
+
+  if (serviceType === 'rental') {
+    const normalizedRentalPayload = normalizeRentalCartPayload(pricingFactors, specificData, rentalDates);
+    normalizedPricingFactors = normalizedRentalPayload.pricingFactors;
+    normalizedSpecificData = normalizedRentalPayload.specificData;
+    normalizedRentalDates = normalizedRentalPayload.rentalDates;
+  }
+
   const ServiceIdGenerator = require('../model/ServiceIdGenerator');
 
   const needsIncrementalId = ['dry_cleaning', 'repair', 'customization'].includes(serviceType);
@@ -162,9 +328,9 @@ exports.addToCart = (req, res) => {
         quantity, 
         basePrice, 
         finalPrice, 
-        pricingFactors, 
-        specificData, 
-        rentalDates,
+        normalizedPricingFactors, 
+        normalizedSpecificData, 
+        normalizedRentalDates,
         (err, result) => {
           if (err) {
             return res.status(500).json({ 
@@ -196,9 +362,9 @@ exports.addToCart = (req, res) => {
       quantity, 
       basePrice, 
       finalPrice, 
-      pricingFactors, 
-      specificData, 
-      rentalDates,
+      normalizedPricingFactors, 
+      normalizedSpecificData, 
+      normalizedRentalDates,
       (err, result) => {
         if (err) {
           return res.status(500).json({ 

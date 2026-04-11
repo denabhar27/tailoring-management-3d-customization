@@ -207,6 +207,145 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function normalizeRentalDuration(value) {
+  const parsed = parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 3;
+  return Math.max(1, Math.min(30, parsed));
+}
+
+function normalizeOverdueRate(value) {
+  const parsed = parseFloat(value);
+  if (!Number.isFinite(parsed)) return 50;
+  return Math.max(0, parsed);
+}
+
+function toDateOnly(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+}
+
+function addDaysToDate(startDate, days) {
+  const dateOnly = toDateOnly(startDate);
+  if (!dateOnly) return null;
+  const d = new Date(`${dateOnly}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const safeDays = Math.max(1, parseInt(days, 10) || 1);
+  d.setDate(d.getDate() + safeDays - 1);
+  return d.toISOString().split('T')[0];
+}
+
+function normalizeSelectedSizesWithTerms(selectedSizes, startDate, fallbackDuration, fallbackOverdueRate, fallbackDueDate) {
+  if (!Array.isArray(selectedSizes)) {
+    return { selectedSizes: [], duration: fallbackDuration, overdueRate: fallbackOverdueRate, dueDate: fallbackDueDate };
+  }
+
+  const durations = [];
+  const overdueRates = [];
+  const dueDates = [];
+
+  const normalized = selectedSizes.map((entry = {}) => {
+    const rentalDuration = normalizeRentalDuration(entry.rental_duration ?? entry.duration ?? fallbackDuration);
+    const overdueAmount = normalizeOverdueRate(entry.overdue_amount ?? entry.overdue_rate ?? fallbackOverdueRate);
+    const dueDate = toDateOnly(entry.due_date)
+      || addDaysToDate(startDate, rentalDuration)
+      || toDateOnly(fallbackDueDate)
+      || null;
+
+    durations.push(rentalDuration);
+    overdueRates.push(overdueAmount);
+    if (dueDate) dueDates.push(dueDate);
+
+    return {
+      ...entry,
+      rental_duration: rentalDuration,
+      overdue_amount: overdueAmount,
+      overdue_rate: overdueAmount,
+      due_date: dueDate
+    };
+  });
+
+  const duration = durations.length > 0 ? Math.max(...durations) : fallbackDuration;
+  const overdueRate = overdueRates.length > 0 ? Math.max(...overdueRates) : fallbackOverdueRate;
+  const dueDate = dueDates.length > 0
+    ? dueDates.reduce((latest, current) => (current > latest ? current : latest), dueDates[0])
+    : (toDateOnly(fallbackDueDate) || addDaysToDate(startDate, duration));
+
+  return { selectedSizes: normalized, duration, overdueRate, dueDate };
+}
+
+function buildRentalTermsFromSpecificData(specificData = {}, rentalStartDate, fallbackDuration, fallbackOverdueRate, fallbackDueDate) {
+  const nextSpecificData = { ...specificData };
+
+  if (nextSpecificData?.is_bundle && Array.isArray(nextSpecificData.bundle_items)) {
+    const durations = [];
+    const rates = [];
+    const dueDates = [];
+
+    nextSpecificData.bundle_items = nextSpecificData.bundle_items.map((bundleItem = {}) => {
+      const selectedSizes = bundleItem.selected_sizes || bundleItem.selectedSizes || [];
+      const normalized = normalizeSelectedSizesWithTerms(
+        selectedSizes,
+        bundleItem.rental_start_date || rentalStartDate,
+        fallbackDuration,
+        fallbackOverdueRate,
+        bundleItem.rental_end_date || fallbackDueDate
+      );
+
+      durations.push(normalized.duration);
+      rates.push(normalized.overdueRate);
+      if (normalized.dueDate) dueDates.push(normalized.dueDate);
+
+      return {
+        ...bundleItem,
+        selected_sizes: normalized.selectedSizes,
+        selectedSizes: normalized.selectedSizes,
+        rental_duration: normalized.duration,
+        overdue_rate: normalized.overdueRate,
+        due_date: normalized.dueDate,
+        rental_end_date: normalized.dueDate || bundleItem.rental_end_date || null
+      };
+    });
+
+    const duration = durations.length > 0 ? Math.max(...durations) : fallbackDuration;
+    const overdueRate = rates.length > 0 ? Math.max(...rates) : fallbackOverdueRate;
+    const dueDate = dueDates.length > 0
+      ? dueDates.reduce((latest, current) => (current > latest ? current : latest), dueDates[0])
+      : (toDateOnly(fallbackDueDate) || addDaysToDate(rentalStartDate, duration));
+
+    nextSpecificData.rental_duration = duration;
+    nextSpecificData.overdue_rate = overdueRate;
+    nextSpecificData.due_date = dueDate;
+    nextSpecificData.rental_end_date = dueDate;
+
+    return { specificData: nextSpecificData, duration, overdueRate, dueDate };
+  }
+
+  const selectedSizes = nextSpecificData.selected_sizes || nextSpecificData.selectedSizes || [];
+  const normalized = normalizeSelectedSizesWithTerms(
+    selectedSizes,
+    rentalStartDate,
+    fallbackDuration,
+    fallbackOverdueRate,
+    fallbackDueDate
+  );
+
+  nextSpecificData.selected_sizes = normalized.selectedSizes;
+  nextSpecificData.selectedSizes = normalized.selectedSizes;
+  nextSpecificData.rental_duration = normalized.duration;
+  nextSpecificData.overdue_rate = normalized.overdueRate;
+  nextSpecificData.due_date = normalized.dueDate;
+  nextSpecificData.rental_end_date = normalized.dueDate;
+
+  return {
+    specificData: nextSpecificData,
+    duration: normalized.duration,
+    overdueRate: normalized.overdueRate,
+    dueDate: normalized.dueDate
+  };
+}
+
 function buildPreparedOrderItemsFromCart(cartItems = []) {
   const supportedServices = new Set(['dry_cleaning', 'repair', 'customization', 'customize']);
   const preparedItems = [];
@@ -218,6 +357,206 @@ function buildPreparedOrderItemsFromCart(cartItems = []) {
     const pricingFactors = parseJsonSafely(rawItem.pricing_factors, {});
     const garments = Array.isArray(specificData.garments) ? specificData.garments.filter(Boolean) : [];
     const sourceCartId = rawItem.cart_id || null;
+
+    if (rawItem.service_type === 'rental' && specificData?.is_bundle && Array.isArray(specificData.bundle_items) && specificData.bundle_items.length > 0) {
+      const preparedCountBeforeBundle = preparedItems.length;
+      const bundleItems = specificData.bundle_items.filter(Boolean);
+      const fallbackLinePrice = toNumber(rawItem.final_price, toNumber(rawItem.base_price, 0));
+      const totalBundleSelectedSizes = bundleItems.reduce((sum, bundleItem = {}) => {
+        const sizes = Array.isArray(bundleItem.selected_sizes) ? bundleItem.selected_sizes : (Array.isArray(bundleItem.selectedSizes) ? bundleItem.selectedSizes : []);
+        return sum + Math.max(0, sizes.length);
+      }, 0);
+      const splitFallback = fallbackLinePrice / Math.max(totalBundleSelectedSizes, 1);
+
+      bundleItems.forEach((bundleItem = {}, bundleIndex) => {
+        const bundleItemId = parseInt(bundleItem.item_id ?? bundleItem.id ?? bundleItem.service_id, 10);
+        if (!bundleItemId) return;
+
+        const sizeOptions = bundleItem.size_options || bundleItem.sizeOptions || {};
+        const selectedSizesRaw = Array.isArray(bundleItem.selected_sizes)
+          ? bundleItem.selected_sizes.filter(Boolean)
+          : (Array.isArray(bundleItem.selectedSizes) ? bundleItem.selectedSizes.filter(Boolean) : []);
+
+        selectedSizesRaw.forEach((entry = {}, index) => {
+          const sizeKey = entry.sizeKey || entry.size_key || null;
+          const sizeLabel = entry.label || entry.sizeLabel || sizeKey || `Size ${index + 1}`;
+          const sizeQty = Math.max(1, parseInt(entry.quantity, 10) || 1);
+
+          const option = sizeKey ? (sizeOptions[sizeKey] || {}) : {};
+          const unitPrice = toNumber(entry.price, toNumber(option.price, 0));
+          const cycleDays = normalizeRentalDuration(option.rental_duration ?? option.rentalDuration ?? entry.billing_cycle ?? 3);
+          const selectedDays = normalizeRentalDuration(entry.rental_duration ?? entry.rentalDuration ?? cycleDays);
+          const cycleCount = Math.max(1, Math.ceil(selectedDays / Math.max(1, cycleDays)));
+          const computedLinePrice = unitPrice > 0 ? (sizeQty * unitPrice * cycleCount) : splitFallback;
+          const linePrice = toNumber(computedLinePrice, splitFallback);
+
+          const unitDeposit = toNumber(entry.deposit, toNumber(option.deposit, 0));
+          const lineDeposit = Math.max(0, sizeQty * unitDeposit);
+          const overdueAmount = normalizeOverdueRate(entry.overdue_amount ?? entry.overdueRate ?? option.overdue_amount ?? option.overdueRate ?? 50);
+          const dueDate = toDateOnly(entry.due_date || entry.dueDate || bundleItem.rental_end_date || rawItem.rental_end_date) || addDaysToDate(rawItem.rental_start_date, selectedDays);
+
+          const childSpecificData = {
+            ...specificData,
+            is_bundle: false,
+            category: 'rental',
+            service_id: bundleItemId,
+            item_id: bundleItemId,
+            item_name: bundleItem.item_name || `Bundle Item ${bundleIndex + 1}`,
+            image_url: bundleItem.image_url || bundleItem.imageUrl || bundleItem.img || specificData.image_url || specificData.imageUrl || null,
+            img: bundleItem.img || bundleItem.image_url || bundleItem.imageUrl || specificData.img || specificData.image_url || specificData.imageUrl || null,
+            front_image: bundleItem.front_image || bundleItem.frontImage || specificData.front_image || specificData.frontImage || null,
+            back_image: bundleItem.back_image || bundleItem.backImage || specificData.back_image || specificData.backImage || null,
+            side_image: bundleItem.side_image || bundleItem.sideImage || specificData.side_image || specificData.sideImage || null,
+            size: `${sizeLabel} x${sizeQty}`,
+            selected_size: sizeKey,
+            selected_sizes: [{
+              ...entry,
+              sizeKey,
+              label: sizeLabel,
+              quantity: sizeQty,
+              price: unitPrice > 0 ? unitPrice : entry.price,
+              deposit: unitDeposit,
+              rental_duration: selectedDays,
+              overdue_amount: overdueAmount,
+              due_date: dueDate
+            }],
+            selectedSizes: [{
+              ...entry,
+              sizeKey,
+              label: sizeLabel,
+              quantity: sizeQty,
+              price: unitPrice > 0 ? unitPrice : entry.price,
+              deposit: unitDeposit,
+              rental_duration: selectedDays,
+              overdue_amount: overdueAmount,
+              due_date: dueDate
+            }],
+            size_options: sizeOptions,
+            rental_duration: selectedDays,
+            overdue_rate: overdueAmount,
+            due_date: dueDate,
+            rental_end_date: dueDate,
+            __sourceCartId: sourceCartId
+          };
+
+          const childPricingFactors = {
+            ...pricingFactors,
+            is_bundle: false,
+            price: linePrice,
+            duration: selectedDays,
+            rental_duration: selectedDays,
+            overdue_rate: overdueAmount,
+            due_date: dueDate,
+            downpayment: lineDeposit.toString(),
+            deposit: lineDeposit.toString(),
+            total_due_on_pickup: (linePrice + lineDeposit).toString()
+          };
+
+          preparedItems.push({
+            ...rawItem,
+            service_id: bundleItemId,
+            quantity: sizeQty,
+            base_price: linePrice,
+            final_price: linePrice,
+            rental_end_date: dueDate,
+            pricing_factors: childPricingFactors,
+            specific_data: childSpecificData
+          });
+        });
+      });
+
+      if (preparedItems.length > preparedCountBeforeBundle) {
+        return;
+      }
+    }
+
+    if (rawItem.service_type === 'rental' && !specificData?.is_bundle) {
+      const selectedSizesRaw = Array.isArray(specificData.selected_sizes)
+        ? specificData.selected_sizes.filter(Boolean)
+        : (Array.isArray(specificData.selectedSizes) ? specificData.selectedSizes.filter(Boolean) : []);
+
+      if (selectedSizesRaw.length > 0) {
+        const sizeOptions = specificData.size_options || specificData.sizeOptions || {};
+        const fallbackLinePrice = toNumber(rawItem.final_price, toNumber(rawItem.base_price, 0));
+        const splitFallback = fallbackLinePrice / Math.max(selectedSizesRaw.length, 1);
+
+        selectedSizesRaw.forEach((entry = {}, index) => {
+          const sizeKey = entry.sizeKey || entry.size_key || null;
+          const sizeLabel = entry.label || entry.sizeLabel || sizeKey || `Size ${index + 1}`;
+          const sizeQty = Math.max(1, parseInt(entry.quantity, 10) || 1);
+
+          const option = sizeKey ? (sizeOptions[sizeKey] || {}) : {};
+          const unitPrice = toNumber(entry.price, toNumber(option.price, 0));
+          const cycleDays = normalizeRentalDuration(option.rental_duration ?? option.rentalDuration ?? entry.billing_cycle ?? 3);
+          const selectedDays = normalizeRentalDuration(entry.rental_duration ?? entry.rentalDuration ?? cycleDays);
+          const cycleCount = Math.max(1, Math.ceil(selectedDays / Math.max(1, cycleDays)));
+          const computedLinePrice = unitPrice > 0 ? (sizeQty * unitPrice * cycleCount) : splitFallback;
+          const linePrice = toNumber(computedLinePrice, splitFallback);
+
+          const unitDeposit = toNumber(entry.deposit, toNumber(option.deposit, 0));
+          const lineDeposit = Math.max(0, sizeQty * unitDeposit);
+          const overdueAmount = normalizeOverdueRate(entry.overdue_amount ?? entry.overdueRate ?? option.overdue_amount ?? option.overdueRate ?? 50);
+          const dueDate = toDateOnly(entry.due_date || entry.dueDate || rawItem.rental_end_date) || addDaysToDate(rawItem.rental_start_date, selectedDays);
+
+          const childSpecificData = {
+            ...specificData,
+            size: `${sizeLabel} x${sizeQty}`,
+            selected_size: sizeKey,
+            selected_sizes: [{
+              ...entry,
+              sizeKey,
+              label: sizeLabel,
+              quantity: sizeQty,
+              price: unitPrice > 0 ? unitPrice : entry.price,
+              deposit: unitDeposit,
+              rental_duration: selectedDays,
+              overdue_amount: overdueAmount,
+              due_date: dueDate
+            }],
+            selectedSizes: [{
+              ...entry,
+              sizeKey,
+              label: sizeLabel,
+              quantity: sizeQty,
+              price: unitPrice > 0 ? unitPrice : entry.price,
+              deposit: unitDeposit,
+              rental_duration: selectedDays,
+              overdue_amount: overdueAmount,
+              due_date: dueDate
+            }],
+            rental_duration: selectedDays,
+            overdue_rate: overdueAmount,
+            due_date: dueDate,
+            rental_end_date: dueDate,
+            __sourceCartId: sourceCartId
+          };
+
+          const childPricingFactors = {
+            ...pricingFactors,
+            price: linePrice,
+            duration: selectedDays,
+            rental_duration: selectedDays,
+            overdue_rate: overdueAmount,
+            due_date: dueDate,
+            downpayment: lineDeposit.toString(),
+            deposit: lineDeposit.toString(),
+            total_due_on_pickup: (linePrice + lineDeposit).toString()
+          };
+
+          preparedItems.push({
+            ...rawItem,
+            quantity: sizeQty,
+            base_price: linePrice,
+            final_price: linePrice,
+            rental_end_date: dueDate,
+            pricing_factors: childPricingFactors,
+            specific_data: childSpecificData
+          });
+        });
+
+        return;
+      }
+    }
 
     if (!supportedServices.has(rawItem.service_type) || garments.length <= 1) {
       preparedItems.push({
@@ -334,16 +673,40 @@ const Order = {
       const orderId = orderResult.insertId;
 
       const itemValues = preparedCartItems.map(item => {
-        const specificData = parseJsonSafely(item.specific_data, {});
+        let specificData = parseJsonSafely(item.specific_data, {});
         const factors = parseJsonSafely(item.pricing_factors, {});
+        let rentalDuration = null;
+        let overdueRate = null;
+        let dueDate = null;
 
         if (item.service_type === 'rental') {
           try {
             const itemTotalPrice = parseFloat(item.final_price || 0);
             const expectedDownpayment = itemTotalPrice * 0.5;
 
+            const fallbackDuration = normalizeRentalDuration(factors.rental_duration ?? factors.duration ?? 3);
+            const fallbackOverdueRate = normalizeOverdueRate(factors.overdue_rate ?? factors.overdue_amount ?? 50);
+            const fallbackDueDate = toDateOnly(item.rental_end_date) || addDaysToDate(item.rental_start_date, fallbackDuration);
+
+            const terms = buildRentalTermsFromSpecificData(
+              specificData,
+              item.rental_start_date,
+              fallbackDuration,
+              fallbackOverdueRate,
+              fallbackDueDate
+            );
+
+            specificData = terms.specificData;
+            rentalDuration = terms.duration;
+            overdueRate = terms.overdueRate;
+            dueDate = terms.dueDate;
+
             factors.downpayment = expectedDownpayment.toString();
             factors.down_payment = expectedDownpayment.toString();
+            factors.rental_duration = rentalDuration;
+            factors.duration = rentalDuration;
+            factors.overdue_rate = overdueRate;
+            factors.due_date = dueDate;
           } catch (e) {
             console.error('Error parsing pricing factors for rental:', e);
           }
@@ -358,7 +721,10 @@ const Order = {
           item.final_price,
           item.appointment_date,
           item.rental_start_date,
-          item.rental_end_date,
+          dueDate || item.rental_end_date,
+          rentalDuration,
+          overdueRate,
+          dueDate || item.rental_end_date,
           JSON.stringify(factors),
           JSON.stringify(specificData)
         ];
@@ -367,7 +733,8 @@ const Order = {
       const itemSql = `
         INSERT INTO order_items (
           order_id, service_type, service_id, quantity, base_price, final_price,
-          appointment_date, rental_start_date, rental_end_date, pricing_factors, specific_data
+          appointment_date, rental_start_date, rental_end_date, rental_duration, overdue_rate, due_date,
+          pricing_factors, specific_data
         ) VALUES ?
       `;
 
@@ -623,15 +990,40 @@ const Order = {
 
       const itemValues = items.map(item => {
         let pricingFactors = item.pricing_factors || '{}';
+        let specificData = parseJsonSafely(item.specific_data, {});
+        let rentalDuration = null;
+        let overdueRate = null;
+        let dueDate = null;
 
         if (item.service_type === 'rental') {
           try {
             const factors = typeof pricingFactors === 'string' ? JSON.parse(pricingFactors) : pricingFactors;
             const totalPrice = parseFloat(item.final_price || 0);
             const expectedDownpayment = totalPrice * 0.5;
+
+            const fallbackDuration = normalizeRentalDuration(factors.rental_duration ?? factors.duration ?? item.rental_duration ?? 3);
+            const fallbackOverdueRate = normalizeOverdueRate(factors.overdue_rate ?? factors.overdue_amount ?? item.overdue_rate ?? 50);
+            const fallbackDueDate = toDateOnly(item.due_date) || toDateOnly(item.rental_end_date) || addDaysToDate(item.rental_start_date, fallbackDuration);
+
+            const terms = buildRentalTermsFromSpecificData(
+              specificData,
+              item.rental_start_date,
+              fallbackDuration,
+              fallbackOverdueRate,
+              fallbackDueDate
+            );
+
+            specificData = terms.specificData;
+            rentalDuration = terms.duration;
+            overdueRate = terms.overdueRate;
+            dueDate = terms.dueDate;
             
             factors.downpayment = expectedDownpayment.toString();
             factors.down_payment = expectedDownpayment.toString();
+            factors.rental_duration = rentalDuration;
+            factors.duration = rentalDuration;
+            factors.overdue_rate = overdueRate;
+            factors.due_date = dueDate;
             
             pricingFactors = JSON.stringify(factors);
           } catch (e) {
@@ -648,16 +1040,20 @@ const Order = {
           item.final_price,
           item.appointment_date,
           item.rental_start_date,
-          item.rental_end_date,
+          dueDate || item.rental_end_date,
+          rentalDuration,
+          overdueRate,
+          dueDate || item.rental_end_date,
           pricingFactors,
-          item.specific_data || '{}'
+          JSON.stringify(specificData)
         ];
       });
 
       const itemSql = `
         INSERT INTO order_items (
           order_id, service_type, service_id, quantity, base_price, final_price,
-          appointment_date, rental_start_date, rental_end_date, pricing_factors, specific_data,
+          appointment_date, rental_start_date, rental_end_date, rental_duration, overdue_rate, due_date,
+          pricing_factors, specific_data,
           approval_status
         ) VALUES ?
       `;
@@ -1304,6 +1700,7 @@ Order.getRentalOrders = (callback) => {
       DATE_FORMAT(oi.appointment_date, '%Y-%m-%d %H:%i:%s') as appointment_date,
       DATE_FORMAT(oi.rental_start_date, '%Y-%m-%d') as rental_start_date,
       DATE_FORMAT(oi.rental_end_date, '%Y-%m-%d') as rental_end_date,
+      DATE_FORMAT(oi.due_date, '%Y-%m-%d') as due_date,
       COALESCE(
         (SELECT ot.status 
          FROM order_tracking ot 
@@ -1346,7 +1743,8 @@ Order.getRentalOrdersByStatus = (status, callback) => {
       DATE_FORMAT(o.order_date, '%Y-%m-%d %H:%i:%s') as order_date,
       DATE_FORMAT(oi.appointment_date, '%Y-%m-%d %H:%i:%s') as appointment_date,
       DATE_FORMAT(oi.rental_start_date, '%Y-%m-%d') as rental_start_date,
-      DATE_FORMAT(oi.rental_end_date, '%Y-%m-%d') as rental_end_date
+      DATE_FORMAT(oi.rental_end_date, '%Y-%m-%d') as rental_end_date,
+      DATE_FORMAT(oi.due_date, '%Y-%m-%d') as due_date
     FROM order_items oi
     JOIN orders o ON oi.order_id = o.order_id
     LEFT JOIN user u ON o.user_id = u.user_id

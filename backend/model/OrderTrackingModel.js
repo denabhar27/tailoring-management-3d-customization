@@ -56,7 +56,10 @@ const OrderTracking = {
         oi.deposit_refund_date,
         DATE_FORMAT(oi.rental_start_date, '%Y-%m-%d') as rental_start_date,
         DATE_FORMAT(oi.rental_end_date, '%Y-%m-%d') as rental_end_date,
-        DATEDIFF(oi.rental_end_date, oi.rental_start_date) as rental_period,
+        oi.rental_duration,
+        oi.overdue_rate,
+        DATE_FORMAT(oi.due_date, '%Y-%m-%d') as due_date,
+        DATEDIFF(COALESCE(oi.due_date, oi.rental_end_date), oi.rental_start_date) as rental_period,
         COALESCE(
           (SELECT ot.status 
            FROM order_tracking ot 

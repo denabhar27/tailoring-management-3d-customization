@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 console.log('ENV API URL:', process.env.EXPO_PUBLIC_API_BASE_URL);
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.202:5000/api';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.66:5000/api';
 console.log('Using API_BASE_URL:', API_BASE_URL);
 const REQUEST_TIMEOUT = parseInt(process.env.EXPO_PUBLIC_REQUEST_TIMEOUT || '10000', 10);
 
@@ -354,10 +354,43 @@ export const orderTrackingService = {
     });
   },
 
+  requestEnhancement: async (orderItemId: string, payload: { notes: string; preferredCompletionDate?: string | null; addAccessories?: boolean }) => {
+    return apiCall(`/tracking/request-enhancement/${orderItemId}`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
   cancelOrderItem: async (orderItemId: string, reason: string) => {
     return apiCall(`/orders/items/${orderItemId}/cancel`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
+    });
+  }
+};
+
+export const damageRecordService = {
+  getCompensationIncidents: async (params?: { orderItemId?: string | number; myOnly?: boolean; serviceType?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.orderItemId) query.set('order_item_id', String(params.orderItemId));
+    if (params?.myOnly) query.set('my_only', 'true');
+    if (params?.serviceType) query.set('service_type', params.serviceType);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return apiCall(`/damage-records/compensation-incidents${suffix}`);
+  },
+
+  submitCustomerLiabilityDecision: async (
+    incidentId: string | number,
+    payload: {
+      liability_status: 'approved' | 'rejected';
+      customer_compensation_choice?: 'money' | 'clothe';
+      customer_proceed_choice?: 'proceed' | 'dont_proceed';
+      notes?: string;
+    }
+  ) => {
+    return apiCall(`/damage-records/compensation-incidents/${incidentId}/customer-liability`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
     });
   }
 };

@@ -23,7 +23,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 
 import { orderStore, Order } from "../../../utils/orderStore";
-import { authService, orderTrackingService, notificationService, measurementsService, API_BASE_URL } from "../../../utils/apiService";
+import { authService, orderTrackingService, notificationService, measurementsService, damageRecordService, API_BASE_URL } from "../../../utils/apiService";
 
 const { width, height } = Dimensions.get("window");
 
@@ -39,6 +39,26 @@ interface Measurements {
   top?: { [key: string]: string };
   bottom?: { [key: string]: string };
   notes?: string;
+}
+
+interface CompensationIncident {
+  id: number;
+  order_item_id: number;
+  service_type?: string;
+  damage_type?: string;
+  damage_description?: string;
+  compensation_amount?: string | number;
+  compensation_type?: 'money' | 'clothe' | 'both';
+  clothe_description?: string;
+  damaged_quantity?: string | number;
+  total_quantity?: string | number;
+  damaged_garment_type?: string;
+  liability_status?: 'pending' | 'approved' | 'rejected' | string;
+  compensation_status?: 'unpaid' | 'paid' | string;
+  customer_compensation_choice?: 'money' | 'clothe' | string;
+  customer_proceed_choice?: 'proceed' | 'dont_proceed' | string;
+  payment_reference?: string;
+  compensation_paid_at?: string;
 }
 
 export default function ProfileScreen() {
@@ -67,6 +87,14 @@ export default function ProfileScreen() {
   const [profilePicUri, setProfilePicUri] = useState<string | null>(null);
   const [uploadingPic, setUploadingPic] = useState(false);
   const [pendingPicture, setPendingPicture] = useState<{ uri: string; name: string; type: string } | null>(null);
+  const [compensationIncidentsByItem, setCompensationIncidentsByItem] = useState<Record<number, CompensationIncident>>({});
+  const [compensationModalVisible, setCompensationModalVisible] = useState(false);
+  const [selectedCompensationIncident, setSelectedCompensationIncident] = useState<CompensationIncident | null>(null);
+  const [selectedCompensationOrderItemId, setSelectedCompensationOrderItemId] = useState<number | null>(null);
+  const [selectedCompensationServiceType, setSelectedCompensationServiceType] = useState('');
+  const [customerCompensationChoice, setCustomerCompensationChoice] = useState<Record<number, 'money' | 'clothe'>>({});
+  const [customerProceedChoice, setCustomerProceedChoice] = useState<Record<number, 'proceed' | 'dont_proceed'>>({});
+  const [submittingLiabilityDecision, setSubmittingLiabilityDecision] = useState(false);
 
   useEffect(() => {
     setOrders(orderStore.getOrders());
@@ -132,6 +160,7 @@ export default function ProfileScreen() {
         })).filter((order: any) => order.items.length > 0);
 
         setOrders(filteredOrders);
+        await fetchCompensationIncidents(filteredOrders);
         console.log("Filtered orders data:", filteredOrders);
       } else {
         setError(result.message || 'Failed to fetch orders');
@@ -139,6 +168,7 @@ export default function ProfileScreen() {
     } catch (err) {
       console.error('Error fetching orders:', err);
       setError('Error loading orders');
+      setCompensationIncidentsByItem({});
     } finally {
       if (isRefreshing) {
         setRefreshing(false);
@@ -218,6 +248,116 @@ export default function ProfileScreen() {
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+  const formatCurrencyPHP = (value: string | number | null | undefined) => {
+    const amount = Number(value || 0);
+    return `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const fetchCompensationIncidents = async (orderList: any[]) => {
+    try {
+      const response = await damageRecordService.getCompensationIncidents({ myOnly: true });
+      const incidents = Array.isArray(response?.incidents) ? response.incidents : [];
+
+      const validOrderItemIds = new Set(
+        (orderList || [])
+          .flatMap((o: any) => Array.isArray(o.items) ? o.items : [])
+          .map((i: any) => Number(i.order_item_id))
+          .filter((id: number) => Number.isFinite(id) && id > 0)
+      );
+
+      const incidentMap: Record<number, CompensationIncident> = {};
+      incidents.forEach((incident: CompensationIncident) => {
+        const orderItemId = Number(incident?.order_item_id);
+        if (!Number.isFinite(orderItemId) || orderItemId <= 0) return;
+        if (!validOrderItemIds.has(orderItemId)) return;
+        if (!incidentMap[orderItemId]) {
+          incidentMap[orderItemId] = incident;
+        }
+      });
+
+      setCompensationIncidentsByItem(incidentMap);
+    } catch (incidentError) {
+      console.error('Error fetching compensation incidents:', incidentError);
+      setCompensationIncidentsByItem({});
+    }
+  };
+
+  const openCompensationModal = (item: any) => {
+    const orderItemId = Number(item?.order_item_id);
+    if (!orderItemId) return;
+
+    const incident = compensationIncidentsByItem[orderItemId];
+    if (!incident) return;
+
+    const serviceType = String(item?.service_type || incident?.service_type || '').toLowerCase();
+    const defaultCompChoice: 'money' | 'clothe' =
+      incident?.customer_compensation_choice === 'clothe' || incident?.compensation_type === 'clothe'
+        ? 'clothe'
+        : 'money';
+    const defaultProceedChoice: 'proceed' | 'dont_proceed' =
+      incident?.customer_proceed_choice === 'dont_proceed' ? 'dont_proceed' : 'proceed';
+
+    setSelectedCompensationIncident(incident);
+    setSelectedCompensationOrderItemId(orderItemId);
+    setSelectedCompensationServiceType(serviceType);
+    setCustomerCompensationChoice((prev) => ({ ...prev, [orderItemId]: defaultCompChoice }));
+    setCustomerProceedChoice((prev) => ({ ...prev, [orderItemId]: defaultProceedChoice }));
+    setCompensationModalVisible(true);
+  };
+
+  const closeCompensationModal = () => {
+    setCompensationModalVisible(false);
+    setSelectedCompensationIncident(null);
+    setSelectedCompensationOrderItemId(null);
+    setSelectedCompensationServiceType('');
+  };
+
+  const handleCustomerLiabilityDecision = async (decision: 'approved' | 'rejected') => {
+    if (!selectedCompensationIncident?.id || !selectedCompensationOrderItemId) return;
+
+    const isApprove = decision === 'approved';
+    const isRentalDamageChargeFlow = selectedCompensationServiceType === 'rental';
+
+    const selectedCompChoice = customerCompensationChoice[selectedCompensationOrderItemId] || 'money';
+    const selectedProceedChoice = customerProceedChoice[selectedCompensationOrderItemId] || 'proceed';
+
+    try {
+      setSubmittingLiabilityDecision(true);
+      const result = await damageRecordService.submitCustomerLiabilityDecision(selectedCompensationIncident.id, {
+        liability_status: decision,
+        customer_compensation_choice: isApprove ? selectedCompChoice : undefined,
+        customer_proceed_choice: isApprove ? selectedProceedChoice : undefined,
+      });
+
+      if (!result?.success) {
+        Alert.alert('Error', result?.message || 'Failed to submit your decision');
+        return;
+      }
+
+      if (isApprove) {
+        Alert.alert(
+          'Decision Submitted',
+          `You selected ${selectedCompChoice === 'clothe' ? 'clothe replacement' : (isRentalDamageChargeFlow ? 'damage payment' : 'money compensation')}. ${selectedProceedChoice === 'proceed' ? 'Your order will proceed.' : 'Your order will not proceed.'}`
+        );
+      } else {
+        Alert.alert(
+          'Decision Submitted',
+          isRentalDamageChargeFlow
+            ? 'Damage charge disputed. Admin will review and provide an update.'
+            : 'Compensation declined. Admin will review and provide an updated decision.'
+        );
+      }
+
+      closeCompensationModal();
+      await fetchOrderTracking();
+    } catch (decisionError: any) {
+      Alert.alert('Error', decisionError?.message || 'Failed to submit your decision');
+      console.error('Error submitting liability decision:', decisionError);
+    } finally {
+      setSubmittingLiabilityDecision(false);
+    }
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -853,6 +993,16 @@ export default function ProfileScreen() {
                     item.pricing_factors?.isUniform === true
                   );
                   const finalPrice = parseFloat(item.final_price);
+                  const compensationIncidentForItem = compensationIncidentsByItem[Number(item.order_item_id)] || null;
+                  const hasCompensationIncident = !!compensationIncidentForItem;
+                  const liabilityStatus = String(compensationIncidentForItem?.liability_status || '').toLowerCase();
+                  const compensationStatus = String(compensationIncidentForItem?.compensation_status || '').toLowerCase();
+                  const isLiabilityPendingIncident = hasCompensationIncident && liabilityStatus === 'pending';
+                  const isLiabilityRejectedIncident = hasCompensationIncident && liabilityStatus === 'rejected';
+                  const isCompensationPaid = hasCompensationIncident && compensationStatus === 'paid';
+                  const isRentalDamageChargeFlow = String(item.service_type || compensationIncidentForItem?.service_type || '').toLowerCase() === 'rental';
+                  const settlementLabel = isRentalDamageChargeFlow ? 'Damage Charge' : 'Compensation';
+                  const amountLabel = isRentalDamageChargeFlow ? 'Damage Charge Amount' : 'Compensation Amount';
 
                   return (
                     <View key={`${item.order_id}-${item.order_item_id}`} style={styles.orderCard}>
@@ -895,6 +1045,20 @@ export default function ProfileScreen() {
                             {getStatusLabel(item.status)}
                           </Text>
                         </View>
+                        {hasCompensationIncident && (
+                          <TouchableOpacity
+                            style={styles.compensationAttentionButton}
+                            onPress={() => openCompensationModal(item)}
+                            activeOpacity={0.85}
+                          >
+                            <Ionicons name={isLiabilityPendingIncident ? 'alert-circle' : 'document-text-outline'} size={16} color="#fff" />
+                            <Text style={styles.compensationAttentionButtonText}>
+                              {isLiabilityPendingIncident
+                                ? (isRentalDamageChargeFlow ? 'Review Charge' : 'Review Compensation')
+                                : (isRentalDamageChargeFlow ? 'View Charge' : 'View Compensation')}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                       {(estimatedPrice > 0 || parseFloat(item.final_price) > 0) && (
                         <View style={styles.priceComparison}>
@@ -1027,6 +1191,62 @@ export default function ProfileScreen() {
                           )}
                         </View>
                       </View>
+                      {hasCompensationIncident && (
+                        <View style={styles.compensationSummaryCard}>
+                          <View style={styles.compensationSummaryHeader}>
+                            <Ionicons
+                              name={isLiabilityPendingIncident ? 'warning' : (isLiabilityRejectedIncident ? 'close-circle' : 'information-circle')}
+                              size={18}
+                              color={isLiabilityPendingIncident ? '#EA580C' : (isLiabilityRejectedIncident ? '#B91C1C' : '#1D4ED8')}
+                            />
+                            <Text style={styles.compensationSummaryTitle}>
+                              {isRentalDamageChargeFlow ? 'Damage Charge Update' : 'Compensation Update'}
+                            </Text>
+                          </View>
+
+                          <Text style={styles.compensationSummaryText}>
+                            {amountLabel}: {formatCurrencyPHP(compensationIncidentForItem?.compensation_amount || 0)}
+                          </Text>
+
+                          {!!compensationIncidentForItem?.damaged_quantity && !!compensationIncidentForItem?.total_quantity && (
+                            <Text style={styles.compensationSummaryText}>
+                              Affected Quantity: {compensationIncidentForItem?.damaged_quantity} of {compensationIncidentForItem?.total_quantity} piece(s)
+                            </Text>
+                          )}
+
+                          <Text style={styles.compensationSummaryText}>
+                            Liability: {compensationIncidentForItem?.liability_status || 'N/A'} / {settlementLabel}: {compensationIncidentForItem?.compensation_status || 'N/A'}
+                          </Text>
+
+                          {isLiabilityPendingIncident && (
+                            <Text style={styles.compensationSummaryHint}>
+                              Please review and respond to this {isRentalDamageChargeFlow ? 'damage charge' : 'compensation'}.
+                            </Text>
+                          )}
+                          {isLiabilityRejectedIncident && (
+                            <Text style={styles.compensationSummaryHint}>
+                              You declined this decision. Waiting for admin update.
+                            </Text>
+                          )}
+                          {isCompensationPaid && (
+                            <Text style={styles.compensationSummaryHint}>
+                              {isRentalDamageChargeFlow
+                                ? 'Damage charge is marked as paid.'
+                                : 'Compensation is marked as paid by staff.'}
+                            </Text>
+                          )}
+
+                          <TouchableOpacity
+                            style={styles.compensationViewButton}
+                            onPress={() => openCompensationModal(item)}
+                            activeOpacity={0.85}
+                          >
+                            <Text style={styles.compensationViewButtonText}>
+                              {isRentalDamageChargeFlow ? 'View Damage Charge' : 'View Compensation'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
                       {shouldShowPriceConfirmation(item) && (
                         <View style={styles.priceConfirmationActions}>
                           <View style={styles.confirmationMessage}>
@@ -1285,6 +1505,174 @@ export default function ProfileScreen() {
             </View>
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+      <Modal
+        visible={compensationModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeCompensationModal}
+      >
+        <View style={styles.compensationModalOverlay}>
+          <View style={styles.compensationModalCard}>
+            <View style={styles.compensationModalHeader}>
+              <Text style={styles.compensationModalTitle}>
+                {selectedCompensationServiceType === 'rental' ? 'Damage Charge Details' : 'Compensation Details'}
+              </Text>
+              <TouchableOpacity onPress={closeCompensationModal} style={styles.compensationModalCloseBtn}>
+                <Ionicons name="close" size={22} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.compensationModalBody} contentContainerStyle={{ paddingBottom: 8 }}>
+              <View style={styles.compensationDetailBox}>
+                <Text style={styles.compensationDetailText}>Damage Type: {selectedCompensationIncident?.damage_type || 'N/A'}</Text>
+                <Text style={styles.compensationDetailText}>Description: {selectedCompensationIncident?.damage_description || 'N/A'}</Text>
+                {!!selectedCompensationIncident?.damaged_quantity && !!selectedCompensationIncident?.total_quantity && (
+                  <Text style={styles.compensationDetailText}>
+                    Affected Quantity: {selectedCompensationIncident?.damaged_quantity} of {selectedCompensationIncident?.total_quantity} piece(s)
+                  </Text>
+                )}
+
+                {selectedCompensationIncident?.compensation_type === 'clothe' && selectedCompensationServiceType !== 'rental' ? (
+                  <Text style={styles.compensationDetailText}>
+                    Compensation: Clothe - {selectedCompensationIncident?.clothe_description || 'Replacement garment'}
+                  </Text>
+                ) : selectedCompensationIncident?.compensation_type === 'both' && selectedCompensationServiceType !== 'rental' ? (
+                  <>
+                    <Text style={styles.compensationDetailText}>Money Option: {formatCurrencyPHP(selectedCompensationIncident?.compensation_amount || 0)}</Text>
+                    <Text style={styles.compensationDetailText}>Clothe Option: {selectedCompensationIncident?.clothe_description || 'Replacement garment'}</Text>
+                  </>
+                ) : (
+                  <Text style={styles.compensationDetailText}>
+                    {selectedCompensationServiceType === 'rental' ? 'Damage Charge Amount' : 'Compensation Amount'}: {formatCurrencyPHP(selectedCompensationIncident?.compensation_amount || 0)}
+                  </Text>
+                )}
+
+                <Text style={styles.compensationDetailText}>
+                  Liability Status: {String(selectedCompensationIncident?.liability_status || 'pending').replace(/_/g, ' ')}
+                </Text>
+                <Text style={styles.compensationDetailText}>
+                  {selectedCompensationServiceType === 'rental' ? 'Damage Charge' : 'Compensation'} Status: {String(selectedCompensationIncident?.compensation_status || 'unpaid').replace(/_/g, ' ')}
+                </Text>
+                {!!selectedCompensationIncident?.customer_compensation_choice && (
+                  <Text style={styles.compensationDetailText}>
+                    Your Choice: {selectedCompensationIncident?.customer_compensation_choice === 'clothe' ? 'Clothe replacement' : (selectedCompensationServiceType === 'rental' ? 'Damage payment' : 'Money')}
+                  </Text>
+                )}
+                {!!selectedCompensationIncident?.customer_proceed_choice && (
+                  <Text style={styles.compensationDetailText}>
+                    Order Proceed: {selectedCompensationIncident?.customer_proceed_choice === 'proceed' ? 'Proceed' : 'Do not proceed'}
+                  </Text>
+                )}
+              </View>
+
+              {String(selectedCompensationIncident?.compensation_status || '').toLowerCase() === 'paid' && (
+                <View style={styles.compensationPaidBanner}>
+                  <Text style={styles.compensationPaidBannerText}>
+                    {selectedCompensationServiceType === 'rental'
+                      ? 'Damage charge has been marked as paid by staff.'
+                      : 'Compensation has been marked as paid. Please claim in store.'}
+                  </Text>
+                </View>
+              )}
+
+              {String(selectedCompensationIncident?.liability_status || '').toLowerCase() === 'pending' && selectedCompensationOrderItemId && (
+                <View style={styles.compensationActionPanel}>
+                  <Text style={styles.compensationPanelTitle}>
+                    {selectedCompensationServiceType === 'rental' ? 'Confirm damage charge:' : 'Choose compensation:'}
+                  </Text>
+
+                  <View style={styles.compensationChoiceRow}>
+                    {(selectedCompensationIncident?.compensation_type === 'money' || selectedCompensationIncident?.compensation_type === 'both' || selectedCompensationServiceType === 'rental') && (
+                      <TouchableOpacity
+                        style={styles.choiceOption}
+                        onPress={() => setCustomerCompensationChoice((prev) => ({ ...prev, [selectedCompensationOrderItemId]: 'money' }))}
+                      >
+                        <Ionicons
+                          name={customerCompensationChoice[selectedCompensationOrderItemId] !== 'clothe' ? 'radio-button-on' : 'radio-button-off'}
+                          size={18}
+                          color="#7C3AED"
+                        />
+                        <Text style={styles.choiceOptionText}>
+                          {selectedCompensationServiceType === 'rental' ? 'Damage payment' : 'Money'} - {formatCurrencyPHP(selectedCompensationIncident?.compensation_amount || 0)}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {(selectedCompensationIncident?.compensation_type === 'clothe' || selectedCompensationIncident?.compensation_type === 'both') && selectedCompensationServiceType !== 'rental' && (
+                      <TouchableOpacity
+                        style={styles.choiceOption}
+                        onPress={() => setCustomerCompensationChoice((prev) => ({ ...prev, [selectedCompensationOrderItemId]: 'clothe' }))}
+                      >
+                        <Ionicons
+                          name={customerCompensationChoice[selectedCompensationOrderItemId] === 'clothe' ? 'radio-button-on' : 'radio-button-off'}
+                          size={18}
+                          color="#7C3AED"
+                        />
+                        <Text style={styles.choiceOptionText}>
+                          Clothe - {selectedCompensationIncident?.clothe_description || 'Replacement garment'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  <Text style={styles.compensationPanelTitle}>Do you want the order to proceed?</Text>
+                  <View style={styles.compensationChoiceRow}>
+                    <TouchableOpacity
+                      style={styles.choiceOption}
+                      onPress={() => setCustomerProceedChoice((prev) => ({ ...prev, [selectedCompensationOrderItemId]: 'proceed' }))}
+                    >
+                      <Ionicons
+                        name={customerProceedChoice[selectedCompensationOrderItemId] !== 'dont_proceed' ? 'radio-button-on' : 'radio-button-off'}
+                        size={18}
+                        color="#7C3AED"
+                      />
+                      <Text style={styles.choiceOptionText}>Yes, proceed</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.choiceOption}
+                      onPress={() => setCustomerProceedChoice((prev) => ({ ...prev, [selectedCompensationOrderItemId]: 'dont_proceed' }))}
+                    >
+                      <Ionicons
+                        name={customerProceedChoice[selectedCompensationOrderItemId] === 'dont_proceed' ? 'radio-button-on' : 'radio-button-off'}
+                        size={18}
+                        color="#7C3AED"
+                      />
+                      <Text style={styles.choiceOptionText}>No, do not proceed</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.compensationActionButtons}>
+                    <TouchableOpacity
+                      style={[styles.compensationDeclineBtn, submittingLiabilityDecision && styles.compensationActionDisabled]}
+                      onPress={() => handleCustomerLiabilityDecision('rejected')}
+                      disabled={submittingLiabilityDecision}
+                    >
+                      <Text style={styles.compensationDeclineBtnText}>
+                        {submittingLiabilityDecision
+                          ? 'Submitting...'
+                          : (selectedCompensationServiceType === 'rental' ? 'Dispute Charge' : 'Decline Compensation')}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.compensationAcceptBtn, submittingLiabilityDecision && styles.compensationActionDisabled]}
+                      onPress={() => handleCustomerLiabilityDecision('approved')}
+                      disabled={submittingLiabilityDecision}
+                    >
+                      <Text style={styles.compensationAcceptBtnText}>
+                        {submittingLiabilityDecision
+                          ? 'Submitting...'
+                          : (selectedCompensationServiceType === 'rental' ? 'Accept Charge' : 'Accept Compensation')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
       <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <TouchableOpacity onPress={() => router.push("/home")}>
@@ -1548,7 +1936,25 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   orderStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
     marginBottom: 12,
+  },
+  compensationAttentionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#B45309",
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    gap: 6,
+  },
+  compensationAttentionButtonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
   },
   priceComparison: {
     backgroundColor: "#F9FAFB",
@@ -1603,6 +2009,48 @@ const styles = StyleSheet.create({
   },
   orderTimeline: {
     marginBottom: 16,
+  },
+  compensationSummaryCard: {
+    backgroundColor: "#FFF7ED",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FDBA74",
+    padding: 12,
+    marginBottom: 14,
+  },
+  compensationSummaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  compensationSummaryTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#7C2D12",
+  },
+  compensationSummaryText: {
+    fontSize: 13,
+    color: "#9A3412",
+    marginBottom: 4,
+  },
+  compensationSummaryHint: {
+    fontSize: 13,
+    color: "#C2410C",
+    marginTop: 4,
+  },
+  compensationViewButton: {
+    alignSelf: "flex-end",
+    marginTop: 8,
+    backgroundColor: "#8B4513",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  compensationViewButtonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
   },
   timelineContainer: {
     flexDirection: "column",
@@ -1797,6 +2245,118 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
+  },
+  compensationModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    justifyContent: "center",
+    padding: 16,
+  },
+  compensationModalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    maxHeight: "90%",
+    overflow: "hidden",
+  },
+  compensationModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  compensationModalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  compensationModalCloseBtn: {
+    padding: 4,
+  },
+  compensationModalBody: {
+    padding: 14,
+  },
+  compensationDetailBox: {
+    backgroundColor: "#FFF8E1",
+    borderWidth: 1,
+    borderColor: "#F2D28B",
+    borderRadius: 10,
+    padding: 12,
+  },
+  compensationDetailText: {
+    fontSize: 13,
+    color: "#7C2D12",
+    marginBottom: 6,
+    lineHeight: 18,
+  },
+  compensationPaidBanner: {
+    marginTop: 12,
+    backgroundColor: "#E8F5E9",
+    borderColor: "#A5D6A7",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+  },
+  compensationPaidBannerText: {
+    color: "#1B5E20",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  compensationActionPanel: {
+    marginTop: 12,
+    gap: 10,
+  },
+  compensationPanelTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  compensationChoiceRow: {
+    gap: 8,
+  },
+  choiceOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  choiceOptionText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#374151",
+  },
+  compensationActionButtons: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+  },
+  compensationDeclineBtn: {
+    flex: 1,
+    backgroundColor: "#C62828",
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  compensationDeclineBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  compensationAcceptBtn: {
+    flex: 1,
+    backgroundColor: "#2E7D32",
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  compensationAcceptBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  compensationActionDisabled: {
+    opacity: 0.65,
   },
   modalContainer: {
     flex: 1,

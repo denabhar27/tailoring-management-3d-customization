@@ -1,50 +1,71 @@
-# Welcome to your Expo app 👋
+# Web User vs Mobile User Parity List
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Goal: list what the web user app has that the mobile user app still does not have.
 
-## Get started
+## Compared Apps
 
-1. Install dependencies
+- Web user: tailoring-management-user/src/user and related user components
+- Mobile user: react-native/my-tailoring-app/app and related mobile utilities
 
-   ```bash
-   npm install
-   ```
+## Web User Features Missing on Mobile User
 
-2. Start the app
+### High Priority (core user actions)
 
-   ```bash
-   npx expo start
-   ```
+- [ ] Price confirmation action buttons (Accept / Decline)
+  - Web user can respond when admin changes price
+  - Mobile user currently sees the status/notes but no action buttons
 
-In the output, you'll find options to open the app in a
+- [ ] Compensation decision flow (damage/liability)
+  - Web user can review compensation case and respond
+  - Mobile user has no compensation decision UI
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- [ ] Enhancement request flow after service completion
+  - Web user can request enhancements and track enhancement result
+  - Mobile user has no enhancement request screen/flow
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Medium Priority (tracking and transparency)
 
-## Get a fresh project
+- [ ] Full order detail parity (web-style detail breakdown and richer status context)
+- [ ] Full transaction detail modal parity (web has richer per-order detail)
+- [ ] Rental deposit refund status visibility
+- [ ] Rental overdue penalty visibility (per day and total)
+- [ ] Better display of admin update reason/context in the order flow
 
-When you're ready, run:
+### User Self-Service Gaps
 
-```bash
-npm run reset-project
-```
+- [ ] Measurement self-management from mobile (add/edit/update), if this is intended for users
+- [ ] Cancel order item from mobile profile/history with reason input
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### UI/Info Gaps
 
-## Learn more
+- [ ] Richer rental bundle/item detail display like web
+- [ ] Complete parity for service-specific order cards and details
 
-To learn more about developing your project with Expo, look at the following resources:
+## Mobile User Features Already Present
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- Login/signup/forgot password
+- Home, FAQ, contact, notifications
+- Core services: customization, dry cleaning, repair, rental
+- Cart flow and order preview
+- Order history and transaction log screen
+- Profile with timeline display and measurement view
+- Appointment date/time slot booking
 
-## Join the community
+## Quick Build Order
 
-Join our community of developers creating universal apps.
+1. Price confirmation accept/decline UI + API wiring
+2. Compensation decision UI + API wiring
+3. Enhancement request UI + status tracking
+4. Rental penalty and deposit refund visibility
+5. Remaining detail and self-service parity
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Code Reference Pointers
+
+- Web user profile/details: tailoring-management-user/src/user/Profile.jsx
+- Web user order details: tailoring-management-user/src/user/OrderDetailsModal.jsx
+- Web transaction details: tailoring-management-user/src/user/components/TransactionLogModal.jsx
+- Mobile profile: react-native/my-tailoring-app/app/(tabs)/UserProfile/profile.tsx
+- Mobile order history: react-native/my-tailoring-app/app/(tabs)/orders/OrderHistory.tsx
+- Mobile order details: react-native/my-tailoring-app/app/(tabs)/orders/[id].tsx
+- Mobile cart: react-native/my-tailoring-app/app/(tabs)/cart/Cart.tsx
+- Mobile APIs: react-native/my-tailoring-app/utils/apiService.ts

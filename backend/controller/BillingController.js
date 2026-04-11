@@ -208,6 +208,8 @@ exports.getAllBillingRecords = (req, res) => {
 
       return {
         id: item.item_id,
+        orderId: item.order_id,
+        displayId: `ORD-${item.order_id}`,
         uniqueNo: uniqueNo,
         customerName: item.order_type === 'walk_in' 
           ? (item.walk_in_customer_name || 'Walk-in Customer')
@@ -364,6 +366,8 @@ exports.getBillingRecordsByStatus = (req, res) => {
 
       return {
         id: item.item_id,
+        orderId: item.order_id,
+        displayId: `ORD-${item.order_id}`,
         uniqueNo: uniqueNo,
         customerName: item.order_type === 'walk_in' 
           ? (item.walk_in_customer_name || 'Walk-in Customer')

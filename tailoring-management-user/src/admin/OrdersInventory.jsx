@@ -435,7 +435,7 @@ const OrdersInventory = () => {
     combined = combined.filter(item => {
       // Search filter
       const matchesSearch = searchTerm === '' ||
-        item.uniqueNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.displayId || item.uniqueNo)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.displayService?.toLowerCase().includes(searchTerm.toLowerCase());
       
@@ -1066,7 +1066,7 @@ const OrdersInventory = () => {
     try {
       const currentUser = getUser();
       const reportRows = combinedData.map((item) => ({
-        'ID': item.uniqueNo || '',
+        'ID': item.dataType === 'order' ? (item.displayId || item.uniqueNo || '') : (item.uniqueNo || ''),
         'Customer/Item': item.displayName || '',
         'Service/Category': item.displayService || '',
         'Amount/Price': parseFloat(item.displayAmount || 0),
@@ -1272,6 +1272,7 @@ const OrdersInventory = () => {
                     </tr>
                   ) : (
                     combinedData.map(item => {
+                      const rowId = item.dataType === 'order' ? (item.displayId || item.uniqueNo || '') : (item.uniqueNo || '');
 
                       return (
                         <tr 
@@ -1279,7 +1280,7 @@ const OrdersInventory = () => {
                           onClick={() => handleViewDetails(item)}
                           className="clickable-row"
                         >
-                          <td><strong>{item.uniqueNo}</strong></td>
+                          <td><strong>{rowId}</strong></td>
                           <td>{item.displayName}</td>
                           <td>
                             <span className="service-type-badge" data-service-type={(item.serviceType || '').toLowerCase()}>
@@ -1527,8 +1528,8 @@ const OrdersInventory = () => {
             </div>
             <div className="modal-body">
               <div className="detail-row">
-                <strong>Order ID:</strong>
-                <span>{selectedItem.uniqueNo}</span>
+                <strong>{selectedItem.dataType === 'order' ? 'Order ID:' : 'Item ID:'}</strong>
+                <span>{selectedItem.dataType === 'order' ? (selectedItem.displayId || selectedItem.uniqueNo) : selectedItem.uniqueNo}</span>
               </div>
               <div className="detail-row">
                 <strong>Customer Name:</strong>

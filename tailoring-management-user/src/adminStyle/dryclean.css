@@ -2340,6 +2340,40 @@ tbody td {
 
 }
 
+.btn-receive {
+
+  padding: 12px 24px;
+
+  background: linear-gradient(135deg, #8B4513 0%, #6f360f 100%);
+
+  color: white;
+
+  border: none;
+
+  border-radius: 8px;
+
+  cursor: pointer;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  transition: all 0.3s ease;
+
+  box-shadow: 0 4px 12px rgba(111, 54, 15, 0.28);
+
+}
+
+.btn-receive:hover {
+
+  background: linear-gradient(135deg, #7a3f11 0%, #5e2f0d 100%);
+
+  transform: translateY(-2px);
+
+  box-shadow: 0 6px 16px rgba(94, 47, 13, 0.36);
+
+}
+
 .modal-overlay.confirm-overlay {
 
   z-index: 2000;

@@ -81,6 +81,8 @@ const DryCleaning = () => {
 
   const [savingEstimatedDate, setSavingEstimatedDate] = useState(false);
 
+  const [markingOrderReceived, setMarkingOrderReceived] = useState(false);
+
   const [showEnhanceModal, setShowEnhanceModal] = useState(false);
 
   const [enhanceOrder, setEnhanceOrder] = useState(null);
@@ -234,6 +236,37 @@ const DryCleaning = () => {
 
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
 
+  };
+
+  const getPricingFactors = (order) => {
+    const rawPricingFactors = order?.pricing_factors;
+    if (typeof rawPricingFactors === 'string') {
+      try {
+        return JSON.parse(rawPricingFactors || '{}');
+      } catch (err) {
+        return {};
+      }
+    }
+    return rawPricingFactors || {};
+  };
+
+  const isOrderReceivedByAdmin = (order) => {
+    const pricingFactors = getPricingFactors(order);
+    return Boolean(
+      pricingFactors.adminReceivedClothes ||
+      pricingFactors.receivedByAdmin ||
+      pricingFactors.clothesReceived
+    );
+  };
+
+  const getOrderReceivedAt = (order) => {
+    const pricingFactors = getPricingFactors(order);
+    return (
+      pricingFactors.adminReceivedClothesAt ||
+      pricingFactors.receivedByAdminAt ||
+      pricingFactors.clothesReceivedAt ||
+      null
+    );
   };
 
   const toggleParentOrderCollapse = (orderId) => {
@@ -2005,6 +2038,51 @@ const DryCleaning = () => {
 
   };
 
+  const handleMarkOrderReceived = async () => {
+
+    if (!selectedOrder || selectedOrder.approval_status !== 'accepted') return;
+
+    if (isOrderReceivedByAdmin(selectedOrder)) {
+      showToast('Order is already marked as received.', 'success');
+      return;
+    }
+
+    try {
+      setMarkingOrderReceived(true);
+      const currentPricingFactors = getPricingFactors(selectedOrder);
+      const receivedAt = new Date().toISOString();
+
+      const result = await updateDryCleaningOrderItem(selectedOrder.item_id, {
+        approvalStatus: selectedOrder.approval_status,
+        pricingFactors: {
+          ...currentPricingFactors,
+          adminReceivedClothes: true,
+          adminReceivedClothesAt: receivedAt
+        }
+      });
+
+      if (result.success) {
+        setSelectedOrder((prev) => ({
+          ...prev,
+          pricing_factors: {
+            ...getPricingFactors(prev),
+            adminReceivedClothes: true,
+            adminReceivedClothesAt: receivedAt
+          }
+        }));
+        showToast('Order marked as received.', 'success');
+        loadDryCleaningOrders();
+      } else {
+        showToast(result.message || 'Failed to mark order as received', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to mark order as received', 'error');
+    } finally {
+      setMarkingOrderReceived(false);
+    }
+
+  };
+
 
 
   const openEnhanceModal = (item) => {
@@ -2922,6 +3000,7 @@ const DryCleaning = () => {
                     ? JSON.parse(item.pricing_factors || '{}')
 
                     : (item.pricing_factors || {});
+                  const isReceivedByAdmin = isOrderReceivedByAdmin(item);
 
                   const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
 
@@ -3108,6 +3187,12 @@ const DryCleaning = () => {
                       {pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted && (
                         <div style={{ fontSize: '11px', color: '#673ab7', marginTop: '4px', fontWeight: '600' }}>
                           ✨ Enhancement
+                        </div>
+                      )}
+
+                      {item.approval_status === 'accepted' && isReceivedByAdmin && (
+                        <div style={{ marginTop: '4px', fontSize: '11px', color: '#1b5e20', fontWeight: '600' }}>
+                          Note: Received
                         </div>
                       )}
 
@@ -4479,6 +4564,24 @@ const DryCleaning = () => {
 
               </div>
 
+              {selectedOrder.approval_status === 'accepted' && (
+                <div className="detail-row"><strong>Note:</strong> {(() => {
+                  const isReceivedByAdmin = isOrderReceivedByAdmin(selectedOrder);
+                  if (!isReceivedByAdmin) {
+                    return 'Not yet received';
+                  }
+                  const receivedAt = getOrderReceivedAt(selectedOrder);
+                  if (!receivedAt) {
+                    return 'Received';
+                  }
+                  const parsedDate = new Date(receivedAt);
+                  if (Number.isNaN(parsedDate.getTime())) {
+                    return 'Received';
+                  }
+                  return `Received (${parsedDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })})`;
+                })()}</div>
+              )}
+
 
 
               {selectedOrder.pricing_factors?.adminNotes && (
@@ -4521,6 +4624,17 @@ const DryCleaning = () => {
             </div>
 
             <div className="modal-footer">
+
+              {selectedOrder.approval_status === 'accepted' && (
+                <button
+                  className="btn-receive"
+                  onClick={handleMarkOrderReceived}
+                  disabled={markingOrderReceived || isOrderReceivedByAdmin(selectedOrder)}
+                  style={(markingOrderReceived || isOrderReceivedByAdmin(selectedOrder)) ? { opacity: 0.7, cursor: 'not-allowed' } : undefined}
+                >
+                  {isOrderReceivedByAdmin(selectedOrder) ? 'Received' : (markingOrderReceived ? 'Receiving...' : 'Receive')}
+                </button>
+              )}
 
               <button className="close-btn" onClick={() => setShowDetailModal(false)}>Close</button>
 

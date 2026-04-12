@@ -18,7 +18,7 @@ import { deleteOrderItem } from '../api/OrderApi';
 
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
 
-
+const RENTAL_DEMO_OFFSET_STORAGE_KEY = 'rental_demo_days_offset';
 
 function Rental() {
 
@@ -36,6 +36,11 @@ function Rental() {
   const [collapsedParentOrders, setCollapsedParentOrders] = useState({});
 
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [demoDaysOffset, setDemoDaysOffset] = useState(() => {
+    const saved = parseInt(localStorage.getItem(RENTAL_DEMO_OFFSET_STORAGE_KEY) || '0', 10);
+    if (Number.isNaN(saved)) return 0;
+    return Math.max(0, saved);
+  });
 
   const [showEditModal, setShowEditModal] = useState(false);
 
@@ -140,6 +145,9 @@ function Rental() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    if (demoDaysOffset !== 0) {
+      today.setDate(today.getDate() + demoDaysOffset);
+    }
 
     let nearestDueDiff = Number.POSITIVE_INFINITY;
     let maxDaysOverdue = 0;
@@ -230,6 +238,10 @@ function Rental() {
   const getDepositReturnSnapshot = (rental) => {
     const pricingFactors = parsePricingFactors(rental?.pricing_factors);
     const depositAmount = calcDepositFromRental(rental);
+    const specificData = rental?.specific_data || {};
+    const selectedSizes = Array.isArray(specificData?.bundle_items)
+      ? specificData.bundle_items.flatMap((bundleItem) => bundleItem?.selected_sizes || bundleItem?.selectedSizes || [])
+      : (specificData?.selected_sizes || specificData?.selectedSizes || []);
     
     const refundedAmount = parseFloat(rental?.deposit_refunded || pricingFactors?.deposit_refunded_amount || 0);
     
@@ -303,6 +315,10 @@ function Rental() {
   const closeDepositReturnModal = () => {
     setShowDepositReturnModal(false);
     setDepositReturnAmount('');
+  };
+
+  const closeDetailModal = () => {
+    setShowDetailModal(false);
   };
 
 
@@ -742,7 +758,13 @@ function Rental() {
 
   };
 
-
+  useEffect(() => {
+    localStorage.setItem(RENTAL_DEMO_OFFSET_STORAGE_KEY, String(demoDaysOffset));
+    console.log('🔴 [Admin] Demo offset saved to localStorage:', demoDaysOffset);
+    // Dispatch custom event for same-tab listeners (Profile component)
+    window.dispatchEvent(new CustomEvent('rentalDemoOffsetChanged', { detail: { offset: demoDaysOffset } }));
+    console.log('🔴 [Admin] Custom event dispatched with offset:', demoDaysOffset);
+  }, [demoDaysOffset]);
 
   useEffect(() => {
 
@@ -2600,13 +2622,16 @@ function Rental() {
                     const effectiveDueDate = rentalPenaltySnapshot.dueDate || rental.rental_end_date || null;
                     const basePaymentRequired = finalPrice + calcDepositFromRental(rental);
                     const derivedOverduePaidAmount = Math.max(0, amountPaid - basePaymentRequired);
+                    const storedOverduePaid = Math.max(0, parseFloat(pricingFactors.overdue_paid) || 0);
+                    const storedOverdueDue = Math.max(0, parseFloat(pricingFactors.overdue_total_due) || 0);
                     const overduePaidAmount = Math.max(
-                      0,
-                      parseFloat(pricingFactors.overdue_paid || derivedOverduePaidAmount)
+                      storedOverduePaid,
+                      derivedOverduePaidAmount
                     );
                     const overdueTotalDue = Math.max(
-                      0,
-                      parseFloat(pricingFactors.overdue_total_due || rentalPenaltySnapshot.totalPenalty || derivedOverduePaidAmount)
+                      storedOverdueDue,
+                      Math.max(0, rentalPenaltySnapshot.totalPenalty || 0),
+                      derivedOverduePaidAmount
                     );
                     const overdueIsSettled = overdueTotalDue > 0 && overduePaidAmount >= overdueTotalDue;
 
@@ -3209,56 +3234,68 @@ function Rental() {
 
                                 )}
 
-                                {rental.approval_status !== 'cancelled' && rental.approval_status !== 'price_confirmation' && rental.approval_status !== 'returned' && !(isPending && rental.order_type !== 'walk_in') && (
+                                {(() => {
+                                  const overdueSnapshotForAction = getRentalOverdueOutstanding(rental);
+                                  const hasReturnedUnpaidOverdue =
+                                    rental.approval_status === 'returned'
+                                    && Math.max(0, overdueSnapshotForAction.overdueDueNow || 0) > 0;
+                                  const canShowPaymentAction =
+                                    rental.approval_status !== 'cancelled'
+                                    && rental.approval_status !== 'price_confirmation'
+                                    && !(isPending && rental.order_type !== 'walk_in')
+                                    && (rental.approval_status !== 'returned' || hasReturnedUnpaidOverdue);
 
-                                <button
+                                  if (!canShowPaymentAction) return null;
 
-                                    className="icon-btn"
+                                  return (
+                                    <button
 
-                                    onClick={(e) => {
+                                      className="icon-btn"
 
-                                      e.stopPropagation();
+                                      onClick={(e) => {
 
-                                      setSelectedRental(rental);
+                                        e.stopPropagation();
 
-                                      const paymentSnapshot = getRentalPaymentSnapshot(rental);
-                                      const overdueSnapshot = getRentalOverdueOutstanding(rental);
-                                      const isOverduePayment = statusToDisplay === 'unreturned';
-                                      const initialAmount = isOverduePayment
-                                        ? overdueSnapshot.overdueDueNow
-                                        : paymentSnapshot.totalPayment;
+                                        setSelectedRental(rental);
 
-                                      setPaymentModalMode(isOverduePayment ? 'overdue' : 'regular');
+                                        const paymentSnapshot = getRentalPaymentSnapshot(rental);
+                                        const overdueSnapshot = overdueSnapshotForAction;
+                                        const isOverduePayment = statusToDisplay === 'unreturned' || hasReturnedUnpaidOverdue;
+                                        const initialAmount = isOverduePayment
+                                          ? overdueSnapshot.overdueDueNow
+                                          : paymentSnapshot.totalPayment;
 
-                                      setPaymentAmount(initialAmount > 0 ? initialAmount.toFixed(2) : '');
+                                        setPaymentModalMode(isOverduePayment ? 'overdue' : 'regular');
 
-                                      setRequiredPaymentAmount(isOverduePayment ? 0 : paymentSnapshot.totalPayment);
+                                        setPaymentAmount(initialAmount > 0 ? initialAmount.toFixed(2) : '');
 
-                                      setPendingRentedStatus(null);
+                                        setRequiredPaymentAmount(isOverduePayment ? 0 : paymentSnapshot.totalPayment);
 
-                                      setCashReceived('');
+                                        setPendingRentedStatus(null);
 
-                                      setShowPaymentModal(true);
+                                        setCashReceived('');
 
-                                    }}
+                                        setShowPaymentModal(true);
 
-                                    title={statusToDisplay === 'unreturned' ? 'Overdue Payment' : 'Record Payment'}
+                                      }}
 
-                                    style={{
+                                      title={statusToDisplay === 'unreturned' || hasReturnedUnpaidOverdue ? 'Overdue Payment' : 'Record Payment'}
 
-                                      backgroundColor: statusToDisplay === 'unreturned' ? '#ef6c00' : '#2196F3',
+                                      style={{
 
-                                      color: 'white'
+                                        backgroundColor: statusToDisplay === 'unreturned' || hasReturnedUnpaidOverdue ? '#ef6c00' : '#2196F3',
 
-                                    }}
+                                        color: 'white'
 
-                                  >
+                                      }}
 
-                                    💰
+                                    >
 
-                                </button>
+                                      💰
 
-                              )}
+                                    </button>
+                                  );
+                                })()}
 
                               {(() => {
                                 const refundSnapshot = getDepositReturnSnapshot(rental);
@@ -4270,7 +4307,7 @@ function Rental() {
 
         <div className="modal-overlay active" onClick={(e) => {
 
-          if (e.target.classList.contains('modal-overlay')) setShowDetailModal(false);
+          if (e.target.classList.contains('modal-overlay')) closeDetailModal();
 
         }}>
 
@@ -4280,7 +4317,7 @@ function Rental() {
 
               <h2>Rental Details</h2>
 
-              <span className="close-modal" onClick={() => setShowDetailModal(false)}>×</span>
+              <span className="close-modal" onClick={closeDetailModal}>×</span>
 
             </div>
 
@@ -4975,6 +5012,122 @@ function Rental() {
 
               <div className="detail-row">
 
+                <strong>Demo Time:</strong>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+
+                  <span style={{ color: '#666', fontSize: '0.92rem' }}>
+
+                    {demoDaysOffset === 0 ? 'Today (real time)' : `+${demoDaysOffset} day(s) ahead`}
+
+                  </span>
+
+                  <button
+
+                    type="button"
+
+                    onClick={() => setDemoDaysOffset((prev) => prev + 1)}
+
+                    style={{
+
+                      border: '1px solid #d0d0d0',
+
+                      backgroundColor: '#fff',
+
+                      color: '#5d2f0f',
+
+                      borderRadius: '6px',
+
+                      padding: '4px 10px',
+
+                      cursor: 'pointer',
+
+                      fontWeight: 600,
+
+                      fontSize: '0.82rem'
+
+                    }}
+
+                  >
+
+                    +1 Day
+
+                  </button>
+
+                  <button
+
+                    type="button"
+
+                    onClick={() => setDemoDaysOffset((prev) => prev + 3)}
+
+                    style={{
+
+                      border: '1px solid #d0d0d0',
+
+                      backgroundColor: '#fff',
+
+                      color: '#5d2f0f',
+
+                      borderRadius: '6px',
+
+                      padding: '4px 10px',
+
+                      cursor: 'pointer',
+
+                      fontWeight: 600,
+
+                      fontSize: '0.82rem'
+
+                    }}
+
+                  >
+
+                    +3 Days
+
+                  </button>
+
+                  {demoDaysOffset !== 0 && (
+
+                    <button
+
+                      type="button"
+
+                      onClick={() => setDemoDaysOffset(0)}
+
+                      style={{
+
+                        border: '1px solid #d0d0d0',
+
+                        backgroundColor: '#fafafa',
+
+                        color: '#444',
+
+                        borderRadius: '6px',
+
+                        padding: '4px 10px',
+
+                        cursor: 'pointer',
+
+                        fontWeight: 600,
+
+                        fontSize: '0.82rem'
+
+                      }}
+
+                    >
+
+                      Reset
+
+                    </button>
+
+                  )}
+
+                </div>
+
+              </div>
+
+              <div className="detail-row">
+
                 <strong>Rental Period:</strong>
 
                 <span>
@@ -5510,7 +5663,7 @@ function Rental() {
 
             <div className="modal-footer">
 
-              <button className="btn-cancel" onClick={() => setShowDetailModal(false)}>
+              <button className="btn-cancel" onClick={closeDetailModal}>
 
                 Close
 

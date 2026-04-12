@@ -2369,15 +2369,26 @@ exports.recordRentalPayment = (req, res) => {
     const penaltySnapshot = serviceType === 'rental' ? calculateDynamicPenalty(item, new Date()) : { penaltyAmount: 0 };
     const totalOverdueDueNow = Math.max(0, parseFloat(penaltySnapshot.penaltyAmount || 0));
     const overduePaidSoFar = Math.max(0, parseFloat(pricingFactors.overdue_paid || 0));
-    const outstandingOverdue = Math.max(0, totalOverdueDueNow - overduePaidSoFar);
-    const totalPaymentRequired = basePaymentRequired + outstandingOverdue;
+    const paymentRecordedAtIso = new Date().toISOString();
     const isOverduePayment = String(paymentKind || '').toLowerCase().trim() === 'overdue';
+
+    let effectiveOverdueTotalDue = totalOverdueDueNow;
+    if (serviceType === 'rental' && isOverduePayment && effectiveOverdueTotalDue <= 0) {
+      const persistedOverdueDue = Math.max(0, parseFloat(pricingFactors.overdue_total_due || 0));
+      // Manual overdue payments (including demo-assisted flows) should still be traceable for customer tracking.
+      effectiveOverdueTotalDue = Math.max(persistedOverdueDue, overduePaidSoFar + amount, amount);
+    }
+
+    const outstandingOverdue = Math.max(0, effectiveOverdueTotalDue - overduePaidSoFar);
+    const totalPaymentRequired = basePaymentRequired + outstandingOverdue;
 
     const newAmountPaid = currentAmountPaid + amount;
     const baseOutstandingBeforePayment = Math.max(0, basePaymentRequired - currentAmountPaid);
-    const paymentTowardOverdue = Math.max(0, amount - baseOutstandingBeforePayment);
-    const updatedOverduePaid = Math.min(totalOverdueDueNow, overduePaidSoFar + paymentTowardOverdue);
-    const overdueRemaining = Math.max(0, totalOverdueDueNow - updatedOverduePaid);
+    const paymentTowardOverdue = isOverduePayment
+      ? amount
+      : Math.max(0, amount - baseOutstandingBeforePayment);
+    const updatedOverduePaid = Math.min(effectiveOverdueTotalDue, overduePaidSoFar + paymentTowardOverdue);
+    const overdueRemaining = Math.max(0, effectiveOverdueTotalDue - updatedOverduePaid);
     const remainingBalance = totalPaymentRequired - newAmountPaid;
     const changeAmount = cashTendered - amount;
 
@@ -2391,13 +2402,27 @@ exports.recordRentalPayment = (req, res) => {
     pricingFactors.amount_paid = newAmountPaid.toString();
     pricingFactors.remaining_balance = Math.max(0, remainingBalance).toString();
     if (serviceType === 'rental') {
-      pricingFactors.overdue_total_due = totalOverdueDueNow.toString();
+      pricingFactors.overdue_total_due = effectiveOverdueTotalDue.toString();
       pricingFactors.overdue_paid = updatedOverduePaid.toString();
       pricingFactors.overdue_remaining = overdueRemaining.toString();
-      pricingFactors.penalty = totalOverdueDueNow;
-      pricingFactors.penaltyDays = penaltySnapshot.penaltyDays || 0;
+      pricingFactors.penalty = effectiveOverdueTotalDue;
+      pricingFactors.penaltyDays = penaltySnapshot.penaltyDays || (isOverduePayment ? 1 : 0);
       pricingFactors.penaltyDueDate = penaltySnapshot.primaryDueDate || null;
-      pricingFactors.penaltyLastUpdatedAt = new Date().toISOString();
+      pricingFactors.penaltyLastUpdatedAt = paymentRecordedAtIso;
+      if (isOverduePayment) {
+        pricingFactors.overdue_last_payment_amount = amount.toFixed(2);
+        pricingFactors.overdue_last_payment_at = paymentRecordedAtIso;
+        pricingFactors.overdue_last_payment_method = paymentMethod || 'cash';
+        const paymentEvents = Array.isArray(pricingFactors.overdue_payment_events)
+          ? pricingFactors.overdue_payment_events
+          : [];
+        paymentEvents.push({
+          amount: parseFloat(amount.toFixed(2)),
+          recorded_at: paymentRecordedAtIso,
+          method: paymentMethod || 'cash'
+        });
+        pricingFactors.overdue_payment_events = paymentEvents.slice(-10);
+      }
     }
 
     let newPaymentStatus = item.payment_status || 'unpaid';
@@ -2481,7 +2506,9 @@ exports.recordRentalPayment = (req, res) => {
       }
 
       const TransactionLog = require('../model/TransactionLogModel');
-      const transactionType = newPaymentStatus === 'down-payment' ? 'downpayment' : 
+      const transactionType = isOverduePayment
+              ? 'overdue_payment'
+              : newPaymentStatus === 'down-payment' ? 'downpayment' : 
                               (newPaymentStatus === 'paid' || newPaymentStatus === 'fully_paid') ? 'final_payment' : 'partial_payment';
       
       if (logUserId) {
@@ -2493,7 +2520,7 @@ exports.recordRentalPayment = (req, res) => {
           previous_payment_status: previousPaymentStatus,
           new_payment_status: newPaymentStatus,
           payment_method: paymentMethod || 'cash',
-          notes: `${actorName} recorded payment of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}. Cash received: ₱${cashTendered.toFixed(2)}. Change: ₱${changeAmount.toFixed(2)}. Method: ${paymentMethod || 'cash'}. Customer: ${customerName}`,
+          notes: `${actorName} recorded ${isOverduePayment ? 'overdue payment' : 'payment'} of ₱${amount.toFixed(2)}. Total paid: ₱${newAmountPaid.toFixed(2)} of ₱${finalPrice.toFixed(2)}. Cash received: ₱${cashTendered.toFixed(2)}. Change: ₱${changeAmount.toFixed(2)}. Method: ${paymentMethod || 'cash'}. Customer: ${customerName}`,
           created_by: actorName
         }, (transLogErr, transLogResult) => {
           if (transLogErr) {
@@ -2785,6 +2812,112 @@ exports.recordRentalDepositReturn = (req, res) => {
         }
 
         applyLogs();
+      }
+    );
+  });
+};
+
+exports.confirmRentalDepositReceipt = (req, res) => {
+  const itemId = req.params.id;
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: 'Unauthorized user.'
+    });
+  }
+
+  if (req.user.role === 'admin' || req.user.role === 'clerk') {
+    return res.status(403).json({
+      success: false,
+      message: 'Only customers can confirm deposit receipt.'
+    });
+  }
+
+  Order.getOrderItemById(itemId, (getErr, item) => {
+    if (getErr || !item) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order item not found'
+      });
+    }
+
+    if ((item.service_type || '').toLowerCase().trim() !== 'rental') {
+      return res.status(400).json({
+        success: false,
+        message: 'Deposit receipt confirmation is only available for rental orders.'
+      });
+    }
+
+    if (Number(item.user_id) !== Number(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+      let pricingFactors = {};
+      try {
+        pricingFactors = item.pricing_factors ? JSON.parse(item.pricing_factors) : {};
+      } catch {
+        pricingFactors = {};
+      }
+
+      const refundedAmount = Math.max(
+        0,
+        parseFloat(item.deposit_refunded || pricingFactors.deposit_refunded_amount || 0)
+      );
+
+      if (refundedAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No recorded deposit return found for this order item yet.'
+        });
+      }
+
+      const alreadyConfirmed =
+        pricingFactors.deposit_refund_received === true
+        || String(pricingFactors.deposit_refund_received).toLowerCase() === 'true';
+
+      if (alreadyConfirmed) {
+        return res.json({
+          success: true,
+          message: 'Deposit receipt already confirmed.',
+          confirmation: {
+            received: true,
+            confirmed_at: pricingFactors.deposit_refund_received_at || null,
+            refunded_amount: refundedAmount
+          }
+        });
+      }
+
+      const confirmedAt = new Date().toISOString();
+      pricingFactors.deposit_refund_received = true;
+      pricingFactors.deposit_refund_received_at = confirmedAt;
+      pricingFactors.deposit_refund_received_by = userId;
+
+    db.query(
+      'UPDATE order_items SET pricing_factors = ? WHERE item_id = ?',
+      [JSON.stringify(pricingFactors), itemId],
+      (updateErr) => {
+        if (updateErr) {
+          return res.status(500).json({
+            success: false,
+            message: 'Error confirming deposit receipt',
+            error: updateErr
+          });
+        }
+
+        return res.json({
+          success: true,
+          message: 'Deposit receipt confirmed successfully.',
+          confirmation: {
+            received: true,
+            confirmed_at: confirmedAt,
+            refunded_amount: refundedAmount
+          }
+        });
       }
     );
   });

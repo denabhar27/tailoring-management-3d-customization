@@ -154,3 +154,20 @@ export async function requestEnhancement(orderItemId, notes, preferredCompletion
     };
   }
 }
+
+export async function confirmRentalDepositReceipt(orderItemId) {
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/orders/rental/items/${orderItemId}/confirm-deposit-receipt`,
+      {},
+      { headers: getAuthHeaders() }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Confirm rental deposit receipt error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Error confirming deposit receipt'
+    };
+  }
+}

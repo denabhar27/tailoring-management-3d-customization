@@ -896,6 +896,23 @@ tbody td {
   background: #143d59;
 }
 
+.btn-receive {
+  padding: 5px 20px;
+  background: linear-gradient(135deg, #8B4513 0%, #6f360f 100%);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(111, 54, 15, 0.28);
+}
+
+.btn-receive:hover {
+  background: linear-gradient(135deg, #7a3f11 0%, #5e2f0d 100%);
+  box-shadow: 0 6px 16px rgba(94, 47, 13, 0.36);
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

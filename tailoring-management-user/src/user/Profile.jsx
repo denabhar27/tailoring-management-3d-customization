@@ -5,7 +5,7 @@ import '../styles/Profile.css';
 import logo from "../assets/logo.png";
 import dp from "../assets/dp.png";
 import { getUser, updateProfile, uploadProfilePicture } from '../api/AuthApi';
-import { getUserOrderTracking, getStatusBadgeClass, getStatusLabel, cancelOrderItem, requestEnhancement } from '../api/OrderTrackingApi';
+import { getUserOrderTracking, getStatusBadgeClass, getStatusLabel, cancelOrderItem, requestEnhancement, confirmRentalDepositReceipt } from '../api/OrderTrackingApi';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import TransactionLogModal from './components/TransactionLogModal';
 import { useAlert } from '../context/AlertContext';
@@ -13,6 +13,8 @@ import { getMyMeasurements } from '../api/CustomerApi';
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
 import { API_BASE_URL, API_URL } from '../api/config';
 import { getCompensationIncidents, submitCustomerLiabilityDecision } from '../api/DamageCompensationApi';
+
+const RENTAL_DEMO_OFFSET_STORAGE_KEY = 'rental_demo_days_offset';
 
 const Profile = () => {
   const { alert, confirm } = useAlert();
@@ -51,6 +53,7 @@ const Profile = () => {
   const [enhancePreferredDate, setEnhancePreferredDate] = useState('');
   const [enhanceAddAccessories, setEnhanceAddAccessories] = useState(false);
   const [submittingEnhancement, setSubmittingEnhancement] = useState(false);
+  const [confirmingDepositByItem, setConfirmingDepositByItem] = useState({});
   const [declineReasonModalOpen, setDeclineReasonModalOpen] = useState(false);
   const [declineReasonText, setDeclineReasonText] = useState('');
   const [itemToDecline, setItemToDecline] = useState(null);
@@ -66,6 +69,39 @@ const Profile = () => {
 
   const [transactionLogModalOpen, setTransactionLogModalOpen] = useState(false);
   const [selectedOrderItemId, setSelectedOrderItemId] = useState(null);
+
+  const [demoOffset, setDemoOffset] = useState(() => {
+    const saved = parseInt(localStorage.getItem(RENTAL_DEMO_OFFSET_STORAGE_KEY) || '0', 10);
+    const value = Number.isNaN(saved) ? 0 : Math.max(0, saved);
+    console.log('🟢 [Profile] Initial demoOffset from localStorage:', value);
+    return value;
+  });
+
+  useEffect(() => {
+    const handleDemoOffsetChange = (event) => {
+      let newOffset = 0;
+      
+      // Handle custom event from Admin (same tab)
+      if (event.type === 'rentalDemoOffsetChanged' && event?.detail?.offset !== undefined) {
+        newOffset = Math.max(0, event.detail.offset);
+      } 
+      // Handle storage event (other tabs)
+      else if (event.type === 'storage') {
+        const saved = parseInt(localStorage.getItem(RENTAL_DEMO_OFFSET_STORAGE_KEY) || '0', 10);
+        newOffset = Number.isNaN(saved) ? 0 : Math.max(0, saved);
+      }
+      
+      setDemoOffset(newOffset);
+    };
+    
+    // Listen to custom event (same tab) and storage event (other tabs)
+    window.addEventListener('rentalDemoOffsetChanged', handleDemoOffsetChange);
+    window.addEventListener('storage', handleDemoOffsetChange);
+    return () => {
+      window.removeEventListener('rentalDemoOffsetChanged', handleDemoOffsetChange);
+      window.removeEventListener('storage', handleDemoOffsetChange);
+    };
+  }, []);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileData, setProfileData] = useState({
@@ -655,6 +691,41 @@ const Profile = () => {
       setSubmittingDecline(false);
     }
   };
+
+  const handleConfirmDepositReceipt = async (item) => {
+    const orderItemId = item?.order_item_id;
+    if (!orderItemId) return;
+
+    const confirmed = await confirm(
+      'Confirm that you already received the deposit refund from the store?',
+      'Confirm Deposit Receipt',
+      'question',
+      { confirmText: 'Yes, Received', cancelText: 'Not Yet' }
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setConfirmingDepositByItem((prev) => ({ ...prev, [orderItemId]: true }));
+      const result = await confirmRentalDepositReceipt(orderItemId);
+
+      if (!result.success) {
+        await alert(result.message || 'Failed to confirm deposit receipt.', 'Error', 'error');
+        return;
+      }
+
+      await alert('Deposit receipt confirmed. Thank you!', 'Success', 'success');
+      const ordersResult = await getUserOrderTracking();
+      if (ordersResult.success) {
+        setOrders(ordersResult.data || []);
+      }
+    } catch (error) {
+      await alert('Failed to confirm deposit receipt.', 'Error', 'error');
+    } finally {
+      setConfirmingDepositByItem((prev) => ({ ...prev, [orderItemId]: false }));
+    }
+  };
+
   const closeDetailsModal = () => {
     setSelectedItem(null);
     setDetailsModalOpen(false);
@@ -2008,6 +2079,7 @@ const Profile = () => {
             final_price: item.final_price,
             order_date: order.order_date,
             status_updated_at: item.status_updated_at,
+            updated_at: item.updated_at || order.updated_at,
             specific_data: item.specific_data,
             pricing_factors: item.pricing_factors,
             rental_start_date: item.rental_start_date,
@@ -2018,10 +2090,8 @@ const Profile = () => {
     });
 
     allItems.sort((a, b) => {
-
-      const dateA = a.status_updated_at ? new Date(a.status_updated_at) : new Date(a.order_date);
-      const dateB = b.status_updated_at ? new Date(b.status_updated_at) : new Date(b.order_date);
-
+      const dateA = new Date(a.updated_at || a.status_updated_at || a.order_date || 0).getTime();
+      const dateB = new Date(b.updated_at || b.status_updated_at || b.order_date || 0).getTime();
       return dateB - dateA;
     });
 
@@ -2378,9 +2448,11 @@ const Profile = () => {
                 }, new Map());
 
                 const groupedItems = Array.from(groupedMap.values()).flatMap((group) =>
-                  group.sort((a, b) =>
-                    Number(a.child_order_id || a.order_item_id || 0) - Number(b.child_order_id || b.order_item_id || 0)
-                  )
+                  group.sort((a, b) => {
+                    const dateA = new Date(a.updated_at || a.status_updated_at || a.order_date || 0).getTime();
+                    const dateB = new Date(b.updated_at || b.status_updated_at || b.order_date || 0).getTime();
+                    return dateB - dateA;
+                  })
                 );
 
                 const parentItemCounts = groupedItems.reduce((counts, groupedItem) => {
@@ -2427,6 +2499,72 @@ const Profile = () => {
                 const rentalPaymentMode = String(pricingFactors.rental_payment_mode || 'regular').toLowerCase();
                 const rentalPaymentModeLabel = rentalPaymentMode === 'flat_rate' ? 'Flat Rate' : 'Regular';
                 const rentalFlatRateUntilDate = pricingFactors.flat_rate_until_date || null;
+                const toDateOnly = (value) => {
+                  if (!value) return null;
+                  const raw = String(value).trim();
+                  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+                  return match ? match[1] : null;
+                };
+                const selectedSizesForDueDate = isBundle && Array.isArray(item.specific_data?.bundle_items)
+                  ? item.specific_data.bundle_items.flatMap((bundleItem) => bundleItem.selected_sizes || bundleItem.selectedSizes || [])
+                  : (item.specific_data?.selected_sizes || item.specific_data?.selectedSizes || []);
+                const fallbackDueDate =
+                  toDateOnly(item.due_date)
+                  || toDateOnly(pricingFactors?.due_date)
+                  || (rentalPaymentMode === 'flat_rate' && rentalFlatRateUntilDate ? toDateOnly(rentalFlatRateUntilDate) : null)
+                  || toDateOnly(item.rental_end_date)
+                  || null;
+                const dueDateRows = selectedSizesForDueDate.length > 0
+                  ? selectedSizesForDueDate.map((size) => ({
+                      dueDate: toDateOnly(size?.due_date) || fallbackDueDate
+                    }))
+                  : [{ dueDate: fallbackDueDate }];
+                let nearestDueDate = fallbackDueDate;
+                let nearestDueDiff = Number.POSITIVE_INFINITY;
+                const dueTodayForDiff = new Date();
+                dueTodayForDiff.setHours(0, 0, 0, 0);
+                if (demoOffset !== 0) {
+                  dueTodayForDiff.setDate(dueTodayForDiff.getDate() + demoOffset);
+                }
+                dueDateRows.forEach((row) => {
+                  if (!row.dueDate) return;
+                  const dueDate = new Date(`${row.dueDate}T00:00:00`);
+                  if (Number.isNaN(dueDate.getTime())) return;
+                  const daysUntilDue = Math.ceil((dueDate.getTime() - dueTodayForDiff.getTime()) / (1000 * 60 * 60 * 24));
+                  if (daysUntilDue < nearestDueDiff) {
+                    nearestDueDiff = daysUntilDue;
+                    nearestDueDate = row.dueDate;
+                  }
+                });
+                const overdueRate = Math.max(0, parseFloat(pricingFactors.overdue_rate || 100) || 100);
+                const overdueTotalDue = Math.max(0, parseFloat(pricingFactors.overdue_total_due || pricingFactors.penalty || 0) || 0);
+                const overduePaid = Math.max(0, parseFloat(pricingFactors.overdue_paid || 0) || 0);
+                const overdueRemaining = Math.max(0, parseFloat(pricingFactors.overdue_remaining || (overdueTotalDue - overduePaid)) || 0);
+                const overdueLastPaymentAmount = Math.max(0, parseFloat(pricingFactors.overdue_last_payment_amount || 0) || 0);
+                const overdueLastPaymentAt = pricingFactors.overdue_last_payment_at || null;
+                const overduePaymentEvents = Array.isArray(pricingFactors.overdue_payment_events)
+                  ? pricingFactors.overdue_payment_events
+                  : [];
+                const hasExplicitOverduePaymentRecord = !!overdueLastPaymentAt || overduePaymentEvents.length > 0;
+                const overdueDueDateSource = nearestDueDate || null;
+                let overdueDiffDays = null;
+                if (overdueDueDateSource) {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  // Apply demo offset for display purposes only (does not affect backend calculations)
+                  if (demoOffset !== 0) {
+                    today.setDate(today.getDate() + demoOffset);
+                  }
+                  const dueDateObj = new Date(`${overdueDueDateSource}T00:00:00`);
+                  if (!Number.isNaN(dueDateObj.getTime())) {
+                    dueDateObj.setHours(0, 0, 0, 0);
+                    overdueDiffDays = Math.ceil((dueDateObj - today) / (1000 * 60 * 60 * 24));
+                  }
+                }
+                const isDateBasedOverdue = overdueDiffDays !== null && overdueDiffDays < 0;
+                const hasOverdueRecord = overdueTotalDue > 0 || overduePaid > 0 || overdueRemaining > 0 || !!overdueLastPaymentAt;
+                const showOverdueStatusBadge = isRental && (isDateBasedOverdue || hasOverdueRecord);
+                const isOverdueSettled = overdueTotalDue > 0 && overdueRemaining <= 0 && hasExplicitOverduePaymentRecord;
 
                 const totalPaid = amountPaid;
                 const remainingAmount = Math.max(0, finalPrice - totalPaid);
@@ -2614,16 +2752,24 @@ const Profile = () => {
                           💳 {item.payment_status_display}
                         </span>
                       )}
+                      {showOverdueStatusBadge && (
+                        <span className="status-badge" style={{ backgroundColor: isOverdueSettled ? '#e8f5e9' : '#f8d7da', color: isOverdueSettled ? '#1b5e20' : '#721c24', border: `1px solid ${isOverdueSettled ? '#a5d6a7' : '#f5c6cb'}` }}>
+                          {isOverdueSettled
+                            ? `✅ OVERDUE PAID${overduePaid > 0 ? ` ₱${overduePaid.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}`
+                            : `🚨 OVERDUE${overdueTotalDue > 0 ? ` ₱${overdueTotalDue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}`}
+                        </span>
+                      )}
                     </div>
-                    {isRental && (item.status === 'rented' || item.status === 'picked_up') && (() => {
-                      const dueDateSource = (rentalPaymentMode === 'flat_rate' && rentalFlatRateUntilDate)
-                        ? rentalFlatRateUntilDate
-                        : item.rental_end_date;
+                    {isRental && (item.status === 'rented' || item.status === 'picked_up' || item.status === 'returned') && (() => {
+                      const dueDateSource = overdueDueDateSource;
                       if (!dueDateSource) return null;
 
                       const today = new Date();
                       today.setHours(0, 0, 0, 0);
-                      const endDate = new Date(dueDateSource);
+                      if (demoOffset !== 0) {
+                        today.setDate(today.getDate() + demoOffset);
+                      }
+                      const endDate = new Date(`${dueDateSource}T00:00:00`);
                       if (Number.isNaN(endDate.getTime())) return null;
                       endDate.setHours(0, 0, 0, 0);
                       const diffTime = endDate - today;
@@ -2631,7 +2777,33 @@ const Profile = () => {
 
                       if (diffDays < 0) {
                         const daysOverdue = Math.abs(diffDays);
-                        const penaltyAmount = daysOverdue * 100;
+                        const penaltyAmount = overdueTotalDue > 0 ? overdueTotalDue : (daysOverdue * overdueRate);
+
+                        if (item.status === 'returned' && isOverdueSettled) {
+                          return (
+                            <div style={{
+                              backgroundColor: '#e8f5e9',
+                              border: '1px solid #a5d6a7',
+                              borderRadius: '8px',
+                              padding: '12px 16px',
+                              marginTop: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px'
+                            }}>
+                              <span style={{ fontSize: '24px' }}>✅</span>
+                              <div>
+                                <div style={{ color: '#1b5e20', fontWeight: '600', fontSize: '14px' }}>
+                                  Overdue settled for this returned rental.
+                                </div>
+                                <div style={{ color: '#1b5e20', fontSize: '13px', marginTop: '4px' }}>
+                                  Settled overdue amount: <strong>₱{overduePaid.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+
                         return (
                           <div style={{
                             backgroundColor: '#f8d7da',
@@ -2649,8 +2821,13 @@ const Profile = () => {
                                 OVERDUE: {daysOverdue} day{daysOverdue > 1 ? 's' : ''} past due date!
                               </div>
                               <div style={{ color: '#721c24', fontSize: '13px', marginTop: '4px' }}>
-                                Current penalty: <strong>₱{penaltyAmount.toLocaleString()}</strong> (₱100/day)
+                                Current penalty: <strong>₱{penaltyAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> (₱{overdueRate.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/day)
                               </div>
+                              {item.status === 'returned' && overdueRemaining > 0 && (
+                                <div style={{ color: '#721c24', fontSize: '12px', marginTop: '4px', fontWeight: '600' }}>
+                                  Item is already returned but overdue payment is still pending.
+                                </div>
+                              )}
                               <div style={{ color: '#856404', fontSize: '12px', marginTop: '4px' }}>
                                 Please return immediately to avoid additional charges.
                               </div>
@@ -2677,7 +2854,7 @@ const Profile = () => {
                                 DUE TODAY! Please return the item today.
                               </div>
                               <div style={{ color: '#856404', fontSize: '12px', marginTop: '4px' }}>
-                                Late returns will incur a penalty of ₱100 per day.
+                                Late returns will incur a penalty of ₱{overdueRate.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per day.
                               </div>
                             </div>
                           </div>
@@ -2702,7 +2879,7 @@ const Profile = () => {
                                 Return in {diffDays} day{diffDays > 1 ? 's' : ''} ({new Date(item.rental_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})
                               </div>
                               <div style={{ color: '#004085', fontSize: '12px', marginTop: '4px' }}>
-                                Late returns will incur a penalty of ₱100 per day.
+                                Late returns will incur a penalty of ₱{overdueRate.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per day.
                               </div>
                             </div>
                           </div>
@@ -2710,6 +2887,22 @@ const Profile = () => {
                       }
                       return null;
                     })()}
+                    {isRental && overdueLastPaymentAt && overdueLastPaymentAmount > 0 && (
+                      <div style={{
+                        backgroundColor: '#e8f5e9',
+                        border: '1px solid #a5d6a7',
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        marginTop: '10px',
+                        color: '#1b5e20',
+                        fontSize: '13px'
+                      }}>
+                        <strong>Overdue Payment Recorded:</strong> ₱{overdueLastPaymentAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <div style={{ marginTop: '3px', color: '#2e7d32' }}>
+                          {new Date(overdueLastPaymentAt).toLocaleString()}
+                        </div>
+                      </div>
+                    )}
                     {isEnhancementCancelledByAdmin && (
                       <div style={{ margin: '10px 0', padding: '12px 14px', backgroundColor: '#ffebee', border: '1px solid #ef9a9a', borderRadius: '8px', fontSize: '13px', color: '#c62828' }}>
                         <strong>❌ Enhancement Request Cancelled</strong>
@@ -3057,8 +3250,16 @@ const Profile = () => {
                     )}
 
                     {item.service_type === 'rental' && (() => {
-                      const refundedAmount = parseFloat(item.deposit_refunded || item.pricing_factors?.deposit_refunded_amount || 0);
-                      const refundedDate = item.deposit_refund_date || item.pricing_factors?.deposit_refunded_at;
+                      const pricingFactors = typeof item.pricing_factors === 'string'
+                        ? JSON.parse(item.pricing_factors || '{}')
+                        : (item.pricing_factors || {});
+                      const refundedAmount = parseFloat(item.deposit_refunded || pricingFactors?.deposit_refunded_amount || 0);
+                      const refundedDate = item.deposit_refund_date || pricingFactors?.deposit_refunded_at;
+                      const refundReceived =
+                        pricingFactors?.deposit_refund_received === true
+                        || String(pricingFactors?.deposit_refund_received).toLowerCase() === 'true';
+                      const refundReceivedAt = pricingFactors?.deposit_refund_received_at || null;
+                      const isConfirmingReceipt = !!confirmingDepositByItem[item.order_item_id];
 
                       if (item.status === 'returned') {
                         const pf2 = typeof item.pricing_factors === 'string' ? JSON.parse(item.pricing_factors || '{}') : (item.pricing_factors || {});
@@ -3093,6 +3294,35 @@ const Profile = () => {
                                   ? `Recorded on ${new Date(refundedDate).toLocaleString()}`
                                   : 'Recorded by admin'}
                               </div>
+                              <div style={{ marginTop: '8px', color: refundReceived ? '#2e7d32' : '#8B4513', fontSize: '13px', fontWeight: '600' }}>
+                                {refundReceived
+                                  ? `Receipt confirmed${refundReceivedAt ? ` on ${new Date(refundReceivedAt).toLocaleString()}` : ''}`
+                                  : 'Awaiting your confirmation that you received the refund.'}
+                              </div>
+                              {!refundReceived && (
+                                <div style={{ marginTop: '10px' }}>
+                                  <button
+                                    onClick={() => handleConfirmDepositReceipt(item)}
+                                    disabled={isConfirmingReceipt}
+                                    style={{
+                                      padding: '5px 10px',
+                                      borderRadius: '6px',
+                                      border: 'none',
+                                      backgroundColor: '#2e7d32',
+                                      color: '#fff',
+                                      cursor: isConfirmingReceipt ? 'not-allowed' : 'pointer',
+                                      fontWeight: '600',
+                                      fontSize: '0.82rem',
+                                      lineHeight: 1.2,
+                                      minHeight: 'auto',
+                                      boxShadow: 'none',
+                                      opacity: isConfirmingReceipt ? 0.7 : 1
+                                    }}
+                                  >
+                                    {isConfirmingReceipt ? 'Confirming...' : 'Confirm Received'}
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           );
                         } else if (remainingRefund > 0) {
@@ -3139,6 +3369,35 @@ const Profile = () => {
                               ? `Recorded on ${new Date(refundedDate).toLocaleString()}`
                               : 'Recorded by admin'}
                           </div>
+                          <div style={{ marginTop: '8px', color: refundReceived ? '#2e7d32' : '#8B4513', fontSize: '13px', fontWeight: '600' }}>
+                            {refundReceived
+                              ? `Receipt confirmed${refundReceivedAt ? ` on ${new Date(refundReceivedAt).toLocaleString()}` : ''}`
+                              : 'Awaiting your confirmation that you received the refund.'}
+                          </div>
+                          {!refundReceived && (
+                            <div style={{ marginTop: '10px' }}>
+                              <button
+                                onClick={() => handleConfirmDepositReceipt(item)}
+                                disabled={isConfirmingReceipt}
+                                style={{
+                                  padding: '5px 10px',
+                                  borderRadius: '6px',
+                                  border: 'none',
+                                  backgroundColor: '#2e7d32',
+                                  color: '#fff',
+                                  cursor: isConfirmingReceipt ? 'not-allowed' : 'pointer',
+                                  fontWeight: '600',
+                                  fontSize: '0.82rem',
+                                  lineHeight: 1.2,
+                                  minHeight: 'auto',
+                                  boxShadow: 'none',
+                                  opacity: isConfirmingReceipt ? 0.7 : 1
+                                }}
+                              >
+                                {isConfirmingReceipt ? 'Confirming...' : 'Confirm Received'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })()}

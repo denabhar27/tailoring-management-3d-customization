@@ -35,6 +35,7 @@ router.get('/rental/orders/status/:status', orderController.getRentalOrdersBySta
 router.put('/rental/items/:id', orderController.updateRentalOrderItem);
 router.post('/rental/items/:id/payment', orderController.recordRentalPayment); 
 router.post('/rental/items/:id/deposit-return', orderController.recordRentalDepositReturn);
+router.post('/rental/items/:id/confirm-deposit-receipt', orderController.confirmRentalDepositReceipt);
 
 router.post('/items/:id/payment', orderController.recordRentalPayment); 
 

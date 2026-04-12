@@ -100,6 +100,8 @@ const Repair = () => {
 
   const [savingEstimatedDate, setSavingEstimatedDate] = useState(false);
 
+  const [markingOrderReceived, setMarkingOrderReceived] = useState(false);
+
   const [showEnhanceModal, setShowEnhanceModal] = useState(false);
 
   const [enhanceOrder, setEnhanceOrder] = useState(null);
@@ -245,6 +247,37 @@ const Repair = () => {
     setToast({ show: true, message, type });
 
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  };
+
+  const getPricingFactors = (order) => {
+    const rawPricingFactors = order?.pricing_factors;
+    if (typeof rawPricingFactors === 'string') {
+      try {
+        return JSON.parse(rawPricingFactors || '{}');
+      } catch (err) {
+        return {};
+      }
+    }
+    return rawPricingFactors || {};
+  };
+
+  const isOrderReceivedByAdmin = (order) => {
+    const pricingFactors = getPricingFactors(order);
+    return Boolean(
+      pricingFactors.adminReceivedClothes ||
+      pricingFactors.receivedByAdmin ||
+      pricingFactors.clothesReceived
+    );
+  };
+
+  const getOrderReceivedAt = (order) => {
+    const pricingFactors = getPricingFactors(order);
+    return (
+      pricingFactors.adminReceivedClothesAt ||
+      pricingFactors.receivedByAdminAt ||
+      pricingFactors.clothesReceivedAt ||
+      null
+    );
   };
 
   const toggleParentOrderCollapse = (orderId) => {
@@ -2157,6 +2190,51 @@ const Repair = () => {
 
   };
 
+  const handleMarkOrderReceived = async () => {
+
+    if (!selectedOrder || selectedOrder.approval_status !== 'accepted') return;
+
+    if (isOrderReceivedByAdmin(selectedOrder)) {
+      showToast('Order is already marked as received.', 'success');
+      return;
+    }
+
+    try {
+      setMarkingOrderReceived(true);
+      const currentPricingFactors = getPricingFactors(selectedOrder);
+      const receivedAt = new Date().toISOString();
+
+      const result = await updateRepairOrderItem(selectedOrder.item_id, {
+        approvalStatus: selectedOrder.approval_status,
+        pricingFactors: {
+          ...currentPricingFactors,
+          adminReceivedClothes: true,
+          adminReceivedClothesAt: receivedAt
+        }
+      });
+
+      if (result.success) {
+        setSelectedOrder((prev) => ({
+          ...prev,
+          pricing_factors: {
+            ...getPricingFactors(prev),
+            adminReceivedClothes: true,
+            adminReceivedClothesAt: receivedAt
+          }
+        }));
+        showToast('Order marked as received.', 'success');
+        loadRepairOrders();
+      } else {
+        showToast(result.message || 'Failed to mark order as received', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to mark order as received', 'error');
+    } finally {
+      setMarkingOrderReceived(false);
+    }
+
+  };
+
 
 
   const handleSaveEstimatedCompletionDateFromDetails = async () => {
@@ -3161,6 +3239,7 @@ const Repair = () => {
                     ? JSON.parse(item.pricing_factors || '{}')
 
                     : (item.pricing_factors || {});
+                  const isReceivedByAdmin = isOrderReceivedByAdmin(item);
 
                   const isEnhancementOrder = pricingFactors.enhancementRequest && pricingFactors.enhancementAdminAccepted;
 
@@ -3362,6 +3441,12 @@ const Repair = () => {
                           }
                           return null;
                         })()}
+
+                        {item.approval_status === 'accepted' && isReceivedByAdmin && (
+                          <div style={{ marginTop: '4px', fontSize: '11px', color: '#1b5e20', fontWeight: '600' }}>
+                            Note: Received
+                          </div>
+                        )}
 
                       </td>
 
@@ -4675,6 +4760,24 @@ const Repair = () => {
 
               </div>
 
+              {selectedOrder.approval_status === 'accepted' && (
+                <div className="detail-row"><strong>Note:</strong> {(() => {
+                  const isReceivedByAdmin = isOrderReceivedByAdmin(selectedOrder);
+                  if (!isReceivedByAdmin) {
+                    return 'Not yet received';
+                  }
+                  const receivedAt = getOrderReceivedAt(selectedOrder);
+                  if (!receivedAt) {
+                    return 'Received';
+                  }
+                  const parsedDate = new Date(receivedAt);
+                  if (Number.isNaN(parsedDate.getTime())) {
+                    return 'Received';
+                  }
+                  return `Received (${parsedDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })})`;
+                })()}</div>
+              )}
+
 
 
               {selectedOrder.pricing_factors?.adminNotes && (
@@ -4714,6 +4817,17 @@ const Repair = () => {
             </div>
 
             <div className="modal-footer">
+
+              {selectedOrder.approval_status === 'accepted' && (
+                <button
+                  className="btn-receive"
+                  onClick={handleMarkOrderReceived}
+                  disabled={markingOrderReceived || isOrderReceivedByAdmin(selectedOrder)}
+                  style={(markingOrderReceived || isOrderReceivedByAdmin(selectedOrder)) ? { opacity: 0.7, cursor: 'not-allowed' } : undefined}
+                >
+                  {isOrderReceivedByAdmin(selectedOrder) ? 'Received' : (markingOrderReceived ? 'Receiving...' : 'Receive')}
+                </button>
+              )}
 
               <button className="close-btn" onClick={() => setShowDetailModal(false)}>Close</button>
 

@@ -39,6 +39,7 @@ export default function RentalDetail() {
   const [selectedSizeKey, setSelectedSizeKey] = useState<string | null>(null);
   const [selectedSizeQuantities, setSelectedSizeQuantities] = useState<Record<string, number>>({});
   const [selectedSizeDurations, setSelectedSizeDurations] = useState<Record<string, number>>({});
+  const [selectedSizeStartDates, setSelectedSizeStartDates] = useState<Record<string, Date>>({});
   const [liveSizeAvailability, setLiveSizeAvailability] = useState<Record<string, number | null>>({});
   const [availabilityUpdatedAt, setAvailabilityUpdatedAt] = useState<string>('');
   const [availabilityAuthFailed, setAvailabilityAuthFailed] = useState(false);
@@ -49,52 +50,115 @@ export default function RentalDetail() {
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [tempStartDate, setTempStartDate] = useState<Date | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [calendarTargetSizeKey, setCalendarTargetSizeKey] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [measurementUnit, setMeasurementUnit] = useState<'inch' | 'cm'>('inch');
   const [expandedMeasurementSize, setExpandedMeasurementSize] = useState<string | null>(null);
 
-  const deriveSizeOptions = (sourceItem: any): Record<string, any> => {
-    const direct = sourceItem?.size_options;
-    if (direct && typeof direct === 'object' && Object.keys(direct).length > 0) {
-      return direct;
-    }
+  const parseNumberLike = (value: any): number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    const normalized = String(value).replace(/[^\d.-]/g, '');
+    if (!normalized) return null;
+    const parsed = parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
 
+  const normalizeSizeOption = (sizeKey: string, rawOption: any = {}, fallbackOption: any = {}) => {
+    const quantityRaw = parseNumberLike(rawOption?.quantity ?? fallbackOption?.quantity);
+    const quantity = quantityRaw === null ? null : Math.max(0, Math.floor(quantityRaw));
+
+    const priceRaw = parseNumberLike(
+      rawOption?.price ?? rawOption?.daily_rate ?? fallbackOption?.price ?? fallbackOption?.daily_rate ?? item?.price
+    );
+    const price = priceRaw === null ? 0 : Math.max(0, priceRaw);
+
+    const depositRaw = parseNumberLike(
+      rawOption?.deposit ??
+      rawOption?.deposit_amount ??
+      rawOption?.downpayment ??
+      rawOption?.downPayment ??
+      fallbackOption?.deposit ??
+      fallbackOption?.deposit_amount ??
+      fallbackOption?.downpayment ??
+      fallbackOption?.downPayment
+    );
+    const deposit = depositRaw === null ? 0 : Math.max(0, depositRaw);
+
+    const durationRaw = parseNumberLike(rawOption?.rental_duration ?? fallbackOption?.rental_duration ?? 3);
+    const rentalDuration = durationRaw === null ? 3 : Math.max(1, Math.min(30, Math.floor(durationRaw)));
+
+    const overdueRaw = parseNumberLike(rawOption?.overdue_amount ?? fallbackOption?.overdue_amount ?? 50);
+    const overdueAmount = overdueRaw === null ? 50 : Math.max(0, overdueRaw);
+
+    return {
+      label:
+        rawOption?.label ||
+        fallbackOption?.label ||
+        SIZE_LABELS[sizeKey] ||
+        rawOption?.customLabel ||
+        fallbackOption?.customLabel ||
+        sizeKey,
+      quantity,
+      price,
+      deposit,
+      rental_duration: rentalDuration,
+      overdue_amount: overdueAmount,
+      measurements:
+        rawOption?.measurements ||
+        rawOption?.measurement_profile ||
+        rawOption?.measurementProfile ||
+        fallbackOption?.measurements ||
+        fallbackOption?.measurement_profile ||
+        fallbackOption?.measurementProfile ||
+        null,
+    };
+  };
+
+  const deriveSizeOptions = (sourceItem: any): Record<string, any> => {
+    const byEntry: Record<string, any> = {};
+    let parsed: any = null;
     const rawSize = sourceItem?.size;
-    if (!rawSize) return {};
 
     try {
-      const parsed = typeof rawSize === 'string' ? JSON.parse(rawSize) : rawSize;
-      if (!parsed || typeof parsed !== 'object') return {};
-
-      const structured = parsed.size_options || parsed.sizeOptions;
-      if (structured && typeof structured === 'object') {
-        return structured;
-      }
-
-      if (parsed.format === 'rental_size_v2' && Array.isArray(parsed.size_entries)) {
-        const mapped: Record<string, any> = {};
-        parsed.size_entries.forEach((entry: any, idx: number) => {
-          const baseKey = entry?.sizeKey || '';
-          const key = baseKey && baseKey !== 'custom'
-            ? baseKey
-            : (entry?.customLabel || `custom_${idx + 1}`);
-          mapped[key] = {
-            label: SIZE_LABELS[key] || entry?.customLabel || key,
-            quantity: Number.isFinite(parseInt(entry?.quantity, 10)) ? Math.max(0, parseInt(entry.quantity, 10)) : 0,
-            price: Number.isFinite(parseFloat(entry?.price)) ? Math.max(0, parseFloat(entry.price)) : 0,
-            deposit: Number.isFinite(parseFloat(entry?.deposit)) ? Math.max(0, parseFloat(entry.deposit)) : 0,
-            rental_duration: Number.isFinite(parseInt(entry?.rental_duration, 10)) ? Math.max(1, Math.min(30, parseInt(entry.rental_duration, 10))) : 3,
-            overdue_amount: Number.isFinite(parseFloat(entry?.overdue_amount)) ? Math.max(0, parseFloat(entry.overdue_amount)) : 50,
-            measurements: entry?.measurements || entry?.measurement_profile || entry?.measurementProfile || null,
-          };
-        });
-        return mapped;
-      }
-
-      return {};
+      parsed = rawSize ? (typeof rawSize === 'string' ? JSON.parse(rawSize) : rawSize) : null;
     } catch {
-      return {};
+      parsed = null;
     }
+
+    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.size_entries)) {
+      parsed.size_entries.forEach((entry: any, idx: number) => {
+        const baseKey = String(entry?.sizeKey || '').trim();
+        const key = baseKey && baseKey !== 'custom' ? baseKey : (entry?.customLabel || `custom_${idx + 1}`);
+        byEntry[key] = normalizeSizeOption(key, entry);
+      });
+    }
+
+    const direct = sourceItem?.size_options;
+    const structured = direct || parsed?.size_options || parsed?.sizeOptions || parsed?.size_options_v1 || parsed?.sizeOptionsV1;
+
+    const byStructured: Record<string, any> = {};
+    if (structured && typeof structured === 'object' && !Array.isArray(structured)) {
+      Object.entries(structured).forEach(([key, value]) => {
+        byStructured[key] = normalizeSizeOption(key, value, byEntry[key]);
+      });
+    }
+
+    const merged: Record<string, any> = {};
+    const keys = new Set([...Object.keys(byEntry), ...Object.keys(byStructured)]);
+    keys.forEach((key) => {
+      merged[key] = normalizeSizeOption(key, byStructured[key], byEntry[key]);
+    });
+
+    return merged;
+  };
+
+  const getAvailableSizeKeys = (sizeOptions: Record<string, any> = {}) => {
+    return Object.keys(sizeOptions).filter((key) => {
+      const qty = sizeOptions?.[key]?.quantity;
+      if (qty === null || qty === undefined || qty === '') return true;
+      const parsedQty = parseInt(String(qty), 10);
+      return !Number.isNaN(parsedQty) && parsedQty > 0;
+    });
   };
 
   const effectiveSizeOptions = useMemo(() => deriveSizeOptions(item), [item]);
@@ -235,13 +299,15 @@ export default function RentalDetail() {
         setItem(loaded);
         setSelectedSizeQuantities({});
         setSelectedSizeDurations({});
+        setSelectedSizeStartDates({});
         setLiveSizeAvailability({});
         try {
           const sizeOpts = deriveSizeOptions(loaded);
           if (sizeOpts && typeof sizeOpts === 'object') {
-            const firstKey = Object.keys(sizeOpts)[0] || null;
+            const availableKeys = getAvailableSizeKeys(sizeOpts);
+            const firstKey = availableKeys[0] || null;
             const durationMap: Record<string, number> = {};
-            Object.keys(sizeOpts).forEach((sizeKey) => {
+            availableKeys.forEach((sizeKey) => {
               const d = parseInt(String(sizeOpts?.[sizeKey]?.rental_duration ?? 3), 10);
               durationMap[sizeKey] = Number.isNaN(d) ? 3 : Math.min(30, Math.max(1, d));
             });
@@ -351,18 +417,23 @@ export default function RentalDetail() {
 
   const getSizeEntries = () => {
     if (!effectiveSizeOptions || typeof effectiveSizeOptions !== 'object') return [] as Array<[string, any]>;
-    return Object.entries(effectiveSizeOptions as Record<string, any>);
+    const filteredKeys = getAvailableSizeKeys(effectiveSizeOptions as Record<string, any>);
+    return filteredKeys.map((key) => [key, (effectiveSizeOptions as Record<string, any>)[key]]) as Array<[string, any]>;
   };
 
   const getSizeMaxQuantity = (sizeKey: string) => {
+    const declared = parseInt(String(effectiveSizeOptions?.[sizeKey]?.quantity ?? ''), 10);
+    if (!Number.isNaN(declared)) {
+      return Math.max(0, declared);
+    }
+
     const raw = liveSizeAvailability?.[sizeKey];
     const parsedLive = raw === null || raw === undefined ? null : parseInt(String(raw), 10);
     if (parsedLive !== null && !Number.isNaN(parsedLive)) {
       return Math.max(0, parsedLive);
     }
 
-    const declared = parseInt(String(effectiveSizeOptions?.[sizeKey]?.quantity ?? ''), 10);
-    return Number.isNaN(declared) ? null : Math.max(0, declared);
+    return null;
   };
 
   const getSizeDuration = (sizeKey: string) => {
@@ -373,6 +444,14 @@ export default function RentalDetail() {
     return Number.isNaN(fallback) ? 3 : Math.min(30, Math.max(1, fallback));
   };
 
+  const toIsoDate = (date: Date) => {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
+
+  const getSizeStartDate = (sizeKey: string): Date | null => {
+    return selectedSizeStartDates?.[sizeKey] || startDate || null;
+  };
+
   const updateSizeDuration = (sizeKey: string, delta: number) => {
     const current = getSizeDuration(sizeKey);
     const next = Math.min(30, Math.max(1, current + delta));
@@ -381,7 +460,8 @@ export default function RentalDetail() {
 
   const getSizeEndDate = (sizeKey: string) => {
     const duration = getSizeDuration(sizeKey);
-    return calculateEndDate(startDate, duration);
+    const sizeStart = getSizeStartDate(sizeKey);
+    return calculateEndDate(sizeStart, duration);
   };
 
   const getLongestSelectedDuration = () => {
@@ -483,10 +563,10 @@ export default function RentalDetail() {
   };
 
   const calculateTotal = () => {
-    if (!startDate) return 0;
     if (getSizeEntries().length > 0) {
       return calculateTotalForSizeSelections();
     }
+    if (!startDate) return 0;
     if (!rentalDuration) return 0;
     return calculateTotalCost(rentalDuration, item);
   };
@@ -510,22 +590,68 @@ export default function RentalDetail() {
 
   const applyStartDate = () => {
     if (tempStartDate) {
-      setStartDate(tempStartDate);
+      if (calendarTargetSizeKey) {
+        setSelectedSizeStartDates((prev) => ({
+          ...prev,
+          [calendarTargetSizeKey]: tempStartDate,
+        }));
+      } else {
+        setStartDate(tempStartDate);
+      }
 
     }
+    setCalendarTargetSizeKey(null);
     setShowCalendar(false);
   };
 
+  const openGlobalDatePicker = () => {
+    setCalendarTargetSizeKey(null);
+    setTempStartDate(startDate);
+    setShowCalendar(true);
+  };
+
+  const openSizeDatePicker = (sizeKey: string) => {
+    setCalendarTargetSizeKey(sizeKey);
+    setTempStartDate(getSizeStartDate(sizeKey));
+    setShowCalendar(true);
+  };
+
+  const getSelectedSizeTerms = () => {
+    return Object.entries(selectedSizeQuantities)
+      .filter(([, qty]) => parseInt(String(qty), 10) > 0)
+      .map(([sizeKey, qty]) => {
+        const quantity = parseInt(String(qty), 10);
+        const duration = getSizeDuration(sizeKey);
+        const lineStartDate = getSizeStartDate(sizeKey);
+        const lineDueDate = calculateEndDate(lineStartDate, duration);
+        return {
+          sizeKey,
+          quantity,
+          rental_duration: duration,
+          startDate: lineStartDate,
+          dueDate: lineDueDate,
+        };
+      });
+  };
+
   const handleAddToCart = () => {
-    if (!startDate) {
-      Alert.alert("Missing Date", "Please select a start date");
-      return;
-    }
     if (getSizeEntries().length > 0 && getTotalSelectedQuantity() <= 0) {
       Alert.alert('Size Required', 'Please select at least one size quantity.');
       return;
     }
+    if (getSizeEntries().length > 0) {
+      const missingDateSize = getSelectedSizeTerms().find((term) => !term.startDate);
+      if (missingDateSize) {
+        const label = effectiveSizeOptions?.[missingDateSize.sizeKey]?.label || missingDateSize.sizeKey;
+        Alert.alert('Missing Date', `Please select a start date for ${label}.`);
+        return;
+      }
+    }
     if (getSizeEntries().length === 0) {
+      if (!startDate) {
+        Alert.alert("Missing Date", "Please select a start date");
+        return;
+      }
       if (rentalDuration < 3) {
         Alert.alert("Invalid Duration", "Minimum rental period is 3 days");
         return;
@@ -547,8 +673,23 @@ export default function RentalDetail() {
       setAddingToCart(true);
       const totalPrice = calculateTotal();
       const hasSizeOptions = getSizeEntries().length > 0;
-      const longestDuration = hasSizeOptions ? getLongestSelectedDuration() : rentalDuration;
-      const calculatedEndDate = endDate || calculateEndDate(startDate, longestDuration);
+      const selectedTerms = hasSizeOptions ? getSelectedSizeTerms() : [];
+      const longestDuration = hasSizeOptions
+        ? selectedTerms.reduce((maxDuration, term) => Math.max(maxDuration, term.rental_duration), 0)
+        : rentalDuration;
+      const earliestStart = hasSizeOptions
+        ? selectedTerms
+            .map((term) => term.startDate)
+            .filter((date): date is Date => !!date)
+            .sort((a, b) => a.getTime() - b.getTime())[0] || null
+        : startDate;
+      const latestDue = hasSizeOptions
+        ? selectedTerms
+            .map((term) => term.dueDate)
+            .filter((date): date is Date => !!date)
+            .sort((a, b) => b.getTime() - a.getTime())[0] || null
+        : null;
+      const calculatedEndDate = hasSizeOptions ? latestDue : (endDate || calculateEndDate(startDate, longestDuration));
 
       if (!calculatedEndDate) {
         Alert.alert("Error", "Unable to calculate end date");
@@ -575,17 +716,20 @@ export default function RentalDetail() {
             ? Object.entries(selectedSizeQuantities)
                 .filter(([, qty]) => parseInt(String(qty), 10) > 0)
                 .map(([sizeKey, qty]) => ({
+                  start_date: (() => {
+                    const lineStartDate = getSizeStartDate(sizeKey);
+                    return lineStartDate ? toIsoDate(lineStartDate) : '';
+                  })(),
                   rental_duration: getSizeDuration(sizeKey),
                   overdue_amount: Math.max(0, parseFloat(effectiveSizeOptions?.[sizeKey]?.overdue_amount || 50) || 50),
                   due_date: (() => {
                     const dueDate = getSizeEndDate(sizeKey);
-                    return dueDate
-                      ? `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`
-                      : '';
+                    return dueDate ? toIsoDate(dueDate) : '';
                   })(),
                   sizeKey,
                   quantity: parseInt(String(qty), 10),
                   price: parseFloat(effectiveSizeOptions?.[sizeKey]?.price || item.price || '0') || 0,
+                  deposit: parseFloat(effectiveSizeOptions?.[sizeKey]?.deposit || 0) || 0,
                   label: effectiveSizeOptions?.[sizeKey]?.label || sizeKey
                 }))
             : [{
@@ -609,8 +753,8 @@ export default function RentalDetail() {
           side_image: item.side_image || null,
         },
         rentalDates: {
-          startDate: `${startDate!.getFullYear()}-${String(startDate!.getMonth() + 1).padStart(2, '0')}-${String(startDate!.getDate()).padStart(2, '0')}`,
-          endDate: `${calculatedEndDate.getFullYear()}-${String(calculatedEndDate.getMonth() + 1).padStart(2, '0')}-${String(calculatedEndDate.getDate()).padStart(2, '0')}`
+          startDate: earliestStart ? toIsoDate(earliestStart) : '',
+          endDate: toIsoDate(calculatedEndDate)
         }
       };
 
@@ -689,8 +833,11 @@ export default function RentalDetail() {
                   const selectedQty = parseInt(String(selectedSizeQuantities[key] || 0), 10);
                   const maxQty = getSizeMaxQuantity(key);
                   const selectedDuration = getSizeDuration(key);
+                  const lineStartDate = getSizeStartDate(key);
                   const lineEndDate = getSizeEndDate(key);
                   const sizeMeasurements = getMeasurementsForSize(key);
+                  const unitPrice = parseFloat(String(opt?.price ?? item?.price ?? '0')) || 0;
+                  const unitDeposit = parseFloat(String(opt?.deposit ?? 0)) || 0;
                   const isMeasurementsOpen = expandedMeasurementSize === key;
                   return (
                     <View key={key} style={styles.sizeRow}>
@@ -713,8 +860,10 @@ export default function RentalDetail() {
                           </Text>
                         </TouchableOpacity>
                         <View style={styles.sizeMetaRow}>
-                          <Text style={styles.sizeMetaText}>₱{(parseFloat(opt?.price || item?.price || '0') || 0).toLocaleString()} / 3 days</Text>
-                          <Text style={styles.sizeMetaText}>Deposit: ₱{(parseFloat(opt?.deposit || 0) || 0).toLocaleString()}</Text>
+                          <Text style={styles.sizeMetaText}>₱{unitPrice.toLocaleString()} / 3 days</Text>
+                          {unitDeposit > 0 && (
+                            <Text style={[styles.sizeMetaText, styles.sizeDepositText]}>Deposit: ₱{unitDeposit.toLocaleString()}</Text>
+                          )}
                         </View>
                       </View>
                       <View style={styles.sizeQuantityRow}>
@@ -735,7 +884,7 @@ export default function RentalDetail() {
                           <Text style={[styles.qtyButtonText, (maxQty === null || selectedQty >= maxQty) && styles.qtyButtonTextDisabled]}>+</Text>
                         </TouchableOpacity>
                         </View>
-                        <Text style={styles.stockText}>Stock: {maxQty === null ? 'Not set' : maxQty}</Text>
+                        <Text style={styles.stockText}>Stock: {maxQty === null ? 0 : maxQty}</Text>
                       </View>
                       <View style={styles.sizeDurationRow}>
                         <Text style={styles.sizeDurationLabel}>Duration:</Text>
@@ -759,6 +908,16 @@ export default function RentalDetail() {
                           </TouchableOpacity>
                         )}
                       </View>
+                      <TouchableOpacity
+                        style={styles.sizeDatePickerBtn}
+                        onPress={() => openSizeDatePicker(key)}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="calendar-outline" size={16} color="#78350F" />
+                        <Text style={styles.sizeDatePickerText}>
+                          Start Date ({opt?.label || key}): {lineStartDate ? formatDate(lineStartDate) : 'Select date'}
+                        </Text>
+                      </TouchableOpacity>
                       <Text style={styles.sizeEndDateText}>
                         End Date ({opt?.label || key}): {lineEndDate ? formatDate(lineEndDate) : 'Select start date'}
                       </Text>
@@ -896,20 +1055,17 @@ export default function RentalDetail() {
             <Text style={styles.sectionLabel}>Rental Period</Text>
             <TouchableOpacity
               style={styles.calendarBtn}
-              onPress={() => {
-                setTempStartDate(startDate);
-                setShowCalendar(true);
-              }}
+              onPress={openGlobalDatePicker}
             >
               <Ionicons name="calendar-outline" size={22} color="#94665B" />
               <View style={{ flex: 1, marginLeft: 12 }}>
                 {startDate ? (
                   <Text style={styles.dateText}>
-                    Start: {formatDate(startDate)}
+                    Default Start: {formatDate(startDate)}
                   </Text>
                 ) : (
                   <Text style={styles.placeholderText}>
-                    Tap to select start date
+                    Tap to select default start date
                   </Text>
                 )}
               </View>
@@ -1324,6 +1480,9 @@ const styles = StyleSheet.create({
     color: "#5A5045",
     fontWeight: "600",
   },
+  sizeDepositText: {
+    color: "#B94A48",
+  },
   sizeDurationRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1389,6 +1548,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#374151",
     fontWeight: "600",
+  },
+  sizeDatePickerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1,
+    borderColor: "#FCD34D",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  sizeDatePickerText: {
+    fontSize: 12,
+    color: "#78350F",
+    fontWeight: "700",
   },
   rowMeasurementsPanel: {
     marginTop: 8,

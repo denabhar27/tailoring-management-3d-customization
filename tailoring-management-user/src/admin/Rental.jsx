@@ -1089,8 +1089,15 @@ function Rental() {
     const rentalPriceOnly = parsedPrice - depositAmount;
 
     const isWalkIn = pendingPricingRental.order_type === 'walk_in';
+    const currentStatusRaw = String(pendingPricingRental.approval_status || '').toLowerCase();
+    const normalizedCurrentStatus =
+      currentStatusRaw === 'ready_for_pickup' || currentStatusRaw === 'accepted'
+        ? 'ready_to_pickup'
+        : currentStatusRaw;
 
-    const nextStatus = isWalkIn ? 'rented' : 'ready_to_pickup';
+    const nextStatus = isWalkIn
+      ? 'rented'
+      : (normalizedCurrentStatus === 'ready_to_pickup' ? 'rented' : 'ready_to_pickup');
 
 
 
@@ -3110,11 +3117,16 @@ function Rental() {
                                         }
 
                                         if (currentStatus === 'pending' || currentStatus === 'pending_review') {
-
-                                          openPendingPricingSetup(rental);
-
+                                          handleStatusUpdate(rental.item_id, nextStatus, rental);
                                           return;
+                                        }
 
+                                        if (
+                                          nextStatus === 'rented' &&
+                                          (currentStatus === 'ready_to_pickup' || currentStatus === 'ready_for_pickup' || currentStatus === 'accepted')
+                                        ) {
+                                          openPendingPricingSetup(rental);
+                                          return;
                                         }
 
                                         handleStatusUpdate(rental.item_id, nextStatus, rental);

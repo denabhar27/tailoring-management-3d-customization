@@ -79,6 +79,19 @@ const formatSize = (size: any): { label: string; value: string }[] | null => {
   }
 };
 
+const parseMaybeJson = (value: any, fallback: any = {}) => {
+  if (!value) return fallback;
+  if (typeof value === 'object') return value;
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+};
+
 export default function OrderDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -196,6 +209,24 @@ export default function OrderDetails() {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
+
+  const getEstimatedCompletionDate = () => {
+    const pricingFactors = parseMaybeJson(order?.pricing_factors, {});
+    const specificData = parseMaybeJson(order?.specific_data, {});
+    return (
+      order?.estimated_completion_date ||
+      pricingFactors?.estimatedCompletionDate ||
+      pricingFactors?.estimated_completion_date ||
+      specificData?.estimatedCompletionDate ||
+      specificData?.estimated_completion_date ||
+      null
+    );
+  };
+
+  const pricingFactors = parseMaybeJson(order?.pricing_factors, {});
+  const rentalPaymentMode = String(pricingFactors?.rental_payment_mode || 'regular').toLowerCase();
+  const rentalPaymentModeLabel = rentalPaymentMode === 'flat_rate' ? 'Flat Rate' : 'Regular';
+  const rentalFlatRateUntilDate = pricingFactors?.flat_rate_until_date || null;
 
   if (loading) {
     return (
@@ -807,6 +838,16 @@ export default function OrderDetails() {
                       <Text style={styles.value}>{formatDate(order.rental_end_date)}</Text>
                     </View>
                   )}
+                  <View style={styles.rentalStatusRow}>
+                    <View style={[styles.rentalStatusBadge, styles.rentalPaymentModeBadge]}>
+                      <Text style={styles.rentalStatusText}>{rentalPaymentModeLabel}</Text>
+                    </View>
+                    {rentalPaymentMode === 'flat_rate' && rentalFlatRateUntilDate && (
+                      <View style={[styles.rentalStatusBadge, styles.rentalFlatRateBadge]}>
+                        <Text style={styles.rentalStatusText}>Until {formatDate(rentalFlatRateUntilDate)}</Text>
+                      </View>
+                    )}
+                  </View>
                 </>
               )}
               {(order.service_type === 'customization' || order.service_type === 'customize') && (
@@ -855,6 +896,17 @@ export default function OrderDetails() {
                   )}
                 </>
               )}
+
+              {(() => {
+                const estimatedCompletionDate = getEstimatedCompletionDate();
+                if (!estimatedCompletionDate) return null;
+                return (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.label}>Estimated Completion Date</Text>
+                    <Text style={styles.value}>{formatDate(estimatedCompletionDate)}</Text>
+                  </View>
+                );
+              })()}
             </View>
           )}
           <View style={styles.priceSection}>
@@ -1050,6 +1102,31 @@ const styles = StyleSheet.create({
   orderNo: { fontSize: 19, fontWeight: "700", color: "#1F2937" },
   statusBadge: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
   statusText: { fontSize: 14, fontWeight: "600" },
+  rentalStatusRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 18,
+  },
+  rentalStatusBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  rentalPaymentModeBadge: {
+    backgroundColor: "#EEF7FF",
+    borderColor: "#B6D4FE",
+  },
+  rentalFlatRateBadge: {
+    backgroundColor: "#FFF5EC",
+    borderColor: "#F3C7A7",
+  },
+  rentalStatusText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#1F4F82",
+  },
   date: { fontSize: 14, color: "#6B7280", marginBottom: 4 },
   serviceType: {
     fontSize: 19,

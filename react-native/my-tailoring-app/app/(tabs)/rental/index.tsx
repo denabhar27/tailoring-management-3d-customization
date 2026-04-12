@@ -133,30 +133,113 @@ export default function RentalLanding() {
     return Math.max(0, parsed);
   };
 
+  const parseMoney = (value: any) => {
+    if (value === null || value === undefined || value === '') return 0;
+    const parsed = parseFloat(String(value).replace(/[^\d.-]/g, ''));
+    return Number.isNaN(parsed) ? 0 : Math.max(0, parsed);
+  };
+
+  const getNormalizedSizeOptions = (item: any): Record<string, any> => {
+    const mapped: Record<string, any> = {};
+
+    const assignOption = (key: string, option: any = {}) => {
+      if (!key) return;
+      const qtyRaw = option?.quantity;
+      const qtyParsed = qtyRaw === null || qtyRaw === undefined || qtyRaw === '' ? null : parseInt(String(qtyRaw), 10);
+      mapped[key] = {
+        label: option?.label || key,
+        quantity: Number.isNaN(qtyParsed as any) ? null : qtyParsed,
+        price: parseMoney(option?.price ?? option?.daily_rate),
+        deposit: parseMoney(option?.deposit ?? option?.deposit_amount ?? option?.downpayment ?? option?.downPayment),
+        rental_duration: Math.max(1, Math.min(30, parseInt(String(option?.rental_duration ?? 3), 10) || 3)),
+        overdue_amount: Math.max(0, parseFloat(String(option?.overdue_amount ?? 50)) || 50),
+      };
+    };
+
+    const direct = item?.size_options;
+    if (direct && typeof direct === 'object' && !Array.isArray(direct)) {
+      Object.entries(direct).forEach(([key, option]) => assignOption(key, option));
+    }
+
+    const parsed = item?.size
+      ? (() => {
+          try {
+            return typeof item.size === 'string' ? JSON.parse(item.size) : item.size;
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+
+    if (parsed && typeof parsed === 'object') {
+      if (Array.isArray(parsed.size_entries)) {
+        parsed.size_entries.forEach((entry: any, idx: number) => {
+          const baseKey = String(entry?.sizeKey || '').trim();
+          const key = baseKey && baseKey !== 'custom' ? baseKey : (entry?.customLabel || `custom_${idx + 1}`);
+          assignOption(key, {
+            ...entry,
+            label: entry?.label || entry?.customLabel || key,
+          });
+        });
+      }
+
+      const structured = parsed.size_options || parsed.sizeOptions;
+      if (structured && typeof structured === 'object' && !Array.isArray(structured)) {
+        Object.entries(structured).forEach(([key, option]) => {
+          if (!mapped[key]) {
+            assignOption(key, option);
+            return;
+          }
+          mapped[key] = {
+            ...mapped[key],
+            label: (option as any)?.label || mapped[key].label,
+            quantity: (option as any)?.quantity ?? mapped[key].quantity,
+            price: parseMoney((option as any)?.price ?? (option as any)?.daily_rate ?? mapped[key].price),
+            deposit: parseMoney((option as any)?.deposit ?? (option as any)?.deposit_amount ?? (option as any)?.downpayment ?? (option as any)?.downPayment ?? mapped[key].deposit),
+            rental_duration: Math.max(1, Math.min(30, parseInt(String((option as any)?.rental_duration ?? mapped[key].rental_duration ?? 3), 10) || 3)),
+            overdue_amount: Math.max(0, parseFloat(String((option as any)?.overdue_amount ?? mapped[key].overdue_amount ?? 50)) || 50),
+          };
+        });
+      }
+    }
+
+    return mapped;
+  };
+
+  const getAvailableSizeKeys = (sizeOptions: Record<string, any> = {}) => {
+    return Object.keys(sizeOptions).filter((key) => {
+      const qty = sizeOptions?.[key]?.quantity;
+      if (qty === null || qty === undefined || qty === '') return true;
+      const parsedQty = parseInt(String(qty), 10);
+      return !Number.isNaN(parsedQty) && parsedQty > 0;
+    });
+  };
+
+  const getDisplaySizeOptions = (item: any): Record<string, any> => {
+    const normalized = getNormalizedSizeOptions(item);
+    const keys = getAvailableSizeKeys(normalized);
+    return keys.reduce((acc, key) => {
+      acc[key] = normalized[key];
+      return acc;
+    }, {} as Record<string, any>);
+  };
+
   const buildAvailabilityMapForItem = (item: any, liveMap: Record<string, any> = {}) => {
     const map: Record<string, number | null> = {};
-    const sizeOptions = item?.size_options || {};
-    const declaredOptions = item?.size ? (() => {
-      try {
-        const parsed = typeof item.size === 'string' ? JSON.parse(item.size) : item.size;
-        return parsed?.size_options || parsed?.sizeOptions || {};
-      } catch {
-        return {};
-      }
-    })() : {};
+    const sizeOptions = getDisplaySizeOptions(item);
 
     if (Object.keys(sizeOptions).length === 0) {
       map.__default = toNonNegativeNumberOrNull(liveMap.__default);
       if (map.__default === null) {
-        map.__default = toNonNegativeNumberOrNull(item?.total_available ?? declaredOptions?.__default?.quantity ?? declaredOptions?.quantity);
+        map.__default = toNonNegativeNumberOrNull(item?.total_available);
       }
       return map;
     }
 
     Object.entries(sizeOptions).forEach(([sizeKey, option]: any) => {
+      const declaredQty = toNonNegativeNumberOrNull(option?.quantity);
       const liveQty = toNonNegativeNumberOrNull(liveMap[sizeKey]);
-      const declaredQty = toNonNegativeNumberOrNull(option?.quantity ?? declaredOptions?.[sizeKey]?.quantity);
-      map[sizeKey] = liveQty !== null ? liveQty : declaredQty;
+      map[sizeKey] = declaredQty !== null ? declaredQty : liveQty;
     });
 
     return map;
@@ -208,11 +291,11 @@ export default function RentalLanding() {
           }
           return prev.filter(i => getItemId(i) !== itemId);
         } else {
-          const hasSizeOptions = Object.keys(item.size_options || {}).length > 0;
+          const hasSizeOptions = Object.keys(getDisplaySizeOptions(item)).length > 0;
           if (!hasSizeOptions) {
             setCardSizeSelections(p => ({
               ...p,
-              [itemId]: { __default: Math.max(1, parseInt(String(p?.[itemId]?.__default || 1), 10)) }
+              [itemId]: { __default: Math.max(0, parseInt(String(p?.[itemId]?.__default ?? 0), 10) || 0) }
             }));
           }
           fetchItemAvailability(item);
@@ -230,7 +313,7 @@ export default function RentalLanding() {
 
   const updateCardSizeQuantity = (item: any, sizeKey: string, delta: number) => {
     const itemId = getItemId(item);
-    const option = item.size_options?.[sizeKey] || {};
+    const option = getDisplaySizeOptions(item)?.[sizeKey] || {};
     const liveQty = realTimeAvailability?.[itemId]?.[sizeKey];
     const maxQty = liveQty ?? toNonNegativeNumberOrNull(option.quantity ?? item?.total_available);
     const currentQty = parseInt(String(cardSizeSelections?.[itemId]?.[sizeKey] || 0), 10);
@@ -303,7 +386,7 @@ export default function RentalLanding() {
     if (!bundleDuration || selectedItems.length === 0) return 0;
     return selectedItems.reduce((total, item) => {
       const selections = cardSizeSelections[getItemId(item)] || {};
-      const sizeOpts = item.size_options || {};
+      const sizeOpts = getDisplaySizeOptions(item);
       
       if (Object.keys(sizeOpts).length === 0) {
         return total + calculateItemCost(item, bundleDuration);
@@ -340,14 +423,15 @@ export default function RentalLanding() {
 
   const getItemSizeSummary = (item: any) => {
     const selections = getItemSizeSelection(item);
-    if (Object.keys(item.size_options || {}).length === 0) {
+    const sizeOpts = getDisplaySizeOptions(item);
+    if (Object.keys(sizeOpts).length === 0) {
       const defaultQty = parseInt(String(selections.__default || 0), 10);
       return defaultQty > 0 ? `Standard x${defaultQty}` : '';
     }
     return Object.entries(selections)
       .filter(([, qty]) => parseInt(String(qty), 10) > 0)
       .map(([sizeKey, qty]) => {
-        const label = item.size_options?.[sizeKey]?.label || sizeKey;
+        const label = sizeOpts?.[sizeKey]?.label || sizeKey;
         return `${label} x${qty}`;
       })
       .join(', ');
@@ -420,15 +504,17 @@ export default function RentalLanding() {
     try {
       const itemsWithSizes = selectedItems.map(item => {
         const selections = cardSizeSelections[getItemId(item)] || {};
-        const hasSizeOptions = Object.keys(item.size_options || {}).length > 0;
+        const sizeOpts = getDisplaySizeOptions(item);
+        const hasSizeOptions = Object.keys(sizeOpts).length > 0;
         const selectedSizes = hasSizeOptions
           ? Object.entries(selections)
               .filter(([, qty]) => parseInt(String(qty), 10) > 0)
               .map(([sizeKey, qty]) => ({
                 sizeKey,
                 quantity: parseInt(String(qty), 10),
-                price: item.size_options?.[sizeKey]?.price || 0,
-                label: item.size_options?.[sizeKey]?.label || sizeKey
+                price: sizeOpts?.[sizeKey]?.price || 0,
+                deposit: sizeOpts?.[sizeKey]?.deposit || 0,
+                label: sizeOpts?.[sizeKey]?.label || sizeKey
               }))
           : [{
               sizeKey: '__default',
@@ -650,6 +736,7 @@ export default function RentalLanding() {
             <View style={styles.rentalGrid}>
               {getPagedRentals().map((item) => {
                 const selected = isItemSelected(item);
+                const displaySizeOptions = getDisplaySizeOptions(item);
                 return (
                   <TouchableOpacity
                     key={item.item_id}
@@ -700,9 +787,9 @@ export default function RentalLanding() {
                     {isMultiSelectMode && (
                       <View style={styles.cardSizeControlsWrap}>
                         <Text style={styles.cardSizeHeading}>Sizes & Quantity</Text>
-                        {(Object.keys(item.size_options || {}).length > 0
-                          ? Object.entries(item.size_options)
-                          : [['__default', { label: item.size || 'Standard', quantity: item.total_available || 1 }]]
+                        {(Object.keys(displaySizeOptions).length > 0
+                          ? Object.entries(displaySizeOptions)
+                          : [['__default', { label: item.size || 'Standard', quantity: item.total_available ?? 0 }]]
                         ).map(([sizeKey, opt]: any) => {
                           const itemId = getItemId(item);
                           const currentQty = parseInt(String(cardSizeSelections?.[itemId]?.[sizeKey] || 0), 10);
@@ -712,7 +799,7 @@ export default function RentalLanding() {
                           return (
                             <View key={`${itemId}-${sizeKey}`} style={styles.cardSizeRow}>
                               <Text style={styles.cardSizeLabel} numberOfLines={1}>
-                                {(opt?.label || sizeKey).toUpperCase()}  Stock: {maxQty === null ? 'Not set' : maxQty}
+                                {(opt?.label || sizeKey).toUpperCase()}  Stock: {maxQty === null ? 0 : maxQty}
                               </Text>
                               <View style={styles.cardQtyControls}>
                                 <TouchableOpacity
@@ -894,20 +981,21 @@ export default function RentalLanding() {
 
                   {selectedItems.map((item) => {
                     const selections = cardSizeSelections[getItemId(item)] || {};
+                    const sizeOpts = getDisplaySizeOptions(item);
                     const sizeSummary = Object.entries(selections)
                       .filter(([, qty]) => parseInt(String(qty), 10) > 0)
-                      .map(([sizeKey, qty]) => `${item.size_options?.[sizeKey]?.label || sizeKey} x${qty}`)
+                      .map(([sizeKey, qty]) => `${sizeOpts?.[sizeKey]?.label || sizeKey} x${qty}`)
                       .join(', ');
 
                     const itemCost = (() => {
-                      if (Object.keys(item.size_options || {}).length === 0) {
+                      if (Object.keys(sizeOpts).length === 0) {
                         return calculateItemCost(item, bundleDuration);
                       }
                       let total = 0;
                       Object.entries(selections).forEach(([sizeKey, qty]) => {
                         const q = parseInt(String(qty), 10);
                         if (isNaN(q) || q <= 0) return;
-                        const sizePrice = item.size_options?.[sizeKey]?.price || parseFloat(item.price || '500');
+                        const sizePrice = sizeOpts?.[sizeKey]?.price || parseFloat(item.price || '500');
                         const validDuration = Math.floor(bundleDuration / 3) * 3;
                         total += q * sizePrice * (validDuration / 3);
                       });

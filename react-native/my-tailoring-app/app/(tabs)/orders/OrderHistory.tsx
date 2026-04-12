@@ -63,7 +63,11 @@ export default function OrderHistoryScreen() {
             order_date: order.order_date,
             order_id: order.order_id
           }))
-        }));
+        })).sort((a: any, b: any) => {
+          const aDate = new Date(a.order_date || a.created_at || a.updated_at || 0).getTime();
+          const bDate = new Date(b.order_date || b.created_at || b.updated_at || 0).getTime();
+          return bDate - aDate;
+        });
         setOrders(normalizedOrders as any);
       }
     } catch (error) {

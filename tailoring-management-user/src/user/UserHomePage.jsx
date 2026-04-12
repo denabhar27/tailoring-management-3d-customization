@@ -650,12 +650,12 @@ const UserHomePage = ({ setIsLoggedIn }) => {
               lineHeight: 1.5,
               marginBottom: "8px",
               color: "#d4c5b9"
-            }}>Location: Ground floor of Zamboanga A.E. Colleges, 41 Rizal Street, Zamboanga City, Philippines</p>
+            }}>Location: Jackman Tailor, 50 Rizal Street</p>
             <p style={{
               fontSize: "0.9rem",
               lineHeight: 1.5,
               color: "#d4c5b9"
-            }}>Monday-Saturday: 8 AM - 6 PM</p>
+            }}>Monday to Saturday: 8:30 AM - 4:30 PM</p>
           </div>
           
           <div>
@@ -675,7 +675,7 @@ const UserHomePage = ({ setIsLoggedIn }) => {
               fontSize: "1rem",
               lineHeight: 1.6,
               color: "#d4c5b9"
-            }}>Email: Ronald@gmail.com</p>
+            }}>Email: ronald_mares1981</p>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

@@ -27,6 +27,7 @@ import { orderStore, Order } from "../../../utils/orderStore";
 import { authService, orderTrackingService, notificationService, measurementsService, damageRecordService, API_BASE_URL } from "../../../utils/apiService";
 
 const { width, height } = Dimensions.get("window");
+const ORDER_TRACKING_MAX_HEIGHT = Math.floor(height * 0.58);
 
 interface UserData {
   first_name: string;
@@ -164,7 +165,12 @@ export default function ProfileScreen() {
             item.status !== 'rejected' &&
             item.status !== 'price_declined'
           )
-        })).filter((order: any) => order.items.length > 0);
+        })).filter((order: any) => order.items.length > 0)
+          .sort((a: any, b: any) => {
+            const aDate = new Date(a.order_date || a.created_at || a.updated_at || 0).getTime();
+            const bDate = new Date(b.order_date || b.created_at || b.updated_at || 0).getTime();
+            return bDate - aDate;
+          });
 
         setOrders(filteredOrders);
         await fetchCompensationIncidents(filteredOrders);
@@ -1094,15 +1100,61 @@ export default function ProfileScreen() {
               </Text>
             </View>
           ) : (
-            <View style={styles.orderCards}>
-              {(orders || []).flatMap((order: any) => {
-                if (!order || !Array.isArray(order.items)) {
-                  return [];
-                }
-                return order.items.map((item: any) => {
+            <View style={styles.orderTrackingScrollContainer}>
+              <ScrollView
+                style={styles.orderTrackingScroll}
+                contentContainerStyle={styles.orderTrackingScrollContent}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator
+              >
+                <View style={styles.orderCards}>
+                  {(orders || [])
+                    .slice()
+                    .sort((a: any, b: any) => {
+                      const aDate = new Date(a.order_date || a.created_at || a.updated_at || 0).getTime();
+                      const bDate = new Date(b.order_date || b.created_at || b.updated_at || 0).getTime();
+                      return bDate - aDate;
+                    })
+                    .flatMap((order: any) => {
+                      if (!order || !Array.isArray(order.items)) {
+                        return [];
+                      }
+                      return order.items.map((item: any) => {
                   const itemOrderItemId = resolveOrderItemId(item);
                   const estimatedPrice = getEstimatedPrice(item.specific_data, item.service_type);
                   const priceChanged = hasPriceChanged(item.specific_data, parseFloat(item.final_price), item.service_type);
+                  const parsePricingFactors = (value: any) => {
+                    if (!value) return {};
+                    if (typeof value === 'string') {
+                      try {
+                        return JSON.parse(value);
+                      } catch {
+                        return {};
+                      }
+                    }
+                    return value;
+                  };
+                  const pricingFactors = {
+                    ...parsePricingFactors(item?.specific_data?.pricing_factors),
+                    ...parsePricingFactors(item?.specific_data?.pricingFactors),
+                    ...parsePricingFactors(item?.pricing_factors),
+                  };
+                  const enhancementRequested = pricingFactors?.enhancementRequest === true || pricingFactors?.enhancementRequest === 'true';
+                  const enhancementAccepted = pricingFactors?.enhancementAdminAccepted === true || pricingFactors?.enhancementAdminAccepted === 'true';
+                  const enhancementPendingReview = pricingFactors?.enhancementPendingAdminReview === true || pricingFactors?.enhancementPendingAdminReview === 'true';
+                  const enhancementCancelled = pricingFactors?.enhancementCancelledByAdmin === true || pricingFactors?.enhancementCancelledByAdmin === 'true';
+                  const addAccessories = pricingFactors?.addAccessories === true || pricingFactors?.addAccessories === 'true';
+                  const isEnhancementOrder = enhancementRequested && enhancementAccepted;
+                  const isEnhancementPending = enhancementRequested && enhancementPendingReview;
+                  const isEnhancementCancelledByAdmin = enhancementCancelled && !enhancementRequested;
+                  const isAccessoriesEnhancement = enhancementRequested && addAccessories && !enhancementAccepted;
+                  const enhancementProcessStatuses = ['accepted', 'price_confirmation', 'confirmed', 'in_progress'];
+                  const isUnderEnhancement =
+                    (isEnhancementOrder || isAccessoriesEnhancement) &&
+                    enhancementProcessStatuses.includes(String(item?.status || '').toLowerCase());
+                  const rentalPaymentMode = String(pricingFactors?.rental_payment_mode || 'regular').toLowerCase();
+                  const rentalPaymentModeLabel = rentalPaymentMode === 'flat_rate' ? 'Flat Rate' : 'Regular';
+                  const rentalFlatRateUntilDate = pricingFactors?.flat_rate_until_date || null;
 
                   const isUniform = (item.service_type === 'customize' || item.service_type === 'customization') && (
                     item.specific_data?.garmentType?.toLowerCase() === 'uniform' ||
@@ -1114,12 +1166,37 @@ export default function ProfileScreen() {
                   const hasCompensationIncident = !!compensationIncidentForItem;
                   const liabilityStatus = String(compensationIncidentForItem?.liability_status || '').toLowerCase();
                   const compensationStatus = String(compensationIncidentForItem?.compensation_status || '').toLowerCase();
+                  const customerProceedChoiceFromDB = String(compensationIncidentForItem?.customer_proceed_choice || '').toLowerCase();
                   const isLiabilityPendingIncident = hasCompensationIncident && liabilityStatus === 'pending';
                   const isLiabilityRejectedIncident = hasCompensationIncident && liabilityStatus === 'rejected';
                   const isCompensationPaid = hasCompensationIncident && compensationStatus === 'paid';
+                  const customerWantsToProceed = customerProceedChoiceFromDB === 'proceed';
+                  const customerDoesNotProceed = customerProceedChoiceFromDB === 'dont_proceed';
                   const isRentalDamageChargeFlow = String(item.service_type || compensationIncidentForItem?.service_type || '').toLowerCase() === 'rental';
                   const settlementLabel = isRentalDamageChargeFlow ? 'Damage Charge' : 'Compensation';
                   const amountLabel = isRentalDamageChargeFlow ? 'Damage Charge Amount' : 'Compensation Amount';
+                  const displayStatusLabel = hasCompensationIncident
+                    ? (isLiabilityPendingIncident
+                      ? (isRentalDamageChargeFlow ? 'Damage Review' : 'Compensation Review')
+                      : isLiabilityRejectedIncident
+                        ? (isRentalDamageChargeFlow ? 'Charge Disputed' : 'Compensation Rejected')
+                        : customerDoesNotProceed
+                          ? (isRentalDamageChargeFlow ? 'Damage Paid' : 'Compensated')
+                          : isCompensationPaid && customerWantsToProceed
+                            ? getStatusLabel(item.status)
+                            : isCompensationPaid
+                              ? (isRentalDamageChargeFlow ? 'Damage Paid' : 'Compensated')
+                              : (isRentalDamageChargeFlow ? 'For Damage Payment' : 'For Compensation'))
+                    : getStatusLabel(item.status);
+                  const displayStatusColor = hasCompensationIncident
+                    ? (isCompensationPaid || customerDoesNotProceed ? '#1b5e20' : isLiabilityRejectedIncident ? '#bf360c' : '#c62828')
+                    : getStatusColor(item.status);
+                  const displayStatusBackground = hasCompensationIncident
+                    ? (isCompensationPaid || customerDoesNotProceed ? '#e8f5e9' : isLiabilityRejectedIncident ? '#fbe9e7' : '#ffebee')
+                    : `${getStatusColor(item.status)}20`;
+                  const displayStatusBorder = hasCompensationIncident
+                    ? (isCompensationPaid || customerDoesNotProceed ? '#a5d6a7' : isLiabilityRejectedIncident ? '#ffccbc' : '#ef9a9a')
+                    : 'transparent';
 
                   return (
                     <View key={`${item.order_id}-${itemOrderItemId || item.child_order_id || item.order_item_id}`} style={styles.orderCard}>
@@ -1150,18 +1227,34 @@ export default function ProfileScreen() {
                         <View
                           style={[
                             styles.statusBadge,
-                            { backgroundColor: getStatusColor(item.status) + "20" },
+                            {
+                              backgroundColor: displayStatusBackground,
+                              borderWidth: hasCompensationIncident ? 1 : 0,
+                              borderColor: displayStatusBorder,
+                            },
                           ]}
                         >
                           <Text
                             style={[
                               styles.statusText,
-                              { color: getStatusColor(item.status) },
+                              { color: displayStatusColor },
                             ]}
                           >
-                            {getStatusLabel(item.status)}
+                            {displayStatusLabel}
                           </Text>
                         </View>
+                        {String(item.service_type || '').toLowerCase() === 'rental' && (
+                          <View style={styles.rentalStatusRow}>
+                            <View style={[styles.rentalStatusBadge, styles.rentalPaymentModeBadge]}>
+                              <Text style={styles.rentalStatusText}>{rentalPaymentModeLabel}</Text>
+                            </View>
+                            {rentalPaymentMode === 'flat_rate' && rentalFlatRateUntilDate && (
+                              <View style={[styles.rentalStatusBadge, styles.rentalFlatRateBadge]}>
+                                <Text style={styles.rentalStatusText}>Until {rentalFlatRateUntilDate}</Text>
+                              </View>
+                            )}
+                          </View>
+                        )}
                         {hasCompensationIncident && (
                           <TouchableOpacity
                             style={styles.compensationAttentionButton}
@@ -1177,6 +1270,27 @@ export default function ProfileScreen() {
                           </TouchableOpacity>
                         )}
                       </View>
+                      {(isUnderEnhancement || isEnhancementPending || isEnhancementCancelledByAdmin) && (
+                        <View style={styles.enhancementStatusRow}>
+                          {isEnhancementPending && (
+                            <View style={[styles.enhancementBadge, styles.enhancementBadgePending]}>
+                              <Text style={[styles.enhancementBadgeText, styles.enhancementBadgeTextPending]}>Enhancement Pending Review</Text>
+                            </View>
+                          )}
+                          {isUnderEnhancement && (
+                            <View style={[styles.enhancementBadge, styles.enhancementBadgeActive]}>
+                              <Text style={[styles.enhancementBadgeText, styles.enhancementBadgeTextActive]}>
+                                {isAccessoriesEnhancement ? 'Enhancement + Accessories' : 'Enhancement'}
+                              </Text>
+                            </View>
+                          )}
+                          {isEnhancementCancelledByAdmin && (
+                            <View style={[styles.enhancementBadge, styles.enhancementBadgeCancelled]}>
+                              <Text style={[styles.enhancementBadgeText, styles.enhancementBadgeTextCancelled]}>Enhancement Cancelled</Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
                       {(estimatedPrice > 0 || parseFloat(item.final_price) > 0) && (
                         <View style={styles.priceComparison}>
                           {estimatedPrice > 0 ? (
@@ -1334,6 +1448,11 @@ export default function ProfileScreen() {
                           <Text style={styles.compensationSummaryText}>
                             Liability: {compensationIncidentForItem?.liability_status || 'N/A'} / {settlementLabel}: {compensationIncidentForItem?.compensation_status || 'N/A'}
                           </Text>
+                          {customerDoesNotProceed && (
+                            <Text style={styles.compensationSummaryHint}>
+                              The order is marked as compensated because you chose not to proceed.
+                            </Text>
+                          )}
 
                           {isLiabilityPendingIncident && (
                             <Text style={styles.compensationSummaryHint}>
@@ -1409,6 +1528,8 @@ export default function ProfileScreen() {
                   );
                 });
               })}
+                </View>
+              </ScrollView>
             </View>
           )}
         </View>
@@ -2153,6 +2274,22 @@ const styles = StyleSheet.create({
   orderCards: {
 
   },
+  orderTrackingScrollContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+    overflow: "hidden",
+  },
+  orderTrackingScroll: {
+    maxHeight: ORDER_TRACKING_MAX_HEIGHT,
+  },
+  orderTrackingScrollContent: {
+    padding: 12,
+  },
   serviceType: {
     fontSize: 12,
     color: "#6B7280",
@@ -2169,6 +2306,69 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 10,
     marginBottom: 12,
+  },
+  rentalStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  rentalStatusBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  rentalPaymentModeBadge: {
+    backgroundColor: "#EEF7FF",
+    borderColor: "#B6D4FE",
+  },
+  rentalFlatRateBadge: {
+    backgroundColor: "#FFF5EC",
+    borderColor: "#F3C7A7",
+  },
+  rentalStatusText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#1F4F82",
+  },
+  enhancementStatusRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  enhancementBadge: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  enhancementBadgePending: {
+    backgroundColor: "#EDE7F6",
+    borderColor: "#CE93D8",
+  },
+  enhancementBadgeActive: {
+    backgroundColor: "#EDE7F6",
+    borderColor: "#CE93D8",
+  },
+  enhancementBadgeCancelled: {
+    backgroundColor: "#FFEBEE",
+    borderColor: "#EF9A9A",
+  },
+  enhancementBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  enhancementBadgeTextPending: {
+    color: "#673AB7",
+  },
+  enhancementBadgeTextActive: {
+    color: "#673AB7",
+  },
+  enhancementBadgeTextCancelled: {
+    color: "#C62828",
   },
   compensationAttentionButton: {
     flexDirection: "row",

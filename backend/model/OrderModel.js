@@ -78,6 +78,70 @@ function buildRentalReservations(cartItems) {
   return Array.from(reservations.values());
 }
 
+function normalizeInventorySizeEntries(sizeRaw) {
+  const parsed = parseJsonSafely(sizeRaw, null);
+  if (!parsed || typeof parsed !== 'object') {
+    return { payload: null, entries: [] };
+  }
+
+  if (Array.isArray(parsed.size_entries) && parsed.size_entries.length > 0) {
+    return {
+      payload: parsed,
+      entries: parsed.size_entries.map((entry) => ({ ...entry }))
+    };
+  }
+
+  const options = parsed.size_options || parsed.sizeOptions || parsed.size_options_v1 || parsed.sizeOptionsV1;
+  if (options && typeof options === 'object' && !Array.isArray(options)) {
+    const entries = Object.entries(options).map(([sizeKey, option = {}]) => ({
+      ...option,
+      sizeKey: option.sizeKey || sizeKey,
+      label: option.label || option.name || sizeKey,
+      quantity: Math.max(0, parseInt(option.quantity, 10) || 0)
+    }));
+
+    return {
+      payload: {
+        ...parsed,
+        format: 'rental_size_v2',
+        size_entries: entries
+      },
+      entries
+    };
+  }
+
+  return { payload: parsed, entries: [] };
+}
+
+function findInventorySizeEntryIndex(entries, selectedKey) {
+  const rawKey = String(selectedKey || '').trim().toLowerCase();
+  if (!rawKey) return -1;
+
+  const aliasMap = {
+    s: 'small',
+    small: 'small',
+    m: 'medium',
+    medium: 'medium',
+    l: 'large',
+    large: 'large',
+    xl: 'extra_large',
+    'extra large': 'extra_large',
+    extra_large: 'extra_large'
+  };
+
+  const normalizedKey = aliasMap[rawKey] || rawKey;
+
+  return entries.findIndex((entry) => {
+    const entryKey = String(entry?.sizeKey || entry?.size_key || '').trim().toLowerCase();
+    const entryLabel = String(entry?.label || entry?.customLabel || '').trim().toLowerCase();
+
+    if (entryKey === normalizedKey) return true;
+    if (entryLabel === normalizedKey) return true;
+    if (entryKey === 'custom' && entryLabel === rawKey) return true;
+    return false;
+  });
+}
+
 function reserveRentalInventoryFromCartItems(cartItems, callback) {
   const reservations = buildRentalReservations(cartItems);
 
@@ -109,29 +173,32 @@ function reserveRentalInventoryFromCartItems(cartItems, callback) {
       }
 
       const currentAvailable = parseInt(row.total_available, 10) || 0;
-      if (currentAvailable < reservation.qty) {
-        const err = new Error(`Not enough stock for ${row.item_name || `item ${reservation.itemId}`}. Available: ${currentAvailable}, requested: ${reservation.qty}.`);
+      const normalizedSizeInfo = normalizeInventorySizeEntries(row.size);
+      const sizeBasedAvailable = normalizedSizeInfo.entries.reduce((sum, entry) => {
+        const quantity = parseInt(entry?.quantity, 10);
+        return sum + (Number.isNaN(quantity) ? 0 : Math.max(0, quantity));
+      }, 0);
+      const effectiveAvailable = sizeBasedAvailable > 0 ? sizeBasedAvailable : currentAvailable;
+
+      if (effectiveAvailable < reservation.qty) {
+        const err = new Error(`Not enough stock for ${row.item_name || `item ${reservation.itemId}`}. Available: ${effectiveAvailable}, requested: ${reservation.qty}.`);
         err.statusCode = 400;
         return callback(err);
       }
 
       const sizeSelectionEntries = Object.entries(reservation.sizeSelections || {});
       if (sizeSelectionEntries.length > 0) {
-        const sizePayload = parseJsonSafely(row.size, null);
-        if (!sizePayload || sizePayload.format !== 'rental_size_v2' || !Array.isArray(sizePayload.size_entries)) {
+        const sizePayload = normalizedSizeInfo.payload;
+        const normalizedEntries = normalizedSizeInfo.entries;
+
+        if (!sizePayload || normalizedEntries.length === 0) {
           const err = new Error(`Size profile missing for ${row.item_name || `item ${reservation.itemId}`}. Please re-save the rental item in admin.`);
           err.statusCode = 400;
           return callback(err);
         }
 
-        const normalizedEntries = sizePayload.size_entries.map((entry) => ({ ...entry }));
-
         for (const [selectedKey, requestedQty] of sizeSelectionEntries) {
-          const entryIndex = normalizedEntries.findIndex((entry) => {
-            if (entry.sizeKey === selectedKey) return true;
-            if (entry.sizeKey === 'custom' && String(entry.customLabel || '').trim().toLowerCase() === selectedKey.toLowerCase()) return true;
-            return false;
-          });
+          const entryIndex = findInventorySizeEntryIndex(normalizedEntries, selectedKey);
 
           if (entryIndex === -1) {
             const err = new Error(`Selected size "${selectedKey}" not found for ${row.item_name || `item ${reservation.itemId}`}.`);
@@ -149,7 +216,11 @@ function reserveRentalInventoryFromCartItems(cartItems, callback) {
           normalizedEntries[entryIndex].quantity = currentSizeQty - requestedQty;
         }
 
-        updatedSizeByItem.set(reservation.itemId, JSON.stringify({ ...sizePayload, size_entries: normalizedEntries }));
+        updatedSizeByItem.set(reservation.itemId, JSON.stringify({
+          ...sizePayload,
+          format: 'rental_size_v2',
+          size_entries: normalizedEntries
+        }));
       }
     }
 

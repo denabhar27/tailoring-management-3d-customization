@@ -713,6 +713,16 @@ const Repair = () => {
 
   };
 
+  const getPreferredCompletionDate = (item) => {
+    const specificData = parseMaybeObject(item?.specific_data);
+    return specificData?.preferredDate
+      || specificData?.preferred_date
+      || specificData?.appointmentDate
+      || specificData?.appointment_date
+      || item?.preferred_date
+      || '';
+  };
+
 
 
   const getComputedStatus = (item) => {
@@ -3509,16 +3519,6 @@ const Repair = () => {
                                 return null;
                               }
 
-                              const getPreferredCompletionDate = (item) => {
-                                const specificData = parseMaybeObject(item?.specific_data);
-                                return specificData?.preferredDate
-                                  || specificData?.preferred_date
-                                  || specificData?.appointmentDate
-                                  || specificData?.appointment_date
-                                  || item?.preferred_date
-                                  || '';
-                              };
-                              
                               return (
                                 <button
                                   className="icon-btn next-status"

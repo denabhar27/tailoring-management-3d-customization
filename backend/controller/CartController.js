@@ -549,8 +549,8 @@ exports.submitCart = (req, res) => {
       if (err) {
         return res.status(err.statusCode || 500).json({ 
           success: false, 
-          message: "Error creating order", 
-          error: err 
+          message: err.message || "Error creating order", 
+          error: err.message || err 
         });
       }
 

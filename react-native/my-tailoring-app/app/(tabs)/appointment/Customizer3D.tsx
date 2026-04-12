@@ -149,8 +149,8 @@ export default function Customizer3DScreen() {
   const [isShopOpen, setIsShopOpen] = useState(true);
   const [controlsHidden, setControlsHidden] = useState(false);
   const buildFreshCustomizerUrl = () => {
-    const separator = WEB_3D_CUSTOMIZER_URL.includes('?') ? '&' : '?';
-    return `${WEB_3D_CUSTOMIZER_URL}${separator}platform=mobile&ts=${Date.now()}`;
+    // Remove platform=mobile to load full desktop version
+    return `${WEB_3D_CUSTOMIZER_URL}?ts=${Date.now()}`;
   };
   const [webCustomizerUrl, setWebCustomizerUrl] = useState(buildFreshCustomizerUrl());
 
@@ -339,6 +339,30 @@ export default function Customizer3DScreen() {
   const injectedJavaScript = `
     (function() {
 
+      // Force desktop mode - override all mobile detection methods
+      window.IS_MOBILE = false;
+      window.IS_DESKTOP = true;
+      window.PLATFORM = 'desktop';
+      window.REACT_NATIVE_WEBVIEW = true;
+      
+      // Override common mobile detection libraries
+      window.navigator.isMobile = false;
+      window.navigator.userAgentData = { mobile: false, platform: 'Windows' };
+      
+      // Override screen size detection
+      Object.defineProperty(window.screen, 'width', { get: () => 1920 });
+      Object.defineProperty(window.screen, 'height', { get: () => 1080 });
+      Object.defineProperty(window, 'innerWidth', { get: () => 1920 });
+      Object.defineProperty(window, 'innerHeight', { get: () => 1080 });
+      
+      // Override touch detection
+      window.ontouchstart = null;
+      window.navigator.maxTouchPoints = 0;
+      
+      // Override device detection
+      window.navigator.vendor = 'Google Inc.';
+      window.navigator.platform = 'Win32';
+
       window.REACT_NATIVE_AUTH = {
         token: ${authToken ? `"${authToken}"` : 'null'},
         userId: ${userId ? `"${userId}"` : 'null'},
@@ -356,6 +380,26 @@ export default function Customizer3DScreen() {
           }));
         }
       };
+
+      // Debug 3D loading
+      setTimeout(() => {
+        console.log('=== 3D Debug Info ===');
+        console.log('WebGL available:', !!window.WebGLRenderingContext);
+        console.log('Canvas elements:', document.querySelectorAll('canvas').length);
+        console.log('3D libraries:', {
+          three: !!window.THREE,
+          babylon: !!window.BABYLON
+        });
+        console.log('Platform detection:', {
+          isMobile: window.IS_MOBILE,
+          isDesktop: window.IS_DESKTOP,
+          platform: window.PLATFORM,
+          userAgent: navigator.userAgent.substring(0, 50) + '...',
+          screenWidth: window.screen.width,
+          screenHeight: window.screen.height
+        });
+        console.log('Mobile detection override applied');
+      }, 2000);
 
       window.addEventListener('webglcontextlost', function(e) {
         e.preventDefault();
@@ -399,8 +443,6 @@ export default function Customizer3DScreen() {
         }
         return false;
       };
-
-      window.IS_REACT_NATIVE_WEBVIEW = true;
 
       document.dispatchEvent(new CustomEvent('reactNativeReady', {
         detail: window.REACT_NATIVE_AUTH
@@ -861,8 +903,8 @@ export default function Customizer3DScreen() {
           webViewRef.current?.reload();
         }}
         userAgent={Platform.select({
-          ios: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1 ReactNativeWebView',
-          android: 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 ReactNativeWebView',
+          ios: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          android: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         })}
       />
       {(isLoading || isSaving) && (

@@ -4,7 +4,7 @@
 Implement **dynamic overdue amounts and rental duration per size** instead of fixed values. Each size (Small, Medium, Large, XL, etc.) will have its own:
 - **Rental duration** (number of days)
 - **Overdue amount** (penalty per day after due date)
-- **Price and deposit** (existing fields)
+- 
 
 ## Key Changes Required
 

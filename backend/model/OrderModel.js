@@ -1328,7 +1328,48 @@ const Order = {
       WHERE oi.service_type = 'repair'
       ORDER BY COALESCE((SELECT MAX(al.created_at) FROM action_logs al WHERE al.order_item_id = oi.item_id), o.order_date) DESC
     `;
-    db.query(sql, callback);
+    const fallbackSql = `
+      SELECT 
+        oi.*,
+        o.order_id,
+        o.user_id,
+        NULL as order_type,
+        NULL as walk_in_customer_id,
+        o.status as order_status,
+        o.notes as order_notes,
+        u.first_name as customer_first_name,
+        u.last_name as customer_last_name,
+        u.email as customer_email,
+        u.phone_number as customer_phone,
+        u.first_name,
+        u.last_name,
+        u.email,
+        u.phone_number,
+        NULL as walk_in_customer_name,
+        NULL as walk_in_customer_email,
+        NULL as walk_in_customer_phone,
+        DATE_FORMAT(o.order_date, '%Y-%m-%d %H:%i:%s') as order_date,
+        DATE_FORMAT(oi.appointment_date, '%Y-%m-%d %H:%i:%s') as appointment_date,
+        DATE_FORMAT(oi.rental_start_date, '%Y-%m-%d') as rental_start_date,
+        DATE_FORMAT(oi.rental_end_date, '%Y-%m-%d') as rental_end_date
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      LEFT JOIN user u ON o.user_id = u.user_id
+      WHERE oi.service_type = 'repair'
+      ORDER BY COALESCE((SELECT MAX(al.created_at) FROM action_logs al WHERE al.order_item_id = oi.item_id), o.order_date) DESC
+    `;
+
+    db.query(sql, (err, results) => {
+      if (
+        err &&
+        (err.code === 'ER_BAD_FIELD_ERROR' || err.code === 'ER_NO_SUCH_TABLE') &&
+        /walk_in_customer|walk_in_customers|order_type/i.test(err.sqlMessage || err.message || '')
+      ) {
+        console.warn('[OrderModel.getRepairOrders] Falling back to legacy schema query:', err.sqlMessage || err.message);
+        return db.query(fallbackSql, callback);
+      }
+      return callback(err, results);
+    });
   },
 
   getRepairOrdersByStatus: (status, callback) => {
@@ -1363,7 +1404,48 @@ const Order = {
       WHERE oi.service_type = 'repair' AND (o.status = ? OR oi.approval_status = ?)
       ORDER BY COALESCE((SELECT MAX(al.created_at) FROM action_logs al WHERE al.order_item_id = oi.item_id), o.order_date) DESC
     `;
-    db.query(sql, [status, status], callback);
+    const fallbackSql = `
+      SELECT 
+        oi.*,
+        o.order_id,
+        o.user_id,
+        NULL as order_type,
+        NULL as walk_in_customer_id,
+        o.status as order_status,
+        o.notes as order_notes,
+        u.first_name as customer_first_name,
+        u.last_name as customer_last_name,
+        u.email as customer_email,
+        u.phone_number as customer_phone,
+        u.first_name,
+        u.last_name,
+        u.email,
+        u.phone_number,
+        NULL as walk_in_customer_name,
+        NULL as walk_in_customer_email,
+        NULL as walk_in_customer_phone,
+        DATE_FORMAT(o.order_date, '%Y-%m-%d %H:%i:%s') as order_date,
+        DATE_FORMAT(oi.appointment_date, '%Y-%m-%d %H:%i:%s') as appointment_date,
+        DATE_FORMAT(oi.rental_start_date, '%Y-%m-%d') as rental_start_date,
+        DATE_FORMAT(oi.rental_end_date, '%Y-%m-%d') as rental_end_date
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      LEFT JOIN user u ON o.user_id = u.user_id
+      WHERE oi.service_type = 'repair' AND (o.status = ? OR oi.approval_status = ?)
+      ORDER BY COALESCE((SELECT MAX(al.created_at) FROM action_logs al WHERE al.order_item_id = oi.item_id), o.order_date) DESC
+    `;
+
+    db.query(sql, [status, status], (err, results) => {
+      if (
+        err &&
+        (err.code === 'ER_BAD_FIELD_ERROR' || err.code === 'ER_NO_SUCH_TABLE') &&
+        /walk_in_customer|walk_in_customers|order_type/i.test(err.sqlMessage || err.message || '')
+      ) {
+        console.warn('[OrderModel.getRepairOrdersByStatus] Falling back to legacy schema query:', err.sqlMessage || err.message);
+        return db.query(fallbackSql, [status, status], callback);
+      }
+      return callback(err, results);
+    });
   },
 
   getDryCleaningOrders: (callback) => {

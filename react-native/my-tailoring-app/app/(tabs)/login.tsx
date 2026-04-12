@@ -11,6 +11,8 @@ import {
   Image,
 } from "react-native";
 import { useRouter } from "expo-router";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 import {
   useFonts,
   Poppins_400Regular,
@@ -22,12 +24,15 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '@/utils/apiService';
 
+WebBrowser.maybeCompleteAuthSession();
+
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -62,6 +67,46 @@ export default function LoginScreen() {
       Alert.alert("Error", error.message || "Failed to connect to server. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsGoogleLoading(true);
+    try {
+      const redirectUri = Linking.createURL("auth/callback");
+      const authData = await authService.getGoogleAuthUrl(redirectUri);
+      const authUrl = authData?.authUrl;
+
+      if (!authUrl) {
+        throw new Error("Google authorization URL was not returned by the server.");
+      }
+
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+
+      if (result.type !== "success" || !result.url) {
+        return;
+      }
+
+      const parsed = Linking.parse(result.url);
+      const token = typeof parsed.queryParams?.token === "string" ? parsed.queryParams.token : "";
+      const role = typeof parsed.queryParams?.role === "string" ? parsed.queryParams.role : "user";
+      const oauthError = typeof parsed.queryParams?.error === "string" ? parsed.queryParams.error : "";
+
+      if (oauthError) {
+        throw new Error(oauthError);
+      }
+
+      const completed = await authService.completeGoogleLogin(token, role);
+      if (!completed.success) {
+        throw new Error(completed.message || "Google login failed.");
+      }
+
+      router.replace("/home");
+    } catch (error: any) {
+      console.error("Google login error:", error);
+      Alert.alert("Error", error.message || "Unable to start Google sign-in. Please try again.");
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -144,10 +189,22 @@ export default function LoginScreen() {
               style={styles.submitButton}
               onPress={handleLogin}
               activeOpacity={0.9}
-              disabled={loading}
+              disabled={loading || isGoogleLoading}
             >
               <Text style={styles.submitButtonText}>
                 {loading ? "Processing..." : "Login Now"}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.orText}>or</Text>
+            <TouchableOpacity
+              style={styles.googleButton}
+              onPress={handleGoogleLogin}
+              activeOpacity={0.9}
+              disabled={loading || isGoogleLoading}
+            >
+              <Ionicons name="logo-google" size={20} color="#DB4437" />
+              <Text style={styles.googleButtonText}>
+                {isGoogleLoading ? "Redirecting to Google..." : "Continue with Google"}
               </Text>
             </TouchableOpacity>
             <View style={styles.footer}>
@@ -314,6 +371,30 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     fontSize: 16,
     color: "#ffffff",
+  },
+  orText: {
+    marginTop: 12,
+    marginBottom: 10,
+    fontFamily: "Poppins_400Regular",
+    fontSize: 13,
+    color: "#888",
+  },
+  googleButton: {
+    width: "100%",
+    paddingVertical: 14,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  googleButtonText: {
+    fontFamily: "Poppins_600SemiBold",
+    fontSize: 14,
+    color: "#333",
   },
   footer: {
     marginTop: 24,

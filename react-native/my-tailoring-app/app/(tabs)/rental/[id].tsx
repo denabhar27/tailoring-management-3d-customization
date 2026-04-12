@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -21,6 +21,13 @@ import { rentalService } from "../../../utils/rentalService";
 import { cartService } from "../../../utils/apiService";
 import RentalImageCarousel from "../../../components/RentalImageCarousel";
 
+const SIZE_LABELS: Record<string, string> = {
+  small: 'Small (S)',
+  medium: 'Medium (M)',
+  large: 'Large (L)',
+  extra_large: 'Extra Large (XL)',
+};
+
 export default function RentalDetail() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,6 +37,11 @@ export default function RentalDetail() {
   const [error, setError] = useState('');
   const [addingToCart, setAddingToCart] = useState(false);
   const [selectedSizeKey, setSelectedSizeKey] = useState<string | null>(null);
+  const [selectedSizeQuantities, setSelectedSizeQuantities] = useState<Record<string, number>>({});
+  const [selectedSizeDurations, setSelectedSizeDurations] = useState<Record<string, number>>({});
+  const [liveSizeAvailability, setLiveSizeAvailability] = useState<Record<string, number | null>>({});
+  const [availabilityUpdatedAt, setAvailabilityUpdatedAt] = useState<string>('');
+  const [availabilityAuthFailed, setAvailabilityAuthFailed] = useState(false);
 
   const today = new Date();
   const [startDate, setStartDate] = useState<Date | null>(null);
@@ -39,7 +51,53 @@ export default function RentalDetail() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [measurementUnit, setMeasurementUnit] = useState<'inch' | 'cm'>('inch');
-  const [showMeasurements, setShowMeasurements] = useState(false);
+  const [expandedMeasurementSize, setExpandedMeasurementSize] = useState<string | null>(null);
+
+  const deriveSizeOptions = (sourceItem: any): Record<string, any> => {
+    const direct = sourceItem?.size_options;
+    if (direct && typeof direct === 'object' && Object.keys(direct).length > 0) {
+      return direct;
+    }
+
+    const rawSize = sourceItem?.size;
+    if (!rawSize) return {};
+
+    try {
+      const parsed = typeof rawSize === 'string' ? JSON.parse(rawSize) : rawSize;
+      if (!parsed || typeof parsed !== 'object') return {};
+
+      const structured = parsed.size_options || parsed.sizeOptions;
+      if (structured && typeof structured === 'object') {
+        return structured;
+      }
+
+      if (parsed.format === 'rental_size_v2' && Array.isArray(parsed.size_entries)) {
+        const mapped: Record<string, any> = {};
+        parsed.size_entries.forEach((entry: any, idx: number) => {
+          const baseKey = entry?.sizeKey || '';
+          const key = baseKey && baseKey !== 'custom'
+            ? baseKey
+            : (entry?.customLabel || `custom_${idx + 1}`);
+          mapped[key] = {
+            label: SIZE_LABELS[key] || entry?.customLabel || key,
+            quantity: Number.isFinite(parseInt(entry?.quantity, 10)) ? Math.max(0, parseInt(entry.quantity, 10)) : 0,
+            price: Number.isFinite(parseFloat(entry?.price)) ? Math.max(0, parseFloat(entry.price)) : 0,
+            deposit: Number.isFinite(parseFloat(entry?.deposit)) ? Math.max(0, parseFloat(entry.deposit)) : 0,
+            rental_duration: Number.isFinite(parseInt(entry?.rental_duration, 10)) ? Math.max(1, Math.min(30, parseInt(entry.rental_duration, 10))) : 3,
+            overdue_amount: Number.isFinite(parseFloat(entry?.overdue_amount)) ? Math.max(0, parseFloat(entry.overdue_amount)) : 50,
+            measurements: entry?.measurements || entry?.measurement_profile || entry?.measurementProfile || null,
+          };
+        });
+        return mapped;
+      }
+
+      return {};
+    } catch {
+      return {};
+    }
+  };
+
+  const effectiveSizeOptions = useMemo(() => deriveSizeOptions(item), [item]);
 
   const getMeasurementValue = (measurement: any, unit: string): string | null => {
     if (!measurement) return null;
@@ -67,12 +125,12 @@ export default function RentalDetail() {
     return null;
   };
 
-  const getMeasurements = (): { label: string; value: string }[] => {
-    if (!item || !item.size) return [];
+  const getMeasurementsFromSource = (sourceData: any): { label: string; value: string }[] => {
+    if (!sourceData) return [];
 
     try {
       let measurements;
-      let sizeString = item.size;
+      const sizeString = sourceData;
 
       if (typeof sizeString === 'string') {
 
@@ -127,6 +185,22 @@ export default function RentalDetail() {
     }
   };
 
+  const getMeasurements = (): { label: string; value: string }[] => {
+    if (!item) return [];
+    return getMeasurementsFromSource(item.size);
+  };
+
+  const getMeasurementsForSize = (sizeKey: string): { label: string; value: string }[] => {
+    const sizeOption = effectiveSizeOptions?.[sizeKey] || {};
+    const source =
+      sizeOption.measurements ||
+      sizeOption.measurement_profile ||
+      sizeOption.measurementProfile ||
+      item?.measurement_profile ||
+      item?.size;
+    return getMeasurementsFromSource(source);
+  };
+
   const calculateEndDate = (start: Date | null, duration: number): Date | null => {
     if (!start) return null;
     const endDateObj = new Date(start);
@@ -159,13 +233,26 @@ export default function RentalDetail() {
       if (result.item) {
         const loaded = result.item;
         setItem(loaded);
+        setSelectedSizeQuantities({});
+        setSelectedSizeDurations({});
+        setLiveSizeAvailability({});
         try {
-          const sizeOpts = loaded?.size_options || null;
+          const sizeOpts = deriveSizeOptions(loaded);
           if (sizeOpts && typeof sizeOpts === 'object') {
             const firstKey = Object.keys(sizeOpts)[0] || null;
-            if (firstKey) setSelectedSizeKey(firstKey);
+            const durationMap: Record<string, number> = {};
+            Object.keys(sizeOpts).forEach((sizeKey) => {
+              const d = parseInt(String(sizeOpts?.[sizeKey]?.rental_duration ?? 3), 10);
+              durationMap[sizeKey] = Number.isNaN(d) ? 3 : Math.min(30, Math.max(1, d));
+            });
+            setSelectedSizeDurations(durationMap);
+            if (firstKey) {
+              setSelectedSizeKey(firstKey);
+              setSelectedSizeQuantities({ [firstKey]: 0 });
+            }
           }
         } catch {}
+        await fetchLiveAvailability(String(loaded?.item_id || id), loaded);
       } else {
         setError('Rental item not found');
       }
@@ -174,6 +261,45 @@ export default function RentalDetail() {
       setError('Failed to load rental details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLiveAvailability = async (itemId: string, loadedItem?: any) => {
+    if (availabilityAuthFailed) return;
+
+    try {
+      const response = await rentalService.getAvailableQuantity(itemId);
+      if (response?.authError) {
+        setAvailabilityAuthFailed(true);
+        return;
+      }
+      const liveMap = response?.available_quantities || {};
+      const sourceItem = loadedItem || item;
+      const sizeOptions = deriveSizeOptions(sourceItem);
+
+      if (!sizeOptions || Object.keys(sizeOptions).length === 0) {
+        const liveDefault = parseInt(String(liveMap.__default), 10);
+        setLiveSizeAvailability({ __default: Number.isNaN(liveDefault) ? null : Math.max(0, liveDefault) });
+      } else {
+        const mapped: Record<string, number | null> = {};
+        Object.entries(sizeOptions).forEach(([sizeKey, opt]: any) => {
+          const liveQty = parseInt(String(liveMap[sizeKey]), 10);
+          mapped[sizeKey] = Number.isNaN(liveQty) ? null : Math.max(0, liveQty);
+        });
+        setLiveSizeAvailability(mapped);
+      }
+
+      setAvailabilityUpdatedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    } catch {
+      const sourceItem = loadedItem || item;
+      const sizeOptions = deriveSizeOptions(sourceItem);
+      if (sizeOptions && Object.keys(sizeOptions).length > 0) {
+        const unknownMap: Record<string, number | null> = {};
+        Object.keys(sizeOptions).forEach((sizeKey) => {
+          unknownMap[sizeKey] = null;
+        });
+        setLiveSizeAvailability(unknownMap);
+      }
     }
   };
 
@@ -186,6 +312,15 @@ export default function RentalDetail() {
     }
     return require("../../../assets/images/rent.jpg");
   };
+
+  useEffect(() => {
+    if (!id || !item) return;
+    const intervalId = setInterval(() => {
+      fetchLiveAvailability(String(id));
+    }, 12000);
+
+    return () => clearInterval(intervalId);
+  }, [id, item, availabilityAuthFailed]);
 
   const getRentalImages = () => {
     if (!item) return [];
@@ -211,6 +346,93 @@ export default function RentalDetail() {
       month: "short",
       day: "numeric",
       year: "numeric",
+    });
+  };
+
+  const getSizeEntries = () => {
+    if (!effectiveSizeOptions || typeof effectiveSizeOptions !== 'object') return [] as Array<[string, any]>;
+    return Object.entries(effectiveSizeOptions as Record<string, any>);
+  };
+
+  const getSizeMaxQuantity = (sizeKey: string) => {
+    const raw = liveSizeAvailability?.[sizeKey];
+    const parsedLive = raw === null || raw === undefined ? null : parseInt(String(raw), 10);
+    if (parsedLive !== null && !Number.isNaN(parsedLive)) {
+      return Math.max(0, parsedLive);
+    }
+
+    const declared = parseInt(String(effectiveSizeOptions?.[sizeKey]?.quantity ?? ''), 10);
+    return Number.isNaN(declared) ? null : Math.max(0, declared);
+  };
+
+  const getSizeDuration = (sizeKey: string) => {
+    const fromState = parseInt(String(selectedSizeDurations?.[sizeKey] ?? ''), 10);
+    if (!Number.isNaN(fromState) && fromState > 0) return Math.min(30, Math.max(1, fromState));
+
+    const fallback = parseInt(String(effectiveSizeOptions?.[sizeKey]?.rental_duration ?? 3), 10);
+    return Number.isNaN(fallback) ? 3 : Math.min(30, Math.max(1, fallback));
+  };
+
+  const updateSizeDuration = (sizeKey: string, delta: number) => {
+    const current = getSizeDuration(sizeKey);
+    const next = Math.min(30, Math.max(1, current + delta));
+    setSelectedSizeDurations((prev) => ({ ...prev, [sizeKey]: next }));
+  };
+
+  const getSizeEndDate = (sizeKey: string) => {
+    const duration = getSizeDuration(sizeKey);
+    return calculateEndDate(startDate, duration);
+  };
+
+  const getLongestSelectedDuration = () => {
+    return Object.entries(selectedSizeQuantities)
+      .filter(([, qty]) => parseInt(String(qty), 10) > 0)
+      .reduce((maxDuration, [sizeKey]) => Math.max(maxDuration, getSizeDuration(sizeKey)), 0);
+  };
+
+  const calculateTotalForSizeSelections = () => {
+    return Object.entries(selectedSizeQuantities)
+      .filter(([, qty]) => parseInt(String(qty), 10) > 0)
+      .reduce((total, [sizeKey, qty]) => {
+        const quantity = parseInt(String(qty), 10);
+        if (Number.isNaN(quantity) || quantity <= 0) return total;
+        const duration = getSizeDuration(sizeKey);
+        const price = parseFloat(effectiveSizeOptions?.[sizeKey]?.price || item?.price || '0') || 0;
+        return total + (quantity * price * (duration / 3));
+      }, 0);
+  };
+
+  const getTotalSelectedQuantity = () => {
+    return Object.values(selectedSizeQuantities).reduce((sum, value) => {
+      const qty = parseInt(String(value), 10);
+      return sum + (Number.isNaN(qty) ? 0 : qty);
+    }, 0);
+  };
+
+  const updateSizeQuantity = (sizeKey: string, delta: number) => {
+    const maxQty = getSizeMaxQuantity(sizeKey);
+    const currentQty = parseInt(String(selectedSizeQuantities[sizeKey] || 0), 10);
+    const nextQty = Math.max(0, currentQty + delta);
+
+    if (delta > 0 && maxQty === null) {
+      Alert.alert('Stock Unavailable', 'Stock is not declared by admin yet for this size.');
+      return;
+    }
+
+    if (delta > 0 && maxQty !== null && nextQty > maxQty) {
+      const label = effectiveSizeOptions?.[sizeKey]?.label || sizeKey;
+      Alert.alert('Out of Stock', `${label} is out of stock.`);
+      return;
+    }
+
+    setSelectedSizeQuantities((prev) => {
+      const next = { ...prev };
+      if (nextQty <= 0) {
+        delete next[sizeKey];
+      } else {
+        next[sizeKey] = nextQty;
+      }
+      return next;
     });
   };
 
@@ -261,7 +483,11 @@ export default function RentalDetail() {
   };
 
   const calculateTotal = () => {
-    if (!startDate || !rentalDuration) return 0;
+    if (!startDate) return 0;
+    if (getSizeEntries().length > 0) {
+      return calculateTotalForSizeSelections();
+    }
+    if (!rentalDuration) return 0;
     return calculateTotalCost(rentalDuration, item);
   };
 
@@ -295,17 +521,23 @@ export default function RentalDetail() {
       Alert.alert("Missing Date", "Please select a start date");
       return;
     }
-    if (rentalDuration < 3) {
-      Alert.alert("Invalid Duration", "Minimum rental period is 3 days");
+    if (getSizeEntries().length > 0 && getTotalSelectedQuantity() <= 0) {
+      Alert.alert('Size Required', 'Please select at least one size quantity.');
       return;
     }
-    if (rentalDuration > 30) {
-      Alert.alert("Too Long", "Maximum rental period is 30 days");
-      return;
-    }
-    if (rentalDuration % 3 !== 0) {
-      Alert.alert("Invalid Duration", "Rental duration must be a multiple of 3 days (3, 6, 9, 12, etc.)");
-      return;
+    if (getSizeEntries().length === 0) {
+      if (rentalDuration < 3) {
+        Alert.alert("Invalid Duration", "Minimum rental period is 3 days");
+        return;
+      }
+      if (rentalDuration > 30) {
+        Alert.alert("Too Long", "Maximum rental period is 30 days");
+        return;
+      }
+      if (rentalDuration % 3 !== 0) {
+        Alert.alert("Invalid Duration", "Rental duration must be a multiple of 3 days (3, 6, 9, 12, etc.)");
+        return;
+      }
     }
     setShowConfirmModal(true);
   };
@@ -314,7 +546,9 @@ export default function RentalDetail() {
     try {
       setAddingToCart(true);
       const totalPrice = calculateTotal();
-      const calculatedEndDate = endDate || calculateEndDate(startDate, rentalDuration);
+      const hasSizeOptions = getSizeEntries().length > 0;
+      const longestDuration = hasSizeOptions ? getLongestSelectedDuration() : rentalDuration;
+      const calculatedEndDate = endDate || calculateEndDate(startDate, longestDuration);
 
       if (!calculatedEndDate) {
         Alert.alert("Error", "Unable to calculate end date");
@@ -324,18 +558,47 @@ export default function RentalDetail() {
       const rentalData = {
         serviceType: 'rental',
         serviceId: item.item_id,
-        quantity: 1,
+        quantity: getSizeEntries().length > 0 ? getTotalSelectedQuantity() : 1,
         basePrice: item.price || item.daily_rate * 3 || '0',
         finalPrice: totalPrice.toString(),
         pricingFactors: {
-          rental_duration: rentalDuration,
+          rental_duration: longestDuration,
           base_price_per_3_days: item.price || item.daily_rate * 3 || '0',
           deposit_amount: item.deposit_amount || '0'
         },
         specificData: {
           item_name: item.item_name,
           brand: item.brand || '',
-          size: selectedSizeKey ? (item.size_options?.[selectedSizeKey]?.label || selectedSizeKey) : (item.size || ''),
+          size: selectedSizeKey ? (effectiveSizeOptions?.[selectedSizeKey]?.label || selectedSizeKey) : (item.size || ''),
+          size_options: effectiveSizeOptions || {},
+          selected_sizes: getSizeEntries().length > 0
+            ? Object.entries(selectedSizeQuantities)
+                .filter(([, qty]) => parseInt(String(qty), 10) > 0)
+                .map(([sizeKey, qty]) => ({
+                  rental_duration: getSizeDuration(sizeKey),
+                  overdue_amount: Math.max(0, parseFloat(effectiveSizeOptions?.[sizeKey]?.overdue_amount || 50) || 50),
+                  due_date: (() => {
+                    const dueDate = getSizeEndDate(sizeKey);
+                    return dueDate
+                      ? `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`
+                      : '';
+                  })(),
+                  sizeKey,
+                  quantity: parseInt(String(qty), 10),
+                  price: parseFloat(effectiveSizeOptions?.[sizeKey]?.price || item.price || '0') || 0,
+                  label: effectiveSizeOptions?.[sizeKey]?.label || sizeKey
+                }))
+            : [{
+                sizeKey: 'default',
+                quantity: 1,
+                rental_duration: rentalDuration,
+                overdue_amount: 50,
+                due_date: calculatedEndDate
+                  ? `${calculatedEndDate.getFullYear()}-${String(calculatedEndDate.getMonth() + 1).padStart(2, '0')}-${String(calculatedEndDate.getDate()).padStart(2, '0')}`
+                  : '',
+                price: parseFloat(item.price || item.daily_rate || '0') || 0,
+                label: String(item.size || 'Standard')
+              }],
           category: item.category || '',
           color: item.color || '',
           material: item.material || '',
@@ -405,31 +668,149 @@ export default function RentalDetail() {
               })()}/3 days
             </Text>
           </View>
-          {item?.size_options && Object.keys(item.size_options).length > 0 && (
+          {Object.keys(effectiveSizeOptions || {}).length > 0 && (
             <View style={styles.sizeSection}>
-              <Text style={styles.sizeSectionLabel}>Select Size</Text>
-              <View style={styles.sizeChips}>
-                {Object.entries(item.size_options).map(([key, opt]: any) => (
-                  <TouchableOpacity
-                    key={key}
-                    style={[
-                      styles.sizeChip,
-                      selectedSizeKey === key && styles.sizeChipActive
-                    ]}
-                    onPress={() => setSelectedSizeKey(key)}
-                    activeOpacity={0.85}
-                  >
-                    <Text
-                      style={[
-                        styles.sizeChipText,
-                        selectedSizeKey === key && styles.sizeChipTextActive
-                      ]}
-                    >
-                      {(opt?.label || key).toUpperCase()}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              <View style={styles.sizeSectionHeader}>
+                <Text style={styles.sizeSectionLabel}>SIZES & QUANTITIES</Text>
+                <TouchableOpacity
+                  style={styles.stockRefreshButton}
+                  onPress={() => fetchLiveAvailability(String(item.item_id || id))}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="refresh" size={14} color="#78350F" />
+                  <Text style={styles.stockRefreshText}>Refresh Stock</Text>
+                </TouchableOpacity>
               </View>
+              {!!availabilityUpdatedAt && (
+                <Text style={styles.stockUpdatedText}>Live stock updated {availabilityUpdatedAt}</Text>
+              )}
+              <View style={styles.sizeRows}>
+                {getSizeEntries().map(([key, opt]: any) => {
+                  const selectedQty = parseInt(String(selectedSizeQuantities[key] || 0), 10);
+                  const maxQty = getSizeMaxQuantity(key);
+                  const selectedDuration = getSizeDuration(key);
+                  const lineEndDate = getSizeEndDate(key);
+                  const sizeMeasurements = getMeasurementsForSize(key);
+                  const isMeasurementsOpen = expandedMeasurementSize === key;
+                  return (
+                    <View key={key} style={styles.sizeRow}>
+                      <View style={styles.sizeHeaderRow}>
+                        <TouchableOpacity
+                          style={[
+                            styles.sizeChip,
+                            selectedSizeKey === key && styles.sizeChipActive
+                          ]}
+                          onPress={() => setSelectedSizeKey(key)}
+                          activeOpacity={0.85}
+                        >
+                          <Text
+                            style={[
+                              styles.sizeChipText,
+                              selectedSizeKey === key && styles.sizeChipTextActive
+                            ]}
+                          >
+                            {(opt?.label || key)}
+                          </Text>
+                        </TouchableOpacity>
+                        <View style={styles.sizeMetaRow}>
+                          <Text style={styles.sizeMetaText}>₱{(parseFloat(opt?.price || item?.price || '0') || 0).toLocaleString()} / 3 days</Text>
+                          <Text style={styles.sizeMetaText}>Deposit: ₱{(parseFloat(opt?.deposit || 0) || 0).toLocaleString()}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.sizeQuantityRow}>
+                        <View style={styles.qtyControls}>
+                        <TouchableOpacity
+                          style={styles.qtyButton}
+                          onPress={() => updateSizeQuantity(key, -1)}
+                          disabled={selectedQty <= 0}
+                        >
+                          <Text style={[styles.qtyButtonText, selectedQty <= 0 && styles.qtyButtonTextDisabled]}>-</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.qtyValue}>{selectedQty}</Text>
+                        <TouchableOpacity
+                          style={styles.qtyButton}
+                          onPress={() => updateSizeQuantity(key, 1)}
+                          disabled={maxQty === null || selectedQty >= maxQty}
+                        >
+                          <Text style={[styles.qtyButtonText, (maxQty === null || selectedQty >= maxQty) && styles.qtyButtonTextDisabled]}>+</Text>
+                        </TouchableOpacity>
+                        </View>
+                        <Text style={styles.stockText}>Stock: {maxQty === null ? 'Not set' : maxQty}</Text>
+                      </View>
+                      <View style={styles.sizeDurationRow}>
+                        <Text style={styles.sizeDurationLabel}>Duration:</Text>
+                        <View style={styles.durationStepControls}>
+                          <TouchableOpacity style={styles.durationStepBtn} onPress={() => updateSizeDuration(key, -1)}>
+                            <Text style={styles.durationStepBtnText}>-</Text>
+                          </TouchableOpacity>
+                          <Text style={styles.durationStepValue}>{selectedDuration}</Text>
+                          <TouchableOpacity style={styles.durationStepBtn} onPress={() => updateSizeDuration(key, 1)}>
+                            <Text style={styles.durationStepBtnText}>+</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <Text style={styles.sizeDurationDays}>days</Text>
+                        {sizeMeasurements.length > 0 && (
+                          <TouchableOpacity
+                            style={styles.measurementsChipBtn}
+                            onPress={() => setExpandedMeasurementSize(isMeasurementsOpen ? null : key)}
+                            activeOpacity={0.85}
+                          >
+                            <Text style={styles.measurementsChipBtnText}>MEASUREMENTS</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <Text style={styles.sizeEndDateText}>
+                        End Date ({opt?.label || key}): {lineEndDate ? formatDate(lineEndDate) : 'Select start date'}
+                      </Text>
+                      {isMeasurementsOpen && sizeMeasurements.length > 0 && (
+                        <View style={styles.rowMeasurementsPanel}>
+                          <View style={styles.rowMeasurementsUnitToggle}>
+                            <TouchableOpacity
+                              style={[
+                                styles.rowMeasurementsUnitBtn,
+                                measurementUnit === 'inch' && styles.rowMeasurementsUnitBtnActive,
+                              ]}
+                              onPress={() => setMeasurementUnit('inch')}
+                            >
+                              <Text
+                                style={[
+                                  styles.rowMeasurementsUnitBtnText,
+                                  measurementUnit === 'inch' && styles.rowMeasurementsUnitBtnTextActive,
+                                ]}
+                              >
+                                IN
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[
+                                styles.rowMeasurementsUnitBtn,
+                                measurementUnit === 'cm' && styles.rowMeasurementsUnitBtnActive,
+                              ]}
+                              onPress={() => setMeasurementUnit('cm')}
+                            >
+                              <Text
+                                style={[
+                                  styles.rowMeasurementsUnitBtnText,
+                                  measurementUnit === 'cm' && styles.rowMeasurementsUnitBtnTextActive,
+                                ]}
+                              >
+                                CM
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                          {sizeMeasurements.map((m, idx) => (
+                            <View key={`${key}-m-${idx}`} style={styles.rowMeasurementLine}>
+                              <Text style={styles.rowMeasurementLabel}>{m.label}</Text>
+                              <Text style={styles.rowMeasurementValue}>{m.value}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+              <Text style={styles.totalQtyText}>Selected total: {getTotalSelectedQuantity()}</Text>
             </View>
           )}
           <View style={styles.detailsGrid}>
@@ -451,26 +832,26 @@ export default function RentalDetail() {
               </View>
             ))}
           </View>
-          {getMeasurements().length > 0 && (
+          {getSizeEntries().length === 0 && getMeasurements().length > 0 && (
             <View style={styles.measurementsSection}>
               <View style={styles.measurementsHeader}>
                 <TouchableOpacity
                   style={styles.measurementsToggleBtn}
-                  onPress={() => setShowMeasurements(!showMeasurements)}
+                  onPress={() => setExpandedMeasurementSize(expandedMeasurementSize === '__default' ? null : '__default')}
                 >
                   <Ionicons name="resize-outline" size={18} color="#fff" />
                   <Text style={styles.measurementsToggleBtnText}>
-                    {showMeasurements ? 'Hide Measurements' : 'Show Measurements'}
+                    {expandedMeasurementSize === '__default' ? 'Hide Measurements' : 'Show Measurements'}
                   </Text>
                   <Ionicons
-                    name={showMeasurements ? "chevron-up" : "chevron-down"}
+                    name={expandedMeasurementSize === '__default' ? "chevron-up" : "chevron-down"}
                     size={16}
                     color="#fff"
                   />
                 </TouchableOpacity>
               </View>
 
-              {showMeasurements && (
+              {expandedMeasurementSize === '__default' && (
                 <View style={styles.measurementsContent}>
                   <View style={styles.unitToggleContainer}>
                     <TouchableOpacity
@@ -534,34 +915,41 @@ export default function RentalDetail() {
               </View>
               <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
             </TouchableOpacity>
-            <View style={styles.durationContainer}>
-              <Text style={styles.durationLabel}>Rental Duration *</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={rentalDuration}
-                  onValueChange={(value) => setRentalDuration(value)}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="3 days" value={3} />
-                  <Picker.Item label="6 days" value={6} />
-                  <Picker.Item label="9 days" value={9} />
-                  <Picker.Item label="12 days" value={12} />
-                  <Picker.Item label="15 days" value={15} />
-                  <Picker.Item label="18 days" value={18} />
-                  <Picker.Item label="21 days" value={21} />
-                  <Picker.Item label="24 days" value={24} />
-                  <Picker.Item label="27 days" value={27} />
-                  <Picker.Item label="30 days" value={30} />
-                </Picker>
-              </View>
-            </View>
-            {startDate && endDate && (
-              <View style={styles.endDateContainer}>
-                <Text style={styles.endDateLabel}>End Date (Auto-calculated)</Text>
-                <Text style={styles.endDateValue}>{formatDate(endDate)}</Text>
+            {getSizeEntries().length === 0 && (
+              <View style={styles.durationContainer}>
+                <Text style={styles.durationLabel}>Rental Duration *</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={rentalDuration}
+                    onValueChange={(value) => setRentalDuration(value)}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="3 days" value={3} />
+                    <Picker.Item label="6 days" value={6} />
+                    <Picker.Item label="9 days" value={9} />
+                    <Picker.Item label="12 days" value={12} />
+                    <Picker.Item label="15 days" value={15} />
+                    <Picker.Item label="18 days" value={18} />
+                    <Picker.Item label="21 days" value={21} />
+                    <Picker.Item label="24 days" value={24} />
+                    <Picker.Item label="27 days" value={27} />
+                    <Picker.Item label="30 days" value={30} />
+                  </Picker>
+                </View>
               </View>
             )}
-            {startDate && rentalDuration && (
+            {getSizeEntries().length > 0 && (
+              <Text style={styles.sizeDurationHint}>Each selected size uses its own duration above.</Text>
+            )}
+            {startDate && (getSizeEntries().length === 0 ? endDate : calculateEndDate(startDate, getLongestSelectedDuration())) && (
+              <View style={styles.endDateContainer}>
+                <Text style={styles.endDateLabel}>End Date (Auto-calculated)</Text>
+                <Text style={styles.endDateValue}>
+                  {formatDate(getSizeEntries().length > 0 ? calculateEndDate(startDate, getLongestSelectedDuration()) : endDate)}
+                </Text>
+              </View>
+            )}
+            {startDate && (getSizeEntries().length > 0 ? getTotalSelectedQuantity() > 0 : rentalDuration > 0) && (
               <View style={styles.totalSection}>
                 <Text style={styles.totalLabel}>Total Cost</Text>
                 <Text style={styles.totalValue}>
@@ -579,7 +967,7 @@ export default function RentalDetail() {
               end={{ x: 1, y: 0 }}
             />
             <Ionicons name="cart" size={24} color="#fff" />
-            <Text style={styles.addBtnText}>ADD TO CART</Text>
+            <Text style={styles.addBtnText}>ADD TO CART  ₱{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
           </TouchableOpacity>
 
           <View style={styles.policyCard}>
@@ -657,12 +1045,22 @@ export default function RentalDetail() {
               </View>
               <Text style={styles.modalTitle}>Confirm Rental</Text>
               <Text style={styles.modalValue}>{item.item_name}</Text>
+              {getSizeEntries().length > 0 && (
+                <Text style={styles.modalValue}>
+                  Sizes: {Object.entries(selectedSizeQuantities)
+                    .filter(([, qty]) => parseInt(String(qty), 10) > 0)
+                    .map(([sizeKey, qty]) => `${effectiveSizeOptions?.[sizeKey]?.label || sizeKey} x${qty} (${getSizeDuration(sizeKey)}d)`)
+                    .join(', ')}
+                </Text>
+              )}
               <Text style={styles.modalValue}>
-                {formatDate(startDate)} → {formatDate(endDate)}
+                {formatDate(startDate)} → {formatDate(getSizeEntries().length > 0 ? calculateEndDate(startDate, getLongestSelectedDuration()) : endDate)}
               </Text>
-              <Text style={styles.modalValue}>
-                {rentalDuration} day{rentalDuration > 1 ? "s" : ""}
-              </Text>
+              {getSizeEntries().length === 0 && (
+                <Text style={styles.modalValue}>
+                  {rentalDuration} day{rentalDuration > 1 ? "s" : ""}
+                </Text>
+              )}
               <View style={styles.costBreakdown}>
                 <View style={styles.costRow}>
                   <Text style={styles.costLabel}>
@@ -677,7 +1075,9 @@ export default function RentalDetail() {
                 </View>
                 <View style={styles.costRow}>
                   <Text style={styles.costLabel}>
-                    ({rentalDuration} days ÷ 3) × Base Price
+                    {getSizeEntries().length > 0
+                      ? 'Per-size quantity × (duration ÷ 3) × size price'
+                      : `(${rentalDuration} days ÷ 3) × Base Price`}
                   </Text>
                   <Text style={styles.costValue}>
                     ₱{calculateTotal().toLocaleString()}
@@ -849,22 +1249,205 @@ const styles = StyleSheet.create({
   },
   description: { fontSize: 15.5, color: "#52525B", lineHeight: 24 },
   sizeSection: { marginTop: 20 },
-  sizeSectionLabel: { fontSize: 14, fontWeight: "700", color: "#1F2937", marginBottom: 10 },
-  sizeChips: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  sizeChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 18,
-    backgroundColor: "#FAFAFA",
-    borderWidth: 1.5,
+  sizeSectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  sizeSectionLabel: { fontSize: 20, fontWeight: "800", color: "#5B3A0E", letterSpacing: 0.4 },
+  stockRefreshButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderWidth: 1,
     borderColor: "#E5E7EB",
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "#FFFBEB",
+  },
+  stockRefreshText: { fontSize: 10, fontWeight: "700", color: "#78350F" },
+  stockUpdatedText: { fontSize: 11, color: "#6B7280", marginBottom: 10 },
+  sizeChips: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  sizeRows: { gap: 10 },
+  sizeRow: {
+    borderWidth: 1,
+    borderColor: "#D8D2C9",
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: "#F7F5F1",
+    gap: 10,
+  },
+  sizeHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+  },
+  sizeChip: {
+    paddingVertical: 2,
+    paddingHorizontal: 2,
+    borderRadius: 8,
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    borderColor: "transparent",
   },
   sizeChipActive: {
-    backgroundColor: "#78350F",
-    borderColor: "#78350F",
+    backgroundColor: "transparent",
+    borderColor: "transparent",
   },
-  sizeChipText: { fontSize: 13, fontWeight: "700", color: "#78350F" },
-  sizeChipTextActive: { color: "#FFFFFF" },
+  sizeChipText: { fontSize: 19, fontWeight: "800", color: "#1F2937" },
+  sizeChipTextActive: { color: "#111827", textDecorationLine: "underline" },
+  sizeQuantityRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  qtyControls: { flexDirection: "row", alignItems: "center", gap: 8 },
+  qtyButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  qtyButtonText: { fontSize: 18, fontWeight: "700", color: "#6B7280" },
+  qtyButtonTextDisabled: { color: "#C4C4C4" },
+  qtyValue: { minWidth: 28, textAlign: "center", fontSize: 18, fontWeight: "800", color: "#111827" },
+  stockText: { fontSize: 12, color: "#7A7165", fontWeight: "600" },
+  sizeMetaRow: {
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  sizeMetaText: {
+    fontSize: 13,
+    color: "#5A5045",
+    fontWeight: "600",
+  },
+  sizeDurationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sizeDurationLabel: {
+    fontSize: 13,
+    color: "#1F2937",
+    fontWeight: "700",
+  },
+  durationStepControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    backgroundColor: "#fff",
+  },
+  durationStepBtn: {
+    width: 32,
+    height: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+  },
+  durationStepBtnText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#6B7280",
+  },
+  durationStepValue: {
+    minWidth: 34,
+    textAlign: "center",
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  sizeDurationDays: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "600",
+  },
+  measurementsChipBtn: {
+    marginLeft: "auto",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  measurementsChipBtnText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#6B7280",
+  },
+  sizeEndDateText: {
+    fontSize: 13,
+    color: "#374151",
+    fontWeight: "600",
+  },
+  rowMeasurementsPanel: {
+    marginTop: 8,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    padding: 10,
+    gap: 6,
+  },
+  rowMeasurementsUnitToggle: {
+    flexDirection: "row",
+    alignSelf: "flex-end",
+    backgroundColor: "#F3F4F6",
+    borderRadius: 14,
+    padding: 2,
+    marginBottom: 4,
+  },
+  rowMeasurementsUnitBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  rowMeasurementsUnitBtnActive: {
+    backgroundColor: "#111827",
+  },
+  rowMeasurementsUnitBtnText: {
+    fontSize: 11,
+    color: "#6B7280",
+    fontWeight: "700",
+  },
+  rowMeasurementsUnitBtnTextActive: {
+    color: "#FFFFFF",
+  },
+  rowMeasurementLine: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+    paddingBottom: 4,
+  },
+  rowMeasurementLabel: {
+    fontSize: 12,
+    color: "#4B5563",
+    fontWeight: "600",
+  },
+  rowMeasurementValue: {
+    fontSize: 12,
+    color: "#111827",
+    fontWeight: "700",
+  },
+  totalQtyText: { marginTop: 8, fontSize: 13, color: "#78350F", fontWeight: "700" },
+  sizeDurationHint: {
+    marginTop: 8,
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "600",
+  },
   calendarBtn: {
     backgroundColor: "#FAFAFA",
     padding: 18,

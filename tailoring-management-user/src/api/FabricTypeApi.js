@@ -1,14 +1,20 @@
 import axios from "axios";
 import { API_URL } from './config';
+import { getToken } from './AuthApi';
 
 const BASE_URL = API_URL;
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return {
-    'Authorization': `Bearer ${token}`,
+  const token = getToken();
+  const headers = {
     'Content-Type': 'application/json'
   };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return headers;
 };
 
 export async function getAllFabricTypes() {

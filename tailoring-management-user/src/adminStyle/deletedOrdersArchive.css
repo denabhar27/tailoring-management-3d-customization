@@ -1,0 +1,92 @@
+.deleted-orders-archive-page {
+  min-height: 100vh;
+  background: #f5f6fa;
+}
+
+.archive-content {
+  margin-left: 270px;
+  padding: 92px 24px 24px;
+}
+
+.archive-header h2 {
+  margin: 0;
+  color: #2f3137;
+}
+
+.archive-header p {
+  margin: 6px 0 18px;
+  color: #6d7481;
+}
+
+.archive-filters {
+  display: grid;
+  grid-template-columns: 190px 1fr 170px 170px;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.archive-filters select,
+.archive-filters input {
+  border: 1px solid #d5d9e2;
+  border-radius: 10px;
+  background: #fff;
+  color: #2f3137;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.archive-table-wrap {
+  background: #fff;
+  border: 1px solid #e6e8ee;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.archive-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.archive-table thead th {
+  text-align: left;
+  background: #2f3137;
+  color: #fff;
+  font-weight: 600;
+  padding: 12px;
+  font-size: 13px;
+}
+
+.archive-table tbody td {
+  padding: 12px;
+  border-bottom: 1px solid #f0f2f6;
+  color: #323843;
+  font-size: 13px;
+}
+
+.archive-empty,
+.archive-loading {
+  text-align: center;
+  padding: 18px;
+  color: #6d7481;
+}
+
+@media (max-width: 1200px) {
+  .archive-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .archive-content {
+    margin-left: 0;
+    padding: 92px 12px 16px;
+  }
+
+  .archive-table-wrap {
+    overflow-x: auto;
+  }
+
+  .archive-table {
+    min-width: 980px;
+  }
+}

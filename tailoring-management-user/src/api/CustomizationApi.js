@@ -1,16 +1,11 @@
 import axios from "axios";
 import { API_URL } from './config';
+import { getToken } from './AuthApi';
 
 const BASE_URL = API_URL;
 
 const getAuthHeaders = () => {
-
-  let token = null;
-  if (typeof window !== 'undefined' && window.REACT_NATIVE_AUTH?.token) {
-    token = window.REACT_NATIVE_AUTH.token;
-  } else if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-    token = localStorage.getItem('token');
-  }
+  const token = getToken();
 
   const headers = {
     'Content-Type': 'application/json'
@@ -25,12 +20,21 @@ const getAuthHeaders = () => {
 
 export async function uploadCustomizationImage(file) {
   try {
+    const token = getToken();
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication required. Please log in again.',
+        requiresAuth: true
+      };
+    }
+
     const formData = new FormData();
     formData.append('customizationImage', file);
 
     const response = await axios.post(`${BASE_URL}/customization/upload-image`, formData, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'multipart/form-data'
       }
     });
@@ -188,7 +192,7 @@ export async function addCustomizationToCart(customizationData) {
 
 export async function uploadGLBFile(file, modelData) {
   try {
-    const token = localStorage.getItem('token');
+    const token = getToken();
     if (!token) {
       console.error('No token found in localStorage');
       return {

@@ -19,6 +19,10 @@ exports.getUserOrderTracking = (req, res) => {
 
     console.log('Raw results from database:', results);
 
+    if (!Array.isArray(results) || results.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
     // Helper function to enrich rental data with measurements
     const enrichRentalWithMeasurements = (specificData, callback) => {
       if (!specificData) return callback(specificData);

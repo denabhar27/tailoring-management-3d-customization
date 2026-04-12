@@ -49,6 +49,34 @@ const normalizeOverdueRate = (value) => {
   return Math.max(0, parsed);
 };
 
+const ensureDeletedOrdersArchiveTable = (callback) => {
+  const createTableSql = `
+    CREATE TABLE IF NOT EXISTS deleted_orders_archive (
+      archive_id INT AUTO_INCREMENT PRIMARY KEY,
+      original_item_id INT NOT NULL,
+      order_id INT NULL,
+      user_id INT NULL,
+      service_type VARCHAR(50) NULL,
+      approval_status VARCHAR(50) NULL,
+      payment_status VARCHAR(50) NULL,
+      price DECIMAL(10,2) NULL,
+      final_price DECIMAL(10,2) NULL,
+      customer_name VARCHAR(255) NULL,
+      order_date DATETIME NULL,
+      deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      deleted_by_user_id INT NULL,
+      deleted_by_name VARCHAR(255) NULL,
+      snapshot LONGTEXT NULL,
+      INDEX idx_service_type (service_type),
+      INDEX idx_deleted_at (deleted_at),
+      INDEX idx_customer_name (customer_name),
+      INDEX idx_original_item_id (original_item_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `;
+
+  db.query(createTableSql, callback);
+};
+
 const collectRentalSizeTerms = (orderItem) => {
   const pricingFactors = parseMaybeJson(orderItem?.pricing_factors, {});
   const specificData = parseMaybeJson(orderItem?.specific_data, {});
@@ -2776,8 +2804,16 @@ exports.deleteOrderItem = (req, res) => {
   const checkQuery = `
     SELECT
       oi.item_id,
+      oi.order_id,
+      oi.price,
+      oi.final_price,
       oi.approval_status,
+      oi.payment_status,
       oi.service_type,
+      oi.specific_data,
+      o.order_date,
+      o.user_id AS order_user_id,
+      CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS db_customer_name,
       EXISTS (
         SELECT 1
         FROM damage_compensation_records dcr
@@ -2786,6 +2822,8 @@ exports.deleteOrderItem = (req, res) => {
           AND dcr.compensation_status = 'paid'
       ) AS has_paid_compensation
     FROM order_items oi
+    LEFT JOIN orders o ON o.order_id = oi.order_id
+    LEFT JOIN user u ON u.user_id = o.user_id
     WHERE oi.item_id = ?
   `;
   
@@ -2821,20 +2859,161 @@ exports.deleteOrderItem = (req, res) => {
       });
     }
 
-    const deleteQuery = `DELETE FROM order_items WHERE item_id = ?`;
-    
-    db.query(deleteQuery, [itemId], (err, result) => {
+    const parsedSpecificData = parseMaybeJson(orderItem.specific_data, {});
+    const fallbackCustomerName = parsedSpecificData.walk_in_customer_name || parsedSpecificData.customerName || 'N/A';
+    const dbCustomerName = String(orderItem.db_customer_name || '').trim();
+    const customerName = dbCustomerName || fallbackCustomerName;
+    const deletedByName = String(req.user?.first_name || req.user?.username || 'admin').trim() || 'admin';
+
+    const archivePayload = {
+      original_item_id: orderItem.item_id,
+      order_id: orderItem.order_id,
+      user_id: orderItem.order_user_id,
+      service_type: orderItem.service_type,
+      approval_status: orderItem.approval_status,
+      payment_status: orderItem.payment_status,
+      price: parseFloat(orderItem.price || 0) || 0,
+      final_price: parseFloat(orderItem.final_price || 0) || 0,
+      customer_name: customerName,
+      order_date: orderItem.order_date,
+      deleted_by_user_id: userId,
+      deleted_by_name: deletedByName,
+      snapshot: JSON.stringify(orderItem)
+    };
+
+    ensureDeletedOrdersArchiveTable((tableErr) => {
+      if (tableErr) {
+        return res.status(500).json({
+          success: false,
+          message: "Error preparing deleted orders archive",
+          error: tableErr
+        });
+      }
+
+      const insertArchiveQuery = `
+        INSERT INTO deleted_orders_archive
+        (original_item_id, order_id, user_id, service_type, approval_status, payment_status, price, final_price, customer_name, order_date, deleted_by_user_id, deleted_by_name, snapshot)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      const archiveValues = [
+        archivePayload.original_item_id,
+        archivePayload.order_id,
+        archivePayload.user_id,
+        archivePayload.service_type,
+        archivePayload.approval_status,
+        archivePayload.payment_status,
+        archivePayload.price,
+        archivePayload.final_price,
+        archivePayload.customer_name,
+        archivePayload.order_date,
+        archivePayload.deleted_by_user_id,
+        archivePayload.deleted_by_name,
+        archivePayload.snapshot
+      ];
+
+      db.query(insertArchiveQuery, archiveValues, (archiveErr) => {
+        if (archiveErr) {
+          return res.status(500).json({
+            success: false,
+            message: "Error archiving deleted order item",
+            error: archiveErr
+          });
+        }
+
+        const deleteQuery = `DELETE FROM order_items WHERE item_id = ?`;
+        db.query(deleteQuery, [itemId], (deleteErr) => {
+          if (deleteErr) {
+            return res.status(500).json({
+              success: false,
+              message: "Error deleting order item",
+              error: deleteErr
+            });
+          }
+
+          res.json({
+            success: true,
+            message: "Order item deleted successfully"
+          });
+        });
+      });
+    });
+  });
+};
+
+exports.getDeletedOrdersArchive = (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'clerk') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin or clerk only.'
+    });
+  }
+
+  ensureDeletedOrdersArchiveTable((tableErr) => {
+    if (tableErr) {
+      return res.status(500).json({
+        success: false,
+        message: 'Error preparing deleted orders archive',
+        error: tableErr
+      });
+    }
+
+    const { serviceType, search, startDate, endDate } = req.query;
+    let query = `
+      SELECT
+        archive_id,
+        original_item_id AS item_id,
+        order_id,
+        customer_name,
+        service_type,
+        approval_status,
+        payment_status,
+        price,
+        final_price,
+        order_date,
+        deleted_at,
+        deleted_by_name
+      FROM deleted_orders_archive
+      WHERE 1=1
+    `;
+
+    const params = [];
+
+    if (serviceType && String(serviceType).trim() !== '') {
+      query += ' AND service_type = ?';
+      params.push(String(serviceType).trim());
+    }
+
+    if (search && String(search).trim() !== '') {
+      const q = `%${String(search).trim()}%`;
+      query += ' AND (CAST(order_id AS CHAR) LIKE ? OR CAST(original_item_id AS CHAR) LIKE ? OR customer_name LIKE ?)';
+      params.push(q, q, q);
+    }
+
+    if (startDate && String(startDate).trim() !== '') {
+      query += ' AND DATE(deleted_at) >= ?';
+      params.push(String(startDate).trim());
+    }
+
+    if (endDate && String(endDate).trim() !== '') {
+      query += ' AND DATE(deleted_at) <= ?';
+      params.push(String(endDate).trim());
+    }
+
+    query += ' ORDER BY deleted_at DESC, archive_id DESC';
+
+    db.query(query, params, (err, rows) => {
       if (err) {
         return res.status(500).json({
           success: false,
-          message: "Error deleting order item",
+          message: 'Error fetching deleted orders archive',
           error: err
         });
       }
 
       res.json({
         success: true,
-        message: "Order item deleted successfully"
+        orders: rows || []
       });
     });
   });

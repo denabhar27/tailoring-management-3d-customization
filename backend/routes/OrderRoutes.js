@@ -8,6 +8,7 @@ router.use(middleware.verifyToken);
 
 router.get('/', orderController.getUserOrders);
 router.get('/all', orderController.getAllOrders);
+router.get('/archive/deleted', orderController.getDeletedOrdersArchive);
 router.get('/:id', orderController.getOrderById);
 
 router.put('/:id/status', orderController.updateOrderStatus);

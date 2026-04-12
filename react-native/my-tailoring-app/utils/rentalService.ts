@@ -39,13 +39,27 @@ const rentalApiCall = async (endpoint: string, options: RequestInit = {}) => {
 
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        let errorData: any = null;
         try {
-          const errorData = await response.json();
+          errorData = await response.json();
           console.log('Rental API Error Data:', errorData);
           errorMessage = errorData.message || errorMessage;
         } catch (jsonError) {
           console.log('Could not parse error response as JSON');
         }
+
+        const isAvailabilityEndpoint = endpoint.includes('/available-quantity');
+        const isUnauthorized = response.status === 401 || /not authenticated|unauthorized/i.test(String(errorMessage));
+        if (isAvailabilityEndpoint && isUnauthorized) {
+          return {
+            success: false,
+            authError: true,
+            message: errorMessage,
+            available_quantities: {},
+            reserved_quantities: {},
+          };
+        }
+
         throw new Error(errorMessage);
       }
 
@@ -60,7 +74,13 @@ const rentalApiCall = async (endpoint: string, options: RequestInit = {}) => {
       throw fetchError;
     }
   } catch (error) {
-    console.error('Rental API call error:', error);
+    const isAvailabilityUnauthorized =
+      endpoint.includes('/available-quantity') &&
+      /not authenticated|unauthorized/i.test(String((error as any)?.message || error));
+
+    if (!isAvailabilityUnauthorized) {
+      console.error('Rental API call error:', error);
+    }
     throw error;
   }
 };
@@ -73,6 +93,10 @@ export const rentalService = {
 
   getRentalById: async (itemId: string) => {
     return rentalApiCall(`/rentals/${itemId}`);
+  },
+
+  getAvailableQuantity: async (itemId: string) => {
+    return rentalApiCall(`/rentals/${itemId}/available-quantity`);
   },
 
   getFeaturedRentals: async () => {

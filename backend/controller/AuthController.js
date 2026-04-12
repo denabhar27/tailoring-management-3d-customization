@@ -140,7 +140,9 @@ exports.googleAuth = (req, res) => {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const redirectUri = process.env.GOOGLE_REDIRECT_URI;
     const scope = 'profile email';
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`;
+    const state = typeof req.query.state === 'string' ? req.query.state : '';
+    const stateParam = state ? `&state=${encodeURIComponent(state)}` : '';
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent${stateParam}`;
     console.log('Returning Google OAuth URL:', authUrl);
     res.json({ authUrl }); 
   } catch (error) {
@@ -149,31 +151,51 @@ exports.googleAuth = (req, res) => {
   }
 };
 
-const redirectWithError = (res, errorMessage) => {
+const isAllowedMobileRedirect = (value) => {
+  if (!value || typeof value !== 'string') return false;
+  return value.startsWith('mytailoringapp://') || value.startsWith('exp://') || value.startsWith('exps://');
+};
+
+const appendQueryParams = (baseUrl, params) => {
+  const hasQuery = baseUrl.includes('?');
+  const separator = hasQuery ? '&' : '?';
+  return `${baseUrl}${separator}${params}`;
+};
+
+const resolveRedirectTarget = (state, frontendUrl) => {
+  if (isAllowedMobileRedirect(state)) {
+    return state;
+  }
+  return `${frontendUrl}/auth/callback`;
+};
+
+const redirectWithError = (res, errorMessage, redirectTarget) => {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-  res.redirect(`${frontendUrl}/auth/callback?error=${encodeURIComponent(errorMessage)}`);
+  const target = redirectTarget || `${frontendUrl}/auth/callback`;
+  res.redirect(appendQueryParams(target, `error=${encodeURIComponent(errorMessage)}`));
 };
 
 exports.googleCallback = async (req, res) => {
-  const { code, error } = req.query;
+  const { code, error, state } = req.query;
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const redirectTarget = resolveRedirectTarget(typeof state === 'string' ? state : '', frontendUrl);
 
   if (error) {
     console.error('Google OAuth error:', error);
     const errorMessage = error === 'access_denied' 
       ? 'Access denied. Please grant permissions to continue.' 
       : `Authentication failed: ${error}`;
-    return redirectWithError(res, errorMessage);
+    return redirectWithError(res, errorMessage, redirectTarget);
   }
 
   if (!code) {
     console.error('No authorization code provided');
-    return redirectWithError(res, 'Authorization code not provided');
+    return redirectWithError(res, 'Authorization code not provided', redirectTarget);
   }
 
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
     console.error('Google OAuth credentials not configured');
-    return redirectWithError(res, 'Google OAuth not configured. Please contact administrator.');
+    return redirectWithError(res, 'Google OAuth not configured. Please contact administrator.', redirectTarget);
   }
 
   try {
@@ -197,7 +219,7 @@ exports.googleCallback = async (req, res) => {
     
     if (!tokens.access_token) {
       console.error('No access token in response:', tokens);
-      return redirectWithError(res, 'Failed to get access token from Google');
+      return redirectWithError(res, 'Failed to get access token from Google', redirectTarget);
     }
 
     const userInfoResponse = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -210,13 +232,13 @@ exports.googleCallback = async (req, res) => {
     
     if (!googleUser.email) {
       console.error('No email in Google user info:', googleUser);
-      return redirectWithError(res, 'Failed to get email from Google account');
+      return redirectWithError(res, 'Failed to get email from Google account', redirectTarget);
     }
 
     User.findByEmail(googleUser.email, (err, results) => {
       if (err) {
         console.error('Database error finding user:', err);
-        return redirectWithError(res, 'Database error. Please try again.');
+        return redirectWithError(res, 'Database error. Please try again.', redirectTarget);
       }
 
       if (results.length > 0) {
@@ -225,7 +247,7 @@ exports.googleCallback = async (req, res) => {
         const userRole = user.role || 'user';
 
         if (user.status === 'inactive' || user.status === 'suspended') {
-          return redirectWithError(res, 'Account is inactive. Please contact an admin.');
+          return redirectWithError(res, 'Account is inactive. Please contact an admin.', redirectTarget);
         }
 
         try {
@@ -244,10 +266,10 @@ exports.googleCallback = async (req, res) => {
             { expiresIn: '24h' }
           );
 
-          res.redirect(`${frontendUrl}/auth/callback?token=${encodeURIComponent(token)}&role=${encodeURIComponent(userRole)}`);
+          res.redirect(appendQueryParams(redirectTarget, `token=${encodeURIComponent(token)}&role=${encodeURIComponent(userRole)}`));
         } catch (jwtError) {
           console.error('JWT signing error:', jwtError);
-          return redirectWithError(res, 'Failed to create authentication token');
+          return redirectWithError(res, 'Failed to create authentication token', redirectTarget);
         }
       } else {
       
@@ -268,13 +290,13 @@ exports.googleCallback = async (req, res) => {
               
                 User.findByEmail(googleUser.email, (findErr, findResults) => {
                   if (findErr || !findResults || findResults.length === 0) {
-                    return redirectWithError(res, 'Failed to create account. Please try again.');
+                    return redirectWithError(res, 'Failed to create account. Please try again.', redirectTarget);
                   }
                   const user = findResults[0];
                   const userRole = user.role || 'user';
 
                   if (user.status === 'inactive' || user.status === 'suspended') {
-                    return redirectWithError(res, 'Account is inactive. Please contact an admin.');
+                    return redirectWithError(res, 'Account is inactive. Please contact an admin.', redirectTarget);
                   }
 
                   const token = jwt.sign(
@@ -291,10 +313,10 @@ exports.googleCallback = async (req, res) => {
                     process.env.JWT_SECRET || "secret",
                     { expiresIn: '24h' }
                   );
-                  res.redirect(`${frontendUrl}/auth/callback?token=${encodeURIComponent(token)}&role=${encodeURIComponent(userRole)}`);
+                  res.redirect(appendQueryParams(redirectTarget, `token=${encodeURIComponent(token)}&role=${encodeURIComponent(userRole)}`));
                 });
               } else {
-                return redirectWithError(res, 'Failed to create account. Please try again.');
+                return redirectWithError(res, 'Failed to create account. Please try again.', redirectTarget);
               }
               return;
             }
@@ -313,10 +335,10 @@ exports.googleCallback = async (req, res) => {
                 { expiresIn: '24h' }
               );
 
-              res.redirect(`${frontendUrl}/auth/callback?token=${encodeURIComponent(token)}&role=user`);
+              res.redirect(appendQueryParams(redirectTarget, `token=${encodeURIComponent(token)}&role=user`));
             } catch (jwtError) {
               console.error('JWT signing error:', jwtError);
-              return redirectWithError(res, 'Failed to create authentication token');
+              return redirectWithError(res, 'Failed to create authentication token', redirectTarget);
             }
           }
         );
@@ -330,14 +352,14 @@ exports.googleCallback = async (req, res) => {
       console.error('Error response data:', error.response.data);
       console.error('Error response status:', error.response.status);
       const errorMessage = error.response.data?.error || error.response.data?.error_description || 'Unknown error';
-      return redirectWithError(res, `Authentication failed: ${errorMessage}`);
+      return redirectWithError(res, `Authentication failed: ${errorMessage}`, redirectTarget);
     } else if (error.request) {
       console.error('No response received:', error.request);
-      return redirectWithError(res, 'No response from Google. Please check your internet connection.');
+      return redirectWithError(res, 'No response from Google. Please check your internet connection.', redirectTarget);
     } else {
     
       console.error('Error setting up request:', error.message);
-      return redirectWithError(res, `Authentication failed: ${error.message || 'Unknown error'}`);
+      return redirectWithError(res, `Authentication failed: ${error.message || 'Unknown error'}`, redirectTarget);
     }
   }
 };

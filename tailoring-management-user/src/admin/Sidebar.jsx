@@ -103,6 +103,13 @@ function Sidebar() {
             </NavLink>
           )}
 
+          {(role === 'admin' || role === 'clerk') && (
+            <NavLink to="/deleted-orders-archive" className={navLinkClass}>
+              <i className="fas fa-archive nav-icon"></i>
+              <span>Deleted Orders Archive</span>
+            </NavLink>
+          )}
+
           {/*}
           {role === 'admin' && (
             <NavLink to="/billing" className={navLinkClass}>

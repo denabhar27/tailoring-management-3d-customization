@@ -34,6 +34,7 @@ import {
   settleCompensationIncident,
   updateCompensationLiability
 } from '../api/DamageCompensationApi';
+import { getClerks } from '../api/ClerkApi';
 import { useAlert } from '../context/AlertContext';
 import { createPortal } from 'react-dom';
 
@@ -151,6 +152,8 @@ const DryCleaning = () => {
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const [damageIncidents, setDamageIncidents] = useState([]);
+  const [clerkOptions, setClerkOptions] = useState([]);
+  const [loadingClerkOptions, setLoadingClerkOptions] = useState(false);
 
   const [showDamageReportModal, setShowDamageReportModal] = useState(false);
   const [showLiabilityModal, setShowLiabilityModal] = useState(false);
@@ -732,6 +735,14 @@ const DryCleaning = () => {
 
   const normalizeIncidentStatus = (value) => String(value || '').toLowerCase();
 
+  const getClerkDisplayName = (clerk) => {
+    const fullName = [clerk?.first_name, clerk?.middle_name, clerk?.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    return fullName || clerk?.email || `Clerk #${clerk?.user_id || ''}`;
+  };
+
 
 
   const getNextStatus = (currentStatus, serviceType = 'dry_cleaning', item = null) => {
@@ -1012,6 +1023,7 @@ const DryCleaning = () => {
     if (isAuthenticated() && (role === 'admin' || role === 'clerk')) {
 
       loadDryCleaningOrders();
+      loadClerkOptions();
 
     }
 
@@ -1058,6 +1070,23 @@ const DryCleaning = () => {
 
   };
 
+  const loadClerkOptions = async () => {
+    setLoadingClerkOptions(true);
+    try {
+      const result = await getClerks();
+      if (result.success) {
+        const clerks = Array.isArray(result.clerks) ? result.clerks : [];
+        setClerkOptions(clerks.filter((clerk) => String(clerk?.status || '').toLowerCase() !== 'inactive'));
+      } else {
+        showToast(result.message || 'Failed to load clerks', 'error');
+      }
+    } catch (error) {
+      showToast('Failed to load clerks', 'error');
+    } finally {
+      setLoadingClerkOptions(false);
+    }
+  };
+
   const getIncidentForItem = (itemId) => {
     const incidents = damageIncidents.filter((incident) => Number(incident.order_item_id) === Number(itemId));
     if (!incidents.length) return null;
@@ -1102,6 +1131,10 @@ const DryCleaning = () => {
     }, 0);
     if (!damageForm.damageType.trim()) {
       showToast('Please enter a damage type', 'error');
+      return;
+    }
+    if (!damageForm.responsibleParty.trim()) {
+      showToast('Please select a responsible clerk', 'error');
       return;
     }
     if (!Number.isInteger(totalQuantity) || totalQuantity < 1) {
@@ -3113,6 +3146,15 @@ const DryCleaning = () => {
                       ) : (
 
                         <div className="action-buttons">
+
+                          {item.approval_status === 'accepted' && !isDamagePendingIncident && !isForCompensationIncident && (
+                            <button className="icon-btn decline" onClick={() => handleDecline(item.item_id)} title="Decline">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                              </svg>
+                            </button>
+                          )}
 
                           {isDamagePendingIncident ? (
                             <div className="action-buttons">
@@ -5308,14 +5350,23 @@ const DryCleaning = () => {
 
               <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
                 <label>Responsible Staff/Admin</label>
-                <input
-                  type="text"
+                <select
                   className="form-control"
                   style={{ width: '100%', boxSizing: 'border-box' }}
-                  placeholder="Name or identifier"
                   value={damageForm.responsibleParty}
+                  disabled={loadingClerkOptions}
                   onChange={(e) => setDamageForm({ ...damageForm, responsibleParty: e.target.value })}
-                />
+                >
+                  <option value="">{loadingClerkOptions ? 'Loading clerks...' : 'Select clerk...'}</option>
+                  {clerkOptions.map((clerk) => {
+                    const clerkName = getClerkDisplayName(clerk);
+                    return (
+                      <option key={clerk.user_id} value={clerkName}>
+                        {clerkName}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
 
               <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>

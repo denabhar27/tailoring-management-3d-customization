@@ -44,6 +44,8 @@ export default function RentalLanding() {
   const [cardSizeSelections, setCardSizeSelections] = useState<{ [itemId: string]: { [sizeKey: string]: number } }>({});
   const [inlineMessage, setInlineMessage] = useState('');
   const [inlineMessageItemId, setInlineMessageItemId] = useState<string | null>(null);
+  const [realTimeAvailability, setRealTimeAvailability] = useState<Record<string, Record<string, number | null>>>({});
+  const [availabilityAuthFailed, setAvailabilityAuthFailed] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const ITEMS_PER_PAGE = 8;
@@ -124,6 +126,71 @@ export default function RentalLanding() {
     return require("../../../assets/images/rent.jpg");
   };
 
+  const toNonNegativeNumberOrNull = (value: any) => {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = parseInt(String(value), 10);
+    if (Number.isNaN(parsed)) return null;
+    return Math.max(0, parsed);
+  };
+
+  const buildAvailabilityMapForItem = (item: any, liveMap: Record<string, any> = {}) => {
+    const map: Record<string, number | null> = {};
+    const sizeOptions = item?.size_options || {};
+    const declaredOptions = item?.size ? (() => {
+      try {
+        const parsed = typeof item.size === 'string' ? JSON.parse(item.size) : item.size;
+        return parsed?.size_options || parsed?.sizeOptions || {};
+      } catch {
+        return {};
+      }
+    })() : {};
+
+    if (Object.keys(sizeOptions).length === 0) {
+      map.__default = toNonNegativeNumberOrNull(liveMap.__default);
+      if (map.__default === null) {
+        map.__default = toNonNegativeNumberOrNull(item?.total_available ?? declaredOptions?.__default?.quantity ?? declaredOptions?.quantity);
+      }
+      return map;
+    }
+
+    Object.entries(sizeOptions).forEach(([sizeKey, option]: any) => {
+      const liveQty = toNonNegativeNumberOrNull(liveMap[sizeKey]);
+      const declaredQty = toNonNegativeNumberOrNull(option?.quantity ?? declaredOptions?.[sizeKey]?.quantity);
+      map[sizeKey] = liveQty !== null ? liveQty : declaredQty;
+    });
+
+    return map;
+  };
+
+  const fetchItemAvailability = async (item: any) => {
+    if (availabilityAuthFailed) return;
+
+    const itemId = getItemId(item);
+    if (!itemId) return;
+
+    try {
+      const response = await rentalService.getAvailableQuantity(String(itemId));
+      if (response?.authError) {
+        setAvailabilityAuthFailed(true);
+        setRealTimeAvailability((prev) => ({
+          ...prev,
+          [itemId]: buildAvailabilityMapForItem(item, {}),
+        }));
+        return;
+      }
+      const liveMap = response?.available_quantities || {};
+      setRealTimeAvailability((prev) => ({
+        ...prev,
+        [itemId]: buildAvailabilityMapForItem(item, liveMap),
+      }));
+    } catch {
+      setRealTimeAvailability((prev) => ({
+        ...prev,
+        [itemId]: buildAvailabilityMapForItem(item, {}),
+      }));
+    }
+  };
+
   const toggleItemSelection = (item: any) => {
     if (isMultiSelectMode) {
       setSelectedItems(prev => {
@@ -141,6 +208,14 @@ export default function RentalLanding() {
           }
           return prev.filter(i => getItemId(i) !== itemId);
         } else {
+          const hasSizeOptions = Object.keys(item.size_options || {}).length > 0;
+          if (!hasSizeOptions) {
+            setCardSizeSelections(p => ({
+              ...p,
+              [itemId]: { __default: Math.max(1, parseInt(String(p?.[itemId]?.__default || 1), 10)) }
+            }));
+          }
+          fetchItemAvailability(item);
           return [...prev, item];
         }
       });
@@ -156,11 +231,22 @@ export default function RentalLanding() {
   const updateCardSizeQuantity = (item: any, sizeKey: string, delta: number) => {
     const itemId = getItemId(item);
     const option = item.size_options?.[sizeKey] || {};
-    const maxQty = parseInt(String(option.quantity || item.total_available || '999'), 10);
+    const liveQty = realTimeAvailability?.[itemId]?.[sizeKey];
+    const maxQty = liveQty ?? toNonNegativeNumberOrNull(option.quantity ?? item?.total_available);
     const currentQty = parseInt(String(cardSizeSelections?.[itemId]?.[sizeKey] || 0), 10);
     const nextQtyRaw = Math.max(0, currentQty + delta);
 
-    if (delta > 0 && !isNaN(maxQty) && nextQtyRaw > maxQty) {
+    if (delta > 0 && maxQty === null) {
+      setInlineMessage('Stock not declared by admin yet');
+      setInlineMessageItemId(itemId);
+      setTimeout(() => {
+        setInlineMessage('');
+        setInlineMessageItemId(null);
+      }, 1800);
+      return;
+    }
+
+    if (delta > 0 && maxQty !== null && nextQtyRaw > maxQty) {
       setInlineMessage(`${option.label || sizeKey} out of stock`);
       setInlineMessageItemId(itemId);
       setTimeout(() => {
@@ -170,7 +256,7 @@ export default function RentalLanding() {
       return;
     }
 
-    const safeQty = !isNaN(maxQty) ? Math.min(nextQtyRaw, maxQty) : nextQtyRaw;
+    const safeQty = maxQty !== null ? Math.min(nextQtyRaw, maxQty) : nextQtyRaw;
     const nextItemSelections = {
       ...(cardSizeSelections[itemId] || {}),
       [sizeKey]: safeQty
@@ -254,6 +340,10 @@ export default function RentalLanding() {
 
   const getItemSizeSummary = (item: any) => {
     const selections = getItemSizeSelection(item);
+    if (Object.keys(item.size_options || {}).length === 0) {
+      const defaultQty = parseInt(String(selections.__default || 0), 10);
+      return defaultQty > 0 ? `Standard x${defaultQty}` : '';
+    }
     return Object.entries(selections)
       .filter(([, qty]) => parseInt(String(qty), 10) > 0)
       .map(([sizeKey, qty]) => {
@@ -272,6 +362,23 @@ export default function RentalLanding() {
       setBundleEndDate(null);
     }
   }, [bundleStartDate, bundleDuration]);
+
+  useEffect(() => {
+    if (!isMultiSelectMode) return;
+
+    const visibleItems = getPagedRentals();
+    visibleItems.forEach((item) => {
+      fetchItemAvailability(item);
+    });
+
+    const intervalId = setInterval(() => {
+      getPagedRentals().forEach((item) => {
+        fetchItemAvailability(item);
+      });
+    }, 12000);
+
+    return () => clearInterval(intervalId);
+  }, [isMultiSelectMode, rentals, activeCategory, currentPage, availabilityAuthFailed]);
 
   const openBundleModal = () => {
     if (selectedItems.length === 0) {
@@ -313,14 +420,22 @@ export default function RentalLanding() {
     try {
       const itemsWithSizes = selectedItems.map(item => {
         const selections = cardSizeSelections[getItemId(item)] || {};
-        const selectedSizes = Object.entries(selections)
-          .filter(([, qty]) => parseInt(String(qty), 10) > 0)
-          .map(([sizeKey, qty]) => ({
-            sizeKey,
-            quantity: parseInt(String(qty), 10),
-            price: item.size_options?.[sizeKey]?.price || 0,
-            label: item.size_options?.[sizeKey]?.label || sizeKey
-          }));
+        const hasSizeOptions = Object.keys(item.size_options || {}).length > 0;
+        const selectedSizes = hasSizeOptions
+          ? Object.entries(selections)
+              .filter(([, qty]) => parseInt(String(qty), 10) > 0)
+              .map(([sizeKey, qty]) => ({
+                sizeKey,
+                quantity: parseInt(String(qty), 10),
+                price: item.size_options?.[sizeKey]?.price || 0,
+                label: item.size_options?.[sizeKey]?.label || sizeKey
+              }))
+          : [{
+              sizeKey: '__default',
+              quantity: Math.max(1, parseInt(String(selections.__default || 1), 10)),
+              price: parseFloat(item.price || '0') || 0,
+              label: item.size || 'Standard'
+            }];
 
         return {
           item,
@@ -540,6 +655,7 @@ export default function RentalLanding() {
                     key={item.item_id}
                     style={[
                       styles.rentalCard,
+                      isMultiSelectMode && styles.rentalCardMulti,
                       isMultiSelectMode && selected && styles.rentalCardSelected
                     ]}
                     activeOpacity={0.88}
@@ -558,7 +674,7 @@ export default function RentalLanding() {
                       </View>
                     )}
 
-                    <View style={styles.imageWrapper}>
+                    <View style={[styles.imageWrapper, isMultiSelectMode && styles.imageWrapperMulti]}>
                       <Image
                         source={getImageSource(item)}
                         style={[
@@ -581,6 +697,48 @@ export default function RentalLanding() {
                         <Text style={styles.priceLabel}>/3 days</Text>
                       </View>
                     </View>
+                    {isMultiSelectMode && (
+                      <View style={styles.cardSizeControlsWrap}>
+                        <Text style={styles.cardSizeHeading}>Sizes & Quantity</Text>
+                        {(Object.keys(item.size_options || {}).length > 0
+                          ? Object.entries(item.size_options)
+                          : [['__default', { label: item.size || 'Standard', quantity: item.total_available || 1 }]]
+                        ).map(([sizeKey, opt]: any) => {
+                          const itemId = getItemId(item);
+                          const currentQty = parseInt(String(cardSizeSelections?.[itemId]?.[sizeKey] || 0), 10);
+                          const liveQty = realTimeAvailability?.[itemId]?.[sizeKey];
+                          const declaredQty = toNonNegativeNumberOrNull(opt?.quantity);
+                          const maxQty = liveQty ?? declaredQty;
+                          return (
+                            <View key={`${itemId}-${sizeKey}`} style={styles.cardSizeRow}>
+                              <Text style={styles.cardSizeLabel} numberOfLines={1}>
+                                {(opt?.label || sizeKey).toUpperCase()}  Stock: {maxQty === null ? 'Not set' : maxQty}
+                              </Text>
+                              <View style={styles.cardQtyControls}>
+                                <TouchableOpacity
+                                  style={styles.cardQtyButton}
+                                  onPress={() => updateCardSizeQuantity(item, sizeKey, -1)}
+                                  disabled={currentQty <= 0}
+                                >
+                                  <Text style={[styles.cardQtyButtonText, currentQty <= 0 && styles.cardQtyButtonTextDisabled]}>-</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.cardQtyValue}>{currentQty}</Text>
+                                <TouchableOpacity
+                                  style={styles.cardQtyButton}
+                                  onPress={() => updateCardSizeQuantity(item, sizeKey, 1)}
+                                  disabled={maxQty === null || currentQty >= maxQty}
+                                >
+                                  <Text style={[styles.cardQtyButtonText, (maxQty === null || currentQty >= maxQty) && styles.cardQtyButtonTextDisabled]}>+</Text>
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          );
+                        })}
+                        {inlineMessageItemId === getItemId(item) && !!inlineMessage && (
+                          <Text style={styles.cardInlineMessage}>{inlineMessage}</Text>
+                        )}
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -609,14 +767,14 @@ export default function RentalLanding() {
               <Text style={styles.bundleCount}>{selectedItems.length}</Text> item{selectedItems.length > 1 ? 's' : ''} selected
             </Text>
             <Text style={styles.bundleDownpayment}>
-              Est. Downpayment: ₱{calculateBundleDownpayment().toLocaleString()}
+              Estimated Downpayment (50%): ₱{calculateBundleDownpayment().toLocaleString()}
             </Text>
           </View>
           <TouchableOpacity
             style={styles.bundleButton}
             onPress={openBundleModal}
           >
-            <Text style={styles.bundleButtonText}>Set Dates & Add to Cart</Text>
+            <Text style={styles.bundleButtonText}>Continue Checkout</Text>
             <Ionicons name="arrow-forward" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -631,7 +789,7 @@ export default function RentalLanding() {
           <View style={styles.bundleModalContent}>
             <View style={styles.bundleModalHeader}>
               <Text style={styles.bundleModalTitle}>
-                Rental Bundle ({selectedItems.length} items)
+                Bundle Rental Checkout
               </Text>
               <TouchableOpacity onPress={closeBundleModal}>
                 <Ionicons name="close" size={28} color="#1F2937" />
@@ -640,7 +798,7 @@ export default function RentalLanding() {
 
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.selectedItemsPreview}>
-                <Text style={styles.selectedItemsTitle}>Selected Items:</Text>
+                <Text style={styles.selectedItemsTitle}>Selected Items & Sizes</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectedItemsScroll}>
                   {selectedItems.map((item) => (
                     <View key={getItemId(item)} style={styles.selectedItemChip}>
@@ -653,7 +811,7 @@ export default function RentalLanding() {
                         {item.item_name || item.name}
                       </Text>
                       <Text style={styles.selectedItemSize} numberOfLines={1}>
-                        {getItemSizeSummary(item) || 'No size'}
+                        {getItemSizeSummary(item) || 'Choose size qty'}
                       </Text>
                       <TouchableOpacity
                         onPress={() => toggleItemSelection(item)}
@@ -666,7 +824,7 @@ export default function RentalLanding() {
                 </ScrollView>
               </View>
               <View style={styles.dateSection}>
-                <Text style={styles.dateSectionTitle}>Rental Dates *</Text>
+                <Text style={styles.dateSectionTitle}>Rental Schedule *</Text>
 
                 <View style={styles.dateInputGroup}>
                   <Text style={styles.dateLabel}>Start Date</Text>
@@ -1054,7 +1212,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 16,
   },
+  rentalCardMulti: {
+    height: 320,
+  },
   imageWrapper: { width: "100%", height: "100%" },
+  imageWrapperMulti: { height: 160 },
   rentalImage: { width: "100%", height: "100%" },
   rentalInfoOverlay: {
     position: "absolute",
@@ -1077,6 +1239,66 @@ const styles = StyleSheet.create({
   priceRow: { flexDirection: "row", alignItems: "baseline", gap: 6 },
   rentalPrice: { fontSize: 20, fontWeight: "900", color: "#F59E0B" },
   priceLabel: { fontSize: 12, color: "#CBD5E1", fontWeight: "600" },
+  cardSizeControlsWrap: {
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 10,
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+  },
+  cardSizeHeading: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  cardSizeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cardSizeLabel: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  cardQtyControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cardQtyButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  cardQtyButtonText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#78350F',
+  },
+  cardQtyButtonTextDisabled: {
+    color: '#C4C4C4',
+  },
+  cardQtyValue: {
+    minWidth: 16,
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  cardInlineMessage: {
+    fontSize: 11,
+    color: '#DC2626',
+    fontWeight: '700',
+  },
 
   loadingContainer: {
     padding: 40,

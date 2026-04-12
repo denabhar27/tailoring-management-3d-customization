@@ -36,15 +36,16 @@ export async function loginUser(credentials) {
     const response = await axios.post(`${BASE_URL}/login`, credentials);
     const data = response.data;
 
-    if (
-      data.message === "Login successful" ||
-      data.message === "Admin login successful"
-    ) {
+    if (data?.token) {
       localStorage.setItem("token", data.token);
-      localStorage.setItem("role", data.role);
+      if (data.role) {
+        localStorage.setItem("role", data.role);
+      }
 
       const userData = data.user || data.admin;
-      localStorage.setItem("user", JSON.stringify(userData));
+      if (userData) {
+        localStorage.setItem("user", JSON.stringify(userData));
+      }
     }
 
     return data;
@@ -58,7 +59,18 @@ export async function loginUser(credentials) {
 }
 
 export function getToken() {
-  return localStorage.getItem("token");
+  const rawToken = localStorage.getItem("token")
+    || localStorage.getItem("authToken")
+    || localStorage.getItem("accessToken");
+
+  if (!rawToken) return null;
+
+  const token = String(rawToken).trim();
+  if (!token || token === 'null' || token === 'undefined') {
+    return null;
+  }
+
+  return token;
 }
 
 export function getUserRole() {

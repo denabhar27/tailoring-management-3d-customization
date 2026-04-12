@@ -304,11 +304,6 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
   };
 
   // Garment management functions
-  const addGarment = () => {
-    const newId = Math.max(...garments.map(g => g.id)) + 1;
-    setGarments([...garments, { id: newId, garmentType: '', customGarmentType: '', brand: '', quantity: 1 }]);
-  };
-
   const removeGarment = (id) => {
     if (garments.length > 1) {
       setGarments(garments.filter(g => g.id !== id));
@@ -664,14 +659,6 @@ const DryCleaningFormModal = ({ isOpen, onClose, onCartUpdate }) => {
               </div>
             ))}
             
-            <button 
-              type="button" 
-              className="add-garment-link"
-              onClick={addGarment}
-            >
-              + Add Another Garment
-            </button>
-
             <div className="form-group-shared">
               <label htmlFor="notes" className="form-label-shared"><i className="fas fa-pen"></i> Special Instructions</label>
               <textarea

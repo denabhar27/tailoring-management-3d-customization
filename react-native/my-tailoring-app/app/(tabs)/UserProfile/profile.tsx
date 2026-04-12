@@ -21,6 +21,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter , useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
+import { Calendar } from "react-native-calendars";
 
 import { orderStore, Order } from "../../../utils/orderStore";
 import { authService, orderTrackingService, notificationService, measurementsService, damageRecordService, API_BASE_URL } from "../../../utils/apiService";
@@ -95,6 +96,12 @@ export default function ProfileScreen() {
   const [customerCompensationChoice, setCustomerCompensationChoice] = useState<Record<number, 'money' | 'clothe'>>({});
   const [customerProceedChoice, setCustomerProceedChoice] = useState<Record<number, 'proceed' | 'dont_proceed'>>({});
   const [submittingLiabilityDecision, setSubmittingLiabilityDecision] = useState(false);
+  const [enhancementModalVisible, setEnhancementModalVisible] = useState(false);
+  const [selectedEnhancementItem, setSelectedEnhancementItem] = useState<any>(null);
+  const [enhancementNotes, setEnhancementNotes] = useState('');
+  const [enhancementPreferredDate, setEnhancementPreferredDate] = useState('');
+  const [showEnhancementCalendar, setShowEnhancementCalendar] = useState(false);
+  const [submittingEnhancement, setSubmittingEnhancement] = useState(false);
 
   useEffect(() => {
     setOrders(orderStore.getOrders());
@@ -255,6 +262,49 @@ export default function ProfileScreen() {
     return `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
+  const resolveOrderItemId = (item: any): number => {
+    const resolved = Number(item?.order_item_id || item?.child_order_id || 0);
+    return Number.isFinite(resolved) && resolved > 0 ? resolved : 0;
+  };
+
+  const normalizeServiceType = (serviceType: any): string => {
+    return String(serviceType || '').toLowerCase().replace(/-/g, '_').replace(/\s+/g, '_').trim();
+  };
+
+  const supportsEnhancementRequest = (serviceType: any): boolean => {
+    const normalized = normalizeServiceType(serviceType);
+    return ['repair', 'customization', 'customize', 'dry_cleaning', 'drycleaning'].includes(normalized);
+  };
+
+  const canRequestEnhancement = (item: any): boolean => {
+    return item?.status === 'completed' && supportsEnhancementRequest(item?.service_type);
+  };
+
+  const toBackendDate = (input: string): string | null => {
+    const value = String(input || '').trim();
+    if (!value) return null;
+
+    const ymdMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (ymdMatch) return value;
+
+    const dmyMatch = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!dmyMatch) return null;
+
+    const day = Number(dmyMatch[1]);
+    const month = Number(dmyMatch[2]);
+    const year = Number(dmyMatch[3]);
+    if (year < 2000 || month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+    return `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+  };
+
+  const formatDateForDisplay = (input: string): string => {
+    const value = String(input || '').trim();
+    const ymdMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!ymdMatch) return value;
+    return `${ymdMatch[3]}/${ymdMatch[2]}/${ymdMatch[1]}`;
+  };
+
   const fetchCompensationIncidents = async (orderList: any[]) => {
     try {
       const response = await damageRecordService.getCompensationIncidents({ myOnly: true });
@@ -263,7 +313,7 @@ export default function ProfileScreen() {
       const validOrderItemIds = new Set(
         (orderList || [])
           .flatMap((o: any) => Array.isArray(o.items) ? o.items : [])
-          .map((i: any) => Number(i.order_item_id))
+          .map((i: any) => resolveOrderItemId(i))
           .filter((id: number) => Number.isFinite(id) && id > 0)
       );
 
@@ -285,7 +335,7 @@ export default function ProfileScreen() {
   };
 
   const openCompensationModal = (item: any) => {
-    const orderItemId = Number(item?.order_item_id);
+    const orderItemId = resolveOrderItemId(item);
     if (!orderItemId) return;
 
     const incident = compensationIncidentsByItem[orderItemId];
@@ -575,6 +625,72 @@ export default function ProfileScreen() {
     } catch (error) {
       Alert.alert('Error', 'Error declining price. Please try again.');
       console.error('Error declining price:', error);
+    }
+  };
+
+  const openEnhancementModal = (item: any) => {
+    if (!canRequestEnhancement(item)) {
+      Alert.alert('Not Available', 'Enhancement request is only available for completed dry cleaning, customization, or repair orders.');
+      return;
+    }
+
+    setSelectedEnhancementItem(item);
+    setEnhancementNotes('');
+    setEnhancementPreferredDate('');
+    setShowEnhancementCalendar(false);
+    setEnhancementModalVisible(true);
+  };
+
+  const closeEnhancementModal = () => {
+    if (submittingEnhancement) return;
+    setEnhancementModalVisible(false);
+    setSelectedEnhancementItem(null);
+    setEnhancementNotes('');
+    setEnhancementPreferredDate('');
+    setShowEnhancementCalendar(false);
+  };
+
+  const submitEnhancementRequest = async () => {
+    const item = selectedEnhancementItem;
+    const orderItemId = resolveOrderItemId(item);
+
+    if (!item || !orderItemId) {
+      Alert.alert('Error', 'Order item not found for enhancement request.');
+      return;
+    }
+
+    const notes = enhancementNotes.trim();
+    if (!notes) {
+      Alert.alert('Validation', 'Enhancement notes are required.');
+      return;
+    }
+
+    const preferredCompletionDate = toBackendDate(enhancementPreferredDate);
+    if (enhancementPreferredDate.trim() && !preferredCompletionDate) {
+      Alert.alert('Validation', 'Preferred completion date must be in dd/mm/yyyy or yyyy-mm-dd format.');
+      return;
+    }
+
+    try {
+      setSubmittingEnhancement(true);
+      const result = await orderTrackingService.requestEnhancement(String(orderItemId), {
+        notes,
+        preferredCompletionDate,
+      });
+
+      if (!result?.success) {
+        Alert.alert('Error', result?.message || 'Failed to submit enhancement request.');
+        return;
+      }
+
+      Alert.alert('Success', 'Enhancement request submitted. Admin will review your request.');
+      closeEnhancementModal();
+      await fetchOrderTracking();
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to submit enhancement request.');
+      console.error('Error submitting enhancement request:', error);
+    } finally {
+      setSubmittingEnhancement(false);
     }
   };
 
@@ -984,6 +1100,7 @@ export default function ProfileScreen() {
                   return [];
                 }
                 return order.items.map((item: any) => {
+                  const itemOrderItemId = resolveOrderItemId(item);
                   const estimatedPrice = getEstimatedPrice(item.specific_data, item.service_type);
                   const priceChanged = hasPriceChanged(item.specific_data, parseFloat(item.final_price), item.service_type);
 
@@ -993,7 +1110,7 @@ export default function ProfileScreen() {
                     item.pricing_factors?.isUniform === true
                   );
                   const finalPrice = parseFloat(item.final_price);
-                  const compensationIncidentForItem = compensationIncidentsByItem[Number(item.order_item_id)] || null;
+                  const compensationIncidentForItem = compensationIncidentsByItem[itemOrderItemId] || null;
                   const hasCompensationIncident = !!compensationIncidentForItem;
                   const liabilityStatus = String(compensationIncidentForItem?.liability_status || '').toLowerCase();
                   const compensationStatus = String(compensationIncidentForItem?.compensation_status || '').toLowerCase();
@@ -1005,14 +1122,14 @@ export default function ProfileScreen() {
                   const amountLabel = isRentalDamageChargeFlow ? 'Damage Charge Amount' : 'Compensation Amount';
 
                   return (
-                    <View key={`${item.order_id}-${item.order_item_id}`} style={styles.orderCard}>
+                    <View key={`${item.order_id}-${itemOrderItemId || item.child_order_id || item.order_item_id}`} style={styles.orderCard}>
                       <View style={styles.orderHeader}>
                         <View style={styles.orderInfo}>
                           <Text style={styles.orderNo}>
                             Parent Order #{item.parent_order_id || item.order_id}
                           </Text>
                           <Text style={styles.orderNo}>
-                            Child Order #{item.child_order_id || item.order_item_id}
+                            Child Order #{itemOrderItemId || item.child_order_id || item.order_item_id}
                           </Text>
                           <Text style={styles.orderNo}>
                             {item.service_type === 'dry_cleaning' ? 'Dry Cleaning' : item.service_type.charAt(0).toUpperCase() + item.service_type.slice(1)} Service
@@ -1264,6 +1381,17 @@ export default function ProfileScreen() {
                         </View>
                       )}
 
+                      {canRequestEnhancement(item) && (
+                        <TouchableOpacity
+                          style={styles.enhancementRequestButton}
+                          onPress={() => openEnhancementModal(item)}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons name="sparkles-outline" size={16} color="#fff" />
+                          <Text style={styles.enhancementRequestButtonText}>Request Enhancement</Text>
+                        </TouchableOpacity>
+                      )}
+
                       <View style={styles.orderFooter}>
                         <View style={styles.orderDates}>
                           <Text style={styles.dateInfo}>Requested: {formatDate(order.order_date)}</Text>
@@ -1271,7 +1399,7 @@ export default function ProfileScreen() {
                         </View>
                         <TouchableOpacity
                           style={styles.viewDetailsBtn}
-                          onPress={() => router.push(`/orders/${item.order_item_id}`)}
+                          onPress={() => router.push(`/orders/${itemOrderItemId || item.order_item_id}`)}
                         >
                           <Text style={styles.viewDetailsText}>View Details</Text>
                           <Ionicons name="chevron-forward" size={16} color="#94665B" />
@@ -1670,6 +1798,106 @@ export default function ProfileScreen() {
                   </View>
                 </View>
               )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={enhancementModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeEnhancementModal}
+      >
+        <View style={styles.enhancementModalOverlay}>
+          <View style={styles.enhancementModalCard}>
+            <View style={styles.enhancementModalHeader}>
+              <Text style={styles.enhancementModalTitle}>Request Enhancement</Text>
+              <TouchableOpacity onPress={closeEnhancementModal}>
+                <Ionicons name="close" size={22} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.enhancementModalBody} keyboardShouldPersistTaps="handled">
+              <Text style={styles.enhancementModalHelpText}>
+                Tell us what issue you found and how you want the order improved.
+              </Text>
+
+              <Text style={styles.enhancementInputLabel}>Enhancement Notes *</Text>
+              <TextInput
+                style={styles.enhancementNotesInput}
+                value={enhancementNotes}
+                onChangeText={setEnhancementNotes}
+                placeholder="Describe the issue/enhancement request..."
+                placeholderTextColor="#9CA3AF"
+                multiline
+                numberOfLines={5}
+                textAlignVertical="top"
+              />
+
+              <Text style={styles.enhancementInputLabel}>Preferred Completion Date (Optional)</Text>
+              <TouchableOpacity
+                style={styles.enhancementDateInput}
+                onPress={() => setShowEnhancementCalendar((prev) => !prev)}
+                activeOpacity={0.85}
+              >
+                <Text style={enhancementPreferredDate ? styles.enhancementDateValue : styles.enhancementDatePlaceholder}>
+                  {enhancementPreferredDate ? formatDateForDisplay(enhancementPreferredDate) : 'dd/mm/yyyy'}
+                </Text>
+                <Ionicons name="calendar-outline" size={18} color="#4B5563" />
+              </TouchableOpacity>
+
+              {showEnhancementCalendar && (
+                <View style={styles.enhancementCalendarWrap}>
+                  <Calendar
+                    current={enhancementPreferredDate || undefined}
+                    minDate={new Date().toISOString().split('T')[0]}
+                    onDayPress={(day: { dateString: string }) => {
+                      setEnhancementPreferredDate(day.dateString);
+                      setShowEnhancementCalendar(false);
+                    }}
+                    markedDates={enhancementPreferredDate ? {
+                      [enhancementPreferredDate]: {
+                        selected: true,
+                        selectedColor: '#8D5A4D',
+                      },
+                    } : {}}
+                    theme={{
+                      todayTextColor: '#8D5A4D',
+                      arrowColor: '#8D5A4D',
+                    }}
+                  />
+                  {!!enhancementPreferredDate && (
+                    <TouchableOpacity
+                      style={styles.enhancementClearDateBtn}
+                      onPress={() => setEnhancementPreferredDate('')}
+                    >
+                      <Text style={styles.enhancementClearDateBtnText}>Clear Date</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+              <View style={styles.enhancementModalButtons}>
+                <TouchableOpacity
+                  style={styles.enhancementCloseButton}
+                  onPress={closeEnhancementModal}
+                  disabled={submittingEnhancement}
+                >
+                  <Text style={styles.enhancementCloseButtonText}>Close</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.enhancementSubmitButton, submittingEnhancement && styles.enhancementSubmitButtonDisabled]}
+                  onPress={submitEnhancementRequest}
+                  disabled={submittingEnhancement}
+                >
+                  {submittingEnhancement ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.enhancementSubmitButtonText}>Submit Request</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         </View>
@@ -2143,6 +2371,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: "center",
   },
+  enhancementRequestButton: {
+    marginBottom: 14,
+    backgroundColor: "#673AB7",
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  enhancementRequestButtonText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
 
   orderCard: {
     backgroundColor: "#fff",
@@ -2357,6 +2600,126 @@ const styles = StyleSheet.create({
   },
   compensationActionDisabled: {
     opacity: 0.65,
+  },
+  enhancementModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    padding: 18,
+  },
+  enhancementModalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    overflow: "hidden",
+    maxHeight: "90%",
+  },
+  enhancementModalHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  enhancementModalTitle: {
+    fontSize: 30,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  enhancementModalBody: {
+    padding: 16,
+  },
+  enhancementModalHelpText: {
+    fontSize: 14,
+    color: "#4B5563",
+    marginBottom: 14,
+    lineHeight: 20,
+  },
+  enhancementInputLabel: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 8,
+  },
+  enhancementNotesInput: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 8,
+    padding: 12,
+    minHeight: 120,
+    fontSize: 16,
+    color: "#111827",
+    marginBottom: 14,
+  },
+  enhancementDateInput: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 18,
+  },
+  enhancementDateValue: {
+    fontSize: 16,
+    color: "#111827",
+  },
+  enhancementDatePlaceholder: {
+    fontSize: 16,
+    color: "#9CA3AF",
+  },
+  enhancementCalendarWrap: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    overflow: "hidden",
+    marginTop: -8,
+    marginBottom: 14,
+  },
+  enhancementClearDateBtn: {
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: "#FAFAFA",
+  },
+  enhancementClearDateBtnText: {
+    color: "#8D5A4D",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  enhancementModalButtons: {
+    gap: 10,
+  },
+  enhancementCloseButton: {
+    backgroundColor: "#6B7280",
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  enhancementCloseButtonText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  enhancementSubmitButton: {
+    backgroundColor: "#8D5A4D",
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  enhancementSubmitButtonDisabled: {
+    opacity: 0.65,
+  },
+  enhancementSubmitButtonText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+    textTransform: "uppercase",
   },
   modalContainer: {
     flex: 1,

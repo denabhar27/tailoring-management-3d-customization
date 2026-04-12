@@ -1,15 +1,50 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 console.log('ENV API URL:', process.env.EXPO_PUBLIC_API_BASE_URL);
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.66:5000/api';
+const resolveExpoHost = (): string | null => {
+  const hostUri = (Constants.expoConfig as any)?.hostUri as string | undefined;
+  if (hostUri) {
+    return hostUri.split(':')[0] || null;
+  }
+
+  const debuggerHost =
+    ((Constants.expoGoConfig as any)?.debuggerHost as string | undefined) ||
+    ((Constants.manifest2 as any)?.extra?.expoGo?.debuggerHost as string | undefined) ||
+    ((Constants.manifest as any)?.debuggerHost as string | undefined);
+
+  if (debuggerHost) {
+    return debuggerHost.split(':')[0] || null;
+  }
+
+  return null;
+};
+
+const resolveDefaultApiBaseUrl = (): string => {
+  const host = resolveExpoHost();
+  if (host && host !== 'localhost' && host !== '127.0.0.1') {
+    return `http://${host}:5000/api`;
+  }
+
+  // Android emulator cannot reach localhost directly; use host loopback alias.
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:5000/api';
+  }
+
+  return 'http://localhost:5000/api';
+};
+
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || resolveDefaultApiBaseUrl();
 console.log('Using API_BASE_URL:', API_BASE_URL);
 const REQUEST_TIMEOUT = parseInt(process.env.EXPO_PUBLIC_REQUEST_TIMEOUT || '10000', 10);
 
 const PUBLIC_AUTH_ENDPOINTS = [
   '/login',
   '/register',
+  '/auth/google',
   '/forgot-password',
   '/verify-reset-code',
   '/reset-password',
@@ -166,6 +201,11 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
       if (fetchError.name === 'AbortError') {
         throw new Error(`Request timeout after ${REQUEST_TIMEOUT}ms. Please check your network connection and ensure the backend server is running at ${API_BASE_URL}`);
       }
+
+      if (fetchError instanceof TypeError && /Network request failed/i.test(fetchError.message || '')) {
+        throw new Error(`Unable to connect to server at ${API_BASE_URL}. Check that backend is running, your phone/emulator is on the same network, and this API URL is reachable.`);
+      }
+
       throw fetchError;
     }
   } catch (error) {
@@ -190,11 +230,48 @@ export const authService = {
     email: string;
     password: string;
     phone_number: string;
+    birthdate: string;
   }) => {
     return apiCall('/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
+  },
+
+  getGoogleAuthUrl: async (state?: string) => {
+    const query = state ? `?state=${encodeURIComponent(state)}` : '';
+    return apiCall(`/auth/google${query}`);
+  },
+
+  completeGoogleLogin: async (token: string, roleFromQuery?: string) => {
+    if (!token) {
+      return { success: false, message: 'Missing authentication token.' };
+    }
+
+    try {
+      const payload = decodeToken(token) || {};
+      const role = roleFromQuery || payload.role || 'user';
+
+      const user = {
+        id: payload.id,
+        first_name: payload.first_name || '',
+        middle_name: payload.middle_name || '',
+        last_name: payload.last_name || '',
+        email: payload.email || '',
+        phone_number: payload.phone_number || null,
+        profile_picture: payload.profile_picture || null,
+        role,
+      };
+
+      await AsyncStorage.setItem('userToken', token);
+      await AsyncStorage.setItem('userRole', role);
+      await AsyncStorage.setItem('userData', JSON.stringify(user));
+
+      return { success: true, role, user };
+    } catch (error) {
+      console.error('Error completing Google login:', error);
+      return { success: false, message: 'Failed to save Google login session.' };
+    }
   },
 
   updateProfile: async (userData: any) => {

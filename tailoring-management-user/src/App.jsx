@@ -22,6 +22,7 @@ import ShopSchedule from "./admin/ShopSchedule";
 import WalkInOrders from "./admin/WalkInOrders";
 import OrdersInventory from "./admin/OrdersInventory";
 import ClerkManagement from "./admin/ClerkManagement";
+import DeletedOrdersArchive from "./admin/DeletedOrdersArchive";
 import Customizer3DPage from "./pages/Customizer3DPage";
 import GoogleAuthCallback from "./components/auth/GoogleAuthCallback";
 
@@ -51,6 +52,7 @@ const App = () => {
         <Route path="/rental-inventory" element={<OrdersInventory />} />
         <Route path="/orders-inventory" element={<OrdersInventory />} />
         <Route path="/clerk-management" element={<ClerkManagement />} />
+        <Route path="/deleted-orders-archive" element={<DeletedOrdersArchive />} />
 
       </Routes>
     </>

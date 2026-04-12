@@ -678,7 +678,7 @@ const Profile = () => {
 
   const isDryCleaningServiceType = (serviceType = '') => {
     const normalized = String(serviceType || '').toLowerCase();
-    return ['dry_cleaning', 'drycleaning', 'dry-cleaning'].includes(normalized);
+    return ['dry_cleaning', 'drycleaning', 'dry-cleaning', 'dry cleaning'].includes(normalized);
   };
 
   const openEnhancementModal = (item) => {

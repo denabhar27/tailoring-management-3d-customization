@@ -29,7 +29,7 @@ export async function getAllRepairOrders() {
 
 export async function getRepairOrdersByStatus(status) {
   try {
-    const response = await axios.get(`${BASE_URL}/orders/repair/status/${status}`, {
+    const response = await axios.get(`${BASE_URL}/orders/repair/orders/status/${status}`, {
       headers: getAuthHeaders()
     });
     return response.data;

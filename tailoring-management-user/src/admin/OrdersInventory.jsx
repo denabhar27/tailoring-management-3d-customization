@@ -283,9 +283,12 @@ const OrdersInventory = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [incidentStatusFilter, setIncidentStatusFilter] = useState('all');
+  const [enhancementStatusFilter, setEnhancementStatusFilter] = useState('all');
   const [serviceTypeFilter, setServiceTypeFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [reportTab, setReportTab] = useState('reports');
   
   // Modal states
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -500,6 +503,143 @@ const OrdersInventory = () => {
     inProgressOrders: billingRecords.filter(b => getOrderStatus(b) === 'in-progress').length,
     totalInventory: inventoryStats.total || inventoryItems.length,
     monthlyRevenue: billingStats.totalRevenue || 0 // Could be calculated based on current month
+  };
+
+  const normalizeServiceType = (value) => {
+    const raw = String(value || '').toLowerCase().trim();
+    if (raw === 'dry-cleaning' || raw === 'drycleaning') return 'dry_cleaning';
+    if (raw === 'customize') return 'customization';
+    return raw;
+  };
+
+  const getEnhancementAmount = (pricingFactors, item = null) => {
+    const factors = pricingFactors || {};
+    const directAdditionalCost = parseFloat(factors.enhancementAdditionalCost || 0);
+    if (Number.isFinite(directAdditionalCost) && directAdditionalCost > 0) {
+      return directAdditionalCost;
+    }
+
+    const accessoriesPrice = parseFloat(factors.accessoriesPrice || 0);
+    if (Number.isFinite(accessoriesPrice) && accessoriesPrice > 0) {
+      return accessoriesPrice;
+    }
+
+    const basePrice = parseFloat(factors.accessoriesBasePrice || 0);
+    const finalPrice = parseFloat(item?.price || item?.final_price || item?.displayAmount || 0) || 0;
+    if (Number.isFinite(finalPrice) && finalPrice > 0 && Number.isFinite(basePrice) && basePrice > 0) {
+      return Math.max(0, finalPrice - basePrice);
+    }
+
+    return 0;
+  };
+
+  const isWithinDateRange = (dateValue) => {
+    if (!dateFrom && !dateTo) return true;
+    const parsedDate = new Date(dateValue || '');
+    if (Number.isNaN(parsedDate.getTime())) return false;
+
+    if (dateFrom) {
+      const from = new Date(`${dateFrom}T00:00:00`);
+      if (parsedDate < from) return false;
+    }
+    if (dateTo) {
+      const to = new Date(`${dateTo}T23:59:59`);
+      if (parsedDate > to) return false;
+    }
+    return true;
+  };
+
+  const enhancementRows = (() => {
+    const source = [...billingRecords, ...inventoryItems];
+    const rowMap = new Map();
+
+    source.forEach((item) => {
+      const pricingFactors = item?.pricingFactors || item?.pricing_factors || {};
+      if (!pricingFactors?.enhancementRequest) return;
+
+      const serviceType = normalizeServiceType(item?.serviceType || item?.service_type || '');
+      const itemId = item?.id || item?.item_id;
+      const orderId = item?.orderId || item?.order_id;
+      if (!itemId || !orderId) return;
+
+      const key = `${serviceType}-${itemId}`;
+      const customerName = item?.customerName || item?.displayName || 'N/A';
+      const requestDate = pricingFactors?.enhancementUpdatedAt || pricingFactors?.enhancementRequestedAt || item?.date || item?.displayDate;
+      const accepted = pricingFactors?.enhancementAdminAccepted === true;
+      const cancelled = pricingFactors?.enhancementCancelledByAdmin === true;
+      const enhancementAmount = getEnhancementAmount(pricingFactors, item);
+
+      const status = cancelled ? 'cancelled' : accepted ? 'accepted' : 'requested';
+      const statusLabel = cancelled ? 'Cancelled' : accepted ? 'Accepted' : 'Requested';
+
+      rowMap.set(key, {
+        id: key,
+        orderId,
+        itemId,
+        serviceType,
+        serviceTypeDisplay: item?.serviceTypeDisplay || item?.displayService || serviceType,
+        customerName,
+        requestDate,
+        status,
+        statusLabel,
+        notes: pricingFactors?.enhancementNotes || '',
+        preferredCompletionDate: pricingFactors?.enhancementPreferredCompletionDate || '',
+        enhancementAmount,
+        accessoriesRequested: pricingFactors?.addAccessories === true
+      });
+    });
+
+    return Array.from(rowMap.values()).sort((a, b) => new Date(b.requestDate || 0) - new Date(a.requestDate || 0));
+  })();
+
+  const filteredCompensationIncidents = compensationIncidents.filter((incident) => {
+    const incidentService = normalizeServiceType(incident?.service_type || '');
+    const serviceFilterNormalized = normalizeServiceType(serviceTypeFilter || '');
+    const incidentDate = incident?.updated_at || incident?.created_at || incident?.reported_at;
+
+    const matchesSearch = searchTerm === ''
+      || String(incident?.order_id || incident?.order_item_id || '').toLowerCase().includes(searchTerm.toLowerCase())
+      || String(getIncidentCustomerName(incident) || '').toLowerCase().includes(searchTerm.toLowerCase())
+      || String(incident?.damage_type || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesService = !serviceTypeFilter || incidentService === serviceFilterNormalized;
+
+    const matchesStatus = incidentStatusFilter === 'all'
+      || (incidentStatusFilter === 'pending_liability' && String(incident?.liability_status || '').toLowerCase() === 'pending')
+      || (incidentStatusFilter === 'approved_liability' && String(incident?.liability_status || '').toLowerCase() === 'approved')
+      || (incidentStatusFilter === 'rejected_liability' && String(incident?.liability_status || '').toLowerCase() === 'rejected')
+      || (incidentStatusFilter === 'paid_compensation' && String(incident?.compensation_status || '').toLowerCase() === 'paid')
+      || (incidentStatusFilter === 'unpaid_compensation' && String(incident?.compensation_status || '').toLowerCase() !== 'paid');
+
+    return matchesSearch && matchesService && matchesStatus && isWithinDateRange(incidentDate);
+  });
+
+  const filteredEnhancementRows = enhancementRows.filter((row) => {
+    const serviceFilterNormalized = normalizeServiceType(serviceTypeFilter || '');
+
+    const matchesSearch = searchTerm === ''
+      || String(row.orderId || '').toLowerCase().includes(searchTerm.toLowerCase())
+      || String(row.customerName || '').toLowerCase().includes(searchTerm.toLowerCase())
+      || String(row.notes || '').toLowerCase().includes(searchTerm.toLowerCase())
+      || String(row.serviceTypeDisplay || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesService = !serviceTypeFilter || row.serviceType === serviceFilterNormalized;
+    const matchesStatus = enhancementStatusFilter === 'all' || row.status === enhancementStatusFilter;
+
+    return matchesSearch && matchesService && matchesStatus && isWithinDateRange(row.requestDate);
+  });
+
+  const acceptedEnhancementRows = filteredEnhancementRows.filter((row) => row.status === 'accepted');
+
+  const acceptedEnhancementSummary = {
+    totalAccepted: acceptedEnhancementRows.length,
+    totalValue: acceptedEnhancementRows.reduce((sum, row) => sum + (parseFloat(row.enhancementAmount || 0) || 0), 0),
+    acceptedWithAccessories: acceptedEnhancementRows.filter((row) => row.accessoriesRequested).length,
+    byService: acceptedEnhancementRows.reduce((acc, row) => {
+      const key = row.serviceTypeDisplay || row.serviceType || 'Unknown';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {})
   };
 
   const rentalInventoryStats = {
@@ -1100,10 +1240,107 @@ const OrdersInventory = () => {
     }
   };
 
+  const handleExportCompensationToExcel = async () => {
+    try {
+      const currentUser = getUser();
+      const incidentRows = filteredCompensationIncidents.map((incident) => ({
+        'Incident ID': incident.id,
+        'Service': formatServiceTypeLabel(incident.service_type),
+        'Service/Category': formatServiceTypeLabel(incident.service_type),
+        'Order ID': incident.order_id || incident.order_item_id,
+        'Customer': getIncidentCustomerName(incident),
+        'Damage Type': String(incident.damage_type || '').replace(/_/g, ' '),
+        'Liability Status': incident.liability_status || 'pending',
+        'Compensation Status': incident.compensation_status || 'unpaid',
+        'Status': `${String(incident.liability_status || 'pending')} / ${String(incident.compensation_status || 'unpaid')}`,
+        'Amount/Price': ((String(incident.liability_status || '').toLowerCase() === 'approved' || String(incident.compensation_status || '').toLowerCase() === 'paid')
+          ? (parseFloat(incident.compensation_amount || 0) || 0)
+          : 0),
+        'Compensation Amount': parseFloat(incident.compensation_amount || 0) || 0,
+        'Handled By': getIncidentHandledBy(incident),
+        'Reported At': incident.created_at || incident.updated_at || ''
+      }));
+
+      if (incidentRows.length === 0) {
+        await alert('No compensation incidents match the current filters.', 'Nothing to Export', 'warning');
+        return;
+      }
+
+      await exportToExcel({
+        data: incidentRows,
+        filename: 'damage_compensation_incidents',
+        sheetName: 'Compensation Incidents',
+        headers: ['Incident ID', 'Service', 'Service/Category', 'Order ID', 'Customer', 'Damage Type', 'Liability Status', 'Compensation Status', 'Status', 'Compensation Amount', 'Handled By', 'Reported At'],
+        receiptInfo: {
+          clerkName: currentUser ? `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || currentUser.username || 'Unknown Clerk' : 'Unknown Clerk',
+          exportDate: new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          reportType: 'Damage Compensation Incidents'
+        }
+      });
+    } catch (error) {
+      console.error('Failed to export compensation incidents:', error);
+      await alert('Failed to export compensation incidents to Excel', 'Export Error', 'error');
+    }
+  };
+
+  const handleExportEnhancementsToExcel = async () => {
+    try {
+      const currentUser = getUser();
+      const enhancementRows = filteredEnhancementRows.map((row) => ({
+        'Order ID': row.orderId,
+        'Item ID': row.itemId,
+        'Customer': row.customerName,
+        'Service': row.serviceTypeDisplay,
+        'Service/Category': row.serviceTypeDisplay,
+        'Enhancement Status': row.statusLabel,
+        'Accessories Requested': row.accessoriesRequested ? 'Yes' : 'No',
+        'Status': row.statusLabel,
+        'Amount/Price': parseFloat(row.enhancementAmount || 0) || 0,
+        'Price': parseFloat(row.enhancementAmount || 0) || 0,
+        'Preferred Completion Date': row.preferredCompletionDate || '',
+        'Requested At': row.requestDate || '',
+        'Enhancement Notes': row.notes || ''
+      }));
+
+      if (enhancementRows.length === 0) {
+        await alert('No enhancement requests match the current filters.', 'Nothing to Export', 'warning');
+        return;
+      }
+
+      await exportToExcel({
+        data: enhancementRows,
+        filename: 'requested_enhancements',
+        sheetName: 'Requested Enhancements',
+        headers: ['Order ID', 'Item ID', 'Customer', 'Service', 'Service/Category', 'Enhancement Status', 'Accessories Requested', 'Status', 'Price', 'Preferred Completion Date', 'Requested At', 'Enhancement Notes'],
+        receiptInfo: {
+          clerkName: currentUser ? `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || currentUser.username || 'Unknown Clerk' : 'Unknown Clerk',
+          exportDate: new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          reportType: 'Requested Enhancements'
+        }
+      });
+    } catch (error) {
+      console.error('Failed to export requested enhancements:', error);
+      await alert('Failed to export requested enhancements to Excel', 'Export Error', 'error');
+    }
+  };
+
   const clearReportFilters = () => {
     setSearchTerm('');
     setStatusFilter('all');
-    setServiceTypeFilter('');
+    setIncidentStatusFilter('all');
+    setEnhancementStatusFilter('all');
     setDateFrom('');
     setDateTo('');
   };
@@ -1112,7 +1349,6 @@ const OrdersInventory = () => {
     <div className="orders-inventory-management">
       <Sidebar />
       <AdminHeader />
-
       <div className="content">
         {/* Page Title */}
         <div className="dashboard-title">
@@ -1133,7 +1369,6 @@ const OrdersInventory = () => {
             </div>
             <div className="stat-number">{combinedStats.totalOrders}</div>
           </div>
-
           <div className="stat-card" onClick={() => setStatusFilter('Paid')}>
             <div className="stat-header">
               <span>Paid</span>
@@ -1173,35 +1408,127 @@ const OrdersInventory = () => {
             </div>
             <div className="stat-number">₱{parseFloat(compensationStats.paid_compensation || 0).toLocaleString()}</div>
           </div>
+
+          <div
+            className="stat-card"
+            onClick={() => {
+              setReportTab('enhancements');
+              setEnhancementStatusFilter('accepted');
+            }}
+          >
+            <div className="stat-header">
+              <span>Accepted Enhancements</span>
+              <div className="stat-icon" style={{ background: '#e8f5e9', color: '#2e7d32' }}>
+                <i className="fas fa-check"></i>
+              </div>
+            </div>
+            <div className="stat-number">{acceptedEnhancementSummary.totalAccepted}</div>
+          </div>
+
+          <div
+            className="stat-card"
+            onClick={() => {
+              setReportTab('enhancements');
+              setEnhancementStatusFilter('accepted');
+            }}
+          >
+            <div className="stat-header">
+              <span>Accepted Value Enhancement</span>
+              <div className="stat-icon" style={{ background: '#e3f2fd', color: '#1565c0' }}>₱</div>
+            </div>
+            <div className="stat-number" style={{ fontSize: '22px' }}>
+              ₱{acceptedEnhancementSummary.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+          </div>
+        </div>
+
+        <div className="reports-tab-switcher" role="tablist" aria-label="Report sections" style={{ marginBottom: '16px' }}>
+          <button
+            type="button"
+            className={`reports-tab-btn ${reportTab === 'reports' ? 'active' : ''}`}
+            onClick={() => setReportTab('reports')}
+            role="tab"
+            aria-selected={reportTab === 'reports'}
+          >
+            Reports
+          </button>
+          <button
+            type="button"
+            className={`reports-tab-btn ${reportTab === 'incidents' ? 'active' : ''}`}
+            onClick={() => setReportTab('incidents')}
+            role="tab"
+            aria-selected={reportTab === 'incidents'}
+          >
+            Damage Compensation Incidents
+          </button>
+          <button
+            type="button"
+            className={`reports-tab-btn ${reportTab === 'enhancements' ? 'active' : ''}`}
+            onClick={() => setReportTab('enhancements')}
+            role="tab"
+            aria-selected={reportTab === 'enhancements'}
+          >
+            Requested Enhancements
+          </button>
         </div>
 
         {/* Search and Filter Section */}
         <div className="search-filter-section">
           <input
             type="text"
-            placeholder="Search by Order ID, Customer Name, or Service..."
+            placeholder={reportTab === 'incidents' ? 'Search by Order ID, Customer, or Damage Type...' : reportTab === 'enhancements' ? 'Search by Order ID, Customer, Service, or Notes...' : 'Search by Order ID, Customer Name, or Service...'}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
           />
 
-          <select 
-            value={statusFilter} 
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="filter-select"
-          >
-            <option value="all">All Status</option>
-            <option value="Completed">Completed</option>
-            <option value="Paid">Paid</option>
-            <option value="Fully Paid">Fully Paid</option>
-            <option value="Partial Payment">Partial Payment</option>
-            <option value="Unpaid">Unpaid</option>
-            <option value="Down-payment">Down-payment</option>
-            <option value="Cancelled">Cancelled</option>
-          </select>
+          {reportTab === 'reports' && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="filter-select"
+            >
+              <option value="all">All Status</option>
+              <option value="Completed">Completed</option>
+              <option value="Paid">Paid</option>
+              <option value="Fully Paid">Fully Paid</option>
+              <option value="Partial Payment">Partial Payment</option>
+              <option value="Unpaid">Unpaid</option>
+              <option value="Down-payment">Down-payment</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          )}
 
-          <select 
-            value={serviceTypeFilter} 
+          {reportTab === 'incidents' && (
+            <select
+              value={incidentStatusFilter}
+              onChange={(e) => setIncidentStatusFilter(e.target.value)}
+              className="filter-select"
+            >
+              <option value="all">All Incident Status</option>
+              <option value="pending_liability">Pending Liability</option>
+              <option value="approved_liability">Approved Liability</option>
+              <option value="rejected_liability">Rejected Liability</option>
+              <option value="paid_compensation">Paid Compensation</option>
+              <option value="unpaid_compensation">Unpaid Compensation</option>
+            </select>
+          )}
+
+          {reportTab === 'enhancements' && (
+            <select
+              value={enhancementStatusFilter}
+              onChange={(e) => setEnhancementStatusFilter(e.target.value)}
+              className="filter-select"
+            >
+              <option value="all">All Enhancement Status</option>
+              <option value="requested">Requested</option>
+              <option value="accepted">Accepted</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          )}
+
+          <select
+            value={serviceTypeFilter}
             onChange={(e) => setServiceTypeFilter(e.target.value)}
             className="filter-select"
           >
@@ -1233,147 +1560,253 @@ const OrdersInventory = () => {
           </button>
         </div>
 
-        {/* Combined Billing & Inventory Table */}
-        <div className="combined-table-section">
-          <div className="combined-table-header">
-            <h3 className="section-title">
-              <i className="fas fa-table"></i> Reports
-              <span className="item-count">({combinedData.length} items)</span>
-            </h3>
-            <button className="print-report-btn" onClick={handleExportReportsToExcel}>
-              <i className="fas fa-file-excel"></i> Export to Excel
-            </button>
-          </div>
-          
-          <div className="table-container scrollable-table">
-            {loading ? (
-              <div className="loading-state">
-                <i className="fas fa-spinner fa-spin"></i>
-                Loading data...
-              </div>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Customer/Item</th>
-                    <th>Service/Category</th>
-                    <th>Amount/Price</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {combinedData.length === 0 ? (
+        {reportTab === 'reports' && (
+          <div className="combined-table-section">
+            <div className="combined-table-header">
+              <h3 className="section-title">
+                <i className="fas fa-table"></i> Reports
+                <span className="item-count">({combinedData.length} items)</span>
+              </h3>
+              <button className="print-report-btn" onClick={handleExportReportsToExcel}>
+                <i className="fas fa-file-excel"></i> Export to Excel
+              </button>
+            </div>
+
+            <div className="table-container scrollable-table">
+              {loading ? (
+                <div className="loading-state">
+                  <i className="fas fa-spinner fa-spin"></i>
+                  Loading data...
+                </div>
+              ) : (
+                <table>
+                  <thead>
                     <tr>
-                      <td colSpan="6" className="empty-state">
-                        No items found matching your filters
-                      </td>
+                      <th>ID</th>
+                      <th>Customer/Item</th>
+                      <th>Service/Category</th>
+                      <th>Amount/Price</th>
+                      <th>Date</th>
+                      <th>Status</th>
                     </tr>
-                  ) : (
-                    combinedData.map(item => {
-                      const rowId = item.dataType === 'order' ? (item.displayId || item.uniqueNo || '') : (item.uniqueNo || '');
-
-                      return (
-                        <tr 
-                          key={item.combinedId} 
-                          onClick={() => handleViewDetails(item)}
-                          className="clickable-row"
-                        >
-                          <td><strong>{rowId}</strong></td>
-                          <td>{item.displayName}</td>
-                          <td>
-                            <span className="service-type-badge" data-service-type={(item.serviceType || '').toLowerCase()}>
-                              {item.displayService}
-                            </span>
-                          </td>
-                          <td className="amount-cell">
-                            {getRentalPriceDisplay(item)}
-                          </td>
-                          <td>{item.displayDate}</td>
-                          <td>
-                            <span 
-                              className={`status-badge ${(item.displayStatus || '').toLowerCase().replace(/ /g, '-')}`}
-                            >
-                              {item.displayStatus || item.status}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-
-        <div className="combined-table-section" style={{ marginTop: '20px' }}>
-          <div className="combined-table-header">
-            <h3 className="section-title">
-              <i className="fas fa-triangle-exclamation"></i> Damage Compensation Incidents
-              <span className="item-count">({compensationIncidents.length} items)</span>
-            </h3>
-          </div>
-
-          <div className="table-container scrollable-table">
-            {loading ? (
-              <div className="loading-state">
-                <i className="fas fa-spinner fa-spin"></i>
-                Loading incidents...
-              </div>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Service</th>
-                    <th>Order ID</th>
-                    <th>Customer</th>
-                    <th>Damage Type</th>
-                    <th>Liability</th>
-                    <th>Compensation</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {compensationIncidents.length === 0 ? (
-                    <tr>
-                      <td colSpan="8" className="empty-state">No damage incidents recorded</td>
-                    </tr>
-                  ) : (
-                    compensationIncidents.map((incident) => (
-                      <tr key={incident.id}>
-                        <td>{formatServiceTypeLabel(incident.service_type)}</td>
-                        <td>#{incident.order_id || incident.order_item_id}</td>
-                        <td>{getIncidentCustomerName(incident)}</td>
-                        <td style={{ textTransform: 'capitalize' }}>{String(incident.damage_type || 'N/A').replace(/_/g, ' ')}</td>
-                        <td><span className={`badge liability-${incident.liability_status}`}>{incident.liability_status}</span></td>
-                        <td style={{ color: getIncidentCompensationMeta(incident).color, fontWeight: getIncidentCompensationMeta(incident).weight }}>
-                          {getIncidentCompensationMeta(incident).text}
-                        </td>
-                        <td><span className={`badge status-${incident.compensation_status}`}>{incident.compensation_status}</span></td>
-                        <td>
-                          <button
-                            className="action-btn view-btn"
-                            onClick={() => {
-                              setSelectedSettlementIncident(incident);
-                              setShowSettlementModal(true);
-                            }}
-                            title="View Details"
-                            style={{ background: '#2196F3', color: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer' }}
-                          >
-                            <i className="fas fa-eye"></i>
-                          </button>
+                  </thead>
+                  <tbody>
+                    {combinedData.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="empty-state">
+                          No items found matching your filters
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            )}
+                    ) : (
+                      combinedData.map(item => {
+                        const rowId = item.dataType === 'order' ? (item.displayId || item.uniqueNo || '') : (item.uniqueNo || '');
+
+                        return (
+                          <tr
+                            key={item.combinedId}
+                            onClick={() => handleViewDetails(item)}
+                            className="clickable-row"
+                          >
+                            <td><strong>{rowId}</strong></td>
+                            <td>{item.displayName}</td>
+                            <td>
+                              <span className="service-type-badge" data-service-type={(item.serviceType || '').toLowerCase()}>
+                                {item.displayService}
+                              </span>
+                            </td>
+                            <td className="amount-cell">
+                              {getRentalPriceDisplay(item)}
+                            </td>
+                            <td>{item.displayDate}</td>
+                            <td>
+                              <span
+                                className={`status-badge ${(item.displayStatus || '').toLowerCase().replace(/ /g, '-')}`}
+                              >
+                                {item.displayStatus || item.status}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
-        </div>
+        )}
+
+        {reportTab === 'incidents' && (
+          <div className="combined-table-section" style={{ marginTop: '20px' }}>
+            <div className="combined-table-header">
+              <h3 className="section-title">
+                <i className="fas fa-triangle-exclamation"></i> Damage Compensation Incidents
+                <span className="item-count">({filteredCompensationIncidents.length} items)</span>
+              </h3>
+              <button className="print-report-btn" onClick={handleExportCompensationToExcel}>
+                <i className="fas fa-file-excel"></i> Export to Excel
+              </button>
+            </div>
+
+            <div className="table-container scrollable-table">
+              {loading ? (
+                <div className="loading-state">
+                  <i className="fas fa-spinner fa-spin"></i>
+                  Loading incidents...
+                </div>
+              ) : (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Service</th>
+                      <th>Order ID</th>
+                      <th>Customer</th>
+                      <th>Damage Type</th>
+                      <th>Liability</th>
+                      <th>Compensation</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCompensationIncidents.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="empty-state">No damage incidents recorded</td>
+                      </tr>
+                    ) : (
+                      filteredCompensationIncidents.map((incident) => (
+                        <tr key={incident.id}>
+                          <td>{formatServiceTypeLabel(incident.service_type)}</td>
+                          <td>#{incident.order_id || incident.order_item_id}</td>
+                          <td>{getIncidentCustomerName(incident)}</td>
+                          <td style={{ textTransform: 'capitalize' }}>{String(incident.damage_type || 'N/A').replace(/_/g, ' ')}</td>
+                          <td><span className={`badge liability-${incident.liability_status}`}>{incident.liability_status}</span></td>
+                          <td style={{ color: getIncidentCompensationMeta(incident).color, fontWeight: getIncidentCompensationMeta(incident).weight }}>
+                            {getIncidentCompensationMeta(incident).text}
+                          </td>
+                          <td><span className={`badge status-${incident.compensation_status}`}>{incident.compensation_status}</span></td>
+                          <td>
+                            <button
+                              className="action-btn view-btn"
+                              onClick={() => {
+                                setSelectedSettlementIncident(incident);
+                                setShowSettlementModal(true);
+                              }}
+                              title="View Details"
+                              style={{ background: '#2196F3', color: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer' }}
+                            >
+                              <i className="fas fa-eye"></i>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+
+        {reportTab === 'enhancements' && (
+          <>
+            <div className="combined-table-section" style={{ marginTop: '20px' }}>
+              <div className="combined-table-header">
+                <h3 className="section-title">
+                  <i className="fas fa-wand-magic-sparkles"></i> Requested Enhancements
+                  <span className="item-count">({filteredEnhancementRows.length} items)</span>
+                </h3>
+                <button className="print-report-btn" onClick={handleExportEnhancementsToExcel}>
+                  <i className="fas fa-file-excel"></i> Export to Excel
+                </button>
+              </div>
+
+              <div className="table-container scrollable-table">
+                {loading ? (
+                  <div className="loading-state">
+                    <i className="fas fa-spinner fa-spin"></i>
+                    Loading enhancement requests...
+                  </div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Order ID</th>
+                        <th>Item ID</th>
+                        <th>Customer</th>
+                        <th>Service</th>
+                        <th>Status</th>
+                        <th>Accessories</th>
+                        <th>Price</th>
+                        <th>Requested At</th>
+                        <th>Notes</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredEnhancementRows.length === 0 ? (
+                        <tr>
+                          <td colSpan="10" className="empty-state">No enhancement requests match your filters</td>
+                        </tr>
+                      ) : (
+                        filteredEnhancementRows.map((row) => (
+                          <tr key={row.id}>
+                            <td><strong>#{row.orderId}</strong></td>
+                            <td>{row.itemId}</td>
+                            <td>{row.customerName}</td>
+                            <td>{row.serviceTypeDisplay}</td>
+                            <td>
+                              <span className={`status-badge ${row.status === 'accepted' ? 'completed' : row.status === 'cancelled' ? 'rejected' : 'pending'}`}>
+                                {row.statusLabel}
+                              </span>
+                            </td>
+                            <td>{row.accessoriesRequested ? 'Yes' : 'No'}</td>
+                            <td>₱{parseFloat(row.enhancementAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td>{row.requestDate ? new Date(row.requestDate).toLocaleString() : 'N/A'}</td>
+                            <td style={{ maxWidth: '260px', whiteSpace: 'normal' }}>{row.notes || 'N/A'}</td>
+                            <td>
+                              <button
+                                className="action-btn view-btn"
+                                onClick={() => {
+                                  setSelectedItem({
+                                    dataType: 'enhancement',
+                                    displayId: row.orderId,
+                                    uniqueNo: row.itemId,
+                                    displayName: row.customerName,
+                                    displayService: row.serviceTypeDisplay,
+                                    displayDate: row.requestDate,
+                                    displayAmount: row.enhancementAmount,
+                                    displayStatus: row.statusLabel,
+                                    status: row.status,
+                                    notes: row.notes,
+                                    pricingFactors: {
+                                      enhancementNotes: row.notes,
+                                      enhancementPreferredCompletionDate: row.preferredCompletionDate,
+                                      enhancementUpdatedAt: row.requestDate,
+                                      addAccessories: row.accessoriesRequested,
+                                      enhancementAdminAccepted: row.status === 'accepted',
+                                      enhancementCancelledByAdmin: row.status === 'cancelled',
+                                      enhancementAdditionalCost: row.enhancementAmount
+                                    }
+                                  });
+                                  setShowDetailModal(true);
+                                }}
+                                title="View Details"
+                                style={{ background: '#2196F3', color: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer' }}
+                              >
+                                <i className="fas fa-eye"></i>
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </>
+        )}
           </>
         )}
 
@@ -1523,14 +1956,20 @@ const OrdersInventory = () => {
         <div className="modal-overlay active" onClick={(e) => { if (e.target.classList.contains('modal-overlay')) setShowDetailModal(false); }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{selectedItem.dataType === 'order' ? 'Order Details' : 'Inventory Item Details'}</h2>
+              <h2>{selectedItem.dataType === 'order' ? 'Order Details' : selectedItem.dataType === 'enhancement' ? 'Enhancement Details' : 'Inventory Item Details'}</h2>
               <span className="close-modal" onClick={() => setShowDetailModal(false)}>×</span>
             </div>
             <div className="modal-body">
               <div className="detail-row">
-                <strong>{selectedItem.dataType === 'order' ? 'Order ID:' : 'Item ID:'}</strong>
-                <span>{selectedItem.dataType === 'order' ? (selectedItem.displayId || selectedItem.uniqueNo) : selectedItem.uniqueNo}</span>
+                <strong>{selectedItem.dataType === 'order' || selectedItem.dataType === 'enhancement' ? 'Order ID:' : 'Item ID:'}</strong>
+                <span>{selectedItem.dataType === 'order' || selectedItem.dataType === 'enhancement' ? (selectedItem.displayId || selectedItem.uniqueNo) : selectedItem.uniqueNo}</span>
               </div>
+              {selectedItem.dataType === 'enhancement' && (
+                <div className="detail-row">
+                  <strong>Item ID:</strong>
+                  <span>{selectedItem.uniqueNo}</span>
+                </div>
+              )}
               <div className="detail-row">
                 <strong>Customer Name:</strong>
                 <span>{selectedItem.displayName}</span>

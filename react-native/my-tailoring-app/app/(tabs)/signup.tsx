@@ -34,6 +34,7 @@ export default function SignupScreen() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [birthdate, setBirthdate] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -45,15 +46,79 @@ export default function SignupScreen() {
     Poppins_700Bold,
   });
 
-  const handleSignup = async () => {
+  const sanitizePhilippinePhone = (value: string) => {
+    let digitsOnly = String(value || "").replace(/\D/g, "");
 
-    if (!firstName || !lastName || !username || !email || !password || !confirmPassword || !phoneNumber) {
+    if (digitsOnly.startsWith("63")) {
+      digitsOnly = digitsOnly.slice(2);
+    }
+    if (digitsOnly.startsWith("0")) {
+      digitsOnly = digitsOnly.slice(1);
+    }
+
+    return digitsOnly.slice(0, 10);
+  };
+
+  const toLocalPhilippinePhone = (value: string) => {
+    const normalized = sanitizePhilippinePhone(value);
+    return normalized ? `0${normalized}` : "";
+  };
+
+  const validatePhoneNumber = (value: string) => {
+    const normalizedPhone = sanitizePhilippinePhone(value);
+    if (!/^9\d{9}$/.test(normalizedPhone)) {
+      return {
+        isValid: false,
+        message: "Phone number must be a valid PH mobile number (e.g. +63 9XXXXXXXXX).",
+      };
+    }
+
+    return { isValid: true, sanitizedPhone: normalizedPhone };
+  };
+
+  const validatePassword = (value: string) => {
+    if (!value) {
+      return { isValid: false, message: "Password is required" };
+    }
+
+    if (value.length < 8) {
+      return {
+        isValid: false,
+        message: `Password must be at least 8 characters long. You have ${value.length} character(s).`,
+      };
+    }
+
+    const specialCharRegex = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?~`]/;
+    if (!specialCharRegex.test(value)) {
+      return {
+        isValid: false,
+        message: "Password must contain at least one special character (!@#$%^&* etc.)",
+      };
+    }
+
+    return { isValid: true };
+  };
+
+  const isValidBirthdate = (value: string) => {
+    if (!value) return false;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return parsed <= today;
+  };
+
+  const handleSignup = async () => {
+    const sanitizedPhone = sanitizePhilippinePhone(phoneNumber);
+
+    if (!firstName || !lastName || !username || !email || !password || !confirmPassword || !sanitizedPhone || !birthdate) {
       Alert.alert("Error", "Please fill in all required fields");
       return;
     }
 
-    if (phoneNumber.replace(/\D/g, '').length !== 11) {
-      Alert.alert("Error", "Phone number must be exactly 11 digits");
+    const phoneValidation = validatePhoneNumber(sanitizedPhone);
+    if (!phoneValidation.isValid) {
+      Alert.alert("Error", phoneValidation.message);
       return;
     }
 
@@ -62,21 +127,28 @@ export default function SignupScreen() {
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters");
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      Alert.alert("Error", passwordValidation.message);
+      return;
+    }
+
+    if (!isValidBirthdate(birthdate)) {
+      Alert.alert("Error", "Please enter a valid birthdate (YYYY-MM-DD) that is not in the future.");
       return;
     }
 
     setLoading(true);
     try {
       const response = await authService.register({
-        first_name: firstName,
-        middle_name: middleName || null,
-        last_name: lastName,
-        username: username,
-        email: email,
-        password: password,
-        phone_number: phoneNumber.replace(/\D/g, '')
+        first_name: firstName.trim(),
+        middle_name: middleName.trim() || null,
+        last_name: lastName.trim(),
+        username: username.trim(),
+        email: email.trim(),
+        password,
+        phone_number: toLocalPhilippinePhone(phoneValidation.sanitizedPhone),
+        birthdate,
       });
 
       if (response.token) {
@@ -211,6 +283,33 @@ export default function SignupScreen() {
                   />
                 </TouchableOpacity>
               </View>
+              {!!password && (
+                <View style={styles.helperBox}>
+                  <Text style={styles.helperTitle}>Password Requirements:</Text>
+                  <Text
+                    style={[
+                      styles.helperItem,
+                      password.length >= 8
+                        ? styles.helperSuccess
+                        : password.length >= 6
+                          ? styles.helperWarning
+                          : styles.helperError,
+                    ]}
+                  >
+                    {password.length >= 8 ? "✓" : password.length >= 6 ? "◐" : "✗"} Minimum 8 characters ({password.length}/8)
+                  </Text>
+                  <Text
+                    style={[
+                      styles.helperItem,
+                      /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?~`]/.test(password)
+                        ? styles.helperSuccess
+                        : styles.helperError,
+                    ]}
+                  >
+                    {/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?~`]/.test(password) ? "✓" : "✗"} At least one special character (!@#$%^&* etc.)
+                  </Text>
+                </View>
+              )}
               <View style={styles.inputGroup}>
                 <TextInput
                   style={styles.input}
@@ -231,14 +330,43 @@ export default function SignupScreen() {
                   />
                 </TouchableOpacity>
               </View>
+              {!!confirmPassword && (
+                <Text
+                  style={[
+                    styles.inlineHelper,
+                    password === confirmPassword ? styles.helperSuccess : styles.helperError,
+                  ]}
+                >
+                  {password === confirmPassword ? "✓ Passwords match" : "✗ Passwords do not match"}
+                </Text>
+              )}
+              <View style={styles.inputGroup}>
+                <View style={styles.phoneInputContainer}>
+                  <Text style={styles.phonePrefix}>+63</Text>
+                  <TextInput
+                    style={styles.phoneInput}
+                    placeholder="9XXXXXXXXX"
+                    placeholderTextColor="#999"
+                    keyboardType="phone-pad"
+                    value={phoneNumber}
+                    onChangeText={(text) => setPhoneNumber(sanitizePhilippinePhone(text))}
+                    maxLength={10}
+                  />
+                </View>
+              </View>
+              {!!phoneNumber && !/^9\d{9}$/.test(sanitizePhilippinePhone(phoneNumber)) && (
+                <Text style={[styles.inlineHelper, styles.helperError]}>
+                  ✗ Use a valid PH mobile number (e.g. +63 9XXXXXXXXX).
+                </Text>
+              )}
               <View style={styles.inputGroup}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Phone Number"
+                  placeholder="Birthdate (YYYY-MM-DD)"
                   placeholderTextColor="#999"
-                  keyboardType="phone-pad"
-                  value={phoneNumber}
-                  onChangeText={(text) => setPhoneNumber(text.replace(/\D/g, ''))}
+                  keyboardType="numbers-and-punctuation"
+                  value={birthdate}
+                  onChangeText={setBirthdate}
                 />
               </View>
               <TouchableOpacity
@@ -368,6 +496,67 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 18,
     top: 14,
+  },
+  helperBox: {
+    width: "100%",
+    marginTop: -4,
+    marginBottom: 12,
+    padding: 10,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  helperTitle: {
+    fontFamily: "Poppins_600SemiBold",
+    fontSize: 12,
+    color: "#555",
+    marginBottom: 4,
+  },
+  helperItem: {
+    fontFamily: "Poppins_400Regular",
+    fontSize: 11,
+    marginTop: 2,
+  },
+  helperSuccess: {
+    color: "#28a745",
+  },
+  helperWarning: {
+    color: "#fd7e14",
+  },
+  helperError: {
+    color: "#dc3545",
+  },
+  inlineHelper: {
+    width: "100%",
+    marginTop: -6,
+    marginBottom: 10,
+    fontFamily: "Poppins_400Regular",
+    fontSize: 11,
+  },
+  phoneInputContainer: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#ddd",
+    borderRadius: 12,
+    backgroundColor: "#ffffff",
+  },
+  phonePrefix: {
+    fontFamily: "Poppins_600SemiBold",
+    fontSize: 15,
+    color: "#555",
+    paddingLeft: 16,
+    paddingRight: 6,
+  },
+  phoneInput: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingRight: 18,
+    fontSize: 15,
+    fontFamily: "Poppins_400Regular",
+    color: "#333",
   },
   submitButton: {
     width: "100%",

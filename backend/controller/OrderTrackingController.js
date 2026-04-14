@@ -19,10 +19,6 @@ exports.getUserOrderTracking = (req, res) => {
 
     console.log('Raw results from database:', results);
 
-    if (!Array.isArray(results) || results.length === 0) {
-      return res.json({ success: true, data: [] });
-    }
-
     // Helper function to enrich rental data with measurements
     const enrichRentalWithMeasurements = (specificData, callback) => {
       if (!specificData) return callback(specificData);
@@ -216,6 +212,9 @@ exports.getUserOrderTracking = (req, res) => {
         next_statuses: nextStatuses,
         rental_start_date: item.rental_start_date || null,
         rental_end_date: item.rental_end_date || null,
+        rental_duration: item.rental_duration || pricingFactors.rental_duration || pricingFactors.duration || null,
+        overdue_rate: item.overdue_rate || pricingFactors.overdue_rate || null,
+        due_date: item.due_date || pricingFactors.due_date || item.rental_end_date || null,
         pricing_factors: pricingFactors,
         deposit_refunded: item.deposit_refunded || null,
         deposit_refund_date: item.deposit_refund_date || null,

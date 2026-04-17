@@ -613,7 +613,7 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                       {item.service_type === 'rental' ? (
                         <>
                           <p>Rental Price: {formatPrice(item.final_price)}</p>
-                          <p>Deposit: {formatPrice(item.pricing_factors?.downpayment || item.specific_data?.downpayment || 0)}</p>
+                          <p>Security Fee: {formatPrice(item.pricing_factors?.downpayment || item.specific_data?.downpayment || 0)}</p>
                         </>
                       ) : item.service_type === 'dry_cleaning' && item.specific_data?.isEstimatedPrice ? (
                         <p>Estimated Price: {formatPrice(item.final_price)}</p>

@@ -162,6 +162,7 @@ const DryCleaning = () => {
   const [showSettlementModal, setShowSettlementModal] = useState(false);
   const [damageTargetItem, setDamageTargetItem] = useState(null);
   const [activeDamageIncident, setActiveDamageIncident] = useState(null);
+  const [disputeImageFile, setDisputeImageFile] = useState(null);
   const [damageForm, setDamageForm] = useState({
       damageType: '',
       damageDescription: '',
@@ -398,7 +399,7 @@ const DryCleaning = () => {
                   onReportDamage?.();
                 }}
               >
-                Report Damage
+                Report Dispute
               </button>
             )}
 
@@ -718,6 +719,8 @@ const DryCleaning = () => {
 
       'completed': 'completed',
 
+      'price_declined': 'rejected',
+
       'cancelled': 'rejected',
 
       'auto_confirmed': 'in-progress'
@@ -749,6 +752,8 @@ const DryCleaning = () => {
       'ready_to_pickup': 'To Pick up',
 
       'completed': 'Completed',
+
+      'price_declined': 'Price Declined',
 
       'cancelled': 'Rejected',
 
@@ -1148,6 +1153,7 @@ const DryCleaning = () => {
       compensationType: 'both',
       clotheDescription: ''
     });
+    setDisputeImageFile(null);
     setShowDamageReportModal(true);
   };
 
@@ -1222,6 +1228,7 @@ const DryCleaning = () => {
       compensation_amount: hasMoneyType ? compensationAmount : 0,
       compensation_type: hasMoneyType && hasClotheType ? 'both' : hasMoneyType ? 'money' : 'clothe',
       clothe_description: hasClotheType ? damageForm.clotheDescription.trim() : null,
+      disputeImageFile,
       notes: 'Reported from Dry Cleaning management'
     });
 
@@ -1233,6 +1240,7 @@ const DryCleaning = () => {
     showToast('Damage incident reported. Set liability next.', 'success');
     setShowDamageReportModal(false);
     setDamageTargetItem(null);
+    setDisputeImageFile(null);
     await loadDryCleaningOrders();
   };
 
@@ -1768,15 +1776,22 @@ const DryCleaning = () => {
 
 
 
-  const handlePriceConfirmationSubmit = async () => {
+  const handlePriceConfirmationSubmit = async (overridePrice = null, overrideReason = null, overrideStatus = null) => {
 
     if (!priceConfirmationItem) return;
 
 
 
-    const finalPrice = parseFloat(priceConfirmationPrice);
+    const isEventObject = overridePrice && typeof overridePrice === 'object' && (
+      typeof overridePrice.preventDefault === 'function' || 'nativeEvent' in overridePrice
+    );
+    const safeOverridePrice = isEventObject ? null : overridePrice;
+
+    const finalPrice = parseFloat(safeOverridePrice ?? priceConfirmationPrice);
     const currentPrice = parseFloat(priceConfirmationItem.final_price || 0);
     const isPriceChanged = Math.abs(finalPrice - currentPrice) > 0.01;
+    const reasonToUse = overrideReason ?? priceConfirmationReason;
+    const targetStatus = overrideStatus || 'price_confirmation';
 
     if (isNaN(finalPrice) || finalPrice <= 0) {
 
@@ -1788,7 +1803,7 @@ const DryCleaning = () => {
 
 
 
-    if (isPriceChanged && !priceConfirmationReason.trim()) {
+    if (isPriceChanged && !String(reasonToUse || '').trim()) {
 
       showToast("Please provide a reason for the price", "error");
 
@@ -1802,11 +1817,11 @@ const DryCleaning = () => {
 
       const result = await updateDryCleaningOrderItem(priceConfirmationItem.item_id, {
 
-        approvalStatus: 'price_confirmation',
+        approvalStatus: targetStatus,
 
         finalPrice: finalPrice,
 
-        adminNotes: isPriceChanged ? priceConfirmationReason.trim() : undefined
+        adminNotes: isPriceChanged ? String(reasonToUse || '').trim() : undefined
 
       });
 
@@ -1814,7 +1829,7 @@ const DryCleaning = () => {
 
         await loadDryCleaningOrders();
 
-        showToast("Dry cleaning request moved to price confirmation!", "success");
+        showToast(targetStatus === 'accepted' ? "Dry cleaning request moved to accepted!" : "Dry cleaning request moved to price confirmation!", "success");
 
         setShowPriceConfirmationModal(false);
 
@@ -1838,6 +1853,97 @@ const DryCleaning = () => {
 
     }
 
+  };
+
+  const getPricingFactorsFromItem = (item) => {
+    try {
+      return typeof item?.pricing_factors === 'string'
+        ? JSON.parse(item.pricing_factors || '{}')
+        : (item?.pricing_factors || {});
+    } catch (error) {
+      return {};
+    }
+  };
+
+  const openPriceConfirmationReviewModal = (item) => {
+    if (!item) return;
+
+    const estimatedPrice = getEstimatedPrice(item) || parseFloat(item.final_price || 0);
+    setPriceConfirmationItem(item);
+    setPriceConfirmationPrice(estimatedPrice.toFixed(2));
+    setPriceConfirmationReason(parseMaybeObject(item?.pricing_factors)?.adminNotes || '');
+    setShowPriceConfirmationModal(true);
+  };
+
+  const handleAcceptHagglePrice = async (item) => {
+    const pricingFactors = parseMaybeObject(item?.pricing_factors);
+    const haggleOffer = parseFloat(pricingFactors?.haggleOffer || 0);
+
+    if (!Number.isFinite(haggleOffer) || haggleOffer <= 0) {
+      showToast('No valid haggle offer found.', 'error');
+      return;
+    }
+
+    try {
+      const result = await updateDryCleaningOrderItem(item.item_id, {
+        approvalStatus: 'accepted',
+        finalPrice: haggleOffer,
+        adminNotes: 'Customer haggle offer accepted',
+        pricingFactors: {
+          haggleDeclined: false,
+          haggleDecision: 'accepted',
+          haggleAcceptedAt: new Date().toISOString(),
+          haggleDecisionBy: 'admin'
+        }
+      });
+
+      if (result.success) {
+        await loadDryCleaningOrders();
+        showToast(`Haggle accepted at ₱${haggleOffer.toFixed(2)}.`, 'success');
+      } else {
+        showToast(result.message || 'Failed to accept haggle offer', 'error');
+      }
+    } catch (error) {
+      console.error('Accept haggle error:', error);
+      showToast('Failed to accept haggle offer', 'error');
+    }
+  };
+
+  const handleDeclineHagglePrice = async (item) => {
+    const pricingFactors = parseMaybeObject(item?.pricing_factors);
+    const haggleOffer = parseFloat(pricingFactors?.haggleOffer || 0);
+
+    if (!Number.isFinite(haggleOffer) || haggleOffer <= 0) {
+      showToast('No valid haggle offer found.', 'error');
+      return;
+    }
+
+    try {
+      const result = await updateDryCleaningOrderItem(item.item_id, {
+        approvalStatus: 'price_confirmation',
+        adminNotes: `Customer haggled price (₱${haggleOffer.toFixed(2)}) was declined by admin.`,
+        pricingFactors: {
+          haggleDeclined: true,
+          haggleDecision: 'declined',
+          haggleDeclinedAt: new Date().toISOString(),
+          haggleDecisionBy: 'admin'
+        }
+      });
+
+      if (result.success) {
+        await loadDryCleaningOrders();
+        showToast('Haggled price declined. Customer will see this in order tracking.', 'success');
+        setShowPriceConfirmationModal(false);
+        setPriceConfirmationItem(null);
+        setPriceConfirmationPrice('');
+        setPriceConfirmationReason('');
+      } else {
+        showToast(result.message || 'Failed to decline haggle offer', 'error');
+      }
+    } catch (error) {
+      console.error('Decline haggle error:', error);
+      showToast('Failed to decline haggle offer', 'error');
+    }
   };
 
 
@@ -3200,7 +3306,17 @@ const DryCleaning = () => {
 
                     <td onClick={(e) => e.stopPropagation()}>
 
-                      {item.approval_status === 'pending_review' || item.approval_status === 'pending' || item.approval_status === null || item.approval_status === undefined || item.approval_status === '' ? (
+                      {item.approval_status === 'price_declined' ? (
+
+                        <div className="action-buttons">
+                          {renderSecondaryActionMenu({
+                            menuId: `dc-${item.item_id}-price-declined`,
+                            showDelete: isAdminUser,
+                            onDelete: () => handleDeleteOrder(item)
+                          })}
+                        </div>
+
+                      ) : item.approval_status === 'pending_review' || item.approval_status === 'pending' || item.approval_status === null || item.approval_status === undefined || item.approval_status === '' ? (
 
                         <div className="action-buttons">
 
@@ -3240,6 +3356,40 @@ const DryCleaning = () => {
                               </svg>
                             </button>
                           )}
+
+                          {!isDamagePendingIncident && !isForCompensationIncident && item.approval_status === 'price_confirmation' && (() => {
+                            const haggleOffer = parseFloat(parseMaybeObject(item?.pricing_factors)?.haggleOffer || 0);
+                            if (!Number.isFinite(haggleOffer) || haggleOffer <= 0) {
+                              return null;
+                            }
+
+                            return (
+                              <>
+                                <button
+                                  className="icon-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openPriceConfirmationReviewModal(item);
+                                  }}
+                                  title={`View Haggle Offer (₱${haggleOffer.toFixed(2)})`}
+                                  style={{ backgroundColor: '#3949ab', color: 'white' }}
+                                >
+                                  <i className="fas fa-eye"></i>
+                                </button>
+                                <button
+                                  className="icon-btn accept"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAcceptHagglePrice(item);
+                                  }}
+                                  title={`Accept Haggle ₱${haggleOffer.toFixed(2)}`}
+                                  style={{ backgroundColor: '#2e7d32', color: 'white' }}
+                                >
+                                  <i className="fas fa-circle-check"></i>
+                                </button>
+                              </>
+                            );
+                          })()}
 
                           {isDamagePendingIncident ? (
                             <div className="action-buttons">
@@ -5060,6 +5210,59 @@ const DryCleaning = () => {
 
 
 
+              {(() => {
+                const pricingFactors = getPricingFactorsFromItem(priceConfirmationItem);
+                const haggleOffer = parseFloat(pricingFactors.haggleOffer || 0);
+                if (!Number.isFinite(haggleOffer) || haggleOffer <= 0) {
+                  return null;
+                }
+
+                return (
+                  <div style={{ marginTop: '12px', padding: '10px', backgroundColor: '#f7f2ed', borderRadius: '6px', border: '1px solid rgba(139, 69, 19, 0.28)', maxWidth: '390px', marginLeft: 'auto', marginRight: 'auto', textAlign: 'center' }}>
+                    <div style={{ fontWeight: 700, color: 'rgb(139, 69, 19)' }}>Customer Haggle Offer</div>
+                    <div style={{ marginTop: '4px', color: '#5b3a1f' }}>₱{haggleOffer.toFixed(2)}</div>
+                    <div style={{ marginTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <button
+                        type="button"
+                        className="btn-cancel"
+                        onClick={() => {
+                          handleDeclineHagglePrice(priceConfirmationItem);
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          fontSize: '13px',
+                          background: '#6c757d',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontWeight: 600,
+                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)'
+                        }}
+                      >
+                        Decline Haggled Price
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-save"
+                        onClick={() => handlePriceConfirmationSubmit(haggleOffer.toFixed(2), priceConfirmationReason || 'Customer haggle offer', 'accepted')}
+                        style={{
+                          padding: '8px 12px',
+                          fontSize: '13px',
+                          background: 'rgb(139, 69, 19)',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontWeight: 600,
+                          boxShadow: '0 4px 12px rgba(139, 69, 19, 0.3)'
+                        }}
+                      >
+                        Accept Haggled Price
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="payment-form-group" style={{ marginTop: '12px' }}>
 
                 <label>Reason for Price <span style={{ color: '#666', fontSize: '12px' }}>(required only if price changes)</span></label>
@@ -5328,7 +5531,7 @@ const DryCleaning = () => {
         <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowDamageReportModal(false)}>
           <div className="modal-content damage-compensation-modal" style={{ maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', textAlign: 'left' }}>
             <div className="modal-header">
-              <h2><i className="fas fa-triangle-exclamation" style={{ marginRight: '8px' }}></i>Report Damage</h2>
+              <h2><i className="fas fa-triangle-exclamation" style={{ marginRight: '8px' }}></i>Report Dispute</h2>
               <span className="close-modal" onClick={() => setShowDamageReportModal(false)}>×</span>
             </div>
             <div className="modal-body damage-compensation-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left' }}>
@@ -5501,6 +5704,28 @@ const DryCleaning = () => {
               </div>
 
               <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
+                <label>Dispute Image</label>
+                <input
+                  type="file"
+                  className="form-control"
+                  accept="image/*"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setDisputeImageFile(file);
+                  }}
+                />
+                <div style={{ fontSize: '12px', color: '#666', marginTop: '6px' }}>
+                  Optional. Upload a photo as evidence for this dispute.
+                </div>
+                {disputeImageFile && (
+                  <div style={{ marginTop: '6px', fontSize: '12px', color: '#1f2a44' }}>
+                    Selected: {disputeImageFile.name}
+                  </div>
+                )}
+              </div>
+
+              <div className="payment-form-group" style={{ width: '100%', gridColumn: '1 / -1' }}>
                 <label>Responsible Staff/Admin</label>
                 <select
                   className="form-control"
@@ -5620,7 +5845,7 @@ const DryCleaning = () => {
               </div>
             </div>
             <div className="modal-footer-centered" style={{ justifyContent: 'flex-end' }}>
-              <button className="btn-cancel" onClick={() => setShowDamageReportModal(false)}>Cancel</button>
+              <button className="btn-cancel" onClick={() => { setShowDamageReportModal(false); setDisputeImageFile(null); }}>Cancel</button>
               <button className="btn-save" onClick={handleReportDamage}>Save Incident</button>
             </div>
           </div>

@@ -4083,7 +4083,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                                         <span className="rc-size-price">₱ {sizePrice.toLocaleString('en-PH', { minimumFractionDigits: 2 })} / {baseDuration} day{baseDuration > 1 ? 's' : ''}</span>
                                       )}
                                       {sizeDeposit > 0 && (
-                                        <span className="rc-size-price" style={{ color: '#b94a48' }}>Deposit: ₱ {sizeDeposit.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+                                        <span className="rc-size-price" style={{ color: '#b94a48' }}>Security Fee: ₱ {sizeDeposit.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
                                       )}
                                     </div>
                                   </div>
@@ -4323,7 +4323,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                               <div key={`${itemId}-${sizeKey}-dep`} className="cost-item deposit">
 
-                                <span>{item.item_name || item.name} ({opt.label || SIZE_LABELS[sizeKey] || sizeKey} x{qty}) Deposit:</span>
+                                <span>{item.item_name || item.name} ({opt.label || SIZE_LABELS[sizeKey] || sizeKey} x{qty}) Security Fee:</span>
 
                                 <span>₱{lineDeposit.toFixed(2)}</span>
 
@@ -4741,7 +4741,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                                   <span className="rc-size-price" style={{ color: '#b94a48' }}>
 
-                                    Deposit: ₱ {parseFloat(opt.deposit).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                    Security Fee: ₱ {parseFloat(opt.deposit).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
 
                                   </span>
 

@@ -408,7 +408,7 @@ const Billing = () => {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
           <span style={{ fontSize: '13px', color: '#666' }}>₱{rentalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-          <span style={{ fontSize: '12px', color: '#ff9800' }}>Deposit: ₱{depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span style={{ fontSize: '12px', color: '#ff9800' }}>Security Fee: ₱{depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           <span style={{ fontSize: '14px', fontWeight: '600', borderTop: '1px solid #ddd', paddingTop: '2px', marginTop: '2px' }}>Total: ₱{totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
       );
@@ -1081,7 +1081,7 @@ const Billing = () => {
 
                     <div className="detail-row">
 
-                      <strong>Deposit Refunded:</strong>
+                      <strong>Security Fee Refunded:</strong>
 
                       <span style={{ color: '#2e7d32', fontWeight: '600' }}>
 
@@ -1097,7 +1097,7 @@ const Billing = () => {
 
                     <div className="detail-row">
 
-                      <strong>Deposit Refund Date:</strong>
+                      <strong>Security Fee Refund Date:</strong>
 
                       <span>{new Date(selectedBill.depositRefundDate).toLocaleString()}</span>
 

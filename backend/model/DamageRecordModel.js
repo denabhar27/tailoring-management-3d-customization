@@ -40,6 +40,7 @@ const ensureCompensationTable = (callback) => {
       damage_description TEXT NULL,
       total_quantity INT NULL,
       damaged_quantity INT NULL,
+      incident_image_url VARCHAR(500) NULL,
       liability_status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
       compensation_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
       compensation_status ENUM('unpaid', 'paid') NOT NULL DEFAULT 'unpaid',
@@ -80,10 +81,17 @@ const ensureCompensationTable = (callback) => {
         }
 
         ensureColumnExists('damage_compensation_records', 'damaged_garment_type', 'VARCHAR(255) NULL', (garmentErr) => {
-          if (!garmentErr) {
-            compensationTableReady = true;
+          if (garmentErr) {
+            callback(garmentErr);
+            return;
           }
-          callback(garmentErr || null);
+
+          ensureColumnExists('damage_compensation_records', 'incident_image_url', 'VARCHAR(500) NULL', (imageErr) => {
+            if (!imageErr) {
+              compensationTableReady = true;
+            }
+            callback(imageErr || null);
+          });
         });
       });
     });
@@ -228,8 +236,8 @@ const DamageRecord = {
 
       const sql = `
         INSERT INTO damage_compensation_records
-        (order_item_id, order_id, service_type, customer_name, reported_by_user_id, reported_by_role, responsible_party, damage_type, damage_description, total_quantity, damaged_quantity, damaged_garment_type, liability_status, compensation_amount, compensation_status, compensation_type, clothe_description, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (order_item_id, order_id, service_type, customer_name, reported_by_user_id, reported_by_role, responsible_party, damage_type, damage_description, total_quantity, damaged_quantity, damaged_garment_type, incident_image_url, liability_status, compensation_amount, compensation_status, compensation_type, clothe_description, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       const values = [
         payload.order_item_id,
@@ -244,6 +252,7 @@ const DamageRecord = {
         payload.total_quantity || null,
         payload.damaged_quantity || null,
         payload.damaged_garment_type || null,
+        payload.incident_image_url || null,
         payload.liability_status || 'pending',
         payload.compensation_amount || 0,
         payload.compensation_status || 'unpaid',

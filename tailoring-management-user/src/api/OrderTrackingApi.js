@@ -138,6 +138,23 @@ export async function cancelOrderItem(orderItemId, reason) {
   }
 }
 
+export async function haggleOrderItemPrice(orderItemId, offeredPrice) {
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/orders/${orderItemId}/haggle-price`,
+      { offeredPrice },
+      { headers: getAuthHeaders() }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Haggle order item price error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Error submitting haggle price'
+    };
+  }
+}
+
 export async function requestEnhancement(orderItemId, notes, preferredCompletionDate = null, addAccessories = false, photoFiles = []) {
   try {
     const token = localStorage.getItem('token');
@@ -183,7 +200,7 @@ export async function requestEnhancement(orderItemId, notes, preferredCompletion
   }
 }
 
-export async function confirmRentalDepositReceipt(orderItemId) {
+export async function confirmRentalSecurityFeeReceipt(orderItemId) {
   try {
     const response = await axios.post(
       `${BASE_URL}/orders/rental/items/${orderItemId}/confirm-deposit-receipt`,
@@ -192,10 +209,10 @@ export async function confirmRentalDepositReceipt(orderItemId) {
     );
     return response.data;
   } catch (error) {
-    console.error('Confirm rental deposit receipt error:', error);
+    console.error('Confirm rental security fee receipt error:', error);
     return {
       success: false,
-      message: error.response?.data?.message || 'Error confirming deposit receipt'
+      message: error.response?.data?.message || 'Error confirming security fee receipt'
     };
   }
 }

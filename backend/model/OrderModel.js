@@ -1620,28 +1620,38 @@ const Order = {
       console.log("Adding approval_status update:", approvalStatus);
     }
 
+    let pricingFactorsExpr = "COALESCE(pricing_factors, '{}')";
+    let hasPricingFactorUpdates = false;
+
+    const appendPricingFactorUpdate = (jsonPath, value) => {
+      pricingFactorsExpr = `JSON_SET(${pricingFactorsExpr}, '${jsonPath}', ?)`;
+      values.push(value);
+      hasPricingFactorUpdates = true;
+    };
+
     if (adminNotes !== undefined) {
-      updates.push('pricing_factors = JSON_SET(pricing_factors, \'$.adminNotes\', ?)');
-      values.push(adminNotes || '');
+      appendPricingFactorUpdate('$.adminNotes', adminNotes || '');
       console.log("Adding adminNotes update:", adminNotes);
     }
 
     if (estimatedCompletionDate !== undefined) {
       // Store as a simple YYYY-MM-DD string (or NULL when cleared) inside pricing_factors.
-      updates.push('pricing_factors = JSON_SET(COALESCE(pricing_factors, \'{}\'), \'$.estimatedCompletionDate\', ?)');
-      values.push(estimatedCompletionDate || null);
+      appendPricingFactorUpdate('$.estimatedCompletionDate', estimatedCompletionDate || null);
     }
 
     if (pricingFactors) {
       Object.keys(pricingFactors).forEach((key) => {
-        updates.push(`pricing_factors = JSON_SET(COALESCE(pricing_factors, '{}'), '$.${key}', ?)`);
-        values.push(pricingFactors[key]);
+        appendPricingFactorUpdate(`$.${key}`, pricingFactors[key]);
       });
     }
 
     if (finalPrice !== undefined) {
-      updates.push('pricing_factors = JSON_SET(pricing_factors, \'$.adminPriceUpdated\', true)');
+      appendPricingFactorUpdate('$.adminPriceUpdated', true);
       console.log("Setting adminPriceUpdated flag");
+    }
+
+    if (hasPricingFactorUpdates) {
+      updates.push(`pricing_factors = ${pricingFactorsExpr}`);
     }
 
     if (updates.length === 0) {

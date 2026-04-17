@@ -294,6 +294,28 @@
   background: #45a049;
 }
 
+.btn-haggle-price {
+  background: #ff9800;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.3s ease, opacity 0.3s ease;
+}
+
+.btn-haggle-price:hover {
+  background: #f57c00;
+}
+
+.btn-haggle-price:disabled {
+  background: #d9a86c;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .btn-decline-price {
   background: #f44336;
   color: white;

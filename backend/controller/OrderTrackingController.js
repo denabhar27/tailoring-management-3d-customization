@@ -210,6 +210,7 @@ exports.getUserOrderTracking = (req, res) => {
         final_price: item.final_price,
         specific_data: specificData,
         status: item.status || 'pending',
+        latest_tracking_note: item.notes || '',
         status_label: statusInfo.label,
         status_class: statusInfo.class,
         status_updated_at: item.status_updated_at,

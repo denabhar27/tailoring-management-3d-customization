@@ -99,6 +99,109 @@ const acceptPrice = async (req, res) => {
   }
 };
 
+const hagglePrice = async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const userId = req.user.id;
+    const offeredPriceRaw = req.body?.offeredPrice;
+    const offeredPrice = parseFloat(offeredPriceRaw);
+
+    if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid haggle price.'
+      });
+    }
+
+    Order.getOrderItemById(itemId, (err, item) => {
+      if (err) {
+        return res.status(500).json({ success: false, message: 'Error fetching order item' });
+      }
+
+      if (!item) {
+        return res.status(404).json({ success: false, message: 'Order item not found' });
+      }
+
+      Order.getById(item.order_id, (orderErr, orderResult) => {
+        if (orderErr || !orderResult || orderResult.length === 0) {
+          return res.status(404).json({ success: false, message: 'Order not found' });
+        }
+
+        const order = orderResult[0];
+        if (order.user_id !== userId) {
+          return res.status(403).json({ success: false, message: 'Unauthorized access to this order' });
+        }
+
+        if (String(item.approval_status || '').toLowerCase() !== 'price_confirmation') {
+          return res.status(400).json({
+            success: false,
+            message: 'Haggle is only available while the order is in price confirmation.'
+          });
+        }
+
+        let pricingFactors = {};
+        try {
+          pricingFactors = item.pricing_factors
+            ? (typeof item.pricing_factors === 'string' ? JSON.parse(item.pricing_factors) : item.pricing_factors)
+            : {};
+        } catch {
+          pricingFactors = {};
+        }
+
+        if (pricingFactors.haggleUsed === true) {
+          return res.status(400).json({
+            success: false,
+            message: 'You have already used your one-time haggle.'
+          });
+        }
+
+        const serviceType = String(item.service_type || '').toLowerCase().trim();
+        const updateData = {
+          pricingFactors: {
+            ...pricingFactors,
+            haggleOffer: offeredPrice,
+            haggleUsed: true,
+            haggleOfferedAt: new Date().toISOString(),
+            haggleOfferedBy: userId
+          }
+        };
+
+        const updateFunction =
+          serviceType === 'dry_cleaning' || serviceType === 'drycleaning' || serviceType === 'dry-cleaning'
+            ? Order.updateDryCleaningOrderItem
+            : serviceType === 'customization' || serviceType === 'customize'
+              ? (id, data, cb) => require('../model/CustomizationModel').updateOrderItem(id, data, cb)
+              : Order.updateRepairOrderItem;
+
+        updateFunction(itemId, updateData, (updateErr) => {
+          if (updateErr) {
+            return res.status(500).json({ success: false, message: 'Error saving haggle price' });
+          }
+
+          db.query(
+            `INSERT INTO order_tracking (order_item_id, status, notes, updated_by) VALUES (?, ?, ?, ?)`,
+            [itemId, 'price_confirmation', `Customer haggled price to ₱${offeredPrice.toFixed(2)}`, userId],
+            (trackErr) => {
+              if (trackErr) {
+                console.error('Error logging haggle tracking entry:', trackErr);
+              }
+
+              res.json({
+                success: true,
+                message: 'Haggle price submitted successfully.',
+                offeredPrice
+              });
+            }
+          );
+        });
+      });
+    });
+  } catch (error) {
+    console.error('Haggle price error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 const declinePrice = async (req, res) => {
   try {
     const { itemId } = req.params;
@@ -183,5 +286,6 @@ const declinePrice = async (req, res) => {
 
 module.exports = {
   acceptPrice,
-  declinePrice
+  declinePrice,
+  hagglePrice
 };

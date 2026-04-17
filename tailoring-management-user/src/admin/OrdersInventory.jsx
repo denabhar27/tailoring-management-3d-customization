@@ -33,11 +33,19 @@ const parseRentalSizeEntries = (rawSize) => {
         const key = entry?.sizeKey || entry?.size_key || `custom_${idx}`;
         const qty = parseInt(entry?.quantity, 10);
         const quantity = Number.isNaN(qty) ? 0 : Math.max(0, qty);
+        const sizeDeposit = parseFloat(
+          entry?.deposit ?? entry?.security_fee ?? entry?.securityFee ?? 0
+        );
         const label =
           key === 'custom'
             ? (entry?.customLabel || entry?.label || `Custom ${idx + 1}`)
             : (entry?.label || SIZE_LABELS[key] || key);
-        return { key, label, quantity };
+        return {
+          key,
+          label,
+          quantity,
+          securityFee: Number.isFinite(sizeDeposit) ? Math.max(0, sizeDeposit) : 0
+        };
       });
     }
 
@@ -46,7 +54,15 @@ const parseRentalSizeEntries = (rawSize) => {
       return Object.entries(source).map(([key, option]) => {
         const qty = parseInt(option?.quantity, 10);
         const quantity = Number.isNaN(qty) ? 0 : Math.max(0, qty);
-        return { key, label: option?.label || SIZE_LABELS[key] || key, quantity };
+        const optionDeposit = parseFloat(
+          option?.deposit ?? option?.security_fee ?? option?.securityFee ?? 0
+        );
+        return {
+          key,
+          label: option?.label || SIZE_LABELS[key] || key,
+          quantity,
+          securityFee: Number.isFinite(optionDeposit) ? Math.max(0, optionDeposit) : 0
+        };
       });
     }
   } catch {
@@ -88,6 +104,48 @@ const getSizeAvailabilityRows = (item) => {
       isOut: row.quantity <= 0
     };
   });
+};
+
+const parseMaybeObject = (value) => {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+};
+
+const getRentalSecurityFeeValue = (item) => {
+  const pricingFactors = parseMaybeObject(item?.pricing_factors);
+  const specificData = parseMaybeObject(item?.specific_data);
+
+  const candidates = [
+    item?.security_fee,
+    item?.securityFee,
+    item?.deposit,
+    item?.deposit_amount,
+    item?.downpayment,
+    pricingFactors?.security_fee,
+    pricingFactors?.securityFee,
+    pricingFactors?.deposit,
+    pricingFactors?.deposit_amount,
+    pricingFactors?.downpayment,
+    specificData?.security_fee,
+    specificData?.securityFee,
+    specificData?.deposit,
+    specificData?.deposit_amount,
+    specificData?.downpayment
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = parseFloat(candidate || 0);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return 0;
 };
 
 const normalizeSizeKey = (key = '') => {
@@ -354,6 +412,12 @@ const OrdersInventory = () => {
       { value: 'cancelled', label: 'Cancelled' }
     ];
 
+    const RENTAL_SUMMARY_STATUS_OPTIONS = [
+      { value: 'available', label: 'Available' },
+      { value: 'rented', label: 'Rented' },
+      { value: 'maintenance', label: 'Maintenance' }
+    ];
+
   const navigate = useNavigate();
   const location = useLocation();
   const { alert, confirm, prompt } = useAlert();
@@ -414,6 +478,8 @@ const OrdersInventory = () => {
   const [isRentalModalOpen, setIsRentalModalOpen] = useState(false);
   const [editingRentalId, setEditingRentalId] = useState(null);
   const [rentalFilter, setRentalFilter] = useState('');
+  const [rentalSummaryStatusFilters, setRentalSummaryStatusFilters] = useState([]);
+  const [rentalSummarySizeFilters, setRentalSummarySizeFilters] = useState([]);
   const [rentalFormData, setRentalFormData] = useState({
     item_name: '',
     description: '',
@@ -1391,6 +1457,112 @@ const OrdersInventory = () => {
     ? rentalItems.filter(i => (i.status || 'available') === rentalFilter) 
     : rentalItems;
 
+  const rentalInventoryTableRows = filteredRentalItems.flatMap((item) => {
+    const sizeRows = getSizeAvailabilityRows(item);
+    const itemName = item.item_name || item.name || `Item #${item.item_id}`;
+    const itemPrice = parseFloat(item.price || 0) || 0;
+    const securityFee = getRentalSecurityFeeValue(item);
+
+    if (sizeRows.length === 0) {
+      const availableQty = Math.max(0, parseInt(item.total_available, 10) || 0);
+      const totalQty = availableQty;
+      const statusSummary = `${availableQty} of ${totalQty} ${availableQty === 1 ? 'is' : 'are'} available`;
+      const statusTags = [
+        {
+          type: 'available',
+          text: statusSummary
+        }
+      ];
+
+      return [{
+        key: `${item.item_id}-no-size`,
+        itemName,
+        sizeLabel: 'N/A',
+        qty: totalQty,
+        price: itemPrice,
+        securityFee,
+        statusSummary,
+        statusTags,
+        statusTypes: ['available']
+      }];
+    }
+
+    return sizeRows.map((row) => {
+      const rentedQty = Math.max(0, parseInt(row.rentedQty, 10) || 0);
+      const maintenanceQty = Math.max(0, parseInt(row.maintenanceQty, 10) || 0);
+      const availableQty = Math.max(0, parseInt(row.quantity, 10) || 0);
+      const totalQty = Math.max(0, availableQty + rentedQty + maintenanceQty);
+      const rowSecurityFee = Number.isFinite(parseFloat(row.securityFee))
+        ? Math.max(0, parseFloat(row.securityFee))
+        : securityFee;
+      const statusTags = [];
+      const statusTypes = [];
+
+      let statusSummary = `${availableQty} of ${totalQty} ${availableQty === 1 ? 'is' : 'are'} available`;
+
+      if (rentedQty > 0 && maintenanceQty > 0) {
+        statusSummary = `${rentedQty} of ${totalQty} ${rentedQty === 1 ? 'is' : 'are'} rented, ${maintenanceQty} of ${totalQty} ${maintenanceQty === 1 ? 'is' : 'are'} maintenance`;
+        statusTags.push(
+          {
+            type: 'rented',
+            text: `${rentedQty} of ${totalQty} ${rentedQty === 1 ? 'is' : 'are'} rented`
+          },
+          {
+            type: 'maintenance',
+            text: `${maintenanceQty} of ${totalQty} ${maintenanceQty === 1 ? 'is' : 'are'} maintenance`
+          }
+        );
+        statusTypes.push('rented', 'maintenance');
+      } else if (maintenanceQty > 0) {
+        statusSummary = `${maintenanceQty} of ${totalQty} ${maintenanceQty === 1 ? 'is' : 'are'} maintenance`;
+        statusTags.push({
+          type: 'maintenance',
+          text: statusSummary
+        });
+        statusTypes.push('maintenance');
+      } else if (rentedQty > 0) {
+        statusSummary = `${rentedQty} of ${totalQty} ${rentedQty === 1 ? 'is' : 'are'} rented`;
+        statusTags.push({
+          type: 'rented',
+          text: statusSummary
+        });
+        statusTypes.push('rented');
+      } else {
+        statusTags.push({
+          type: 'available',
+          text: statusSummary
+        });
+        statusTypes.push('available');
+      }
+
+      return {
+        key: `${item.item_id}-${row.key}`,
+        itemName,
+        sizeLabel: row.label,
+        qty: totalQty,
+        price: itemPrice,
+        securityFee: rowSecurityFee > 0 ? rowSecurityFee : securityFee,
+        statusSummary,
+        statusTags,
+        statusTypes
+      };
+    });
+  });
+
+  const filteredRentalInventoryTableRows = rentalInventoryTableRows.filter((row) => {
+    const matchesStatus = rentalSummaryStatusFilters.length === 0
+      || row.statusTypes.some((type) => rentalSummaryStatusFilters.includes(type));
+    const matchesSize = rentalSummarySizeFilters.length === 0
+      || rentalSummarySizeFilters.includes(row.sizeLabel);
+    return matchesStatus && matchesSize;
+  });
+
+  const rentalSummarySizeOptions = Array.from(
+    new Set(rentalInventoryTableRows.map((row) => row.sizeLabel).filter(Boolean))
+  )
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+    .map((sizeLabel) => ({ value: sizeLabel, label: sizeLabel }));
+
   const handleExportReportsToExcel = async () => {
     try {
       const currentUser = getUser();
@@ -2114,6 +2286,72 @@ const OrdersInventory = () => {
                 );
               })
             )}
+          </div>
+
+          <div className="rental-summary-table-section">
+            <div className="rental-summary-header">
+              <h4 className="rental-summary-title">Rental Item Size Summary</h4>
+              <div className="rental-summary-filters">
+                <MultiSelectDropdown
+                  allLabel="All Summary Status"
+                  options={RENTAL_SUMMARY_STATUS_OPTIONS}
+                  selectedValues={rentalSummaryStatusFilters}
+                  onChange={setRentalSummaryStatusFilters}
+                  className="filter-select"
+                />
+                <MultiSelectDropdown
+                  allLabel="All Sizes"
+                  options={rentalSummarySizeOptions}
+                  selectedValues={rentalSummarySizeFilters}
+                  onChange={setRentalSummarySizeFilters}
+                  className="filter-select"
+                />
+              </div>
+            </div>
+            <div className="rental-summary-table-wrap">
+              <table className="rental-summary-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Size</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th>Security Fee</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRentalInventoryTableRows.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="rental-summary-empty">
+                        {(rentalSummaryStatusFilters.length > 0 || rentalSummarySizeFilters.length > 0)
+                          ? 'No rental records match the selected summary filters.'
+                          : 'No rental records available.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRentalInventoryTableRows.map((row) => (
+                      <tr key={row.key}>
+                        <td>{row.itemName}</td>
+                        <td>{row.sizeLabel}</td>
+                        <td>{row.qty}</td>
+                        <td>{formatPeso(row.price)}</td>
+                        <td>{formatPeso(row.securityFee)}</td>
+                        <td>
+                          <div className="rental-summary-status-list">
+                            {(row.statusTags || [{ type: 'available', text: row.statusSummary }]).map((tag, index) => (
+                              <span key={`${row.key}-${tag.type}-${index}`} className={`rental-summary-status-label ${tag.type}`}>
+                                {tag.text}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
         )}

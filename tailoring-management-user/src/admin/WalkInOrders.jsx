@@ -22,6 +22,17 @@ const parseRentalSizeConfig = (rawSize) => {
   const fallback = { sizeOptions: {} };
   if (!rawSize) return fallback;
 
+  const readSizeDeposit = (entry = {}) => Math.max(
+    0,
+    parseFloat(
+      entry.deposit
+      ?? entry.downpayment
+      ?? entry.security_fee
+      ?? entry.securityFee
+      ?? 0
+    ) || 0
+  );
+
   try {
     const parsed = typeof rawSize === 'string' ? JSON.parse(rawSize) : rawSize;
     if (!parsed || typeof parsed !== 'object') return fallback;
@@ -29,15 +40,16 @@ const parseRentalSizeConfig = (rawSize) => {
     if (parsed.format === 'rental_size_v2' && Array.isArray(parsed.size_entries)) {
       const sizeOptions = {};
       parsed.size_entries.forEach((entry, idx) => {
-        const key = entry.sizeKey !== 'custom'
-          ? entry.sizeKey
-          : (entry.customLabel || `Custom ${idx + 1}`);
+        const key = String(entry.sizeKey || entry.size_key || `size_${idx}`);
         const qty = parseInt(entry.quantity, 10);
         const price = parseFloat(entry.price) || 0;
+        const deposit = readSizeDeposit(entry);
         sizeOptions[key] = {
           quantity: Number.isNaN(qty) ? 0 : Math.max(0, qty),
           price,
-          label: entry.label || SIZE_LABELS[key] || entry.customLabel || key
+          deposit,
+          label: entry.label || SIZE_LABELS[key] || entry.customLabel || key,
+          rental_duration: Math.max(1, Math.min(30, parseInt(entry.rental_duration, 10) || 3))
         };
       });
       return { sizeOptions };
@@ -52,7 +64,9 @@ const parseRentalSizeConfig = (rawSize) => {
         sizeOptions[key] = {
           quantity: Number.isNaN(qty) ? 0 : Math.max(0, qty),
           price: parseFloat(option.price) || 0,
-          label: option.label || SIZE_LABELS[key] || key
+          deposit: readSizeDeposit(option),
+          label: option.label || SIZE_LABELS[key] || key,
+          rental_duration: Math.max(1, Math.min(30, parseInt(option.rental_duration, 10) || 3))
         };
       });
       return { sizeOptions };
@@ -69,6 +83,28 @@ const getAvailableSizeKeys = (sizeOptions = {}) => {
     const qty = parseInt(sizeOptions?.[key]?.quantity, 10);
     return Number.isNaN(qty) ? false : qty > 0;
   });
+};
+
+const getRentalCycleLabel = (item) => {
+  const sizeOptions = item?.sizeOptions && typeof item.sizeOptions === 'object'
+    ? item.sizeOptions
+    : {};
+  const keys = Object.keys(sizeOptions);
+
+  if (keys.length === 0) {
+    return 'per 3 days';
+  }
+
+  const cycleDays = keys.map((key) => {
+    return Math.max(1, Math.min(30, parseInt(sizeOptions?.[key]?.rental_duration, 10) || 3));
+  });
+
+  const unique = Array.from(new Set(cycleDays)).sort((a, b) => a - b);
+  if (unique.length === 1) {
+    return `per ${unique[0]} day${unique[0] > 1 ? 's' : ''}`;
+  }
+
+  return `base cycle ${unique[0]}-${unique[unique.length - 1]} days`;
 };
 
 const sanitizePhilippineMobile = (phoneNumber) => {
@@ -161,8 +197,9 @@ const WalkInOrders = () => {
 
   const [selectedRentalItems, setSelectedRentalItems] = useState([]);
   const [rentalSizeSelections, setRentalSizeSelections] = useState({});
+  const [rentalSizeDurations, setRentalSizeDurations] = useState({});
   const [expandedSizeMeasurements, setExpandedSizeMeasurements] = useState({});
-  const [rentalDuration, setRentalDuration] = useState(3);
+  const [rentalDuration, setRentalDuration] = useState(1);
   const [eventDate, setEventDate] = useState('');
   const [damageDeposit, setDamageDeposit] = useState('');
   const [rentalPaymentMode, setRentalPaymentMode] = useState('regular');
@@ -332,10 +369,12 @@ const WalkInOrders = () => {
   }, [serviceType, garmentType, quantity, garmentTypes]);
 
   const calculateRentalPrice = () => {
-    if (selectedRentalItems.length === 0 || !rentalDuration) return 0;
+    if (selectedRentalItems.length === 0) return 0;
+    const parsedDuration = Math.max(1, parseInt(rentalDuration, 10) || 1);
+    const durationMultiplier = Math.max(1, Math.ceil(parsedDuration / 3));
+
     return selectedRentalItems.reduce((total, item) => {
       const basePrice = parseFloat(item.price || 0);
-      const durationMultiplier = Math.ceil(parseInt(rentalDuration) / 3);
       const sizeKeys = getAvailableSizeKeys(item.sizeOptions || {});
       const selections = rentalSizeSelections[item.item_id] || {};
 
@@ -345,13 +384,49 @@ const WalkInOrders = () => {
           if (qty <= 0) return sum;
           const sizePrice = parseFloat(item.sizeOptions?.[sizeKey]?.price || 0);
           const effectivePrice = sizePrice > 0 ? sizePrice : basePrice;
-          return sum + (qty * effectivePrice * durationMultiplier);
+          const cycleDays = Math.max(1, Math.min(30, parseInt(item.sizeOptions?.[sizeKey]?.rental_duration, 10) || 3));
+          const selectedDays = Math.max(
+            1,
+            Math.min(
+              30,
+              parseInt(rentalSizeDurations[item.item_id]?.[sizeKey], 10) || cycleDays
+            )
+          );
+          const cycleCount = Math.max(1, Math.ceil(selectedDays / cycleDays));
+          return sum + (qty * effectivePrice * cycleCount);
         }, 0);
         return total + itemTotal;
       }
 
       return total + (basePrice * durationMultiplier);
     }, 0);
+  };
+
+  const calculateRentalSecurityFee = () => {
+    if (selectedRentalItems.length === 0) return 0;
+
+    return selectedRentalItems.reduce((total, item) => {
+      const itemBaseDeposit = Math.max(0, parseFloat(item.downpayment || 0) || 0);
+      const sizeKeys = getAvailableSizeKeys(item.sizeOptions || {});
+      const selections = rentalSizeSelections[item.item_id] || {};
+
+      if (sizeKeys.length > 0) {
+        const sizeDepositTotal = Object.entries(selections).reduce((sum, [sizeKey, qtyRaw]) => {
+          const qty = Math.max(0, parseInt(qtyRaw, 10) || 0);
+          if (qty <= 0) return sum;
+          const sizeDeposit = Math.max(0, parseFloat(item.sizeOptions?.[sizeKey]?.deposit || 0) || 0);
+          const effectiveDeposit = sizeDeposit > 0 ? sizeDeposit : itemBaseDeposit;
+          return sum + (qty * effectiveDeposit);
+        }, 0);
+        return total + sizeDepositTotal;
+      }
+
+      return total + itemBaseDeposit;
+    }, 0);
+  };
+
+  const calculateRentalGrandTotal = () => {
+    return calculateRentalPrice() + calculateRentalSecurityFee();
   };
 
   const prettifyMeasurementLabel = (key) => {
@@ -501,50 +576,8 @@ const WalkInOrders = () => {
       return selectedFromState.map((row) => `${row.label} x${row.quantity}`).join(', ');
     }
 
-    const selectedSizes = Array.isArray(item.selected_sizes)
-      ? item.selected_sizes
-      : (Array.isArray(item.selectedSizes) ? item.selectedSizes : []);
-
-    if (selectedSizes.length > 0) {
-      const merged = new Map();
-      selectedSizes.forEach((entry) => {
-        const key = String(entry?.sizeKey || entry?.size_key || entry?.label || '').trim();
-        if (!key) return;
-        const label = String(entry?.label || key).trim();
-        const qty = Math.max(0, parseInt(entry?.quantity, 10) || 0);
-        const prev = merged.get(key);
-        if (!prev) {
-          merged.set(key, { label, quantity: qty });
-        } else {
-          merged.set(key, { label: prev.label || label, quantity: prev.quantity + qty });
-        }
-      });
-
-      const formatted = Array.from(merged.values())
-        .filter((row) => row.quantity > 0)
-        .map((row) => `${row.label} x${row.quantity}`)
-        .join(', ');
-
-      if (formatted) return formatted;
-    }
-
-    try {
-      const parsed = typeof item.size === 'string' ? JSON.parse(item.size) : item.size;
-      if (parsed && Array.isArray(parsed.size_entries)) {
-        const available = parsed.size_entries
-          .map((entry) => {
-            const qty = Math.max(0, parseInt(entry?.quantity, 10) || 0);
-            const label = entry?.label || entry?.sizeKey || entry?.size_key;
-            if (!label || qty <= 0) return null;
-            return `${label} (${qty})`;
-          })
-          .filter(Boolean)
-          .join(', ');
-        if (available) return available;
-      }
-    } catch {
-      // Ignore JSON parse failures and fall through to legacy string handling.
-    }
+    const hasSizeProfile = getAvailableSizeKeys(item.sizeOptions || {}).length > 0;
+    if (hasSizeProfile) return 'No size selected';
 
     if (typeof item.size === 'string' && item.size.trim() && !item.size.trim().startsWith('{')) {
       return item.size.trim();
@@ -562,6 +595,11 @@ const WalkInOrders = () => {
           delete next[item.item_id];
           return next;
         });
+        setRentalSizeDurations((durationPrev) => {
+          const next = { ...durationPrev };
+          delete next[item.item_id];
+          return next;
+        });
         setExpandedSizeMeasurements((prevExpanded) => {
           const nextExpanded = { ...prevExpanded };
           const prefix = `${item.item_id}:`;
@@ -572,6 +610,30 @@ const WalkInOrders = () => {
         });
         return prev.filter(i => i.item_id !== item.item_id);
       } else {
+        const sizeKeys = getAvailableSizeKeys(item.sizeOptions || {});
+        if (sizeKeys.length > 0) {
+          const firstSizeKey = sizeKeys[0];
+          setRentalSizeSelections((sizePrev) => ({
+            ...sizePrev,
+            [item.item_id]: {
+              ...(sizePrev[item.item_id] || {}),
+              [firstSizeKey]: Math.max(1, parseInt(sizePrev[item.item_id]?.[firstSizeKey], 10) || 1)
+            }
+          }));
+
+          const baseDuration = Math.max(
+            1,
+            Math.min(30, parseInt(item.sizeOptions?.[firstSizeKey]?.rental_duration, 10) || 3)
+          );
+          setRentalSizeDurations((durationPrev) => ({
+            ...durationPrev,
+            [item.item_id]: {
+              ...(durationPrev[item.item_id] || {}),
+              [firstSizeKey]: Math.max(1, parseInt(durationPrev[item.item_id]?.[firstSizeKey], 10) || baseDuration)
+            }
+          }));
+        }
+
         return [...prev, item];
       }
     });
@@ -580,6 +642,7 @@ const WalkInOrders = () => {
   const updateRentalSizeQuantity = (item, sizeKey, delta) => {
     const option = item.sizeOptions?.[sizeKey] || {};
     const maxQty = Math.max(0, parseInt(option.quantity, 10) || 0);
+    const baseDuration = Math.max(1, Math.min(30, parseInt(option.rental_duration, 10) || 3));
 
     setRentalSizeSelections((prev) => {
       const itemSelections = { ...(prev[item.item_id] || {}) };
@@ -598,7 +661,44 @@ const WalkInOrders = () => {
       } else {
         delete next[item.item_id];
       }
+
+      setRentalSizeDurations((prevDurations) => {
+        const itemDurations = { ...(prevDurations[item.item_id] || {}) };
+
+        if (nextQty <= 0) {
+          delete itemDurations[sizeKey];
+        } else if (!itemDurations[sizeKey]) {
+          itemDurations[sizeKey] = baseDuration;
+        }
+
+        const nextDurations = { ...prevDurations };
+        if (Object.keys(itemDurations).length > 0) {
+          nextDurations[item.item_id] = itemDurations;
+        } else {
+          delete nextDurations[item.item_id];
+        }
+        return nextDurations;
+      });
+
       return next;
+    });
+  };
+
+  const updateRentalSizeDuration = (item, sizeKey, delta) => {
+    const option = item.sizeOptions?.[sizeKey] || {};
+    const baseDuration = Math.max(1, Math.min(30, parseInt(option.rental_duration, 10) || 3));
+
+    setRentalSizeDurations((prev) => {
+      const itemDurations = { ...(prev[item.item_id] || {}) };
+      const currentDuration = Math.max(1, Math.min(30, parseInt(itemDurations[sizeKey], 10) || baseDuration));
+      const nextDuration = Math.max(1, Math.min(30, currentDuration + delta));
+
+      itemDurations[sizeKey] = nextDuration;
+
+      return {
+        ...prev,
+        [item.item_id]: itemDurations
+      };
     });
   };
 
@@ -649,7 +749,12 @@ const WalkInOrders = () => {
         return;
       }
     } else if (serviceType === 'rental') {
-      if (selectedRentalItems.length === 0 || !rentalDuration) {
+      const hasNoSizeProfileItem = selectedRentalItems.some((item) => {
+        const sizeKeys = getAvailableSizeKeys(item.sizeOptions || {});
+        return sizeKeys.length === 0;
+      });
+
+      if (selectedRentalItems.length === 0 || (hasNoSizeProfileItem && !rentalDuration)) {
         alert('Please select at least one rental item and duration');
         return;
       }
@@ -736,7 +841,20 @@ const WalkInOrders = () => {
           const qty = sizeKeys.length > 0
             ? Object.values(rentalSizeSelections[item.item_id] || {}).reduce((qSum, qRaw) => qSum + (Math.max(0, parseInt(qRaw, 10) || 0)), 0)
             : 1;
-          return sum + (parseFloat(item.downpayment || '0') * Math.max(1, qty));
+          const sizeDepositFallback = sizeKeys.reduce((depositSum, sizeKey) => {
+            const option = item.sizeOptions?.[sizeKey] || {};
+            const deposit = Math.max(0, parseFloat(
+              option.deposit
+              ?? option.downpayment
+              ?? option.security_fee
+              ?? option.securityFee
+              ?? 0
+            ) || 0);
+            const sizeQty = Math.max(0, parseInt(rentalSizeSelections[item.item_id]?.[sizeKey], 10) || 0);
+            return depositSum + (deposit * sizeQty);
+          }, 0);
+          const itemDeposit = sizeDepositFallback > 0 ? sizeDepositFallback : parseFloat(item.downpayment || item.deposit || 0);
+          return sum + (Math.max(0, itemDeposit) * Math.max(1, qty));
         }, 0);
 
         const rentalItemSelections = selectedRentalItems
@@ -750,7 +868,23 @@ const WalkInOrders = () => {
                   sizeKey,
                   label: item.sizeOptions?.[sizeKey]?.label || SIZE_LABELS[sizeKey] || sizeKey,
                   quantity: qty,
-                  price: parseFloat(item.sizeOptions?.[sizeKey]?.price || 0)
+                  price: parseFloat(item.sizeOptions?.[sizeKey]?.price || 0),
+                  deposit: Math.max(0, parseFloat(
+                    item.sizeOptions?.[sizeKey]?.deposit
+                    ?? item.sizeOptions?.[sizeKey]?.downpayment
+                    ?? item.sizeOptions?.[sizeKey]?.security_fee
+                    ?? item.sizeOptions?.[sizeKey]?.securityFee
+                    ?? 0
+                  ) || 0),
+                  rental_duration: Math.max(
+                    1,
+                    Math.min(
+                      30,
+                      parseInt(rentalSizeDurations[item.item_id]?.[sizeKey], 10)
+                        || parseInt(item.sizeOptions?.[sizeKey]?.rental_duration, 10)
+                        || 3
+                    )
+                  )
                 };
               })
               .filter(Boolean);
@@ -773,7 +907,7 @@ const WalkInOrders = () => {
           customerPhone: normalizedCustomerPhone,
           rentalItemIds: selectedRentalItems.map(item => item.item_id),
           rentalItemSelections,
-          rentalDuration: parseInt(rentalDuration),
+          rentalDuration: Math.max(1, parseInt(rentalDuration, 10) || 1),
           eventDate,
           damageDeposit: damageDeposit || totalDownpayment.toString(),
           paymentMode: rentalPaymentMode,
@@ -799,7 +933,8 @@ const WalkInOrders = () => {
         setPreferredPickupTime('');
         setSelectedRentalItems([]);
         setRentalSizeSelections({});
-        setRentalDuration(3);
+        setRentalSizeDurations({});
+        setRentalDuration(1);
         setEventDate('');
         setDamageDeposit('');
         setRentalPaymentMode('regular');
@@ -1378,7 +1513,7 @@ const WalkInOrders = () => {
                               ₱{parseFloat(item.price || 0).toLocaleString('en-PH', {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2
-                              })} per 3 days
+                              })} {getRentalCycleLabel(item)}
                             </p>
                             {item.category && (
                               <span className="rental-item-category">{item.category}</span>
@@ -1424,6 +1559,14 @@ const WalkInOrders = () => {
                                   const opt = item.sizeOptions?.[sizeKey] || {};
                                   const currentQty = Math.max(0, parseInt(rentalSizeSelections[item.item_id]?.[sizeKey], 10) || 0);
                                   const maxQty = Math.max(0, parseInt(opt.quantity, 10) || 0);
+                                  const cycleDays = Math.max(1, Math.min(30, parseInt(opt.rental_duration, 10) || 3));
+                                  const selectedDays = Math.max(
+                                    1,
+                                    Math.min(
+                                      30,
+                                      parseInt(rentalSizeDurations[item.item_id]?.[sizeKey], 10) || cycleDays
+                                    )
+                                  );
                                   const measurementRows = getSizeMeasurementRows(item, sizeKey);
                                   const measurementToggleKey = `${item.item_id}:${sizeKey}`;
                                   const showMeasurements = !!expandedSizeMeasurements[measurementToggleKey];
@@ -1451,6 +1594,25 @@ const WalkInOrders = () => {
                                             >
                                               +
                                             </button>
+                                          </div>
+                                          <div className="walkin-size-duration-control">
+                                            <span className="walkin-size-duration-label">Duration</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => updateRentalSizeDuration(item, sizeKey, -1)}
+                                              disabled={selectedDays <= 1}
+                                            >
+                                              -
+                                            </button>
+                                            <span>{selectedDays} day{selectedDays > 1 ? 's' : ''}</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => updateRentalSizeDuration(item, sizeKey, 1)}
+                                              disabled={selectedDays >= 30}
+                                            >
+                                              +
+                                            </button>
+                                            <small>base {cycleDays} day{cycleDays > 1 ? 's' : ''}</small>
                                           </div>
                                           {measurementRows.length > 0 && (
                                             <button
@@ -1506,7 +1668,7 @@ const WalkInOrders = () => {
                           <p><strong>Price:</strong> ₱{parseFloat(item.price || 0).toLocaleString('en-PH', {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
-                          })} per 3 days</p>
+                          })} {getRentalCycleLabel(item)}</p>
                         </div>
                       );
                     })}
@@ -1514,19 +1676,21 @@ const WalkInOrders = () => {
                 </div>
               )}
 
-              <div className="form-group">
-                <label>Rental Duration (days) *</label>
-                <input
-                  type="number"
-                  value={rentalDuration}
-                  onChange={(e) => setRentalDuration(e.target.value)}
-                  className="form-control"
-                  min="3"
-                  step="3"
-                  required
-                />
-                <small>Must be a multiple of 3 days</small>
-              </div>
+              {selectedRentalItems.some((item) => getAvailableSizeKeys(item.sizeOptions || {}).length === 0) && (
+                <div className="form-group">
+                  <label>Rental Duration (days) *</label>
+                  <input
+                    type="number"
+                    value={rentalDuration}
+                    onChange={(e) => setRentalDuration(e.target.value)}
+                    className="form-control"
+                    min="1"
+                    step="1"
+                    required
+                  />
+                  <small>Used for items without size-based duration.</small>
+                </div>
+              )}
 
               <div className="form-group">
                 <label>Event Date</label>
@@ -1583,7 +1747,20 @@ const WalkInOrders = () => {
               )}
 
               <div className="price-display">
-                <strong>Total Price: ₱{calculateRentalPrice().toFixed(2)}</strong>
+                <div style={{ display: 'grid', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px' }}>
+                    <span>Rental Price:</span>
+                    <strong>₱{calculateRentalPrice().toFixed(2)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px' }}>
+                    <span>Security Fee:</span>
+                    <strong>₱{calculateRentalSecurityFee().toFixed(2)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px' }}>
+                    <strong>Total Price:</strong>
+                    <strong>₱{calculateRentalGrandTotal().toFixed(2)}</strong>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -2006,6 +2183,46 @@ const WalkInOrders = () => {
           gap: 10px;
           flex-wrap: wrap;
           justify-content: flex-end;
+        }
+        .walkin-size-duration-control {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          border: 1px solid #d6cec3;
+          border-radius: 999px;
+          padding: 2px 8px;
+          background: #fff;
+        }
+        .walkin-size-duration-control button {
+          width: 24px;
+          height: 24px;
+          border: none;
+          border-radius: 999px;
+          background: transparent;
+          color: #7a4317;
+          font-size: 15px;
+          cursor: pointer;
+        }
+        .walkin-size-duration-control button:disabled {
+          color: #b9aea2;
+          cursor: not-allowed;
+        }
+        .walkin-size-duration-label {
+          font-size: 11px;
+          font-weight: 700;
+          color: #7a4317;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+        }
+        .walkin-size-duration-control span {
+          font-size: 12px;
+          font-weight: 700;
+          color: #0f172a;
+        }
+        .walkin-size-duration-control small {
+          font-size: 10px;
+          color: #8b6b53;
+          white-space: nowrap;
         }
         .walkin-view-measurements-btn {
           border: 1px solid #cdb8a6;

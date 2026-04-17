@@ -108,6 +108,18 @@ function Rental() {
     }
   };
 
+  const parseMaybeJson = (value) => {
+    if (!value) return {};
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value || '{}');
+      } catch {
+        return {};
+      }
+    }
+    return value;
+  };
+
   const toDateOnly = (value) => {
     if (!value) return null;
     const raw = String(value).trim();
@@ -116,7 +128,7 @@ function Rental() {
   };
 
   const getRentalSelectedSizes = (rental) => {
-    const specificData = rental?.specific_data || {};
+    const specificData = parseMaybeJson(rental?.specific_data);
     if (specificData?.is_bundle && Array.isArray(specificData.bundle_items)) {
       return specificData.bundle_items.flatMap((bundleItem) => bundleItem.selected_sizes || bundleItem.selectedSizes || []);
     }
@@ -192,17 +204,27 @@ function Rental() {
 
   const calcDepositFromRental = (rental) => {
     const pricingFactors = parsePricingFactors(rental?.pricing_factors);
-    const isBundle = rental?.specific_data?.is_bundle || pricingFactors?.is_bundle;
-    if (isBundle && Array.isArray(rental?.specific_data?.bundle_items)) {
-      const total = rental.specific_data.bundle_items.reduce((sum, bundleItem) => {
+    const specificData = parseMaybeJson(rental?.specific_data);
+    const isBundle = specificData?.is_bundle || pricingFactors?.is_bundle;
+    if (isBundle && Array.isArray(specificData?.bundle_items)) {
+      const total = specificData.bundle_items.reduce((sum, bundleItem) => {
         const sizes = bundleItem.selected_sizes || bundleItem.selectedSizes || [];
         return sum + sizes.reduce((s, size) => s + (parseInt(size.quantity || 0, 10) * parseFloat(size.deposit || 0)), 0);
       }, 0);
       if (total > 0) return total;
     }
-    const selectedSizes = rental?.specific_data?.selected_sizes || rental?.specific_data?.selectedSizes || [];
+    const selectedSizes = specificData?.selected_sizes || specificData?.selectedSizes || [];
     const fromSizes = selectedSizes.reduce((total, size) => total + (parseInt(size.quantity || 0, 10) * parseFloat(size.deposit || 0)), 0);
-    return fromSizes > 0 ? fromSizes : parseFloat(pricingFactors?.downpayment || pricingFactors?.deposit_amount || rental?.specific_data?.downpayment || 0);
+    return fromSizes > 0
+      ? fromSizes
+      : parseFloat(
+          pricingFactors?.deposit_amount
+          || pricingFactors?.downpayment
+          || specificData?.deposit_amount
+          || specificData?.downpayment
+          || rental?.downpayment
+          || 0
+        );
   };
 
   const getRentalPaymentSnapshot = (rental) => {

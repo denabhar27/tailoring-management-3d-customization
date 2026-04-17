@@ -752,8 +752,8 @@ const Order = {
 
         if (item.service_type === 'rental') {
           try {
-            const itemTotalPrice = parseFloat(item.final_price || 0);
-            const expectedDownpayment = itemTotalPrice * 0.5;
+            const totalPrice = parseFloat(item.final_price || 0);
+            const expectedDownpayment = totalPrice * 0.5;
 
             const fallbackDuration = normalizeRentalDuration(factors.rental_duration ?? factors.duration ?? 3);
             const fallbackOverdueRate = normalizeOverdueRate(factors.overdue_rate ?? factors.overdue_amount ?? 50);
@@ -774,6 +774,7 @@ const Order = {
 
             factors.downpayment = expectedDownpayment.toString();
             factors.down_payment = expectedDownpayment.toString();
+            factors.deposit_amount = expectedDownpayment.toString();
             factors.rental_duration = rentalDuration;
             factors.duration = rentalDuration;
             factors.overdue_rate = overdueRate;
@@ -1069,8 +1070,6 @@ const Order = {
         if (item.service_type === 'rental') {
           try {
             const factors = typeof pricingFactors === 'string' ? JSON.parse(pricingFactors) : pricingFactors;
-            const totalPrice = parseFloat(item.final_price || 0);
-            const expectedDownpayment = totalPrice * 0.5;
 
             const fallbackDuration = normalizeRentalDuration(factors.rental_duration ?? factors.duration ?? item.rental_duration ?? 3);
             const fallbackOverdueRate = normalizeOverdueRate(factors.overdue_rate ?? factors.overdue_amount ?? item.overdue_rate ?? 50);
@@ -1088,9 +1087,38 @@ const Order = {
             rentalDuration = terms.duration;
             overdueRate = terms.overdueRate;
             dueDate = terms.dueDate;
+
+            const selectedSizes = Array.isArray(specificData.selected_sizes)
+              ? specificData.selected_sizes
+              : (Array.isArray(specificData.selectedSizes) ? specificData.selectedSizes : []);
+            const bundleItems = Array.isArray(specificData.bundle_items) ? specificData.bundle_items : [];
+            const depositFromSelectedSizes = selectedSizes.reduce((total, size = {}) => {
+              const quantity = Math.max(1, parseInt(size.quantity, 10) || 1);
+              const deposit = Math.max(0, parseFloat(size.deposit || 0) || 0);
+              return total + (quantity * deposit);
+            }, 0);
+            const depositFromBundleItems = bundleItems.reduce((total, bundleItem = {}) => {
+              const sizes = Array.isArray(bundleItem.selected_sizes)
+                ? bundleItem.selected_sizes
+                : (Array.isArray(bundleItem.selectedSizes) ? bundleItem.selectedSizes : []);
+              return total + sizes.reduce((sum, size = {}) => {
+                const quantity = Math.max(1, parseInt(size.quantity, 10) || 1);
+                const deposit = Math.max(0, parseFloat(size.deposit || 0) || 0);
+                return sum + (quantity * deposit);
+              }, 0);
+            }, 0);
+            const expectedDownpayment = Math.max(
+              0,
+              depositFromBundleItems > 0
+                ? depositFromBundleItems
+                : (depositFromSelectedSizes > 0
+                  ? depositFromSelectedSizes
+                  : parseFloat(factors.downpayment || factors.deposit_amount || specificData.downpayment || specificData.deposit_amount || 0))
+            );
             
             factors.downpayment = expectedDownpayment.toString();
             factors.down_payment = expectedDownpayment.toString();
+            factors.deposit_amount = expectedDownpayment.toString();
             factors.rental_duration = rentalDuration;
             factors.duration = rentalDuration;
             factors.overdue_rate = overdueRate;

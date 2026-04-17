@@ -5,7 +5,7 @@ import '../styles/Profile.css';
 import logo from "../assets/logo.png";
 import dp from "../assets/dp.png";
 import { getUser, updateProfile, uploadProfilePicture } from '../api/AuthApi';
-import { getUserOrderTracking, getStatusBadgeClass, getStatusLabel, cancelOrderItem, requestEnhancement, confirmRentalSecurityFeeReceipt, haggleOrderItemPrice } from '../api/OrderTrackingApi';
+import { getUserOrderTracking, getStatusBadgeClass, getStatusLabel, cancelOrderItem, requestEnhancement, confirmRentalSecurityFeeReceipt, haggleOrderItemPrice, confirmOrderItemPickup } from '../api/OrderTrackingApi';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import TransactionLogModal from './components/TransactionLogModal';
 import { useAlert } from '../context/AlertContext';
@@ -59,6 +59,7 @@ const Profile = () => {
   const [itemToHaggle, setItemToHaggle] = useState(null);
   const [hagglePriceInput, setHagglePriceInput] = useState('');
   const [confirmingSecurityFeeByItem, setConfirmingSecurityFeeByItem] = useState({});
+  const [confirmingPickupByItem, setConfirmingPickupByItem] = useState({});
   const [declineReasonModalOpen, setDeclineReasonModalOpen] = useState(false);
   const [declineReasonText, setDeclineReasonText] = useState('');
   const [itemToDecline, setItemToDecline] = useState(null);
@@ -897,6 +898,40 @@ const Profile = () => {
       await alert('Failed to confirm deposit receipt.', 'Error', 'error');
     } finally {
       setConfirmingSecurityFeeByItem((prev) => ({ ...prev, [orderItemId]: false }));
+    }
+  };
+
+  const handleConfirmPickedUp = async (item) => {
+    const orderItemId = item?.order_item_id;
+    if (!orderItemId) return;
+
+    const confirmed = await confirm(
+      'Confirm that you already picked up this item from the store?',
+      'Confirm Pickup',
+      'question',
+      { confirmText: 'Yes, Picked Up', cancelText: 'Not Yet' }
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setConfirmingPickupByItem((prev) => ({ ...prev, [orderItemId]: true }));
+      const result = await confirmOrderItemPickup(orderItemId);
+
+      if (!result.success) {
+        await alert(result.message || 'Failed to confirm pickup.', 'Error', 'error');
+        return;
+      }
+
+      await alert('Pickup confirmed. Thank you!', 'Success', 'success');
+      const ordersResult = await getUserOrderTracking();
+      if (ordersResult.success) {
+        setOrders(ordersResult.data || []);
+      }
+    } catch (error) {
+      await alert('Failed to confirm pickup.', 'Error', 'error');
+    } finally {
+      setConfirmingPickupByItem((prev) => ({ ...prev, [orderItemId]: false }));
     }
   };
 
@@ -3929,6 +3964,25 @@ const Profile = () => {
                         <span className="date-info">Updated: {formatDate(item.status_updated_at)}</span>
                       </div>
                       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        {(item.status === 'ready_to_pickup' || item.status === 'ready_for_pickup') && item.service_type !== 'rental' && (
+                          <button
+                            onClick={() => handleConfirmPickedUp(item)}
+                            disabled={!!confirmingPickupByItem[item.order_item_id]}
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#2e7d32',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: confirmingPickupByItem[item.order_item_id] ? 'not-allowed' : 'pointer',
+                              fontSize: '0.9rem',
+                              fontWeight: '500',
+                              opacity: confirmingPickupByItem[item.order_item_id] ? 0.75 : 1
+                            }}
+                          >
+                            {confirmingPickupByItem[item.order_item_id] ? 'Confirming...' : 'Confirm Picked Up'}
+                          </button>
+                        )}
                         <button
                           className="btn-view-details"
                           onClick={() => handleViewDetails(item)}

@@ -717,6 +717,10 @@ const DryCleaning = () => {
 
       'ready_for_pickup': 'to-pickup',
 
+      'ready_to_pickup': 'to-pickup',
+
+      'picked_up': 'to-pickup',
+
       'completed': 'completed',
 
       'price_declined': 'rejected',
@@ -750,6 +754,8 @@ const DryCleaning = () => {
       'ready_for_pickup': 'To Pick up',
 
       'ready_to_pickup': 'To Pick up',
+
+      'picked_up': 'To Pick up',
 
       'completed': 'Completed',
 
@@ -812,6 +818,12 @@ const DryCleaning = () => {
     if (normalizedCurrentStatus === 'accepted') {
 
       return 'confirmed';
+
+    }
+
+    if (normalizedCurrentStatus === 'picked_up') {
+
+      return 'completed';
 
     }
 
@@ -1393,7 +1405,7 @@ const DryCleaning = () => {
 
     inProgress: allItems.filter(o => o.approval_status === 'confirmed').length,
 
-    toPickup: allItems.filter(o => o.approval_status === 'ready_for_pickup').length,
+    toPickup: allItems.filter(o => o.approval_status === 'ready_for_pickup' || o.approval_status === 'ready_to_pickup' || o.approval_status === 'picked_up').length,
 
     completed: allItems.filter(o => o.approval_status === 'completed').length,
 
@@ -1434,7 +1446,7 @@ const DryCleaning = () => {
 
     } else if (viewFilter === "to-pickup") {
 
-      items = allItems.filter(item => item.approval_status === 'ready_for_pickup');
+      items = allItems.filter(item => item.approval_status === 'ready_for_pickup' || item.approval_status === 'ready_to_pickup' || item.approval_status === 'picked_up');
 
     } else if (viewFilter === "completed") {
 
@@ -3299,6 +3311,12 @@ const DryCleaning = () => {
                       {item.approval_status === 'accepted' && isReceivedByAdmin && (
                         <div style={{ marginTop: '4px', fontSize: '11px', color: '#1b5e20', fontWeight: '600' }}>
                           Note: Received
+                        </div>
+                      )}
+
+                      {item.approval_status === 'picked_up' && (
+                        <div style={{ marginTop: '4px', fontSize: '11px', color: '#1b5e20', fontWeight: '600' }}>
+                          Note: Picked up
                         </div>
                       )}
 

@@ -490,6 +490,10 @@ const Repair = () => {
 
       'ready_for_pickup': 'to-pickup',
 
+      'ready_to_pickup': 'to-pickup',
+
+      'picked_up': 'to-pickup',
+
       'completed': 'completed',
 
       'price_declined': 'rejected',
@@ -523,6 +527,8 @@ const Repair = () => {
       'ready_for_pickup': 'To Pick up',
 
       'ready_to_pickup': 'To Pick up',
+
+      'picked_up': 'To Pick up',
 
       'completed': 'Completed',
 
@@ -579,6 +585,12 @@ const Repair = () => {
     if (normalizedCurrentStatus === 'accepted') {
 
       return 'confirmed';
+
+    }
+
+    if (normalizedCurrentStatus === 'picked_up') {
+
+      return 'completed';
 
     }
 
@@ -3551,6 +3563,12 @@ const Repair = () => {
                         {item.approval_status === 'accepted' && isReceivedByAdmin && (
                           <div style={{ marginTop: '4px', fontSize: '11px', color: '#1b5e20', fontWeight: '600' }}>
                             Note: Received
+                          </div>
+                        )}
+
+                        {item.approval_status === 'picked_up' && (
+                          <div style={{ marginTop: '4px', fontSize: '11px', color: '#1b5e20', fontWeight: '600' }}>
+                            Note: Picked up
                           </div>
                         )}
 

@@ -216,3 +216,20 @@ export async function confirmRentalSecurityFeeReceipt(orderItemId) {
     };
   }
 }
+
+export async function confirmOrderItemPickup(orderItemId) {
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/tracking/confirm-pickup/${orderItemId}`,
+      {},
+      { headers: getAuthHeaders() }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Confirm order pickup error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Error confirming pickup'
+    };
+  }
+}

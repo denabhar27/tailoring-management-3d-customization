@@ -470,6 +470,111 @@ exports.updateTrackingStatus = (req, res) => {
   });
 };
 
+exports.confirmPickupByCustomer = (req, res) => {
+  const userId = req.user.id;
+  const orderItemId = parseInt(req.params.id, 10);
+
+  if (Number.isNaN(orderItemId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid order item ID provided'
+    });
+  }
+
+  Order.getOrderItemById(orderItemId, (itemErr, orderItem) => {
+    if (itemErr) {
+      return res.status(500).json({
+        success: false,
+        message: 'Error fetching order item',
+        error: itemErr
+      });
+    }
+
+    if (!orderItem) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order item not found'
+      });
+    }
+
+    Order.getById(orderItem.order_id, (orderErr, orderRows) => {
+      const order = Array.isArray(orderRows) ? orderRows[0] : orderRows;
+
+      if (orderErr || !order) {
+        return res.status(500).json({
+          success: false,
+          message: 'Error fetching order'
+        });
+      }
+
+      if (order.user_id !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      const serviceType = String(orderItem.service_type || '').toLowerCase();
+      if (serviceType === 'rental') {
+        return res.status(400).json({
+          success: false,
+          message: 'Pickup confirmation is not available for rental items via this action'
+        });
+      }
+
+      OrderTracking.getByOrderItemId(orderItemId, (trackingErr, currentTracking) => {
+        if (trackingErr) {
+          return res.status(500).json({
+            success: false,
+            message: 'Error fetching current tracking',
+            error: trackingErr
+          });
+        }
+
+        const currentStatus = currentTracking.length > 0 ? currentTracking[0].status : (orderItem.approval_status || 'pending');
+        const normalizedCurrentStatus = currentStatus === 'ready_for_pickup' ? 'ready_to_pickup' : currentStatus;
+
+        if (normalizedCurrentStatus !== 'ready_to_pickup') {
+          return res.status(400).json({
+            success: false,
+            message: 'Item is not yet ready for pickup confirmation'
+          });
+        }
+
+        OrderTracking.updateStatus(orderItemId, 'picked_up', 'Picked up (confirmed by customer)', userId, (updateErr) => {
+          if (updateErr) {
+            return res.status(500).json({
+              success: false,
+              message: 'Error updating tracking status',
+              error: updateErr
+            });
+          }
+
+          db.query(
+            'UPDATE order_items SET approval_status = ? WHERE item_id = ?',
+            ['picked_up', orderItemId],
+            (approvalErr) => {
+              if (approvalErr) {
+                console.error('Error updating approval_status after pickup confirmation:', approvalErr);
+              }
+
+              return res.json({
+                success: true,
+                message: 'Pickup confirmed successfully',
+                data: {
+                  order_item_id: orderItemId,
+                  new_status: 'picked_up',
+                  status_info: OrderTracking.getStatusInfo('picked_up', orderItem.service_type)
+                }
+              });
+            }
+          );
+        });
+      });
+    });
+  });
+};
+
 exports.requestEnhancement = (req, res) => {
   const userId = req.user.id;
   const orderItemId = req.params.id;

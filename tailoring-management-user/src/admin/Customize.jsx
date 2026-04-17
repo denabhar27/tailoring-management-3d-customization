@@ -560,6 +560,10 @@ const Customize = () => {
 
       'ready_for_pickup': 'to-pickup',
 
+      'ready_to_pickup': 'to-pickup',
+
+      'picked_up': 'to-pickup',
+
       'completed': 'completed',
 
       'cancelled': 'rejected',
@@ -588,6 +592,10 @@ const Customize = () => {
 
       'ready_for_pickup': 'To Pick up',
 
+      'ready_to_pickup': 'To Pick up',
+
+      'picked_up': 'To Pick up',
+
       'completed': 'Completed',
 
       'cancelled': 'Rejected',
@@ -602,21 +610,29 @@ const Customize = () => {
 
   const getNextStatus = (currentStatus, serviceType = 'customization', item = null) => {
 
-    if (!currentStatus || currentStatus === 'pending_review' || currentStatus === 'pending') {
+    const normalizedCurrentStatus = currentStatus === 'ready_to_pickup' ? 'ready_for_pickup' : currentStatus;
+
+    if (!normalizedCurrentStatus || normalizedCurrentStatus === 'pending_review' || normalizedCurrentStatus === 'pending') {
 
       return 'price_confirmation';
 
     }
 
-    if (currentStatus === 'price_confirmation') {
+    if (normalizedCurrentStatus === 'price_confirmation') {
 
       return 'accepted';
 
     }
 
-    if (currentStatus === 'accepted') {
+    if (normalizedCurrentStatus === 'accepted') {
 
       return 'confirmed';
+
+    }
+
+    if (normalizedCurrentStatus === 'picked_up') {
+
+      return 'completed';
 
     }
 
@@ -634,7 +650,7 @@ const Customize = () => {
 
     const flow = statusFlow[serviceType] || statusFlow['customization'];
 
-    const currentIndex = flow.indexOf(currentStatus);
+    const currentIndex = flow.indexOf(normalizedCurrentStatus);
 
     if (currentIndex === -1 || currentIndex === flow.length - 1) {
 
@@ -4382,6 +4398,12 @@ const Customize = () => {
                           return null;
                         })()}
 
+                        {item.approval_status === 'picked_up' && (
+                          <div style={{ marginTop: '4px', fontSize: '11px', color: '#1b5e20', fontWeight: '600' }}>
+                            Note: Picked up
+                          </div>
+                        )}
+
                       </td>
 
                       <td onClick={(e) => e.stopPropagation()}>
@@ -5830,10 +5852,10 @@ const Customize = () => {
                 }
 
                 return (
-                  <div style={{ marginTop: '12px', padding: '10px', backgroundColor: '#f7f2ed', borderRadius: '6px', border: '1px solid rgba(139, 69, 19, 0.28)' }}>
+                  <div style={{ marginTop: '12px', padding: '10px', backgroundColor: '#f7f2ed', borderRadius: '6px', border: '1px solid rgba(139, 69, 19, 0.28)', maxWidth: '460px', marginLeft: 'auto', marginRight: 'auto', textAlign: 'center' }}>
                     <div style={{ fontWeight: 700, color: 'rgb(139, 69, 19)' }}>Customer Haggle Offer</div>
                     <div style={{ marginTop: '4px', color: '#5b3a1f' }}>₱{haggleOffer.toFixed(2)}</div>
-                    <div style={{ marginTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ marginTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
                       <button
                         type="button"
                         className="btn-cancel"

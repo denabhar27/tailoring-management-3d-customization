@@ -56,6 +56,8 @@ router.get('/transitions/:id', verifyToken, requireAdmin, OrderTrackingControlle
 
 router.post('/update/:id', verifyToken, requireAdmin, OrderTrackingController.updateTrackingStatus);
 
+router.post('/confirm-pickup/:id', verifyToken, OrderTrackingController.confirmPickupByCustomer);
+
 router.post('/request-enhancement/:id', verifyToken, handleEnhancementUpload, OrderTrackingController.requestEnhancement);
 
 module.exports = router;

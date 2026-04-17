@@ -31,7 +31,7 @@ const resolveDefaultApiBaseUrl = (): string => {
 
   // Android emulator cannot reach localhost directly; use host loopback alias.
   if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:5000/api';
+    return 'http://192.168.1.66:5000/api';
   }
 
   return 'http://localhost:5000/api';
@@ -140,13 +140,17 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     const url = `${API_BASE_URL}${endpoint}`;
     const isPublicRequest = isPublicAuthEndpoint(endpoint);
     const headers = await getAuthHeaders(!isPublicRequest);
+    const mergedHeaders: Record<string, string> = {
+      ...headers,
+      ...(options.headers as Record<string, string> | undefined),
+    };
+    if (options.body instanceof FormData) {
+      delete mergedHeaders['Content-Type'];
+    }
 
     const config: RequestInit = {
       ...options,
-      headers: {
-        ...headers,
-        ...options.headers,
-      },
+      headers: mergedHeaders,
     };
 
     console.log('API Call:', url, config);
@@ -176,6 +180,21 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
         }
 
         throw new Error(errorData?.message || 'Unauthorized');
+      }
+
+      // Session invalid: customer JWT missing age verification (sign in again)
+      if (response.status === 403) {
+        let errorData: { message?: string; code?: string } = {};
+        try {
+          const responseClone403 = response.clone();
+          errorData = await responseClone403.json();
+        } catch (_) {}
+
+        if (!isPublicRequest && errorData?.code === 'AGE_VERIFICATION_REQUIRED') {
+          console.warn('Received 403 AGE_VERIFICATION_REQUIRED — clearing auth');
+          await handleAuthFailure();
+          throw new Error(errorData?.message || 'Please sign in again.');
+        }
       }
 
       const responseClone = response.clone();
@@ -260,6 +279,7 @@ export const authService = {
         email: payload.email || '',
         phone_number: payload.phone_number || null,
         profile_picture: payload.profile_picture || null,
+        birthdate: payload.birthdate || null,
         role,
       };
 
@@ -301,7 +321,9 @@ export const authService = {
           middle_name: decoded.middle_name || '',
           last_name: decoded.last_name || '',
           email: decoded.email || '',
-          phone_number: decoded.phone_number || ''
+          phone_number: decoded.phone_number || '',
+          profile_picture: decoded.profile_picture || null,
+          birthdate: decoded.birthdate || null
         }
       };
     } catch (error) {
@@ -431,10 +453,42 @@ export const orderTrackingService = {
     });
   },
 
-  requestEnhancement: async (orderItemId: string, payload: { notes: string; preferredCompletionDate?: string | null; addAccessories?: boolean }) => {
+  requestEnhancement: async (
+    orderItemId: string,
+    payload: {
+      notes: string;
+      preferredCompletionDate?: string | null;
+      addAccessories?: boolean;
+      photos?: { uri: string; name: string; type: string }[];
+    }
+  ) => {
+    const photos = payload.photos?.filter(Boolean) || [];
+    if (photos.length > 0) {
+      const formData = new FormData();
+      formData.append('notes', payload.notes);
+      if (payload.preferredCompletionDate) {
+        formData.append('preferredCompletionDate', payload.preferredCompletionDate);
+      }
+      formData.append('addAccessories', payload.addAccessories ? 'true' : 'false');
+      photos.forEach((p) => {
+        formData.append('photos', {
+          uri: p.uri,
+          name: p.name || 'photo.jpg',
+          type: p.type || 'image/jpeg',
+        } as any);
+      });
+      return apiCall(`/tracking/request-enhancement/${orderItemId}`, {
+        method: 'POST',
+        body: formData as unknown as BodyInit,
+      });
+    }
     return apiCall(`/tracking/request-enhancement/${orderItemId}`, {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        notes: payload.notes,
+        preferredCompletionDate: payload.preferredCompletionDate ?? null,
+        addAccessories: payload.addAccessories ?? false,
+      }),
     });
   },
 

@@ -22,7 +22,7 @@ import ImagePreviewModal from '../components/ImagePreviewModal';
 
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
 
-import { API_BASE_URL } from '../api/config';
+import { API_BASE_URL, getImageUrl } from '../api/config';
 
 import PriceEditModal from '../components/admin/PriceEditModal';
 
@@ -4054,12 +4054,27 @@ const DryCleaning = () => {
         const pf = typeof enhancementViewItem.pricing_factors === 'string'
           ? JSON.parse(enhancementViewItem.pricing_factors || '{}')
           : (enhancementViewItem.pricing_factors || {});
+        const parseEnhancementImageUrls = () => {
+          const raw = pf?.enhancementImageUrls;
+          if (raw == null || raw === '') return [];
+          if (Array.isArray(raw)) return raw;
+          if (typeof raw === 'string') {
+            try {
+              const parsed = JSON.parse(raw);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          }
+          return [];
+        };
+        const enhancementImages = parseEnhancementImageUrls();
 
         return (
           <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowEnhancementViewModal(false)}>
             <div className="modal-content" style={{ maxWidth: '500px' }}>
               <div className="modal-header">
-                <h2>Enhancement Request Details</h2>
+                <h2>Report / Enhancement request</h2>
                 <span className="close-modal" onClick={() => setShowEnhancementViewModal(false)}>×</span>
               </div>
               <div className="modal-body">
@@ -4070,10 +4085,33 @@ const DryCleaning = () => {
                     ? (enhancementViewItem.walk_in_customer_name || 'Walk-in Customer')
                     : `${enhancementViewItem.first_name || ''} ${enhancementViewItem.last_name || ''}`.trim() || 'N/A'}
                 </div>
-                <div className="detail-row"><strong>Enhancement Notes:</strong></div>
+                <div className="detail-row"><strong>Report / Enhancement notes:</strong></div>
                 <div style={{ padding: '10px', backgroundColor: '#f3e5f5', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ce93d8' }}>
                   {pf.enhancementNotes || 'No notes provided'}
                 </div>
+                {enhancementImages.length > 0 && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <div className="detail-row"><strong>Photos attached:</strong></div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                      {enhancementImages.map((url, idx) => (
+                        <img
+                          key={`${url}-${idx}`}
+                          src={getImageUrl(url)}
+                          alt=""
+                          style={{
+                            width: 96,
+                            height: 96,
+                            objectFit: 'cover',
+                            borderRadius: 6,
+                            cursor: 'pointer',
+                            border: '1px solid #ddd'
+                          }}
+                          onClick={() => openImagePreview(getImageUrl(url), 'Enhancement photo')}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="detail-row">
                   <strong>Preferred Completion Date:</strong>
                   {pf.enhancementPreferredCompletionDate

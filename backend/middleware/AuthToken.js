@@ -18,6 +18,13 @@ exports.verifyToken = (req, res, next) => {
       console.error('Token verification error:', err.message);
       return res.status(401).json({ message: "Invalid or expired token" });
     }
+    // Block customer accounts issued before age verification or without a verified DOB claim
+    if (decoded.role === 'user' && decoded.ageVerified !== true) {
+      return res.status(403).json({
+        message: 'Please sign out and sign in again. Your account must confirm you are 18 or older.',
+        code: 'AGE_VERIFICATION_REQUIRED'
+      });
+    }
     req.user = decoded;
     console.log('Token decoded successfully:', {
       id: decoded.id,

@@ -2,6 +2,34 @@ import { useGLTF } from '@react-three/drei';
 import { useMemo, useLayoutEffect, Suspense } from 'react';
 import * as THREE from 'three';
 
+function toManagedPhysicalMaterial(material, materialProps, fabricColor, map) {
+  let nextMaterial = material;
+
+  if (!(nextMaterial instanceof THREE.MeshPhysicalMaterial)) {
+    if (nextMaterial && typeof nextMaterial.dispose === 'function') {
+      nextMaterial.dispose();
+    }
+    nextMaterial = new THREE.MeshPhysicalMaterial();
+  } else if (!nextMaterial.userData?.__tailoringManaged) {
+    nextMaterial = nextMaterial.clone();
+  }
+
+  nextMaterial.userData = {
+    ...(nextMaterial.userData || {}),
+    __tailoringManaged: true
+  };
+
+  nextMaterial.setValues(materialProps);
+  nextMaterial.color.copy(fabricColor);
+  if (nextMaterial.sheenColor) {
+    nextMaterial.sheenColor.copy(fabricColor);
+  }
+  nextMaterial.map = map || null;
+  nextMaterial.needsUpdate = true;
+
+  return nextMaterial;
+}
+
 function CustomModelContent({ modelUrl, materialProps, fabricColor, onLoad, map, pattern }) {
 
   const { scene } = useGLTF(modelUrl);
@@ -13,7 +41,7 @@ function CustomModelContent({ modelUrl, materialProps, fabricColor, onLoad, map,
       return cloned;
     }
     return null;
-  }, [scene, pattern, map]);
+  }, [scene]);
 
   useLayoutEffect(() => {
     if (clonedScene) {
@@ -21,19 +49,12 @@ function CustomModelContent({ modelUrl, materialProps, fabricColor, onLoad, map,
 
       clonedScene.traverse((child) => {
         if (child.isMesh) {
-          if (child.material && child.material.dispose) {
-            child.material.dispose();
-          }
           if (materialProps && fabricColor) {
-            const newMaterial = new THREE.MeshPhysicalMaterial({
-              ...materialProps,
-              color: fabricColor.clone(),
-              sheenColor: fabricColor.clone(),
-              map: map,
-              needsUpdate: true
-            });
-            newMaterial.needsUpdate = true;
-            child.material = newMaterial;
+            if (Array.isArray(child.material)) {
+              child.material = child.material.map((mat) => toManagedPhysicalMaterial(mat, materialProps, fabricColor, map));
+            } else {
+              child.material = toManagedPhysicalMaterial(child.material, materialProps, fabricColor, map);
+            }
           }
           child.castShadow = true;
           child.receiveShadow = true;

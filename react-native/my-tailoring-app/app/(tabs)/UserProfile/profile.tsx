@@ -35,12 +35,119 @@ interface UserData {
   last_name: string;
   email: string;
   phone: string;
+  birthdate?: string | null;
 }
 
 interface Measurements {
   top?: { [key: string]: string };
   bottom?: { [key: string]: string };
   notes?: string;
+}
+
+function isFilledMeasurementValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'object' && value !== null) {
+    const o = value as Record<string, unknown>;
+    if (o.inch !== undefined && o.inch !== null && String(o.inch).trim() !== '' && String(o.inch).trim() !== '0') return true;
+    if (o.cm !== undefined && o.cm !== null && String(o.cm).trim() !== '' && String(o.cm).trim() !== '0') return true;
+    if (o.value !== undefined) return isFilledMeasurementValue(o.value);
+    return false;
+  }
+  const text = String(value).trim();
+  return text !== '' && text !== '0';
+}
+
+function formatMeasurementLabel(key: string): string {
+  const labelMap: Record<string, string> = {
+    chest: 'Chest',
+    shoulders: 'Shoulders',
+    sleeveLength: 'Sleeve Length',
+    sleeve_length: 'Sleeve Length',
+    neck: 'Neck',
+    neckCircumference: 'Neck Circumference',
+    neck_circumference: 'Neck Circumference',
+    waist: 'Waist',
+    hips: 'Hips',
+    frontLength: 'Front Length',
+    front_length: 'Front Length',
+    backLength: 'Back Length',
+    back_length: 'Back Length',
+    armhole: 'Armhole',
+    bicep: 'Bicep',
+    inseam: 'Inseam',
+    outseam: 'Outseam',
+    rise: 'Rise',
+    thigh: 'Thigh',
+    length: 'Length',
+    cuff: 'Cuff',
+  };
+  if (labelMap[key]) return labelMap[key];
+  return key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
+}
+
+function formatMeasurementValue(value: unknown): string {
+  if (value === null || value === undefined) return '—';
+  if (typeof value === 'object' && value !== null) {
+    const o = value as Record<string, unknown>;
+    if (o.inch !== undefined && o.inch !== null && String(o.inch).trim() !== '') {
+      const inch = parseFloat(String(o.inch));
+      if (!Number.isNaN(inch)) {
+        const cmValue = (inch * 2.54).toFixed(1);
+        return `${o.inch}" / ${cmValue} cm`;
+      }
+    }
+    if (o.cm !== undefined && o.cm !== null && String(o.cm).trim() !== '') {
+      return `${o.cm} cm`;
+    }
+    if (o.value !== undefined) return formatMeasurementValue(o.value);
+    return '—';
+  }
+  const text = String(value).trim();
+  if (text === '' || text === '0') return '—';
+  const inch = parseFloat(text);
+  if (Number.isNaN(inch)) return text;
+  const cmValue = (inch * 2.54).toFixed(1);
+  return `${text}" / ${cmValue} cm`;
+}
+
+function getOrderedMeasurementRows(
+  sectionType: 'top' | 'bottom',
+  sectionMeasurements?: Record<string, unknown> | null
+): { label: string; value: unknown }[] {
+  const sm = sectionMeasurements && typeof sectionMeasurements === 'object' ? sectionMeasurements : {};
+  const orderedFields =
+    sectionType === 'top'
+      ? [
+          { label: 'Chest', keys: ['chest'] },
+          { label: 'Waist', keys: ['waist'] },
+          { label: 'Hips', keys: ['hips'] },
+          { label: 'Shoulders', keys: ['shoulders'] },
+          { label: 'Neck Circumference', keys: ['neck_circumference', 'neckCircumference', 'neck'] },
+          { label: 'Front Length', keys: ['front_length', 'frontLength'] },
+          { label: 'Back Length', keys: ['back_length', 'backLength'] },
+          { label: 'Sleeve Length', keys: ['sleeve_length', 'sleeveLength'] },
+          { label: 'Armhole', keys: ['armhole'] },
+          { label: 'Bicep', keys: ['bicep'] },
+          { label: 'Length', keys: ['length'] },
+        ]
+      : [
+          { label: 'Inseam', keys: ['inseam'] },
+          { label: 'Outseam', keys: ['outseam'] },
+          { label: 'Rise', keys: ['rise'] },
+          { label: 'Thigh', keys: ['thigh'] },
+        ];
+  const rows: { label: string; value: unknown }[] = [];
+  const usedKeys = new Set<string>();
+  orderedFields.forEach((field) => {
+    const foundKey = field.keys.find((key) => isFilledMeasurementValue(sm[key]));
+    field.keys.forEach((k) => usedKeys.add(k));
+    rows.push({ label: field.label, value: foundKey ? sm[foundKey] : null });
+  });
+  Object.entries(sm).forEach(([key, val]) => {
+    if (usedKeys.has(key) || !isFilledMeasurementValue(val)) return;
+    rows.push({ label: formatMeasurementLabel(key), value: val });
+  });
+  return rows;
 }
 
 interface CompensationIncident {
@@ -102,6 +209,7 @@ export default function ProfileScreen() {
   const [enhancementNotes, setEnhancementNotes] = useState('');
   const [enhancementPreferredDate, setEnhancementPreferredDate] = useState('');
   const [showEnhancementCalendar, setShowEnhancementCalendar] = useState(false);
+  const [enhancementPhotos, setEnhancementPhotos] = useState<{ uri: string; name: string; type: string }[]>([]);
   const [submittingEnhancement, setSubmittingEnhancement] = useState(false);
 
   useEffect(() => {
@@ -221,6 +329,9 @@ export default function ProfileScreen() {
           last_name: userData.last_name || "",
           email: userData.email || "",
           phone: userData.phone_number || "",
+          birthdate: userData.birthdate
+            ? String(userData.birthdate).split("T")[0]
+            : undefined,
         });
 
         if (userData.profile_picture) {
@@ -636,13 +747,14 @@ export default function ProfileScreen() {
 
   const openEnhancementModal = (item: any) => {
     if (!canRequestEnhancement(item)) {
-      Alert.alert('Not Available', 'Enhancement request is only available for completed dry cleaning, customization, or repair orders.');
+      Alert.alert('Not Available', 'Report / enhancement request is only available for completed dry cleaning, customization, or repair orders.');
       return;
     }
 
     setSelectedEnhancementItem(item);
     setEnhancementNotes('');
     setEnhancementPreferredDate('');
+    setEnhancementPhotos([]);
     setShowEnhancementCalendar(false);
     setEnhancementModalVisible(true);
   };
@@ -653,7 +765,32 @@ export default function ProfileScreen() {
     setSelectedEnhancementItem(null);
     setEnhancementNotes('');
     setEnhancementPreferredDate('');
+    setEnhancementPhotos([]);
     setShowEnhancementCalendar(false);
+  };
+
+  const pickEnhancementPhotos = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission required", "Please allow access to your photo library to attach images.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      selectionLimit: 5,
+      quality: 0.85,
+    });
+
+    if (result.canceled || !result.assets?.length) return;
+
+    const next = result.assets.slice(0, 5).map((a, i) => ({
+      uri: a.uri,
+      name: (a as { fileName?: string }).fileName || `photo-${i}.jpg`,
+      type: (a as { mimeType?: string }).mimeType || "image/jpeg",
+    }));
+    setEnhancementPhotos(next);
   };
 
   const submitEnhancementRequest = async () => {
@@ -682,6 +819,7 @@ export default function ProfileScreen() {
       const result = await orderTrackingService.requestEnhancement(String(orderItemId), {
         notes,
         preferredCompletionDate,
+        photos: enhancementPhotos.length > 0 ? enhancementPhotos : undefined,
       });
 
       if (!result?.success) {
@@ -689,7 +827,7 @@ export default function ProfileScreen() {
         return;
       }
 
-      Alert.alert('Success', 'Enhancement request submitted. Admin will review your request.');
+      Alert.alert('Success', 'Your report / enhancement request was submitted. Admin will review it.');
       closeEnhancementModal();
       await fetchOrderTracking();
     } catch (error: any) {
@@ -967,81 +1105,60 @@ export default function ProfileScreen() {
                 </View>
               ) : measurements ? (
                 <View style={styles.measurementsContent}>
-                  {measurements.top && Object.keys(measurements.top).length > 0 && (
-                    <View style={styles.measurementSection}>
-                      <Text style={styles.measurementSectionTitle}>Top Measurements</Text>
-                      <View style={styles.measurementTable}>
-                        <View style={styles.measurementTableHeader}>
-                          <Text style={styles.measurementHeaderText}>Measurement</Text>
-                          <Text style={styles.measurementHeaderText}>Value (inches)</Text>
-                        </View>
-                        {Object.entries(measurements.top).map(([key, value], idx) => {
-                          if (!value || value === '' || value === '0') return null;
-                          const labelMap: { [key: string]: string } = {
-                            'chest': 'Chest',
-                            'shoulders': 'Shoulders',
-                            'sleeveLength': 'Sleeve Length',
-                            'neck': 'Neck',
-                            'waist': 'Waist',
-                            'length': 'Length'
-                          };
-                          const label = labelMap[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim();
-                          return (
-                            <View key={idx} style={[styles.measurementRow, idx % 2 === 0 ? styles.measurementRowEven : styles.measurementRowOdd]}>
-                              <Text style={styles.measurementLabel}>{label}</Text>
-                              <Text style={styles.measurementValue}>{value}&quot;</Text>
-                            </View>
-                          );
-                        })}
+                  <View style={styles.measurementSection}>
+                    <Text style={styles.measurementSectionTitle}>Top Measurements</Text>
+                    <View style={styles.measurementTable}>
+                      <View style={styles.measurementTableHeader}>
+                        <Text style={styles.measurementHeaderText}>Measurement</Text>
+                        <Text style={styles.measurementHeaderText}>Value (inches / cm)</Text>
                       </View>
-                    </View>
-                  )}
-                  {measurements.bottom && Object.keys(measurements.bottom).length > 0 && (
-                    <View style={styles.measurementSection}>
-                      <Text style={styles.measurementSectionTitle}>Bottom Measurements</Text>
-                      <View style={styles.measurementTable}>
-                        <View style={styles.measurementTableHeader}>
-                          <Text style={styles.measurementHeaderText}>Measurement</Text>
-                          <Text style={styles.measurementHeaderText}>Value (inches)</Text>
+                      {getOrderedMeasurementRows('top', measurements.top as Record<string, unknown> | undefined).map((row, idx) => (
+                        <View
+                          key={`top-${row.label}-${idx}`}
+                          style={[styles.measurementRow, idx % 2 === 0 ? styles.measurementRowEven : styles.measurementRowOdd]}
+                        >
+                          <Text style={styles.measurementLabel}>{row.label}</Text>
+                          <Text
+                            style={[
+                              styles.measurementValue,
+                              row.value == null || !isFilledMeasurementValue(row.value) ? styles.measurementValueEmpty : null,
+                            ]}
+                          >
+                            {formatMeasurementValue(row.value)}
+                          </Text>
                         </View>
-                        {Object.entries(measurements.bottom).map(([key, value], idx) => {
-                          if (!value || value === '' || value === '0') return null;
-                          const labelMap: { [key: string]: string } = {
-                            'waist': 'Waist',
-                            'hips': 'Hips',
-                            'inseam': 'Inseam',
-                            'length': 'Length',
-                            'thigh': 'Thigh',
-                            'outseam': 'Outseam'
-                          };
-                          const label = labelMap[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim();
-                          return (
-                            <View key={idx} style={[styles.measurementRow, idx % 2 === 0 ? styles.measurementRowEven : styles.measurementRowOdd]}>
-                              <Text style={styles.measurementLabel}>{label}</Text>
-                              <Text style={styles.measurementValue}>{value}&quot;</Text>
-                            </View>
-                          );
-                        })}
-                      </View>
+                      ))}
                     </View>
-                  )}
+                  </View>
+                  <View style={styles.measurementSection}>
+                    <Text style={styles.measurementSectionTitle}>Bottom Measurements</Text>
+                    <View style={styles.measurementTable}>
+                      <View style={styles.measurementTableHeader}>
+                        <Text style={styles.measurementHeaderText}>Measurement</Text>
+                        <Text style={styles.measurementHeaderText}>Value (inches / cm)</Text>
+                      </View>
+                      {getOrderedMeasurementRows('bottom', measurements.bottom as Record<string, unknown> | undefined).map((row, idx) => (
+                        <View
+                          key={`bottom-${row.label}-${idx}`}
+                          style={[styles.measurementRow, idx % 2 === 0 ? styles.measurementRowEven : styles.measurementRowOdd]}
+                        >
+                          <Text style={styles.measurementLabel}>{row.label}</Text>
+                          <Text
+                            style={[
+                              styles.measurementValue,
+                              row.value == null || !isFilledMeasurementValue(row.value) ? styles.measurementValueEmpty : null,
+                            ]}
+                          >
+                            {formatMeasurementValue(row.value)}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
                   {measurements.notes && (
                     <View style={styles.measurementNotesContainer}>
                       <Text style={styles.measurementNotesTitle}>Notes:</Text>
                       <Text style={styles.measurementNotesText}>{measurements.notes}</Text>
-                    </View>
-                  )}
-
-                  {(!measurements.top || Object.keys(measurements.top).length === 0) &&
-                   (!measurements.bottom || Object.keys(measurements.bottom).length === 0) && (
-                    <View style={styles.noMeasurementsContainer}>
-                      <Ionicons name="body-outline" size={40} color="#D1D5DB" />
-                      <Text style={styles.noMeasurementsText}>
-                        No measurements recorded yet.
-                      </Text>
-                      <Text style={styles.noMeasurementsSubtext}>
-                        Contact admin to add your measurements.
-                      </Text>
                     </View>
                   )}
                 </View>
@@ -1063,6 +1180,15 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Contact Information</Text>
 
           <View style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <Ionicons name="calendar-outline" size={20} color="#94665B" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Date of birth</Text>
+                <Text style={styles.infoValue}>
+                  {user.birthdate ? user.birthdate : "Not on file"}
+                </Text>
+              </View>
+            </View>
             <View style={styles.infoRow}>
               <Ionicons name="call-outline" size={20} color="#94665B" />
               <View style={styles.infoContent}>
@@ -1507,7 +1633,7 @@ export default function ProfileScreen() {
                           activeOpacity={0.85}
                         >
                           <Ionicons name="sparkles-outline" size={16} color="#fff" />
-                          <Text style={styles.enhancementRequestButtonText}>Request Enhancement</Text>
+                          <Text style={styles.enhancementRequestButtonText}>Report / Enhancement request</Text>
                         </TouchableOpacity>
                       )}
 
@@ -1932,7 +2058,7 @@ export default function ProfileScreen() {
         <View style={styles.enhancementModalOverlay}>
           <View style={styles.enhancementModalCard}>
             <View style={styles.enhancementModalHeader}>
-              <Text style={styles.enhancementModalTitle}>Request Enhancement</Text>
+              <Text style={styles.enhancementModalTitle}>Report / Enhancement request</Text>
               <TouchableOpacity onPress={closeEnhancementModal}>
                 <Ionicons name="close" size={22} color="#6B7280" />
               </TouchableOpacity>
@@ -1948,12 +2074,31 @@ export default function ProfileScreen() {
                 style={styles.enhancementNotesInput}
                 value={enhancementNotes}
                 onChangeText={setEnhancementNotes}
-                placeholder="Describe the issue/enhancement request..."
+                placeholder="Describe the issue or enhancement..."
                 placeholderTextColor="#9CA3AF"
                 multiline
                 numberOfLines={5}
                 textAlignVertical="top"
               />
+
+              <Text style={styles.enhancementInputLabel}>Photos (optional, max 5)</Text>
+              <TouchableOpacity style={styles.enhancementPickPhotosBtn} onPress={pickEnhancementPhotos} activeOpacity={0.85}>
+                <Ionicons name="images-outline" size={18} color="#4B5563" />
+                <Text style={styles.enhancementPickPhotosBtnText}>
+                  {enhancementPhotos.length > 0 ? `${enhancementPhotos.length} photo(s) selected` : "Choose photos"}
+                </Text>
+              </TouchableOpacity>
+              {enhancementPhotos.length > 0 && (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                  {enhancementPhotos.map((p, idx) => (
+                    <Image
+                      key={`${p.uri}-${idx}`}
+                      source={{ uri: p.uri }}
+                      style={{ width: 64, height: 64, borderRadius: 8, borderWidth: 1, borderColor: "#E5E7EB" }}
+                    />
+                  ))}
+                </View>
+              )}
 
               <Text style={styles.enhancementInputLabel}>Preferred Completion Date (Optional)</Text>
               <TouchableOpacity
@@ -2823,9 +2968,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   enhancementModalTitle: {
-    fontSize: 30,
+    fontSize: 18,
     fontWeight: "700",
     color: "#1F2937",
+    flex: 1,
+    paddingRight: 8,
   },
   enhancementModalBody: {
     padding: 16,
@@ -2851,6 +2998,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#111827",
     marginBottom: 14,
+  },
+  enhancementPickPhotosBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 4,
+  },
+  enhancementPickPhotosBtnText: {
+    fontSize: 15,
+    color: "#374151",
+    fontWeight: "600",
   },
   enhancementDateInput: {
     borderWidth: 1,
@@ -3278,6 +3441,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333",
     textAlign: "right",
+  },
+  measurementValueEmpty: {
+    color: "#9CA3AF",
   },
   measurementNotesContainer: {
     marginTop: 20,

@@ -823,3 +823,22 @@
     margin-top: 12px;
     animation: slideDown 0.3s ease-out;
 }
+
+.measurementSection {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 18px;
+    padding: 14px;
+    border: 1px solid rgba(139, 69, 19, 0.12);
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255, 254, 249, 0.92), rgba(255, 248, 240, 0.82));
+}
+
+.measurementSectionTitle {
+    font-size: 13px;
+    font-weight: 700;
+    color: #8B4513;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+}

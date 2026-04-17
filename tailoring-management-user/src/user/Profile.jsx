@@ -52,6 +52,7 @@ const Profile = () => {
   const [enhanceNotes, setEnhanceNotes] = useState('');
   const [enhancePreferredDate, setEnhancePreferredDate] = useState('');
   const [enhanceAddAccessories, setEnhanceAddAccessories] = useState(false);
+  const [enhancePhotoFiles, setEnhancePhotoFiles] = useState([]);
   const [submittingEnhancement, setSubmittingEnhancement] = useState(false);
   const [confirmingDepositByItem, setConfirmingDepositByItem] = useState({});
   const [declineReasonModalOpen, setDeclineReasonModalOpen] = useState(false);
@@ -346,6 +347,117 @@ const Profile = () => {
 
       return [{ label: 'Size', value: typeof size === 'string' ? size : 'N/A' }];
     }
+  };
+
+  const isFilledMeasurementValue = (value) => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'object' && value !== null) {
+      if (value.inch !== undefined && value.inch !== null && String(value.inch).trim() !== '' && String(value.inch).trim() !== '0') return true;
+      if (value.cm !== undefined && value.cm !== null && String(value.cm).trim() !== '' && String(value.cm).trim() !== '0') return true;
+      if (value.value !== undefined) return isFilledMeasurementValue(value.value);
+      return false;
+    }
+    const text = String(value).trim();
+    return text !== '' && text !== '0';
+  };
+
+  const formatMeasurementLabel = (key) => {
+    const labelMap = {
+      chest: 'Chest',
+      shoulders: 'Shoulders',
+      sleeveLength: 'Sleeve Length',
+      sleeve_length: 'Sleeve Length',
+      neck: 'Neck',
+      neckCircumference: 'Neck Circumference',
+      neck_circumference: 'Neck Circumference',
+      waist: 'Waist',
+      hips: 'Hips',
+      frontLength: 'Front Length',
+      front_length: 'Front Length',
+      backLength: 'Back Length',
+      back_length: 'Back Length',
+      armhole: 'Armhole',
+      bicep: 'Bicep',
+      inseam: 'Inseam',
+      outseam: 'Outseam',
+      rise: 'Rise',
+      thigh: 'Thigh',
+      length: 'Length'
+    };
+
+    if (labelMap[key]) return labelMap[key];
+    return key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
+  };
+
+  const formatMeasurementValue = (value) => {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'object' && value !== null) {
+      if (value.inch !== undefined && value.inch !== null && String(value.inch).trim() !== '') {
+        const inch = parseFloat(String(value.inch));
+        if (!Number.isNaN(inch)) {
+          const cmValue = (inch * 2.54).toFixed(1);
+          return `${value.inch}" / ${cmValue} cm`;
+        }
+      }
+      if (value.cm !== undefined && value.cm !== null && String(value.cm).trim() !== '') {
+        return `${value.cm} cm`;
+      }
+      if (value.value !== undefined) {
+        return formatMeasurementValue(value.value);
+      }
+      return '—';
+    }
+    const text = String(value).trim();
+    if (text === '' || text === '0') return '—';
+    const inch = parseFloat(text);
+    if (Number.isNaN(inch)) return text;
+    const cmValue = (inch * 2.54).toFixed(1);
+    return `${text}" / ${cmValue} cm`;
+  };
+
+  /** Matches 3D customization form (upper / lower garment) — always one row per field; extras appended for legacy keys. */
+  const getOrderedMeasurementRows = (sectionType, sectionMeasurements) => {
+    const sm = sectionMeasurements && typeof sectionMeasurements === 'object' ? sectionMeasurements : {};
+
+    const orderedFields = sectionType === 'top'
+      ? [
+          { label: 'Chest', keys: ['chest'] },
+          { label: 'Waist', keys: ['waist'] },
+          { label: 'Hips', keys: ['hips'] },
+          { label: 'Shoulders', keys: ['shoulders'] },
+          { label: 'Neck Circumference', keys: ['neck_circumference', 'neckCircumference', 'neck'] },
+          { label: 'Front Length', keys: ['front_length', 'frontLength'] },
+          { label: 'Back Length', keys: ['back_length', 'backLength'] },
+          { label: 'Sleeve Length', keys: ['sleeve_length', 'sleeveLength'] },
+          { label: 'Armhole', keys: ['armhole'] },
+          { label: 'Bicep', keys: ['bicep'] },
+          { label: 'Length', keys: ['length'] }
+        ]
+      : [
+          { label: 'Inseam', keys: ['inseam'] },
+          { label: 'Outseam', keys: ['outseam'] },
+          { label: 'Rise', keys: ['rise'] },
+          { label: 'Thigh', keys: ['thigh'] }
+        ];
+
+    const rows = [];
+    const usedKeys = new Set();
+
+    orderedFields.forEach((field) => {
+      const foundKey = field.keys.find((key) => isFilledMeasurementValue(sm[key]));
+      field.keys.forEach((k) => usedKeys.add(k));
+      rows.push({
+        label: field.label,
+        value: foundKey ? sm[foundKey] : null
+      });
+    });
+
+    Object.entries(sm).forEach(([key, value]) => {
+      if (usedKeys.has(key) || !isFilledMeasurementValue(value)) return;
+      rows.push({ label: formatMeasurementLabel(key), value });
+    });
+
+    return rows;
   };
 
   const getStatusBadgeClass = (status) => {
@@ -756,12 +868,14 @@ const Profile = () => {
     const serviceType = String(item?.service_type || '').toLowerCase();
     const isEnhanceableService = ['repair', 'customization', 'customize', 'dry_cleaning', 'drycleaning', 'dry-cleaning'].includes(serviceType);
     if (!isEnhanceableService || item?.status !== 'completed') {
-      alert('Enhancement request is only available for completed customization, repair, or dry cleaning orders.', 'Not Available', 'warning');
+      alert('Report / enhancement request is only available for completed customization, repair, or dry cleaning orders.', 'Not Available', 'warning');
       return;
     }
     setItemToEnhance(item);
+    setEnhanceNotes('');
     setEnhancePreferredDate('');
     setEnhanceAddAccessories(false);
+    setEnhancePhotoFiles([]);
     setEnhanceModalOpen(true);
   };
 
@@ -777,15 +891,22 @@ const Profile = () => {
 
     try {
       setSubmittingEnhancement(true);
-      const result = await requestEnhancement(itemToEnhance.order_item_id, notes, enhancePreferredDate || null, addAccessoriesFlag);
+      const result = await requestEnhancement(
+        itemToEnhance.order_item_id,
+        notes,
+        enhancePreferredDate || null,
+        addAccessoriesFlag,
+        enhancePhotoFiles
+      );
       if (result.success) {
-        await alert('Enhancement request submitted. The admin will review and confirm the price.', 'Success', 'success');
+        await alert('Your report / enhancement request was submitted. The admin will review and confirm the price.', 'Success', 'success');
         const ordersResult = await getUserOrderTracking();
         if (ordersResult.success) {
           setOrders(ordersResult.data || []);
         }
         setEnhanceModalOpen(false);
         setItemToEnhance(null);
+        setEnhancePhotoFiles([]);
       } else {
         await alert(result.message || 'Failed to submit enhancement request', 'Error', 'error');
       }
@@ -2232,6 +2353,12 @@ const Profile = () => {
                   </div>
                   <div style={{ marginBottom: '8px' }}>
                     <strong>Contact Number:</strong> {(user && user.phone_number) ? user.phone_number : 'Not provided'}
+                  </div>
+                  <div style={{ marginBottom: '8px' }}>
+                    <strong>Date of birth:</strong>{' '}
+                    {user && user.birthdate
+                      ? String(user.birthdate).split('T')[0]
+                      : 'Not on file'}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', marginTop: '15px', flexWrap: 'wrap' }}>
@@ -3756,7 +3883,7 @@ const Profile = () => {
                               fontWeight: '500'
                             }}
                           >
-                            ✨ Request Enhancement
+                            Report / Enhancement request
                           </button>
                         )}
                       </div>
@@ -3983,7 +4110,7 @@ const Profile = () => {
                         fontWeight: '500'
                       }}
                     >
-                      ✨ Request Enhancement
+                      Report / Enhancement request
                     </button>
                   )}
                 <button className="btn-secondary" onClick={closeDetailsModal}>
@@ -4169,88 +4296,52 @@ const Profile = () => {
                 <div style={{ textAlign: 'center', padding: '40px' }}>Loading measurements...</div>
               ) : measurements ? (
                 <div>
-                  {measurements.top && Object.keys(measurements.top).length > 0 && (
-                    <div style={{ marginBottom: '30px' }}>
-                      <h4 style={{ marginBottom: '15px', color: '#333', fontSize: '1.1rem', fontWeight: '600', borderBottom: '2px solid #8B4513', paddingBottom: '8px' }}>Top Measurements</h4>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: '#f5e6d3' }}>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Measurement</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Value (Inches / CM)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Object.entries(measurements.top).map(([key, value], idx) => {
-                            if (!value || value === '' || value === '0') return null;
-
-                            const labelMap = {
-                              'chest': 'Chest',
-                              'shoulders': 'Shoulders',
-                              'sleeveLength': 'Sleeve Length',
-                              'sleeve_length': 'Sleeve Length',
-                              'neck': 'Neck',
-                              'waist': 'Waist',
-                              'length': 'Length'
-                            };
-                            const label = labelMap[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
-                            const cmValue = (parseFloat(value) * 2.54).toFixed(1);
-                            return (
-                              <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                                <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', fontWeight: '500', color: '#000' }}>{label}</td>
-                                <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}>{value}" / {cmValue} cm</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  {measurements.bottom && Object.keys(measurements.bottom).length > 0 && (
-                    <div style={{ marginBottom: '30px' }}>
-                      <h4 style={{ marginBottom: '15px', color: '#333', fontSize: '1.1rem', fontWeight: '600', borderBottom: '2px solid #8B4513', paddingBottom: '8px' }}>Bottom Measurements</h4>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: '#f5e6d3' }}>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Measurement</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Value (Inches / CM)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Object.entries(measurements.bottom).map(([key, value], idx) => {
-                            if (!value || value === '' || value === '0') return null;
-
-                            const labelMap = {
-                              'waist': 'Waist',
-                              'hips': 'Hips',
-                              'inseam': 'Inseam',
-                              'length': 'Length',
-                              'thigh': 'Thigh',
-                              'outseam': 'Outseam'
-                            };
-                            const label = labelMap[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
-                            const cmValue = (parseFloat(value) * 2.54).toFixed(1);
-                            return (
-                              <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                                <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', fontWeight: '500', color: '#000' }}>{label}</td>
-                                <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}>{value}" / {cmValue} cm</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                  <div style={{ marginBottom: '30px' }}>
+                    <h4 style={{ marginBottom: '15px', color: '#333', fontSize: '1.1rem', fontWeight: '600', borderBottom: '2px solid #8B4513', paddingBottom: '8px' }}>Top Measurements</h4>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f5e6d3' }}>
+                          <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Measurement</th>
+                          <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Value (Inches / CM)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getOrderedMeasurementRows('top', measurements.top).map(({ label, value }, idx) => {
+                          return (
+                            <tr key={`top-${label}-${idx}`} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                              <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', fontWeight: '500', color: '#000' }}>{label}</td>
+                              <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: value == null || !isFilledMeasurementValue(value) ? '#9ca3af' : '#000' }}>{formatMeasurementValue(value)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ marginBottom: '30px' }}>
+                    <h4 style={{ marginBottom: '15px', color: '#333', fontSize: '1.1rem', fontWeight: '600', borderBottom: '2px solid #8B4513', paddingBottom: '8px' }}>Bottom Measurements</h4>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f5e6d3' }}>
+                          <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Measurement</th>
+                          <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Value (Inches / CM)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getOrderedMeasurementRows('bottom', measurements.bottom).map(({ label, value }, idx) => {
+                          return (
+                            <tr key={`bottom-${label}-${idx}`} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                              <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', fontWeight: '500', color: '#000' }}>{label}</td>
+                              <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: value == null || !isFilledMeasurementValue(value) ? '#9ca3af' : '#000' }}>{formatMeasurementValue(value)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                   {measurements.notes && (
                     <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#FFF8F0', borderRadius: '12px', border: '1px solid #E8C9A0', width: '100%', textAlign: 'left' }}>
                       <strong style={{ display: 'block', marginBottom: '10px', color: '#333', fontSize: '16px' }}>Notes</strong>
                       <div style={{ backgroundColor: '#fff', border: '1px solid #E8C9A0', borderRadius: '8px', padding: '12px 14px', color: '#333', fontSize: '14px', lineHeight: '1.5', minHeight: '80px' }}>{measurements.notes}</div>
-                    </div>
-                  )}
-
-                  {(!measurements.top || Object.keys(measurements.top).length === 0) &&
-                   (!measurements.bottom || Object.keys(measurements.bottom).length === 0) && (
-                    <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-                      No measurements have been recorded yet. Please contact the admin to add your measurements.
                     </div>
                   )}
                 </div>
@@ -4673,31 +4764,35 @@ const Profile = () => {
               setItemToEnhance(null);
               setEnhanceNotes('');
               setEnhancePreferredDate('');
+              setEnhancePhotoFiles([]);
+              setEnhanceAddAccessories(false);
             }
           }}
         >
           <div className="details-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
             <div className="details-modal-header">
-              <h3>Request Enhancement</h3>
+              <h3>Report / Enhancement request</h3>
               <button className="details-modal-close" onClick={() => {
                 setEnhanceModalOpen(false);
                 setItemToEnhance(null);
                 setEnhanceNotes('');
                 setEnhancePreferredDate('');
+                setEnhancePhotoFiles([]);
+                setEnhanceAddAccessories(false);
               }}>×</button>
             </div>
             <div className="details-modal-content">
               <p style={{ marginBottom: '16px', color: '#666' }}>
-                Tell us what issue you found and how you want the order improved.
+                Report an issue or describe an enhancement you want. You can attach photos (up to 5).
               </p>
               <div style={{ marginBottom: '14px' }}>
                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
-                  Enhancement Notes <span style={{ color: '#f44336' }}>*</span>
+                  Notes <span style={{ color: '#f44336' }}>*</span>
                 </label>
                 <textarea
                   value={enhanceNotes}
                   onChange={(e) => setEnhanceNotes(e.target.value)}
-                  placeholder="Describe the issue/enhancement request..."
+                  placeholder="Describe the issue or enhancement..."
                   rows={4}
                   style={{
                     width: '100%',
@@ -4709,6 +4804,34 @@ const Profile = () => {
                     resize: 'vertical'
                   }}
                 />
+              </div>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
+                  Attach photos (optional, max 5)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => {
+                    const list = Array.from(e.target.files || []).slice(0, 5);
+                    setEnhancePhotoFiles(list);
+                  }}
+                  style={{ fontSize: '14px', width: '100%' }}
+                />
+                {enhancePhotoFiles.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
+                    {enhancePhotoFiles.map((file, idx) => (
+                      <div key={`${file.name}-${idx}`} style={{ position: 'relative' }}>
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt=""
+                          style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 6, border: '1px solid #e5e7eb' }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
@@ -4755,6 +4878,7 @@ const Profile = () => {
                   setEnhanceNotes('');
                   setEnhancePreferredDate('');
                   setEnhanceAddAccessories(false);
+                  setEnhancePhotoFiles([]);
                 }}
                 disabled={submittingEnhancement}
               >
@@ -4773,7 +4897,7 @@ const Profile = () => {
                   opacity: submittingEnhancement ? 0.7 : 1
                 }}
               >
-                {submittingEnhancement ? 'Submitting...' : 'Submit Request'}
+                {submittingEnhancement ? 'Submitting...' : 'Submit'}
               </button>
             </div>
           </div>

@@ -138,8 +138,36 @@ export async function cancelOrderItem(orderItemId, reason) {
   }
 }
 
-export async function requestEnhancement(orderItemId, notes, preferredCompletionDate = null, addAccessories = false) {
+export async function requestEnhancement(orderItemId, notes, preferredCompletionDate = null, addAccessories = false, photoFiles = []) {
   try {
+    const token = localStorage.getItem('token');
+    const files = Array.isArray(photoFiles) ? photoFiles.filter(Boolean) : [];
+
+    if (files.length > 0) {
+      const formData = new FormData();
+      formData.append('notes', String(notes || ''));
+      if (preferredCompletionDate) {
+        formData.append('preferredCompletionDate', preferredCompletionDate);
+      }
+      formData.append('addAccessories', addAccessories ? 'true' : 'false');
+      files.forEach((file) => {
+        if (file instanceof File) {
+          formData.append('photos', file);
+        }
+      });
+
+      const response = await axios.post(
+        `${BASE_URL}/tracking/request-enhancement/${orderItemId}`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      return response.data;
+    }
+
     const response = await axios.post(
       `${BASE_URL}/tracking/request-enhancement/${orderItemId}`,
       { notes, preferredCompletionDate, addAccessories },

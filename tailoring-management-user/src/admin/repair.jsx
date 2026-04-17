@@ -36,7 +36,7 @@ import { recordPayment } from '../api/PaymentApi';
 
 import { deleteOrderItem, updateOrderItemPrice } from '../api/OrderApi';
 
-import { API_BASE_URL } from '../api/config';
+import { API_BASE_URL, getImageUrl } from '../api/config';
 
 import PriceEditModal from '../components/admin/PriceEditModal';
 import PriceHistoryModal from '../components/admin/PriceHistoryModal';
@@ -3917,11 +3917,26 @@ const Repair = () => {
         const pf = typeof enhancementViewItem.pricing_factors === 'string'
           ? JSON.parse(enhancementViewItem.pricing_factors || '{}')
           : (enhancementViewItem.pricing_factors || {});
+        const parseEnhancementImageUrls = () => {
+          const raw = pf?.enhancementImageUrls;
+          if (raw == null || raw === '') return [];
+          if (Array.isArray(raw)) return raw;
+          if (typeof raw === 'string') {
+            try {
+              const parsed = JSON.parse(raw);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          }
+          return [];
+        };
+        const enhancementImages = parseEnhancementImageUrls();
         return (
           <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowEnhancementViewModal(false)}>
             <div className="modal-content" style={{ maxWidth: '500px' }}>
               <div className="modal-header">
-                <h2>Enhancement Request Details</h2>
+                <h2>Report / Enhancement request</h2>
                 <span className="close-modal" onClick={() => setShowEnhancementViewModal(false)}>×</span>
               </div>
               <div className="modal-body">
@@ -3932,10 +3947,33 @@ const Repair = () => {
                     ? (enhancementViewItem.walk_in_customer_name || 'Walk-in Customer')
                     : `${enhancementViewItem.first_name || ''} ${enhancementViewItem.last_name || ''}`.trim() || 'N/A'}
                 </div>
-                <div className="detail-row"><strong>Enhancement Notes:</strong></div>
+                <div className="detail-row"><strong>Report / Enhancement notes:</strong></div>
                 <div style={{ padding: '10px', backgroundColor: '#f3e5f5', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ce93d8' }}>
                   {pf.enhancementNotes || 'No notes provided'}
                 </div>
+                {enhancementImages.length > 0 && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <div className="detail-row"><strong>Photos attached:</strong></div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                      {enhancementImages.map((url, idx) => (
+                        <img
+                          key={`${url}-${idx}`}
+                          src={getImageUrl(url)}
+                          alt=""
+                          style={{
+                            width: 96,
+                            height: 96,
+                            objectFit: 'cover',
+                            borderRadius: 6,
+                            cursor: 'pointer',
+                            border: '1px solid #ddd'
+                          }}
+                          onClick={() => openImagePreview(getImageUrl(url), 'Enhancement photo')}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {pf.addAccessories && (
                   <div style={{ padding: '8px 12px', backgroundColor: '#fff3e0', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ffcc80', fontSize: '13px', color: '#e65100', fontWeight: '600' }}>
                     ⚠️ Customer requested to add accessories — price confirmation required.

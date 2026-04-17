@@ -478,9 +478,15 @@ exports.requestEnhancement = (req, res) => {
   if (!enhancementNotes) {
     return res.status(400).json({
       success: false,
-      message: 'Enhancement notes are required'
+      message: 'Report / enhancement notes are required'
     });
   }
+
+  const addAccessoriesFlag = addAccessories === true || addAccessories === 'true';
+  const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+  const enhancementImageUrls = uploadedFiles.map(
+    (f) => `/uploads/enhancement-requests/${f.filename}`
+  );
 
   Order.getOrderItemById(orderItemId, (itemErr, orderItem) => {
     if (itemErr || !orderItem) {
@@ -519,7 +525,7 @@ exports.requestEnhancement = (req, res) => {
       const normalizedService = serviceType === 'customize' ? 'customization' : serviceType;
       const updateData = {
         approvalStatus: 'pending',
-        adminNotes: `Customer requested enhancement: ${enhancementNotes}`,
+        adminNotes: `Customer requested report/enhancement: ${enhancementNotes}`,
         estimatedCompletionDate: preferredCompletionDate || null,
         pricingFactors: {
           enhancementRequest: true,
@@ -528,9 +534,10 @@ exports.requestEnhancement = (req, res) => {
           enhancementNotes,
           enhancementPreferredCompletionDate: preferredCompletionDate || null,
           enhancementUpdatedAt: new Date().toISOString(),
-          addAccessories: addAccessories === true,
+          addAccessories: addAccessoriesFlag,
           enhancementCancelledByAdmin: false,
-          enhancementCancelledAt: null
+          enhancementCancelledAt: null,
+          enhancementImageUrls: enhancementImageUrls.length ? JSON.stringify(enhancementImageUrls) : '[]'
         }
       };
 

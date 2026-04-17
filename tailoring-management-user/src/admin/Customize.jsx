@@ -2,7 +2,7 @@ import { useState, useEffect, Fragment, useRef } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
-import { API_BASE_URL } from '../api/config';
+import { API_BASE_URL, getImageUrl } from '../api/config';
 
 import '../adminStyle/customize.css';
 
@@ -1804,6 +1804,11 @@ const Customize = () => {
     { key: 'sleeve_length', label: 'Sleeve Length' },
     { key: 'neck', label: 'Neck' },
     { key: 'waist', label: 'Waist' },
+    { key: 'neck_circumference', label: 'Neck Circumference' },
+    { key: 'front_length', label: 'Front Length' },
+    { key: 'back_length', label: 'Back Length' },
+    { key: 'armhole', label: 'Armhole' },
+    { key: 'bicep', label: 'Bicep' },
     { key: 'length', label: 'Length' }
   ];
 
@@ -1812,6 +1817,7 @@ const Customize = () => {
     { key: 'hips', label: 'Hips' },
     { key: 'inseam', label: 'Inseam' },
     { key: 'length', label: 'Length' },
+    { key: 'rise', label: 'Rise' },
     { key: 'thigh', label: 'Thigh' },
     { key: 'outseam', label: 'Outseam' }
   ];
@@ -1955,14 +1961,19 @@ const Customize = () => {
       }
 
       if (userMeas) {
-        const topFields = ['chest', 'shoulders', 'sleeveLength', 'neck', 'waist', 'length', 'backLength'];
-        const bottomFields = ['waist', 'hips', 'inseam', 'outseam', 'thigh', 'cuff'];
+        const topFields = ['chest', 'shoulders', 'sleeveLength', 'sleeve_length', 'neck', 'neckCircumference', 'waist', 'frontLength', 'backLength', 'length', 'armhole', 'bicep'];
+        const bottomFields = ['waist', 'hips', 'inseam', 'outseam', 'thigh', 'cuff', 'rise'];
         const topMeas = {};
         const bottomMeas = {};
 
         Object.entries(userMeas).forEach(([key, val]) => {
           if (!val) return;
-          const mappedKey = key === 'sleeveLength' ? 'sleeve_length' : key === 'backLength' ? 'length' : key;
+          const mappedKey = key === 'sleeveLength' ? 'sleeve_length'
+            : key === 'neckCircumference' ? 'neck_circumference'
+            : key === 'frontLength' ? 'front_length'
+            : key === 'backLength' ? 'back_length'
+            : key === 'sleeve_length' ? 'sleeve_length'
+            : key;
           if (topFields.includes(key)) topMeas[mappedKey] = val;
           if (bottomFields.includes(key)) bottomMeas[mappedKey] = val;
         });
@@ -4529,11 +4540,26 @@ const Customize = () => {
         const pf = typeof enhancementViewItem.pricing_factors === 'string'
           ? JSON.parse(enhancementViewItem.pricing_factors || '{}')
           : (enhancementViewItem.pricing_factors || {});
+        const parseEnhancementImageUrls = () => {
+          const raw = pf?.enhancementImageUrls;
+          if (raw == null || raw === '') return [];
+          if (Array.isArray(raw)) return raw;
+          if (typeof raw === 'string') {
+            try {
+              const parsed = JSON.parse(raw);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          }
+          return [];
+        };
+        const enhancementImages = parseEnhancementImageUrls();
         return (
           <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowEnhancementViewModal(false)}>
             <div className="modal-content" style={{ maxWidth: '500px' }}>
               <div className="modal-header">
-                <h2>Enhancement Request Details</h2>
+                <h2>Report / Enhancement request</h2>
                 <span className="close-modal" onClick={() => setShowEnhancementViewModal(false)}>×</span>
               </div>
               <div className="modal-body">
@@ -4544,10 +4570,33 @@ const Customize = () => {
                     ? (enhancementViewItem.walk_in_customer_name || 'Walk-in Customer')
                     : `${enhancementViewItem.first_name || ''} ${enhancementViewItem.last_name || ''}`.trim() || 'N/A'}
                 </div>
-                <div className="detail-row"><strong>Enhancement Notes:</strong></div>
+                <div className="detail-row"><strong>Report / Enhancement notes:</strong></div>
                 <div style={{ padding: '10px', backgroundColor: '#f3e5f5', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ce93d8' }}>
                   {pf.enhancementNotes || 'No notes provided'}
                 </div>
+                {enhancementImages.length > 0 && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <div className="detail-row"><strong>Photos attached:</strong></div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                      {enhancementImages.map((url, idx) => (
+                        <img
+                          key={`${url}-${idx}`}
+                          src={getImageUrl(url)}
+                          alt=""
+                          style={{
+                            width: 96,
+                            height: 96,
+                            objectFit: 'cover',
+                            borderRadius: 6,
+                            cursor: 'pointer',
+                            border: '1px solid #ddd'
+                          }}
+                          onClick={() => openImagePreview(getImageUrl(url), 'Enhancement photo')}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {pf.addAccessories && (
                   <div style={{ padding: '8px 12px', backgroundColor: '#fff3e0', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ffcc80', fontSize: '13px', color: '#e65100', fontWeight: '600' }}>
                     Customer requested to add accessories - price confirmation required.
@@ -5736,139 +5785,22 @@ const Customize = () => {
                   <p className="measurement-title" style={{ marginTop: 0, marginBottom: '15px', color: '#000', textAlign: 'center', fontWeight: '600', fontSize: '16px', padding: 0 }}>Primary Customer - Top Measurements</p>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-
-                    <div className="form-group">
-
-                      <label>Chest (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.chest || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, chest: e.target.value } })}
-
-                        placeholder="Enter chest measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Shoulders (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.shoulders || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, shoulders: e.target.value } })}
-
-                        placeholder="Enter shoulder measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Sleeve Length (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.sleeve_length || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, sleeve_length: e.target.value } })}
-
-                        placeholder="Enter sleeve length"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Neck (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.neck || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, neck: e.target.value } })}
-
-                        placeholder="Enter neck measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Waist (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.waist || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, waist: e.target.value } })}
-
-                        placeholder="Enter waist measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Length (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.length || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, length: e.target.value } })}
-
-                        placeholder="Enter length measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
+                    {topMeasurementFields.map((field) => {
+                      const value = measurements.top[field.key] ?? '';
+                      return (
+                        <div className="form-group" key={`top-${field.key}`}>
+                          <label>{field.label} (inches)</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={value}
+                            onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, [field.key]: e.target.value } })}
+                            placeholder={`Enter ${field.label.toLowerCase()} measurement`}
+                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
 
                 </div>
@@ -5877,139 +5809,22 @@ const Customize = () => {
                   <p className="measurement-title" style={{ marginTop: 0, marginBottom: '15px', color: '#000', textAlign: 'center', fontWeight: '600', fontSize: '16px', padding: 0 }}>Primary Customer - Bottom Measurements</p>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-
-                    <div className="form-group">
-
-                      <label>Waist (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.waist || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, waist: e.target.value } })}
-
-                        placeholder="Enter waist measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Hips (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.hips || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, hips: e.target.value } })}
-
-                        placeholder="Enter hip measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Inseam (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.inseam || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, inseam: e.target.value } })}
-
-                        placeholder="Enter inseam measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Length (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.length || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, length: e.target.value } })}
-
-                        placeholder="Enter length measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Thigh (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.thigh || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, thigh: e.target.value } })}
-
-                        placeholder="Enter thigh measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Outseam (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.outseam || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, outseam: e.target.value } })}
-
-                        placeholder="Enter outseam measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
+                    {bottomMeasurementFields.map((field) => {
+                      const value = measurements.bottom[field.key] ?? '';
+                      return (
+                        <div className="form-group" key={`bottom-${field.key}`}>
+                          <label>{field.label} (inches)</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={value}
+                            onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, [field.key]: e.target.value } })}
+                            placeholder={`Enter ${field.label.toLowerCase()} measurement`}
+                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
 
                 </div>

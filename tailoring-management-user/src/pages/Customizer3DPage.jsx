@@ -36,6 +36,7 @@ const Customizer3DPage = () => {
   });
   const [fabric, setFabric] = useState('wool');
   const [pattern, setPattern] = useState('none');
+  const [patternOtherText, setPatternOtherText] = useState('');
   const [measurements, setMeasurements] = useState({
     chest: 38,
     waist: 32,
@@ -89,7 +90,8 @@ const Customizer3DPage = () => {
     { pattern_code: 'minimal-stripe', pattern_name: 'Minimal Stripe', pattern_type: 'procedural', procedural_type: 'minimal-stripe' },
     { pattern_code: 'minimal-check', pattern_name: 'Minimal Check', pattern_type: 'procedural', procedural_type: 'minimal-check' },
     { pattern_code: 'embroidery-1', pattern_name: 'Embroidery Style 1', pattern_type: 'procedural', procedural_type: 'embroidery-1' },
-    { pattern_code: 'embroidery-2', pattern_name: 'Embroidery Style 2', pattern_type: 'procedural', procedural_type: 'embroidery-2' }
+    { pattern_code: 'embroidery-2', pattern_name: 'Embroidery Style 2', pattern_type: 'procedural', procedural_type: 'embroidery-2' },
+    { pattern_code: 'other', pattern_name: 'Other (describe your pattern)', pattern_type: 'procedural', procedural_type: 'none' }
   ];
   const [patterns, setPatterns] = useState(defaultPatterns);
 
@@ -157,6 +159,7 @@ const Customizer3DPage = () => {
           setColors(v.colors || { fabric: '#3a5a72', lining: '#1e2a35', button: '#c8a66a', stitching: '#e1d6c7' });
           setFabric(v.fabric || 'wool');
           setPattern(v.pattern || 'none');
+          setPatternOtherText(v.patternOtherText || '');
           setMeasurements(v.measurements || { chest: 38, waist: 32, hips: 38, shoulders: 18, sleeveLength: 25, inseam: 30 });
           setPersonalization(v.personalization || { initials: '', font: 'Serif', size: 0.8 });
           setDesignImage(v.designImage || null);
@@ -266,7 +269,18 @@ const Customizer3DPage = () => {
             return (a.pattern_name || '').localeCompare(b.pattern_name || '');
           });
 
-          setPatterns(sortedPatterns);
+          const withOther = sortedPatterns.some((p) => p.pattern_code === 'other')
+            ? sortedPatterns
+            : [
+                ...sortedPatterns,
+                {
+                  pattern_code: 'other',
+                  pattern_name: 'Other (describe your pattern)',
+                  pattern_type: 'procedural',
+                  procedural_type: 'none',
+                },
+              ];
+          setPatterns(withOther);
         } else {
           console.warn('⚠️ No patterns found from API, using defaults');
           setPatterns(defaultPatterns);
@@ -289,6 +303,7 @@ const Customizer3DPage = () => {
       colors,
       fabric,
       pattern,
+      patternOtherText,
       style,
       measurements,
       personalization,
@@ -356,7 +371,11 @@ const Customizer3DPage = () => {
         let y = sourceCanvas.height + 70;
 
         const patternObj = patterns.find(p => p.pattern_code === pattern);
-        const patternDisplayName = patternObj ? patternObj.pattern_name : (pattern === 'none' ? 'Solid' : pattern);
+        let patternDisplayName = patternObj ? patternObj.pattern_name : (pattern === 'none' ? 'Solid' : pattern);
+        if (pattern === 'other') {
+          const t = (patternOtherText || '').trim();
+          patternDisplayName = t ? `Other (${t})` : 'Other';
+        }
 
         const infoLines = [
           `🎨 Garment Type: ${garmentName}`,
@@ -521,6 +540,7 @@ const Customizer3DPage = () => {
         colors,
         fabric,
         pattern,
+        patternOtherText,
         measurements,
         personalization,
         notes,
@@ -647,6 +667,8 @@ const Customizer3DPage = () => {
           patterns={patterns}
           pattern={pattern}
           setPattern={setPattern}
+          patternOtherText={patternOtherText}
+          setPatternOtherText={setPatternOtherText}
           fabrics={fabrics}
           designImage={designImage}
           setDesignImage={setDesignImage}

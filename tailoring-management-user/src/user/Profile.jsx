@@ -13,6 +13,7 @@ import { getMyMeasurements } from '../api/CustomerApi';
 import SimpleImageCarousel from '../components/SimpleImageCarousel';
 import { API_BASE_URL, API_URL } from '../api/config';
 import { getCompensationIncidents, submitCustomerLiabilityDecision } from '../api/DamageCompensationApi';
+import { formatPatternChoice } from '../utils/patternDisplay';
 
 const RENTAL_DEMO_OFFSET_STORAGE_KEY = 'rental_demo_days_offset';
 
@@ -1517,6 +1518,7 @@ const Profile = () => {
         {
         const garments = Array.isArray(specific_data.garments) ? specific_data.garments : [];
         const topLevelDesignData = parseDesignData(specific_data.designData);
+        const topLevelPatternLabel = topLevelDesignData ? formatPatternChoice(topLevelDesignData) : null;
         const topLevelAngleImages = topLevelDesignData?.angleImageUrls || topLevelDesignData?.angleImages;
         const preferredDate = specific_data.preferredDate || specific_data.preferred_date;
         const estimatedCompletionDate = item.estimated_completion_date || specific_data.estimatedCompletionDate || specific_data.estimated_completion_date;
@@ -1568,6 +1570,7 @@ const Profile = () => {
 
                 {garments.map((garment, idx) => {
                   const garmentDesignData = parseDesignData(garment.designData);
+                  const garmentPatternLabel = garmentDesignData ? formatPatternChoice(garmentDesignData) : null;
                   const garmentAngleImages = garmentDesignData?.angleImageUrls || garmentDesignData?.angleImages;
 
                   return (
@@ -1636,7 +1639,7 @@ const Profile = () => {
                             {garmentDesignData.size && <div><strong>Size:</strong> {garmentDesignData.size.charAt(0).toUpperCase() + garmentDesignData.size.slice(1)}</div>}
                             {garmentDesignData.fit && <div><strong>Fit:</strong> {garmentDesignData.fit.charAt(0).toUpperCase() + garmentDesignData.fit.slice(1)}</div>}
                             {garmentDesignData.colors?.fabric && <div><strong>Color:</strong> {getColorName(garmentDesignData.colors.fabric)}</div>}
-                            {garmentDesignData.pattern && garmentDesignData.pattern !== 'none' && <div><strong>Pattern:</strong> {garmentDesignData.pattern.charAt(0).toUpperCase() + garmentDesignData.pattern.slice(1)}</div>}
+                            {garmentPatternLabel && <div><strong>Pattern:</strong> {garmentPatternLabel}</div>}
                           </div>
                         </div>
                       )}
@@ -1753,10 +1756,10 @@ const Profile = () => {
                         <span className="detail-value">{getColorName(topLevelDesignData.colors.fabric)}</span>
                       </div>
                     )}
-                    {topLevelDesignData.pattern && topLevelDesignData.pattern !== 'none' && (
+                    {topLevelPatternLabel && (
                       <div className="detail-row">
                         <span className="detail-label">Pattern:</span>
-                        <span className="detail-value">{topLevelDesignData.pattern.charAt(0).toUpperCase() + topLevelDesignData.pattern.slice(1)}</span>
+                        <span className="detail-value">{topLevelPatternLabel}</span>
                       </div>
                     )}
                     {topLevelDesignData.personalization && topLevelDesignData.personalization.initials && (

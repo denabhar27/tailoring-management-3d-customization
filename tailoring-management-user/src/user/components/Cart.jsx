@@ -14,6 +14,7 @@ import { useAlert } from '../../context/AlertContext';
 import { getRentalImageUrl } from '../../api/RentalApi';
 import SimpleImageCarousel from '../../components/SimpleImageCarousel';
 import { API_BASE_URL } from '../../api/config';
+import { formatPatternChoice } from '../../utils/patternDisplay';
 
 const Cart = ({ isOpen, onClose, onCartUpdate }) => {
   const { confirm } = useAlert();
@@ -919,8 +920,8 @@ const Cart = ({ isOpen, onClose, onCartUpdate }) => {
                                       Color: {getColorName(item.specific_data.designData.colors.fabric)}
                                     </p>
                                   )}
-                                  {item.specific_data.designData.pattern && item.specific_data.designData.pattern !== 'none' && (
-                                    <p style={{ margin: '5px 0', fontSize: '14px' }}>Pattern: {item.specific_data.designData.pattern.charAt(0).toUpperCase() + item.specific_data.designData.pattern.slice(1)}</p>
+                                  {formatPatternChoice(item.specific_data.designData) && (
+                                    <p style={{ margin: '5px 0', fontSize: '14px' }}>Pattern: {formatPatternChoice(item.specific_data.designData)}</p>
                                   )}
                                   {item.specific_data.designData.personalization && item.specific_data.designData.personalization.initials && (
                                     <p style={{ margin: '5px 0', fontSize: '14px' }}>

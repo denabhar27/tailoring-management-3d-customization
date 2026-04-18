@@ -118,24 +118,26 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
   const baseColor = colors.fabric;
   const accent = colors.stitching;
 
+  const effectivePatternCode = pattern === 'other' ? 'none' : pattern;
+
   const [imageTexture, setImageTexture] = useState(null);
 
   const [isLoadingTexture, setIsLoadingTexture] = useState(false);
 
   const textureRef = React.useRef(null);
 
-  const currentPatternCodeRef = React.useRef(pattern);
+  const currentPatternCodeRef = React.useRef(effectivePatternCode);
 
   const currentPattern = useMemo(() => {
     if (!patterns || patterns.length === 0) return null;
-    const found = patterns.find(p => p.pattern_code === pattern);
-    console.log('🔍 Looking for pattern:', pattern, 'Found:', found?.pattern_name, 'Type:', found?.pattern_type);
+    const found = patterns.find(p => p.pattern_code === effectivePatternCode);
+    console.log('🔍 Looking for pattern:', effectivePatternCode, 'Found:', found?.pattern_name, 'Type:', found?.pattern_type);
     return found;
-  }, [patterns, pattern]);
+  }, [patterns, effectivePatternCode]);
 
   useEffect(() => {
 
-    currentPatternCodeRef.current = pattern;
+    currentPatternCodeRef.current = effectivePatternCode;
 
     if (textureRef.current) {
       textureRef.current.dispose();
@@ -158,7 +160,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
       const loader = new THREE.TextureLoader();
       loader.setCrossOrigin('anonymous');
 
-      const loadingForPattern = pattern;
+      const loadingForPattern = effectivePatternCode;
 
       loader.load(
         imageUrl,
@@ -214,7 +216,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
         }
       );
     } else if (currentPattern) {
-      console.log('📐 Using procedural pattern:', currentPattern.procedural_type || pattern);
+      console.log('📐 Using procedural pattern:', currentPattern.procedural_type || effectivePatternCode);
     }
 
     return () => {
@@ -223,7 +225,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
         textureRef.current = null;
       }
     };
-  }, [currentPattern, pattern, garment]);
+  }, [currentPattern, effectivePatternCode, garment]);
 
   function getGarmentRepeatMultiplier(garmentType) {
     const multipliers = {
@@ -260,7 +262,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
       return makeProceduralPattern('none', baseColor, accent, 1, 1);
     }
 
-    const proceduralType = currentPattern?.procedural_type || pattern;
+    const proceduralType = currentPattern?.procedural_type || effectivePatternCode;
 
     const repeatMultiplier = getGarmentRepeatMultiplier(garment);
     const baseRepeat = 2;
@@ -275,7 +277,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
       baseRepeat * repeatMultiplier.x,
       baseRepeat * repeatMultiplier.y
     );
-  }, [imageTexture, isLoadingTexture, currentPattern, pattern, baseColor, accent, garment]);
+  }, [imageTexture, isLoadingTexture, currentPattern, effectivePatternCode, baseColor, accent, garment]);
 
   const bump = useMemo(() => makeBump(), []);
   const fabricColor = useMemo(() => {
@@ -479,7 +481,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
 
   useLayoutEffect(() => {
     if (use3DModel && modelScene) {
-      console.log('🔄 Applying material to model, pattern:', pattern, 'hasImageTexture:', !!imageTexture);
+      console.log('🔄 Applying material to model, pattern:', effectivePatternCode, 'hasImageTexture:', !!imageTexture);
 
       modelScene.rotation.y = -Math.PI / 2;
 
@@ -495,7 +497,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
         }
       });
     }
-  }, [modelScene, garment, materialProps, use3DModel, fabricColor, pattern, imageTexture, map]);
+  }, [modelScene, garment, materialProps, use3DModel, fabricColor, effectivePatternCode, imageTexture, map]);
 
   const selectedPantsPath = useMemo(() => {
     if (pantsType === 'formal-men') return '/dress pants 3d model.glb';
@@ -515,7 +517,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
 
   useLayoutEffect(() => {
     if (pantsModelScene) {
-      console.log('🔄 Applying material to pants model, pattern:', pattern, 'hasImageTexture:', !!imageTexture);
+      console.log('🔄 Applying material to pants model, pattern:', effectivePatternCode, 'hasImageTexture:', !!imageTexture);
 
       pantsModelScene.rotation.y = -Math.PI / 2;
 
@@ -531,7 +533,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
         }
       });
     }
-  }, [pantsModelScene, materialProps, fabricColor, pattern, imageTexture, map]);
+  }, [pantsModelScene, materialProps, fabricColor, effectivePatternCode, imageTexture, map]);
 
   const isCoat = garment.startsWith('coat') || garment === 'suit';
   const lapel = isCoat ? style.lapel : 'shawl';
@@ -660,7 +662,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
             materialProps={materialProps}
             fabricColor={fabricColor}
             map={map}
-            pattern={pattern}
+            pattern={effectivePatternCode}
             onLoad={() => {
               console.log('✓ Custom model loaded successfully:', customModelToRender.model_name);
               setCustomModelReady(true);
@@ -720,7 +722,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
             materialProps={materialProps}
             fabricColor={fabricColor}
             map={map}
-            pattern={pattern}
+            pattern={effectivePatternCode}
             onLoad={() => {
               setCustomModelReady(true);
             }}
@@ -761,7 +763,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
           materialProps={materialProps}
           fabricColor={fabricColor}
           map={map}
-          pattern={pattern}
+          pattern={effectivePatternCode}
           onLoad={() => {
             setCustomModelReady(true);
           }}

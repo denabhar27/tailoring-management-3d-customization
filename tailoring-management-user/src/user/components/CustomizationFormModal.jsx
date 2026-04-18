@@ -6,6 +6,7 @@ import { uploadCustomizationImage, addCustomizationToCart } from '../../api/Cust
 import { getAllFabricTypes } from '../../api/FabricTypeApi';
 import { getAllGarmentTypes } from '../../api/GarmentTypeApi';
 import { getAllSlotsWithAvailability, bookSlot } from '../../api/AppointmentSlotApi';
+import { formatPatternChoice } from '../../utils/patternDisplay';
 
 const USER_ALLOWED_SLOT_TIMES = new Set([
   '08:30', '09:30', '10:30', '11:30', '12:30', '13:30', '14:30', '15:30', '16:30'
@@ -926,7 +927,9 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                 )}
               </div>
 
-              {garment.designDetails && (
+              {garment.designDetails && (() => {
+                const patternLabel = formatPatternChoice(garment.designDetails);
+                return (
                 <div className="form-group" style={{ backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '8px', border: '1px solid #e0e0e0', marginTop: '10px' }}>
                   <h4 style={{ margin: '0 0 15px 0', color: '#333', fontSize: '16px', fontWeight: '600' }}>
                     <i className="fas fa-palette"></i> 3D Customization Choices
@@ -947,9 +950,9 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                         <strong>Color:</strong> {getColorName(garment.designDetails.colors.fabric)}
                       </div>
                     )}
-                    {garment.designDetails.pattern && garment.designDetails.pattern !== 'none' && (
+                    {patternLabel && (
                       <div>
-                        <strong>Pattern:</strong> {garment.designDetails.pattern.charAt(0).toUpperCase() + garment.designDetails.pattern.slice(1)}
+                        <strong>Pattern:</strong> {patternLabel}
                       </div>
                     )}
                     {garment.designDetails.personalization && garment.designDetails.personalization.initials && (
@@ -998,7 +1001,8 @@ const CustomizationFormModal = ({ isOpen, onClose, onCartUpdate }) => {
                     )}
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               <div className="form-group-shared" style={{ marginTop: '12px' }}>
                 <button

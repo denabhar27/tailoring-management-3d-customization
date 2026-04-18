@@ -29,7 +29,7 @@ const OWN_MEASUREMENT_SECTIONS = [
   }
 ];
 
-export default function CustomizationPanel({ garment, setGarment, size, setSize, fit, setFit, modelSize, setModelSize, colors, setColors, fabric, setFabric, patterns, pattern, setPattern, fabrics, designImage, setDesignImage, notes, setNotes, buttons, setButtons, accessories, setAccessories, pantsType, setPantsType, style, setStyle, onReview, customModels = [], measurements, setMeasurements, userMeasurements, setUserMeasurements, provideOwnMeasurements, setProvideOwnMeasurements, garmentTypes = [] }) {
+export default function CustomizationPanel({ garment, setGarment, size, setSize, fit, setFit, modelSize, setModelSize, colors, setColors, fabric, setFabric, patterns, pattern, setPattern, patternOtherText = '', setPatternOtherText, fabrics, designImage, setDesignImage, notes, setNotes, buttons, setButtons, accessories, setAccessories, pantsType, setPantsType, style, setStyle, onReview, customModels = [], measurements, setMeasurements, userMeasurements, setUserMeasurements, provideOwnMeasurements, setProvideOwnMeasurements, garmentTypes = [] }) {
   const [selectedButtonModel, setSelectedButtonModel] = useState('/orange button 3d model.glb');
   const [selectedAccessoryModel, setSelectedAccessoryModel] = useState('/accessories/gold lion pendant 3d model.glb');
   const [selectedButtonId, setSelectedButtonId] = useState(null);
@@ -892,7 +892,14 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
               </select>
             </label>
             <label>Pattern
-              <select value={pattern} onChange={e => setPattern(e.target.value)}>
+              <select
+                value={pattern}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPattern(v);
+                  if (v !== 'other' && setPatternOtherText) setPatternOtherText('');
+                }}
+              >
                 {patterns.map(p => (
                   <option key={p.pattern_code || p} value={p.pattern_code || p}>
                     {p.pattern_name || p}
@@ -901,6 +908,29 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
               </select>
             </label>
           </div>
+          {pattern === 'other' && setPatternOtherText && (
+            <div className="row" style={{ marginTop: '12px' }}>
+              <label style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                Describe your pattern
+                <textarea
+                  value={patternOtherText}
+                  onChange={(e) => setPatternOtherText(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. Herringbone weave, subtle pinstripe, floral jacquard…"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #ccc',
+                    fontFamily: 'inherit',
+                    fontSize: '14px',
+                    resize: 'vertical',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </label>
+            </div>
+          )}
           {garment === 'barong' && (
             <div className="row" style={{ marginTop: '16px' }}>
               <label style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>

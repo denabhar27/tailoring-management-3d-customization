@@ -3,6 +3,7 @@ import { useState, useEffect, Fragment, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { API_BASE_URL, getImageUrl } from '../api/config';
+import { formatPatternChoice } from '../utils/patternDisplay';
 
 import '../adminStyle/customize.css';
 
@@ -5604,6 +5605,7 @@ const Customize = () => {
 
                         {garmentsWithDesign.map((garment, idx) => {
                           const designData = parseDesignData(garment.designData);
+                          const patternLabel = formatPatternChoice(designData);
                           return (
                             <div key={idx} style={{ marginBottom: '12px', padding: '10px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
                               <div style={{ marginBottom: '8px', fontWeight: '700' }}>Garment #{idx + 1}</div>
@@ -5611,7 +5613,7 @@ const Customize = () => {
                                 {designData.size && <div><strong>Size:</strong> {designData.size.charAt(0).toUpperCase() + designData.size.slice(1)}</div>}
                                 {designData.fit && <div><strong>Fit:</strong> {designData.fit.charAt(0).toUpperCase() + designData.fit.slice(1)}</div>}
                                 {designData.colors && designData.colors.fabric && <div><strong>Color:</strong> {getColorName(designData.colors.fabric)}</div>}
-                                {designData.pattern && designData.pattern !== 'none' && <div><strong>Pattern:</strong> {designData.pattern.charAt(0).toUpperCase() + designData.pattern.slice(1)}</div>}
+                                {patternLabel && <div><strong>Pattern:</strong> {patternLabel}</div>}
                                 {designData.personalization && designData.personalization.initials && (
                                   <div style={{ gridColumn: '1 / -1' }}>
                                     <strong>Personalization:</strong> {designData.personalization.initials}
@@ -5652,6 +5654,7 @@ const Customize = () => {
                 }
 
                 const designData = parseDesignData(selectedOrder.specific_data?.designData);
+                const topLevelPatternLabel = designData ? formatPatternChoice(designData) : null;
 
                 if (designData && (designData.size || designData.fit || designData.colors || designData.pattern || designData.personalization || designData.buttons || designData.accessories)) {
                   return (
@@ -5664,7 +5667,7 @@ const Customize = () => {
                           {designData.size && <div className="detail-row"><strong>Size:</strong> {designData.size.charAt(0).toUpperCase() + designData.size.slice(1)}</div>}
                           {designData.fit && <div className="detail-row"><strong>Fit:</strong> {designData.fit.charAt(0).toUpperCase() + designData.fit.slice(1)}</div>}
                           {designData.colors && designData.colors.fabric && <div className="detail-row"><strong>Color:</strong> {getColorName(designData.colors.fabric)}</div>}
-                          {designData.pattern && designData.pattern !== 'none' && <div className="detail-row"><strong>Pattern:</strong> {designData.pattern.charAt(0).toUpperCase() + designData.pattern.slice(1)}</div>}
+                          {topLevelPatternLabel && <div className="detail-row"><strong>Pattern:</strong> {topLevelPatternLabel}</div>}
                           {designData.personalization && designData.personalization.initials && (
                             <div className="detail-row" style={{ gridColumn: '1 / -1' }}>
                               <strong>Personalization:</strong> {designData.personalization.initials}

@@ -102,6 +102,15 @@ const getAccessoryName = (modelPath: string | undefined): string => {
   return accessoryMap[modelPath] || modelPath.split('/').pop()?.replace('.glb', '').replace(/\d+/g, '').trim() || '';
 };
 
+const formatPatternChoice = (design: { pattern?: string; patternOtherText?: string } | null | undefined): string | null => {
+  if (!design?.pattern || design.pattern === 'none') return null;
+  if (design.pattern === 'other') {
+    const t = String(design.patternOtherText || '').trim();
+    return t ? `Other — ${t}` : 'Other';
+  }
+  return String(design.pattern).charAt(0).toUpperCase() + String(design.pattern).slice(1);
+};
+
 const defaultFabricTypes: { [key: string]: number } = {
   'Cotton': 200,
   'Silk': 300,
@@ -1186,14 +1195,15 @@ export default function Customizer3DScreen() {
                         </View>
                       </View>
                     )}
-                    {pendingCustomization.designData.pattern && pendingCustomization.designData.pattern !== 'none' && (
-                      <View style={styles.choiceItem}>
-                        <Text style={styles.choiceLabel}>Pattern:</Text>
-                        <Text style={styles.choiceValue}>
-                          {String(pendingCustomization.designData.pattern).charAt(0).toUpperCase() + String(pendingCustomization.designData.pattern).slice(1).replace('-', ' ')}
-                        </Text>
-                      </View>
-                    )}
+                    {(() => {
+                      const patternLabel = formatPatternChoice(pendingCustomization.designData);
+                      return patternLabel ? (
+                        <View style={styles.choiceItem}>
+                          <Text style={styles.choiceLabel}>Pattern:</Text>
+                          <Text style={styles.choiceValue}>{patternLabel}</Text>
+                        </View>
+                      ) : null;
+                    })()}
                     {pendingCustomization.designData.personalization?.initials && (
                       <View style={[styles.choiceItem, styles.choiceItemFull]}>
                         <Text style={styles.choiceLabel}>Personalization:</Text>

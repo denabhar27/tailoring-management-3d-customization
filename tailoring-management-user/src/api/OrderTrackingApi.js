@@ -138,8 +138,53 @@ export async function cancelOrderItem(orderItemId, reason) {
   }
 }
 
-export async function requestEnhancement(orderItemId, notes, preferredCompletionDate = null, addAccessories = false) {
+export async function haggleOrderItemPrice(orderItemId, offeredPrice) {
   try {
+    const response = await axios.post(
+      `${BASE_URL}/orders/${orderItemId}/haggle-price`,
+      { offeredPrice },
+      { headers: getAuthHeaders() }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Haggle order item price error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Error submitting haggle price'
+    };
+  }
+}
+
+export async function requestEnhancement(orderItemId, notes, preferredCompletionDate = null, addAccessories = false, photoFiles = []) {
+  try {
+    const token = localStorage.getItem('token');
+    const files = Array.isArray(photoFiles) ? photoFiles.filter(Boolean) : [];
+
+    if (files.length > 0) {
+      const formData = new FormData();
+      formData.append('notes', String(notes || ''));
+      if (preferredCompletionDate) {
+        formData.append('preferredCompletionDate', preferredCompletionDate);
+      }
+      formData.append('addAccessories', addAccessories ? 'true' : 'false');
+      files.forEach((file) => {
+        if (file instanceof File) {
+          formData.append('photos', file);
+        }
+      });
+
+      const response = await axios.post(
+        `${BASE_URL}/tracking/request-enhancement/${orderItemId}`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      return response.data;
+    }
+
     const response = await axios.post(
       `${BASE_URL}/tracking/request-enhancement/${orderItemId}`,
       { notes, preferredCompletionDate, addAccessories },
@@ -155,7 +200,7 @@ export async function requestEnhancement(orderItemId, notes, preferredCompletion
   }
 }
 
-export async function confirmRentalDepositReceipt(orderItemId) {
+export async function confirmRentalSecurityFeeReceipt(orderItemId) {
   try {
     const response = await axios.post(
       `${BASE_URL}/orders/rental/items/${orderItemId}/confirm-deposit-receipt`,
@@ -164,10 +209,27 @@ export async function confirmRentalDepositReceipt(orderItemId) {
     );
     return response.data;
   } catch (error) {
-    console.error('Confirm rental deposit receipt error:', error);
+    console.error('Confirm rental security fee receipt error:', error);
     return {
       success: false,
-      message: error.response?.data?.message || 'Error confirming deposit receipt'
+      message: error.response?.data?.message || 'Error confirming security fee receipt'
+    };
+  }
+}
+
+export async function confirmOrderItemPickup(orderItemId) {
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/tracking/confirm-pickup/${orderItemId}`,
+      {},
+      { headers: getAuthHeaders() }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Confirm order pickup error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Error confirming pickup'
     };
   }
 }

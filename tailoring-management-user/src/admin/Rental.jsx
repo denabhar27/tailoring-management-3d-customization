@@ -8,7 +8,7 @@ import '../adminStyle/rent.css';
 
 import '../adminStyle/dryclean.css';
 
-import { getAllRentalOrders, getRentalOrdersByStatus, updateRentalOrderItem, recordRentalPayment, recordRentalDepositReturn } from '../api/RentalOrderApi';
+import { getAllRentalOrders, getRentalOrdersByStatus, updateRentalOrderItem, recordRentalPayment, recordRentalSecurityFeeReturn } from '../api/RentalOrderApi';
 
 import { markRentalItemDamaged, restockReturnedRentalSizes, getRentalImageUrl, getRentalById } from '../api/RentalApi';
 
@@ -46,7 +46,7 @@ function Rental() {
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  const [showDepositReturnModal, setShowDepositReturnModal] = useState(false);
+  const [showSecurityFeeReturnModal, setShowSecurityFeeReturnModal] = useState(false);
 
   const [selectedRental, setSelectedRental] = useState(null);
 
@@ -72,7 +72,7 @@ function Rental() {
 
   const [pendingRentedStatus, setPendingRentedStatus] = useState(null);
 
-  const [depositReturnAmount, setDepositReturnAmount] = useState('');
+  const [securityFeeReturnAmount, setSecurityFeeReturnAmount] = useState('');
 
   const [showPricingSetupModal, setShowPricingSetupModal] = useState(false);
 
@@ -108,6 +108,18 @@ function Rental() {
     }
   };
 
+  const parseMaybeJson = (value) => {
+    if (!value) return {};
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value || '{}');
+      } catch {
+        return {};
+      }
+    }
+    return value;
+  };
+
   const toDateOnly = (value) => {
     if (!value) return null;
     const raw = String(value).trim();
@@ -116,7 +128,7 @@ function Rental() {
   };
 
   const getRentalSelectedSizes = (rental) => {
-    const specificData = rental?.specific_data || {};
+    const specificData = parseMaybeJson(rental?.specific_data);
     if (specificData?.is_bundle && Array.isArray(specificData.bundle_items)) {
       return specificData.bundle_items.flatMap((bundleItem) => bundleItem.selected_sizes || bundleItem.selectedSizes || []);
     }
@@ -192,17 +204,27 @@ function Rental() {
 
   const calcDepositFromRental = (rental) => {
     const pricingFactors = parsePricingFactors(rental?.pricing_factors);
-    const isBundle = rental?.specific_data?.is_bundle || pricingFactors?.is_bundle;
-    if (isBundle && Array.isArray(rental?.specific_data?.bundle_items)) {
-      const total = rental.specific_data.bundle_items.reduce((sum, bundleItem) => {
+    const specificData = parseMaybeJson(rental?.specific_data);
+    const isBundle = specificData?.is_bundle || pricingFactors?.is_bundle;
+    if (isBundle && Array.isArray(specificData?.bundle_items)) {
+      const total = specificData.bundle_items.reduce((sum, bundleItem) => {
         const sizes = bundleItem.selected_sizes || bundleItem.selectedSizes || [];
         return sum + sizes.reduce((s, size) => s + (parseInt(size.quantity || 0, 10) * parseFloat(size.deposit || 0)), 0);
       }, 0);
       if (total > 0) return total;
     }
-    const selectedSizes = rental?.specific_data?.selected_sizes || rental?.specific_data?.selectedSizes || [];
+    const selectedSizes = specificData?.selected_sizes || specificData?.selectedSizes || [];
     const fromSizes = selectedSizes.reduce((total, size) => total + (parseInt(size.quantity || 0, 10) * parseFloat(size.deposit || 0)), 0);
-    return fromSizes > 0 ? fromSizes : parseFloat(pricingFactors?.downpayment || pricingFactors?.deposit_amount || rental?.specific_data?.downpayment || 0);
+    return fromSizes > 0
+      ? fromSizes
+      : parseFloat(
+          pricingFactors?.deposit_amount
+          || pricingFactors?.downpayment
+          || specificData?.deposit_amount
+          || specificData?.downpayment
+          || rental?.downpayment
+          || 0
+        );
   };
 
   const getRentalPaymentSnapshot = (rental) => {
@@ -235,7 +257,7 @@ function Rental() {
     };
   };
 
-  const getDepositReturnSnapshot = (rental) => {
+  const getSecurityFeeReturnSnapshot = (rental) => {
     const pricingFactors = parsePricingFactors(rental?.pricing_factors);
     const depositAmount = calcDepositFromRental(rental);
     const specificData = rental?.specific_data || {};
@@ -312,9 +334,9 @@ function Rental() {
     setPaymentModalMode('regular');
   };
 
-  const closeDepositReturnModal = () => {
-    setShowDepositReturnModal(false);
-    setDepositReturnAmount('');
+  const closeSecurityFeeReturnModal = () => {
+    setShowSecurityFeeReturnModal(false);
+    setSecurityFeeReturnAmount('');
   };
 
   const closeDetailModal = () => {
@@ -1566,7 +1588,7 @@ function Rental() {
 
         const recordPayment = await confirm(
 
-          `Before marking as "Rented", record the deposit payment first.\n\nRequired Deposit: ₱${paymentSnapshot.depositAmount.toFixed(2)}\nAlready Paid: ₱${paymentSnapshot.amountPaid.toFixed(2)}\nTo Collect Now: ₱${paymentSnapshot.requiredDepositNow.toFixed(2)}\n\nWould you like to record this payment now?`,
+          `Before marking as "Rented", record the security fee payment first.\n\nRequired Security Feecurity Fee: ₱${paymentSnapshot.depositAmount.toFixed(2)}\nAlready Paid: ₱${paymentSnapshot.amountPaid.toFixed(2)}\nTo Collect Now: ₱${paymentSnapshot.requiredDepositNow.toFixed(2)}\n\nWould you like to record this payment now?`,
 
           'Payment Required',
 
@@ -2117,40 +2139,40 @@ function Rental() {
 
   };
 
-  const handleRecordDepositReturn = async () => {
-    if (!selectedRental || !depositReturnAmount) {
-      await alert('Please enter a deposit return amount', 'Error', 'error');
+  const handleRecordSecurityFeeReturn = async () => {
+    if (!selectedRental || !securityFeeReturnAmount) {
+      await alert('Please enter a security fee return amount', 'Error', 'error');
       return;
     }
 
-    const amount = parseFloat(depositReturnAmount);
+    const amount = parseFloat(securityFeeReturnAmount);
     if (isNaN(amount) || amount <= 0) {
-      await alert('Please enter a valid deposit return amount', 'Error', 'error');
+      await alert('Please enter a valid security fee return amount', 'Error', 'error');
       return;
     }
 
-    const snapshot = getDepositReturnSnapshot(selectedRental);
+    const snapshot = getSecurityFeeReturnSnapshot(selectedRental);
     if (amount > snapshot.refundableRemaining) {
       await alert(`Amount exceeds refundable balance of ₱${snapshot.refundableRemaining.toFixed(2)}.`, 'Error', 'error');
       return;
     }
 
     try {
-      const result = await recordRentalDepositReturn(selectedRental.item_id, amount, snapshot.damagedSizes);
+      const result = await recordRentalSecurityFeeReturn(selectedRental.item_id, amount, snapshot.damagedSizes);
       if (result.success) {
         await alert(
-          `Deposit return of ₱${amount.toFixed(2)} recorded successfully. Remaining refundable deposit: ₱${parseFloat(result.refund?.refundable_remaining || 0).toFixed(2)}.`,
+          `Security fee return of ₱${amount.toFixed(2)} recorded successfully. Remaining refundable security fee: ₱${parseFloat(result.refund?.refundable_remaining || 0).toFixed(2)}.`,
           'Success',
           'success'
         );
-        closeDepositReturnModal();
+        closeSecurityFeeReturnModal();
         await loadRentalOrders();
       } else {
-        await alert(result.message || 'Failed to record deposit return', 'Error', 'error');
+        await alert(result.message || 'Failed to record security fee return', 'Error', 'error');
       }
     } catch (error) {
-      console.error('Error recording deposit return:', error);
-      await alert('Error recording deposit return', 'Error', 'error');
+      console.error('Error recording security fee return:', error);
+      await alert('Error recording security fee return', 'Error', 'error');
     }
   };
 
@@ -2918,7 +2940,7 @@ function Rental() {
 
                             <div style={{ color: '#ff9800', fontWeight: 'bold' }}>
 
-                              Deposit: ₱{downpaymentAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                              Security Fee: ₱{downpaymentAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
 
                             </div>
 
@@ -3298,7 +3320,7 @@ function Rental() {
                                 })()}
 
                               {(() => {
-                                const refundSnapshot = getDepositReturnSnapshot(rental);
+                                const refundSnapshot = getSecurityFeeReturnSnapshot(rental);
                                 const canRecordRefund = rental.approval_status === 'returned' && refundSnapshot.refundableRemaining > 0;
                                 if (!canRecordRefund) return null;
 
@@ -3308,10 +3330,10 @@ function Rental() {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setSelectedRental(rental);
-                                      setDepositReturnAmount(refundSnapshot.refundableRemaining.toFixed(2));
-                                      setShowDepositReturnModal(true);
+                                      setSecurityFeeReturnAmount(refundSnapshot.refundableRemaining.toFixed(2));
+                                      setShowSecurityFeeReturnModal(true);
                                     }}
-                                    title="Record Deposit Return"
+                                    title="Record Security Fee Return"
                                     style={{
                                       backgroundColor: '#ffffff',
                                       color: '#2e7d32',
@@ -4172,11 +4194,11 @@ function Rental() {
 
       )}
 
-      {showDepositReturnModal && selectedRental && (
+      {showSecurityFeeReturnModal && selectedRental && (
 
         <div className="modal-overlay active" onClick={(e) => {
 
-          if (e.target.classList.contains('modal-overlay')) closeDepositReturnModal();
+          if (e.target.classList.contains('modal-overlay')) closeSecurityFeeReturnModal();
 
         }}>
 
@@ -4184,16 +4206,16 @@ function Rental() {
 
             <div className="modal-header">
 
-              <h2>Record Deposit Return</h2>
+              <h2>Record Security Fee Return</h2>
 
-              <span className="close-modal" onClick={closeDepositReturnModal}>×</span>
+              <span className="close-modal" onClick={closeSecurityFeeReturnModal}>×</span>
 
             </div>
 
             <div className="modal-body">
 
               {(() => {
-                const snapshot = getDepositReturnSnapshot(selectedRental);
+                const snapshot = getSecurityFeeReturnSnapshot(selectedRental);
                 return (
                   <>
                     <div className="detail-row">
@@ -4216,7 +4238,7 @@ function Rental() {
                     </div>
 
                     <div className="detail-row">
-                      <strong>Total Deposit:</strong>
+                      <strong>Total Security Fee:</strong>
                       <span style={{ color: '#ff9800', fontWeight: 'bold' }}>
                         ₱{snapshot.depositAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
@@ -4253,7 +4275,7 @@ function Rental() {
                         border: '1px solid #f44336',
                         marginTop: '12px'
                       }}>
-                        <strong style={{ color: '#c62828', display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>⚠️ Non-Refundable Deposits:</strong>
+                        <strong style={{ color: '#c62828', display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>⚠️ Non-Refundable Security Fees:</strong>
                         <div style={{ fontSize: '0.85rem', color: '#555', lineHeight: '1.6' }}>
                           {snapshot.nonRefundableNotes.map((note, idx) => (
                             <div key={idx} style={{ marginBottom: '4px' }}>• {note}</div>
@@ -4266,13 +4288,13 @@ function Rental() {
               })()}
 
               <div className="payment-form-group">
-                <label>Deposit Return Amount *</label>
+                <label>Security Fee Return Amount *</label>
                 <input
                   type="number"
-                  value={depositReturnAmount}
-                  onChange={(e) => setDepositReturnAmount(e.target.value)}
+                  value={securityFeeReturnAmount}
+                  onChange={(e) => setSecurityFeeReturnAmount(e.target.value)}
                   className="form-control"
-                  placeholder="Enter deposit return amount"
+                  placeholder="Enter security fee return amount"
                   min="0"
                   step="0.01"
                   autoFocus
@@ -4283,15 +4305,15 @@ function Rental() {
 
             <div className="modal-footer-centered">
 
-              <button className="btn-cancel" onClick={closeDepositReturnModal}>
+              <button className="btn-cancel" onClick={closeSecurityFeeReturnModal}>
 
                 Cancel
 
               </button>
 
-              <button className="btn-save" onClick={handleRecordDepositReturn}>
+              <button className="btn-save" onClick={handleRecordSecurityFeeReturn}>
 
-                Record Deposit Return
+                Record Security Fee Return
 
               </button>
 
@@ -5425,12 +5447,12 @@ function Rental() {
                         <div style={{ width: '100%' }}>
                           {lines.map((line, idx) => (
                             <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '14px', color: '#666' }}>
-                              <span>{line.label} Deposit:</span>
+                              <span>{line.label} Security Fee:</span>
                               <span style={{ color: '#ff9800', fontWeight: '600' }}>₱{line.amount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                             </div>
                           ))}
                           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '1px solid #e0e0e0', marginTop: '4px' }}>
-                            <span style={{ fontWeight: 'bold' }}>Total Deposit:</span>
+                            <span style={{ fontWeight: 'bold' }}>Total Security Fee:</span>
                             <span style={{ color: '#ff9800', fontWeight: 'bold' }}>₱{depositAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                           </div>
                         </div>
@@ -5449,13 +5471,13 @@ function Rental() {
                           if (lineDeposit <= 0) return null;
                           return (
                             <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '14px', color: '#666' }}>
-                              <span>{size.label || size.sizeKey} ×{qty} Deposit:</span>
+                              <span>{size.label || size.sizeKey} ×{qty} Security Fee:</span>
                               <span style={{ color: '#ff9800', fontWeight: '600' }}>₱{lineDeposit.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                             </div>
                           );
                         })}
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '1px solid #e0e0e0', marginTop: '4px' }}>
-                          <span style={{ fontWeight: 'bold' }}>Total Deposit:</span>
+                          <span style={{ fontWeight: 'bold' }}>Total Security Fee:</span>
                           <span style={{ color: '#ff9800', fontWeight: 'bold' }}>₱{depositAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                         </div>
                       </div>

@@ -509,25 +509,27 @@ exports.getBillingStats = (req, res) => {
         END
       ) as damage_count,
       SUM(
-        COALESCE(
-          CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
-          CASE 
-            WHEN oi.payment_status IN ('paid', 'fully_paid') THEN oi.final_price
-            ELSE 0
-          END
-        )
-        - CASE
-            WHEN COALESCE(dca.has_paid_damage, 0) = 1 THEN (
-              COALESCE(
-                CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
-                CASE 
-                  WHEN oi.payment_status IN ('paid', 'fully_paid') THEN oi.final_price
-                  ELSE 0
-                END
-              ) + COALESCE(dca.paid_compensation_amount, 0)
+        CASE
+          WHEN LOWER(oi.service_type) IN ('repair', 'dry_cleaning', 'dry-cleaning', 'drycleaning', 'dry cleaning')
+            AND COALESCE(dca.has_paid_damage, 0) = 1 THEN 0
+          ELSE (
+            COALESCE(
+              CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.amount_paid')) AS DECIMAL(10,2)),
+              CASE 
+                WHEN oi.payment_status IN ('paid', 'fully_paid') THEN oi.final_price
+                ELSE 0
+              END
             )
-            ELSE 0
-          END
+            - COALESCE(
+              CAST(JSON_UNQUOTE(JSON_EXTRACT(oi.pricing_factors, '$.deposit_refunded_amount')) AS DECIMAL(10,2)),
+              0
+            )
+            + CASE
+                WHEN LOWER(oi.service_type) = 'rental' THEN COALESCE(dca.paid_compensation_amount, 0)
+                ELSE 0
+              END
+          )
+        END
       ) as total_revenue,
       SUM(
         CASE 

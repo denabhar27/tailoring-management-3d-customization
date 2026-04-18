@@ -2,7 +2,7 @@ import { useState, useEffect, Fragment, useRef } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
-import { API_BASE_URL } from '../api/config';
+import { API_BASE_URL, getImageUrl } from '../api/config';
 
 import '../adminStyle/customize.css';
 
@@ -560,6 +560,10 @@ const Customize = () => {
 
       'ready_for_pickup': 'to-pickup',
 
+      'ready_to_pickup': 'to-pickup',
+
+      'picked_up': 'to-pickup',
+
       'completed': 'completed',
 
       'cancelled': 'rejected',
@@ -588,6 +592,10 @@ const Customize = () => {
 
       'ready_for_pickup': 'To Pick up',
 
+      'ready_to_pickup': 'To Pick up',
+
+      'picked_up': 'To Pick up',
+
       'completed': 'Completed',
 
       'cancelled': 'Rejected',
@@ -602,21 +610,29 @@ const Customize = () => {
 
   const getNextStatus = (currentStatus, serviceType = 'customization', item = null) => {
 
-    if (!currentStatus || currentStatus === 'pending_review' || currentStatus === 'pending') {
+    const normalizedCurrentStatus = currentStatus === 'ready_to_pickup' ? 'ready_for_pickup' : currentStatus;
+
+    if (!normalizedCurrentStatus || normalizedCurrentStatus === 'pending_review' || normalizedCurrentStatus === 'pending') {
 
       return 'price_confirmation';
 
     }
 
-    if (currentStatus === 'price_confirmation') {
+    if (normalizedCurrentStatus === 'price_confirmation') {
 
       return 'accepted';
 
     }
 
-    if (currentStatus === 'accepted') {
+    if (normalizedCurrentStatus === 'accepted') {
 
       return 'confirmed';
+
+    }
+
+    if (normalizedCurrentStatus === 'picked_up') {
+
+      return 'completed';
 
     }
 
@@ -634,7 +650,7 @@ const Customize = () => {
 
     const flow = statusFlow[serviceType] || statusFlow['customization'];
 
-    const currentIndex = flow.indexOf(currentStatus);
+    const currentIndex = flow.indexOf(normalizedCurrentStatus);
 
     if (currentIndex === -1 || currentIndex === flow.length - 1) {
 
@@ -1804,6 +1820,11 @@ const Customize = () => {
     { key: 'sleeve_length', label: 'Sleeve Length' },
     { key: 'neck', label: 'Neck' },
     { key: 'waist', label: 'Waist' },
+    { key: 'neck_circumference', label: 'Neck Circumference' },
+    { key: 'front_length', label: 'Front Length' },
+    { key: 'back_length', label: 'Back Length' },
+    { key: 'armhole', label: 'Armhole' },
+    { key: 'bicep', label: 'Bicep' },
     { key: 'length', label: 'Length' }
   ];
 
@@ -1812,6 +1833,7 @@ const Customize = () => {
     { key: 'hips', label: 'Hips' },
     { key: 'inseam', label: 'Inseam' },
     { key: 'length', label: 'Length' },
+    { key: 'rise', label: 'Rise' },
     { key: 'thigh', label: 'Thigh' },
     { key: 'outseam', label: 'Outseam' }
   ];
@@ -1955,14 +1977,19 @@ const Customize = () => {
       }
 
       if (userMeas) {
-        const topFields = ['chest', 'shoulders', 'sleeveLength', 'neck', 'waist', 'length', 'backLength'];
-        const bottomFields = ['waist', 'hips', 'inseam', 'outseam', 'thigh', 'cuff'];
+        const topFields = ['chest', 'shoulders', 'sleeveLength', 'sleeve_length', 'neck', 'neckCircumference', 'waist', 'frontLength', 'backLength', 'length', 'armhole', 'bicep'];
+        const bottomFields = ['waist', 'hips', 'inseam', 'outseam', 'thigh', 'cuff', 'rise'];
         const topMeas = {};
         const bottomMeas = {};
 
         Object.entries(userMeas).forEach(([key, val]) => {
           if (!val) return;
-          const mappedKey = key === 'sleeveLength' ? 'sleeve_length' : key === 'backLength' ? 'length' : key;
+          const mappedKey = key === 'sleeveLength' ? 'sleeve_length'
+            : key === 'neckCircumference' ? 'neck_circumference'
+            : key === 'frontLength' ? 'front_length'
+            : key === 'backLength' ? 'back_length'
+            : key === 'sleeve_length' ? 'sleeve_length'
+            : key;
           if (topFields.includes(key)) topMeas[mappedKey] = val;
           if (bottomFields.includes(key)) bottomMeas[mappedKey] = val;
         });
@@ -2638,19 +2665,107 @@ const Customize = () => {
 
     setPriceConfirmationPrice(estimatedPrice.toFixed(2));
 
-    setPriceConfirmationReason(item.pricing_factors?.adminNotes || '');
+    setPriceConfirmationReason(parseMaybeObject(item?.pricing_factors)?.adminNotes || '');
 
     setShowPriceConfirmationModal(true);
 
   };
 
-  const handlePriceConfirmationSubmit = async () => {
+  const openPriceConfirmationReviewModal = (item) => {
+    if (!item) return;
+
+    const estimatedPrice = getEstimatedPrice(item) || parseFloat(item.final_price || 0);
+    setPriceConfirmationItem(item);
+    setPriceConfirmationPrice(estimatedPrice.toFixed(2));
+    setPriceConfirmationReason(parseMaybeObject(item?.pricing_factors)?.adminNotes || '');
+    setShowPriceConfirmationModal(true);
+  };
+
+  const handleAcceptHagglePrice = async (item) => {
+    const pricingFactors = parseMaybeObject(item?.pricing_factors);
+    const haggleOffer = parseFloat(pricingFactors?.haggleOffer || 0);
+
+    if (!Number.isFinite(haggleOffer) || haggleOffer <= 0) {
+      showToast('No valid haggle offer found.', 'error');
+      return;
+    }
+
+    try {
+      const result = await updateCustomizationOrderItem(item.item_id, {
+        approvalStatus: 'accepted',
+        finalPrice: haggleOffer,
+        adminNotes: 'Customer haggle offer accepted',
+        pricingFactors: {
+          haggleDeclined: false,
+          haggleDecision: 'accepted',
+          haggleAcceptedAt: new Date().toISOString(),
+          haggleDecisionBy: 'admin'
+        }
+      });
+
+      if (result.success) {
+        await loadCustomizationOrders();
+        showToast(`Haggle accepted at ₱${haggleOffer.toFixed(2)}.`, 'success');
+      } else {
+        showToast(result.message || 'Failed to accept haggle offer', 'error');
+      }
+    } catch (error) {
+      console.error('Accept haggle error:', error);
+      showToast('Failed to accept haggle offer', 'error');
+    }
+  };
+
+  const handleDeclineHagglePrice = async (item) => {
+    const pricingFactors = parseMaybeObject(item?.pricing_factors);
+    const haggleOffer = parseFloat(pricingFactors?.haggleOffer || 0);
+
+    if (!Number.isFinite(haggleOffer) || haggleOffer <= 0) {
+      showToast('No valid haggle offer found.', 'error');
+      return;
+    }
+
+    try {
+      const result = await updateCustomizationOrderItem(item.item_id, {
+        approvalStatus: 'price_confirmation',
+        adminNotes: `Customer haggled price (₱${haggleOffer.toFixed(2)}) was declined by admin.`,
+        pricingFactors: {
+          haggleDeclined: true,
+          haggleDecision: 'declined',
+          haggleDeclinedAt: new Date().toISOString(),
+          haggleDecisionBy: 'admin'
+        }
+      });
+
+      if (result.success) {
+        await loadCustomizationOrders();
+        showToast('Haggled price declined. Customer will see this in order tracking.', 'success');
+        setShowPriceConfirmationModal(false);
+        setPriceConfirmationItem(null);
+        setPriceConfirmationPrice('');
+        setPriceConfirmationReason('');
+      } else {
+        showToast(result.message || 'Failed to decline haggle offer', 'error');
+      }
+    } catch (error) {
+      console.error('Decline haggle error:', error);
+      showToast('Failed to decline haggle offer', 'error');
+    }
+  };
+
+  const handlePriceConfirmationSubmit = async (overridePrice = null, overrideReason = null, overrideStatus = null) => {
 
     if (!priceConfirmationItem) return;
 
-    const finalPrice = parseFloat(priceConfirmationPrice);
+    const isEventObject = overridePrice && typeof overridePrice === 'object' && (
+      typeof overridePrice.preventDefault === 'function' || 'nativeEvent' in overridePrice
+    );
+    const safeOverridePrice = isEventObject ? null : overridePrice;
+
+    const finalPrice = parseFloat(safeOverridePrice ?? priceConfirmationPrice);
     const currentPrice = parseFloat(priceConfirmationItem.final_price || 0);
     const isPriceChanged = Math.abs(finalPrice - currentPrice) > 0.01;
+    const reasonToUse = overrideReason ?? priceConfirmationReason;
+    const targetStatus = overrideStatus || 'price_confirmation';
 
     if (isNaN(finalPrice) || finalPrice <= 0) {
 
@@ -2660,7 +2775,7 @@ const Customize = () => {
 
     }
 
-    if (isPriceChanged && !priceConfirmationReason.trim()) {
+    if (isPriceChanged && !String(reasonToUse || '').trim()) {
 
       showToast("Please provide a reason for the price change", "error");
 
@@ -2672,11 +2787,11 @@ const Customize = () => {
 
       const result = await updateCustomizationOrderItem(priceConfirmationItem.item_id, {
 
-        approvalStatus: 'price_confirmation',
+        approvalStatus: targetStatus,
 
         finalPrice: finalPrice,
 
-        adminNotes: isPriceChanged ? priceConfirmationReason.trim() : undefined
+        adminNotes: isPriceChanged ? String(reasonToUse || '').trim() : undefined
 
       });
 
@@ -2686,11 +2801,11 @@ const Customize = () => {
 
         if (viewFilter !== 'all') {
 
-          setViewFilter('price-confirmation');
+          setViewFilter(targetStatus === 'accepted' ? 'accepted' : 'price-confirmation');
 
         }
 
-        showToast("Customization request moved to price confirmation!", "success");
+        showToast(targetStatus === 'accepted' ? "Customization request moved to accepted!" : "Customization request moved to price confirmation!", "success");
 
         setShowPriceConfirmationModal(false);
 
@@ -4283,11 +4398,27 @@ const Customize = () => {
                           return null;
                         })()}
 
+                        {item.approval_status === 'picked_up' && (
+                          <div style={{ marginTop: '4px', fontSize: '11px', color: '#1b5e20', fontWeight: '600' }}>
+                            Note: Picked up
+                          </div>
+                        )}
+
                       </td>
 
                       <td onClick={(e) => e.stopPropagation()}>
 
-                        {item.approval_status === 'pending_review' || item.approval_status === 'pending' || item.approval_status === null || item.approval_status === undefined || item.approval_status === '' ? (
+                        {item.approval_status === 'price_declined' ? (
+
+                          <div className="action-buttons">
+                            {renderSecondaryActionMenu({
+                              menuId: `custom-${item.item_id}-price-declined`,
+                              showDelete: isAdminUser,
+                              onDelete: () => handleDeleteOrder(item)
+                            })}
+                          </div>
+
+                        ) : item.approval_status === 'pending_review' || item.approval_status === 'pending' || item.approval_status === null || item.approval_status === undefined || item.approval_status === '' ? (
 
                           <div className="action-buttons">
 
@@ -4327,6 +4458,38 @@ const Customize = () => {
                                 </svg>
                               </button>
                             )}
+
+                            {item.approval_status === 'price_confirmation' && (() => {
+                              const haggleOffer = parseFloat(parseMaybeObject(item?.pricing_factors)?.haggleOffer || 0);
+                              if (!Number.isFinite(haggleOffer) || haggleOffer <= 0) {
+                                return null;
+                              }
+
+                              return (
+                                <>
+                                  <button
+                                    className="icon-btn"
+                                    onClick={() => {
+                                      openPriceConfirmationReviewModal(item);
+                                    }}
+                                    title={`View Haggle Offer (₱${haggleOffer.toFixed(2)})`}
+                                    style={{ backgroundColor: '#0288d1', color: 'white' }}
+                                  >
+                                    <i className="fas fa-eye"></i>
+                                  </button>
+                                  <button
+                                    className="icon-btn"
+                                    onClick={() => {
+                                      handleAcceptHagglePrice(item);
+                                    }}
+                                    title={`Accept Haggle ₱${haggleOffer.toFixed(2)}`}
+                                    style={{ backgroundColor: '#2e7d32', color: 'white' }}
+                                  >
+                                    <i className="fas fa-check"></i>
+                                  </button>
+                                </>
+                              );
+                            })()}
 
                             {item.approval_status !== 'price_confirmation' && getNextStatus(item.approval_status, 'customization', item) && (() => {
                               const nextStatus = getNextStatus(item.approval_status, 'customization', item);
@@ -4529,11 +4692,26 @@ const Customize = () => {
         const pf = typeof enhancementViewItem.pricing_factors === 'string'
           ? JSON.parse(enhancementViewItem.pricing_factors || '{}')
           : (enhancementViewItem.pricing_factors || {});
+        const parseEnhancementImageUrls = () => {
+          const raw = pf?.enhancementImageUrls;
+          if (raw == null || raw === '') return [];
+          if (Array.isArray(raw)) return raw;
+          if (typeof raw === 'string') {
+            try {
+              const parsed = JSON.parse(raw);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          }
+          return [];
+        };
+        const enhancementImages = parseEnhancementImageUrls();
         return (
           <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setShowEnhancementViewModal(false)}>
             <div className="modal-content" style={{ maxWidth: '500px' }}>
               <div className="modal-header">
-                <h2>Enhancement Request Details</h2>
+                <h2>Report / Enhancement request</h2>
                 <span className="close-modal" onClick={() => setShowEnhancementViewModal(false)}>×</span>
               </div>
               <div className="modal-body">
@@ -4544,10 +4722,33 @@ const Customize = () => {
                     ? (enhancementViewItem.walk_in_customer_name || 'Walk-in Customer')
                     : `${enhancementViewItem.first_name || ''} ${enhancementViewItem.last_name || ''}`.trim() || 'N/A'}
                 </div>
-                <div className="detail-row"><strong>Enhancement Notes:</strong></div>
+                <div className="detail-row"><strong>Report / Enhancement notes:</strong></div>
                 <div style={{ padding: '10px', backgroundColor: '#f3e5f5', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ce93d8' }}>
                   {pf.enhancementNotes || 'No notes provided'}
                 </div>
+                {enhancementImages.length > 0 && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <div className="detail-row"><strong>Photos attached:</strong></div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                      {enhancementImages.map((url, idx) => (
+                        <img
+                          key={`${url}-${idx}`}
+                          src={getImageUrl(url)}
+                          alt=""
+                          style={{
+                            width: 96,
+                            height: 96,
+                            objectFit: 'cover',
+                            borderRadius: 6,
+                            cursor: 'pointer',
+                            border: '1px solid #ddd'
+                          }}
+                          onClick={() => openImagePreview(getImageUrl(url), 'Enhancement photo')}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {pf.addAccessories && (
                   <div style={{ padding: '8px 12px', backgroundColor: '#fff3e0', borderRadius: '6px', marginBottom: '12px', border: '1px solid #ffcc80', fontSize: '13px', color: '#e65100', fontWeight: '600' }}>
                     Customer requested to add accessories - price confirmation required.
@@ -5643,6 +5844,59 @@ const Customize = () => {
 
               </div>
 
+              {(() => {
+                const pricingFactors = parseMaybeObject(priceConfirmationItem?.pricing_factors);
+                const haggleOffer = parseFloat(pricingFactors?.haggleOffer || 0);
+                if (!Number.isFinite(haggleOffer) || haggleOffer <= 0) {
+                  return null;
+                }
+
+                return (
+                  <div style={{ marginTop: '12px', padding: '10px', backgroundColor: '#f7f2ed', borderRadius: '6px', border: '1px solid rgba(139, 69, 19, 0.28)', maxWidth: '460px', marginLeft: 'auto', marginRight: 'auto', textAlign: 'center' }}>
+                    <div style={{ fontWeight: 700, color: 'rgb(139, 69, 19)' }}>Customer Haggle Offer</div>
+                    <div style={{ marginTop: '4px', color: '#5b3a1f' }}>₱{haggleOffer.toFixed(2)}</div>
+                    <div style={{ marginTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <button
+                        type="button"
+                        className="btn-cancel"
+                        onClick={() => {
+                          handleDeclineHagglePrice(priceConfirmationItem);
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          fontSize: '13px',
+                          background: '#6c757d',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontWeight: 600,
+                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)'
+                        }}
+                      >
+                        Decline Haggled Price
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-save"
+                        onClick={() => handlePriceConfirmationSubmit(haggleOffer.toFixed(2), priceConfirmationReason || 'Customer haggle offer', 'accepted')}
+                        style={{
+                          padding: '8px 12px',
+                          fontSize: '13px',
+                          background: 'rgb(139, 69, 19)',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontWeight: 600,
+                          boxShadow: '0 4px 12px rgba(139, 69, 19, 0.3)'
+                        }}
+                      >
+                        Accept Haggled Price
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="payment-form-group" style={{ marginTop: '12px' }}>
 
                 <label>Reason for Price Change <span style={{ color: '#666', fontSize: '12px' }}>(required only if price changes)</span></label>
@@ -5736,139 +5990,22 @@ const Customize = () => {
                   <p className="measurement-title" style={{ marginTop: 0, marginBottom: '15px', color: '#000', textAlign: 'center', fontWeight: '600', fontSize: '16px', padding: 0 }}>Primary Customer - Top Measurements</p>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-
-                    <div className="form-group">
-
-                      <label>Chest (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.chest || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, chest: e.target.value } })}
-
-                        placeholder="Enter chest measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Shoulders (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.shoulders || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, shoulders: e.target.value } })}
-
-                        placeholder="Enter shoulder measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Sleeve Length (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.sleeve_length || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, sleeve_length: e.target.value } })}
-
-                        placeholder="Enter sleeve length"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Neck (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.neck || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, neck: e.target.value } })}
-
-                        placeholder="Enter neck measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Waist (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.waist || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, waist: e.target.value } })}
-
-                        placeholder="Enter waist measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Length (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.top.length || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, length: e.target.value } })}
-
-                        placeholder="Enter length measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
+                    {topMeasurementFields.map((field) => {
+                      const value = measurements.top[field.key] ?? '';
+                      return (
+                        <div className="form-group" key={`top-${field.key}`}>
+                          <label>{field.label} (inches)</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={value}
+                            onChange={(e) => setMeasurements({ ...measurements, top: { ...measurements.top, [field.key]: e.target.value } })}
+                            placeholder={`Enter ${field.label.toLowerCase()} measurement`}
+                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
 
                 </div>
@@ -5877,139 +6014,22 @@ const Customize = () => {
                   <p className="measurement-title" style={{ marginTop: 0, marginBottom: '15px', color: '#000', textAlign: 'center', fontWeight: '600', fontSize: '16px', padding: 0 }}>Primary Customer - Bottom Measurements</p>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-
-                    <div className="form-group">
-
-                      <label>Waist (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.waist || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, waist: e.target.value } })}
-
-                        placeholder="Enter waist measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Hips (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.hips || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, hips: e.target.value } })}
-
-                        placeholder="Enter hip measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Inseam (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.inseam || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, inseam: e.target.value } })}
-
-                        placeholder="Enter inseam measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Length (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.length || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, length: e.target.value } })}
-
-                        placeholder="Enter length measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Thigh (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.thigh || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, thigh: e.target.value } })}
-
-                        placeholder="Enter thigh measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
-                    <div className="form-group">
-
-                      <label>Outseam (inches)</label>
-
-                      <input
-
-                        type="number"
-
-                        step="0.1"
-
-                        value={measurements.bottom.outseam || ''}
-
-                        onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, outseam: e.target.value } })}
-
-                        placeholder="Enter outseam measurement"
-
-                        style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-
-                      />
-
-                    </div>
-
+                    {bottomMeasurementFields.map((field) => {
+                      const value = measurements.bottom[field.key] ?? '';
+                      return (
+                        <div className="form-group" key={`bottom-${field.key}`}>
+                          <label>{field.label} (inches)</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={value}
+                            onChange={(e) => setMeasurements({ ...measurements, bottom: { ...measurements.bottom, [field.key]: e.target.value } })}
+                            placeholder={`Enter ${field.label.toLowerCase()} measurement`}
+                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
 
                 </div>

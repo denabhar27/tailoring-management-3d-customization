@@ -41,6 +41,7 @@ router.post('/items/:id/payment', orderController.recordRentalPayment);
 
 router.post('/:itemId/accept-price', orderPriceController.acceptPrice);
 router.post('/:itemId/decline-price', orderPriceController.declinePrice);
+router.post('/:itemId/haggle-price', orderPriceController.hagglePrice);
 
 router.get('/items/:itemId', orderController.getOrderItemDetails);
 

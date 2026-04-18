@@ -2,6 +2,33 @@ import { useEffect, useState } from 'react';
 import styles from './CustomizationPanel.module.css';
 import { API_BASE_URL } from '../../api/config';
 
+const OWN_MEASUREMENT_SECTIONS = [
+  {
+    title: 'Upper Garment',
+    fields: [
+      { field: 'chest', label: 'Chest' },
+      { field: 'waist', label: 'Waist' },
+      { field: 'hips', label: 'Hips' },
+      { field: 'shoulders', label: 'Shoulders' },
+      { field: 'neckCircumference', label: 'Neck Circumference' },
+      { field: 'frontLength', label: 'Front Length' },
+      { field: 'backLength', label: 'Back Length' },
+      { field: 'sleeveLength', label: 'Sleeve Length' },
+      { field: 'armhole', label: 'Armhole' },
+      { field: 'bicep', label: 'Bicep' }
+    ]
+  },
+  {
+    title: 'Lower Garment (if applicable)',
+    fields: [
+      { field: 'inseam', label: 'Inseam' },
+      { field: 'outseam', label: 'Outseam' },
+      { field: 'rise', label: 'Rise' },
+      { field: 'thigh', label: 'Thigh' }
+    ]
+  }
+];
+
 export default function CustomizationPanel({ garment, setGarment, size, setSize, fit, setFit, modelSize, setModelSize, colors, setColors, fabric, setFabric, patterns, pattern, setPattern, fabrics, designImage, setDesignImage, notes, setNotes, buttons, setButtons, accessories, setAccessories, pantsType, setPantsType, style, setStyle, onReview, customModels = [], measurements, setMeasurements, userMeasurements, setUserMeasurements, provideOwnMeasurements, setProvideOwnMeasurements, garmentTypes = [] }) {
   const [selectedButtonModel, setSelectedButtonModel] = useState('/orange button 3d model.glb');
   const [selectedAccessoryModel, setSelectedAccessoryModel] = useState('/accessories/gold lion pendant 3d model.glb');
@@ -1054,25 +1081,30 @@ export default function CustomizationPanel({ garment, setGarment, size, setSize,
 
           {provideOwnMeasurements && (
             <div className={styles.userMeasurementsForm}>
-              <div className={styles.measurementsGrid}>
-                {getGarmentMeasurements().map((measurement) => (
-                  <div key={measurement.field} className={styles.measurementField}>
-                    <label className={styles.measurementLabel}>
-                      <span>{measurement.label} ({measurement.unit})</span>
-                      <input
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        max="100"
-                        value={userMeasurements?.[measurement.field] || ''}
-                        onChange={(e) => updateUserMeasurement(measurement.field, e.target.value)}
-                        placeholder={`Enter ${measurement.label.toLowerCase()}`}
-                        className={styles.measurementInput}
-                      />
-                    </label>
+              {OWN_MEASUREMENT_SECTIONS.map((section) => (
+                <div key={section.title} className={styles.measurementSection}>
+                  <div className={styles.measurementSectionTitle}>{section.title}</div>
+                  <div className={styles.measurementsGrid}>
+                    {section.fields.map((measurement) => (
+                      <div key={measurement.field} className={styles.measurementField}>
+                        <label className={styles.measurementLabel}>
+                          <span>{measurement.label} (inches)</span>
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            max="120"
+                            value={userMeasurements?.[measurement.field] ?? ''}
+                            onChange={(e) => updateUserMeasurement(measurement.field, e.target.value)}
+                            placeholder={`Enter ${measurement.label.toLowerCase()}`}
+                            className={styles.measurementInput}
+                          />
+                        </label>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
               <div className={styles.measurementNote}>
                 <small>💡 These measurements are optional and will be shown to the admin. The admin can update them if you choose to be re-measured at the store.</small>
               </div>

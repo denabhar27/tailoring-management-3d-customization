@@ -580,7 +580,7 @@ exports.getAvailableQuantity = (req, res) => {
       FROM cart 
       WHERE service_type = 'rental' 
         AND (service_id = ? OR JSON_EXTRACT(specific_data, '$.bundle_items[*].id') LIKE ?)
-        AND status = 'active'
+        AND (expires_at IS NULL OR expires_at > NOW())
     `;
 
     const db = require('../config/db');

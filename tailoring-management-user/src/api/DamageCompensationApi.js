@@ -12,10 +12,29 @@ const getAuthHeader = () => {
 
 export const createCompensationIncident = async (payload) => {
   try {
+    const hasImage = payload?.disputeImageFile instanceof File;
+    let requestBody;
+    let requestHeaders;
+
+    if (hasImage) {
+      const formData = new FormData();
+      Object.entries(payload || {}).forEach(([key, value]) => {
+        if (key === 'disputeImageFile' || value === undefined || value === null) return;
+        formData.append(key, value);
+      });
+      formData.append('disputeImage', payload.disputeImageFile);
+      const token = localStorage.getItem('token');
+      requestHeaders = { Authorization: `Bearer ${token}` };
+      requestBody = formData;
+    } else {
+      requestHeaders = getAuthHeader();
+      requestBody = JSON.stringify(payload);
+    }
+
     const response = await fetch(`${API_URL_DAMAGE}/compensation-incidents`, {
       method: 'POST',
-      headers: getAuthHeader(),
-      body: JSON.stringify(payload)
+      headers: requestHeaders,
+      body: requestBody
     });
 
     if (!response.ok) {

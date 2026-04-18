@@ -1,6 +1,6 @@
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, ContactShadows, Stage } from '@react-three/drei';
-import { useCallback, useEffect, Suspense, useState } from 'react';
+import { OrbitControls, ContactShadows, useGLTF, useProgress } from '@react-three/drei';
+import { useCallback, useEffect, Suspense, useState, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import GarmentModel from './GarmentModel';
 import DraggableButton from './DraggableButton';
@@ -106,12 +106,18 @@ const isMobile = () => {
 };
 
 function LoadingFallback() {
-  return (
-    <mesh>
-      <boxGeometry args={[1, 2, 0.5]} />
-      <meshStandardMaterial color="#cccccc" transparent opacity={0.5} />
-    </mesh>
-  );
+  return null;
+}
+
+function LoadingProgressBridge({ onProgressChange }) {
+  const { progress, loaded, total, active } = useProgress();
+
+  useEffect(() => {
+    const safePercent = Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : 0;
+    onProgressChange({ percent: safePercent, loaded, total, active });
+  }, [progress, loaded, total, active, onProgressChange]);
+
+  return null;
 }
 
 export default function Viewer3D({ garment, size, fit, modelSize, colors, fabric, pattern, style, measurements, personalization, buttons, setButtons, accessories, setAccessories, pantsType, customModels = [], patterns = [] }) {
@@ -125,17 +131,77 @@ export default function Viewer3D({ garment, size, fit, modelSize, colors, fabric
   const [webglSupported, setWebglSupported] = useState(true);
   const [renderError, setRenderError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingPercent, setLoadingPercent] = useState(0);
+  const loadedModelKeysRef = useRef(new Set());
 
   const isMobileDevice = isMobile();
-  const devicePixelRatio = isMobileDevice ? [1, 1] : [1, 2];
+  const devicePixelRatio = isMobileDevice ? [0.8, 1] : [1, 1.5];
+
+  const activeModelKey = useMemo(() => {
+    if (garment === 'pants') {
+      return `pants:${pantsType}`;
+    }
+
+    if (garment?.startsWith('custom-')) {
+      return `custom:${garment}`;
+    }
+
+    const coatVariants = ['coat-men', 'coat-men-plain', 'coat-women', 'coat-women-plain', 'coat-teal'];
+    if (coatVariants.includes(garment)) {
+      return `${garment}:${modelSize}`;
+    }
+
+    return `${garment || 'none'}`;
+  }, [garment, pantsType, modelSize]);
 
   useEffect(() => {
-
-    const timer = setTimeout(() => {
+    if (loadedModelKeysRef.current.has(activeModelKey)) {
       setIsLoading(false);
-    }, isMobileDevice ? 3000 : 2000);
-    return () => clearTimeout(timer);
-  }, [canvasKey, isMobileDevice]);
+      setLoadingPercent(100);
+      return;
+    }
+
+    setIsLoading(true);
+    setLoadingPercent(0);
+  }, [activeModelKey]);
+
+  useEffect(() => {
+    const builtInModelPaths = [
+      '/teal long coat 3d model.glb',
+      '/black blazer 3d model.glb',
+      '/black blazer plain 3d model.glb',
+      '/blazer 3d model.glb',
+      '/blazer 3d women plain model.glb',
+      '/barong tagalog shirt 3d model.glb',
+      '/business suit 3d model.glb',
+      '/business suit 3d model (1).glb',
+      '/pants 3d model.glb',
+      '/dress pants 3d model.glb',
+      '/denim jeans 3d model.glb',
+      '/short3d/blazer short model.glb',
+      '/short3d/blazer short plain M model.glb',
+      '/short3d/blazer W short model.glb',
+      '/short3d/blazer woman short plain model.glb',
+      '/short3d/trench coat 3d  short model.glb'
+    ];
+
+    const preloadModels = () => {
+      builtInModelPaths.forEach((path) => useGLTF.preload(path));
+    };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(preloadModels, { timeout: 1200 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timerId = window.setTimeout(preloadModels, 600);
+    return () => window.clearTimeout(timerId);
+  }, []);
+
+  const handleProgressChange = useCallback(({ percent, active }) => {
+    if (!isLoading) return;
+    setLoadingPercent(active ? percent : Math.max(percent, 95));
+  }, [isLoading]);
 
   useEffect(() => {
     const supported = isWebGLSupported();
@@ -225,61 +291,79 @@ export default function Viewer3D({ garment, size, fit, modelSize, colors, fabric
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'rgba(255,255,255,0.9)',
+          background: 'rgba(255, 255, 255, 0.92)',
           zIndex: 10
         }}>
           <div style={{
-            width: '50px',
-            height: '50px',
-            border: '4px solid #f3f3f3',
-            borderTop: '4px solid #667eea',
+            width: '52px',
+            height: '52px',
             borderRadius: '50%',
-            animation: 'spin 1s linear infinite'
+            border: '4px solid #e4e4e4',
+            borderTopColor: '#7B3F1A',
+            animation: 'viewerSpin 0.9s linear infinite'
           }} />
-          <p style={{ marginTop: '15px', color: '#666', fontSize: '14px' }}>Loading 3D Model...</p>
-          <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+          <p style={{ marginTop: '14px', color: '#666', fontSize: '14px', letterSpacing: '0.3px' }}>Loading 3D customization... {loadingPercent}%</p>
+          <style>{`@keyframes viewerSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
       )}
       <Canvas
         key={canvasKey}
         camera={{ position: [0, 1.6, 5], fov: 50 }}
-        shadows
+        shadows={!isMobileDevice}
         dpr={devicePixelRatio}
         onCreated={({ gl }) => {
           console.log('Canvas created successfully, WebGL version:', gl.capabilities.isWebGL2 ? 'WebGL2' : 'WebGL1');
 
           gl.domElement.addEventListener('webglcontextlost', handleContextLost, false);
           gl.domElement.addEventListener('webglcontextrestored', handleContextRestored, false);
-
-          setTimeout(() => setIsLoading(false), 500);
         }}
         onError={(error) => {
           console.error('Canvas error:', error);
           setRenderError(error?.message || 'Failed to render 3D view');
           setIsLoading(false);
+          setLoadingPercent(100);
         }}
         gl={{
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.4,
           preserveDrawingBuffer: true,
           powerPreference: isMobile() ? 'default' : 'high-performance',
-          antialias: !isMobile(),
+          antialias: false,
           failIfMajorPerformanceCaveat: false,
         }}
       >
         <color attach="background" args={[1, 1, 1]} />
         <fog attach="fog" args={[0xffffff, 10, 30]} />
-        <Stage intensity={0.6} adjustCamera={false} shadows="accumulative" environment={null}>
-          <Suspense fallback={<LoadingFallback />}>
-            <GarmentModel garment={garment} size={size} fit={fit} modelSize={modelSize} colors={colors} fabric={fabric} pattern={pattern} style={style} measurements={measurements} personalization={personalization} pantsType={pantsType} customModels={customModels} patterns={patterns} />
-          </Suspense>
-        </Stage>
+        <LoadingProgressBridge onProgressChange={handleProgressChange} />
+        <Suspense fallback={<LoadingFallback />}>
+          <GarmentModel
+            garment={garment}
+            size={size}
+            fit={fit}
+            modelSize={modelSize}
+            colors={colors}
+            fabric={fabric}
+            pattern={pattern}
+            style={style}
+            measurements={measurements}
+            personalization={personalization}
+            pantsType={pantsType}
+            customModels={customModels}
+            patterns={patterns}
+            onReady={() => {
+              loadedModelKeysRef.current.add(activeModelKey);
+              setLoadingPercent(100);
+              setIsLoading(false);
+            }}
+          />
+        </Suspense>
         <directionalLight position={[4, 6, -3]} intensity={0.8} color="#ffffff" />
         <directionalLight position={[-5, 3, 5]} intensity={0.5} color="#ffffff" />
         <directionalLight position={[0, 5, 0]} intensity={0.3} color="#ffffff" />
-        <ambientLight intensity={0.6} />
+        <hemisphereLight args={["#ffffff", "#d9dde3", 0.32]} />
+        <ambientLight intensity={0.72} />
 
-        <ContactShadows position={[0, 0, 0]} opacity={0.4} scale={10} blur={2.6} far={4.5} />
+        {!isMobileDevice && <ContactShadows position={[0, 0, 0]} opacity={0.3} scale={8} blur={2.2} far={4.5} />}
         <OrbitControls enablePan={false} enabled={!isAnyButtonMoving && !isAnyAccessoryMoving} />
         <CameraController />
         {buttons && buttons.map((btn) => (

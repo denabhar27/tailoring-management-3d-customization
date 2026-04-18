@@ -162,8 +162,12 @@ exports.createCompensationIncident = (req, res) => {
     compensation_amount,
     compensation_type,
     clothe_description,
-    notes
+    notes,
+    incident_image_url
   } = req.body;
+
+  const uploadedImageUrl = req.file ? `/uploads/dispute-images/${req.file.filename}` : null;
+  const incidentImageUrl = uploadedImageUrl || incident_image_url || null;
 
   if (!order_item_id || !service_type || !customer_name || !damage_type) {
     return res.status(400).json({
@@ -231,6 +235,7 @@ exports.createCompensationIncident = (req, res) => {
     compensation_amount: amount,
     compensation_type: compensation_type || 'money',
     clothe_description: clothe_description || null,
+    incident_image_url: incidentImageUrl,
     notes: notes || null,
     liability_status: 'pending',
     compensation_status: 'unpaid'

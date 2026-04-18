@@ -4,13 +4,6 @@ import * as THREE from 'three';
 import CustomModelLoader from './CustomModelLoader';
 import { API_BASE_URL } from '../../api/config';
 
-const isMobile = () => {
-  return typeof window !== 'undefined' && (
-    window.IS_REACT_NATIVE_WEBVIEW ||
-    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-  );
-};
-
 const logModelLoad = (name, scene) => {
   if (scene) {
     console.log(`✅ Model loaded: ${name}`, scene);
@@ -92,7 +85,36 @@ function makeBump() {
   return tex;
 }
 
-export default function GarmentModel({ garment, size, fit, modelSize, colors, fabric, pattern, style, measurements, personalization, pantsType, customModels = [], patterns = [] }) {
+function toManagedPhysicalMaterial(material, materialProps, fabricColor, map) {
+  let nextMaterial = material;
+
+  if (!(nextMaterial instanceof THREE.MeshPhysicalMaterial)) {
+    if (nextMaterial && typeof nextMaterial.dispose === 'function') {
+      nextMaterial.dispose();
+    }
+    nextMaterial = new THREE.MeshPhysicalMaterial();
+  } else if (!nextMaterial.userData?.__tailoringManaged) {
+    // Clone once to avoid mutating shared GLTF materials across model variants.
+    nextMaterial = nextMaterial.clone();
+  }
+
+  nextMaterial.userData = {
+    ...(nextMaterial.userData || {}),
+    __tailoringManaged: true
+  };
+
+  nextMaterial.setValues(materialProps);
+  nextMaterial.color.copy(fabricColor);
+  if (nextMaterial.sheenColor) {
+    nextMaterial.sheenColor.copy(fabricColor);
+  }
+  nextMaterial.map = map || null;
+  nextMaterial.needsUpdate = true;
+
+  return nextMaterial;
+}
+
+export default function GarmentModel({ garment, size, fit, modelSize, colors, fabric, pattern, style, measurements, personalization, pantsType, customModels = [], patterns = [], onReady }) {
   const baseColor = colors.fabric;
   const accent = colors.stitching;
 
@@ -326,11 +348,16 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
     const opacity = garment === 'barong' ? Math.max(0.15, Math.min(0.85, style.transparency || 0.35)) : 1;
 
     const brightness = (0.299 * fabricColor.r + 0.587 * fabricColor.g + 0.114 * fabricColor.b);
+    const isVeryDark = brightness < 0.25;
+    const isDark = brightness < 0.38;
 
-    const adjustedSheen = brightness < 0.3 ? 0.2 : brightness < 0.5 ? 0.4 : 1.0;
+    // Keep dark colors visible but with a more matte finish.
+    const adjustedSheen = isVeryDark ? 0.5 : isDark ? 0.38 : 0.34;
+    const adjustedRoughness = isVeryDark ? Math.max(0.38, rough * 0.9) : isDark ? Math.max(0.46, rough * 0.96) : rough;
+    const emissiveIntensity = isVeryDark ? 0.045 : isDark ? 0.022 : 0.0;
 
     return {
-      roughness: rough,
+      roughness: adjustedRoughness,
       metalness: metal,
       map,
       color: fabricColor,
@@ -338,6 +365,8 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
       opacity,
       sheen: adjustedSheen,
       sheenColor: fabricColor,
+      emissive: fabricColor.clone(),
+      emissiveIntensity,
       bumpMap: bump,
       bumpScale
     };
@@ -353,39 +382,23 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
   const buttonColor = new THREE.Color(colors.button);
   const liningColor = new THREE.Color(colors.lining);
 
-  const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [modelError, setModelError] = useState(null);
+  const readyNotifiedRef = useRef(false);
+  const [customModelReady, setCustomModelReady] = useState(false);
 
-  const isMobileDevice = isMobile();
+  const selectedBuiltInGarmentPath = useMemo(() => {
+    if (garment === 'coat-men') return modelSize === 'short' ? '/short3d/blazer short model.glb' : '/black blazer 3d model.glb';
+    if (garment === 'coat-men-plain') return modelSize === 'short' ? '/short3d/blazer short plain M model.glb' : '/black blazer plain 3d model.glb';
+    if (garment === 'coat-women') return modelSize === 'short' ? '/short3d/blazer W short model.glb' : '/blazer 3d model.glb';
+    if (garment === 'coat-women-plain') return modelSize === 'short' ? '/short3d/blazer woman short plain model.glb' : '/blazer 3d women plain model.glb';
+    if (garment === 'coat-teal') return modelSize === 'short' ? '/short3d/trench coat 3d  short model.glb' : '/teal long coat 3d model.glb';
+    if (garment === 'barong') return '/barong tagalog shirt 3d model.glb';
+    if (garment === 'suit-1') return '/business suit 3d model.glb';
+    if (garment === 'suit-2') return '/business suit 3d model (1).glb';
+    return null;
+  }, [garment, modelSize]);
 
-  const blackBlazer = useGLTF('/black blazer 3d model.glb');
-  const blackBlazerPlain = useGLTF('/black blazer plain 3d model.glb');
-  const blazerWomen = useGLTF('/blazer 3d model.glb');
-  const blazerWomenPlain = useGLTF('/blazer 3d women plain model.glb');
-  const tealCoat = useGLTF('/teal long coat 3d model.glb');
-  const barongModel = useGLTF('/barong tagalog shirt 3d model.glb');
-  const suit1 = useGLTF('/business suit 3d model.glb');
-  const suit2 = useGLTF('/business suit 3d model (1).glb');
-  const pantsCasualMen = useGLTF('/pants 3d model.glb');
-  const pantsFormalMen = useGLTF('/dress pants 3d model.glb');
-  const pantsFormalWomen = useGLTF('/denim jeans 3d model.glb');
-
-  const blackBlazerShort = useGLTF('/short3d/blazer short model.glb');
-  const blackBlazerPlainShort = useGLTF('/short3d/blazer short plain M model.glb');
-  const blazerWomenShort = useGLTF('/short3d/blazer W short model.glb');
-  const blazerWomenPlainShort = useGLTF('/short3d/blazer woman short plain model.glb');
-  const tealCoatShort = useGLTF('/short3d/trench coat 3d  short model.glb');
-
-  useEffect(() => {
-    console.log('🔄 Model loading status...');
-    console.log('Current garment type:', garment);
-    console.log('Is mobile:', isMobileDevice);
-
-    if (blackBlazer?.scene) {
-      setModelsLoaded(true);
-      console.log('✅ Models loaded successfully');
-    }
-  }, [garment, modelSize, blackBlazer?.scene, isMobileDevice]);
+  // Load only the currently active built-in garment model, not all models at startup.
+  const activeBuiltInGarmentGltf = useGLTF(selectedBuiltInGarmentPath || '/business suit 3d model.glb');
 
   const matchingCustomModel = useMemo(() => {
     if (!customModels || customModels.length === 0) {
@@ -433,44 +446,10 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
     return null;
   }, [customModels, garment]);
 
-  let selectedModel = null;
-  let use3DModel = false;
-  let isCustomModel = false;
+  const selectedModel = selectedBuiltInGarmentPath ? activeBuiltInGarmentGltf?.scene : null;
+  const use3DModel = !!matchingCustomModel || !!selectedModel;
 
-  if (matchingCustomModel) {
-    use3DModel = true;
-    isCustomModel = true;
-
-  } else {
-
-  if (garment === 'coat-men') {
-    use3DModel = true;
-    selectedModel = modelSize === 'short' ? blackBlazerShort.scene : blackBlazer.scene;
-  } else if (garment === 'coat-men-plain') {
-    use3DModel = true;
-    selectedModel = modelSize === 'short' ? blackBlazerPlainShort.scene : blackBlazerPlain.scene;
-  } else if (garment === 'coat-women') {
-    use3DModel = true;
-    selectedModel = modelSize === 'short' ? blazerWomenShort.scene : blazerWomen.scene;
-  } else if (garment === 'coat-women-plain') {
-    use3DModel = true;
-    selectedModel = modelSize === 'short' ? blazerWomenPlainShort.scene : blazerWomenPlain.scene;
-  } else if (garment === 'coat-teal') {
-    use3DModel = true;
-    selectedModel = modelSize === 'short' ? tealCoatShort.scene : tealCoat.scene;
-  } else if (garment === 'barong') {
-    use3DModel = true;
-    selectedModel = barongModel.scene;
-  } else if (garment === 'suit-1') {
-    use3DModel = true;
-    selectedModel = suit1.scene;
-  } else if (garment === 'suit-2') {
-    use3DModel = true;
-    selectedModel = suit2.scene;
-  }
-  }
-
-  const modelScene = useMemo(() => selectedModel ? selectedModel.clone() : null, [selectedModel, pattern, imageTexture]);
+  const modelScene = useMemo(() => selectedModel ? selectedModel.clone() : null, [selectedModel]);
 
   const sizeScale = useMemo(() => {
     let baseScale;
@@ -506,20 +485,11 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
 
       modelScene.traverse((child) => {
         if (child.isMesh) {
-
-          if (child.material && child.material.dispose) {
-            child.material.dispose();
+          if (Array.isArray(child.material)) {
+            child.material = child.material.map((mat) => toManagedPhysicalMaterial(mat, materialProps, fabricColor, map));
+          } else {
+            child.material = toManagedPhysicalMaterial(child.material, materialProps, fabricColor, map);
           }
-
-          const newMaterial = new THREE.MeshPhysicalMaterial({
-            ...materialProps,
-            color: fabricColor.clone(),
-            sheenColor: fabricColor.clone(),
-            map: map,
-            needsUpdate: true
-          });
-          newMaterial.needsUpdate = true;
-          child.material = newMaterial;
           child.castShadow = true;
           child.receiveShadow = true;
         }
@@ -527,21 +497,21 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
     }
   }, [modelScene, garment, materialProps, use3DModel, fabricColor, pattern, imageTexture, map]);
 
+  const selectedPantsPath = useMemo(() => {
+    if (pantsType === 'formal-men') return '/dress pants 3d model.glb';
+    if (pantsType === 'formal-women') return '/denim jeans 3d model.glb';
+    return '/pants 3d model.glb';
+  }, [pantsType]);
+
+  // Keep this single pants loader cached and switch source when pants type changes.
+  const activePantsGltf = useGLTF(selectedPantsPath);
+
   const pantsModel = useMemo(() => {
     if (garment !== 'pants') return null;
+    return activePantsGltf?.scene || null;
+  }, [garment, activePantsGltf]);
 
-    if (pantsType === 'casual-men') {
-      return pantsCasualMen.scene;
-    } else if (pantsType === 'formal-men') {
-      return pantsFormalMen.scene;
-    } else if (pantsType === 'formal-women') {
-      return pantsFormalWomen.scene;
-    }
-
-    return pantsCasualMen.scene;
-  }, [garment, pantsType, pantsCasualMen.scene, pantsFormalMen.scene, pantsFormalWomen.scene]);
-
-  const pantsModelScene = useMemo(() => pantsModel ? pantsModel.clone() : null, [pantsModel, pattern, imageTexture]);
+  const pantsModelScene = useMemo(() => pantsModel ? pantsModel.clone() : null, [pantsModel]);
 
   useLayoutEffect(() => {
     if (pantsModelScene) {
@@ -551,20 +521,11 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
 
       pantsModelScene.traverse((child) => {
         if (child.isMesh) {
-
-          if (child.material && child.material.dispose) {
-            child.material.dispose();
+          if (Array.isArray(child.material)) {
+            child.material = child.material.map((mat) => toManagedPhysicalMaterial(mat, materialProps, fabricColor, map));
+          } else {
+            child.material = toManagedPhysicalMaterial(child.material, materialProps, fabricColor, map);
           }
-
-          const newMaterial = new THREE.MeshPhysicalMaterial({
-            ...materialProps,
-            color: fabricColor.clone(),
-            sheenColor: fabricColor.clone(),
-            map: map,
-            needsUpdate: true
-          });
-          newMaterial.needsUpdate = true;
-          child.material = newMaterial;
           child.castShadow = true;
           child.receiveShadow = true;
         }
@@ -616,6 +577,38 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
     console.log('✗ No custom model match found - will use built-in model');
     return null;
   }, [garment, customModels, matchingCustomModel]);
+
+  useEffect(() => {
+    setCustomModelReady(false);
+    readyNotifiedRef.current = false;
+  }, [garment, customModelToRender?.file_url]);
+
+  useEffect(() => {
+    const modelIsReady = !!(
+      (garment === 'pants' && pantsModelScene) ||
+      (customModelToRender && customModelToRender.file_url && customModelReady) ||
+      ((garment.startsWith('coat') || garment.startsWith('suit') || garment === 'barong') && modelScene)
+    );
+
+    const textureIsReady = !isLoadingTexture;
+
+    if (modelIsReady && textureIsReady && !readyNotifiedRef.current) {
+      readyNotifiedRef.current = true;
+      onReady?.();
+    }
+
+    if (!modelIsReady || !textureIsReady) {
+      readyNotifiedRef.current = false;
+    }
+  }, [
+    garment,
+    pantsModelScene,
+    customModelToRender,
+    customModelReady,
+    modelScene,
+    isLoadingTexture,
+    onReady
+  ]);
 
   if (garment === 'pants') {
     if (!pantsModelScene) {
@@ -670,6 +663,7 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
             pattern={pattern}
             onLoad={() => {
               console.log('✓ Custom model loaded successfully:', customModelToRender.model_name);
+              setCustomModelReady(true);
             }}
           />
         </Suspense>
@@ -727,7 +721,9 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
             fabricColor={fabricColor}
             map={map}
             pattern={pattern}
-            onLoad={() => {}}
+            onLoad={() => {
+              setCustomModelReady(true);
+            }}
           />
           {personalization.initials && (
             <Text position={[0, 1.5, 0.3]} fontSize={personalization.size * 0.25} color={colors.stitching}>
@@ -766,7 +762,9 @@ export default function GarmentModel({ garment, size, fit, modelSize, colors, fa
           fabricColor={fabricColor}
           map={map}
           pattern={pattern}
-          onLoad={() => {}}
+          onLoad={() => {
+            setCustomModelReady(true);
+          }}
         />
         {personalization.initials && (
           <Text position={[0, 1.5, 0.3]} fontSize={personalization.size * 0.25} color={colors.stitching}>

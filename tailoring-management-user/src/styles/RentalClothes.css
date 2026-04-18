@@ -2379,6 +2379,139 @@
 
 }
 
+/* Guest rental section refinement to match reference */
+.rental .section-header.rc-rental-head {
+  margin-bottom: 34px;
+}
+
+.rc-rental-eyebrow {
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  font-size: 10px;
+  font-weight: 700;
+  color: #b7a188;
+}
+
+.rc-rental-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.rc-select-multiple-btn {
+  border: 1px solid #d9c6b1;
+  background: #f5eee6;
+  color: #6b4a2f;
+  border-radius: 0;
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rc-select-multiple-btn:hover {
+  background: #ecdfd1;
+}
+
+.rc-select-multiple-btn.active {
+  border-color: #8f5825;
+  background: #8f5825;
+  color: #fff;
+}
+
+.rc-rental-card-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.rc-multi-select-indicator {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #cdb8a0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(47, 32, 23, 0.12);
+}
+
+.rc-multi-select-indicator.selected {
+  background: #8f5825;
+  border-color: #8f5825;
+}
+
+.rc-card-image-select-mode {
+  opacity: 0.9;
+  cursor: pointer;
+}
+
+.rental .rental-card {
+  border-radius: 0;
+  box-shadow: none;
+  border: 1px solid #e8ddd0;
+  background: #fff;
+}
+
+.rental .rental-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(91, 56, 29, 0.12);
+}
+
+.rental .rental-card img {
+  height: 285px;
+  object-fit: cover;
+  background: #f7f4ef;
+}
+
+.rental .rental-info {
+  padding: 18px 16px 14px !important;
+}
+
+.rental .btn-view {
+  border-radius: 0;
+  border: none;
+  background: linear-gradient(90deg, #7a4317 0%, #c79a5e 100%);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 10px;
+  padding: 12px 12px;
+}
+
+.rental .btn-view:hover {
+  background: linear-gradient(90deg, #6d3b14 0%, #b78c54 100%);
+}
+
+.rc-see-more-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+.rc-see-more-btn {
+  color: #6f5a45;
+  cursor: pointer;
+  font-size: 20px;
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  transition: color 0.2s ease;
+}
+
+.rc-see-more-btn:hover {
+  color: #4f2b12;
+}
+
 
 
 /* View modal refresh inspired by clean reference layout */

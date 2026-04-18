@@ -3406,6 +3406,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
           <div className="rc-rental-title-wrap">
 
+            <p className="rc-rental-eyebrow">Wardrobe Collection</p>
             <h2 className="rc-rental-title">{showAll ? 'All Rental Clothes' : 'Rental Clothes'}</h2>
 
             {showAll && (
@@ -3416,9 +3417,10 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
           </div>
 
-          <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="rc-rental-actions">
 
             <button
+              className={`rc-select-multiple-btn ${isMultiSelectMode ? 'active' : ''}`}
 
               onClick={() => {
 
@@ -3441,34 +3443,6 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                   setIsMultiSelectMode(true);
 
                 }
-
-              }}
-
-              style={{
-
-                padding: '8px 16px',
-
-                borderRadius: '20px',
-
-                border: isMultiSelectMode ? '2px solid #8f2f2f' : '2px solid #8f5825',
-
-                backgroundColor: isMultiSelectMode ? '#8f2f2f' : '#8f5825',
-
-                color: 'white',
-
-                cursor: 'pointer',
-
-                fontSize: '14px',
-
-                fontWeight: '600',
-
-                transition: 'all 0.3s ease',
-
-                display: 'flex',
-
-                alignItems: 'center',
-
-                whiteSpace: 'nowrap'
 
               }}
 
@@ -3598,19 +3572,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
             displayItems.map((item, i) => (
 
-            <div
-
-              key={i}
-
-              style={{
-
-                display: 'flex',
-
-                flexDirection: 'column',
-
-              }}
-
-            >
+            <div key={i} className="rc-rental-card-wrap">
 
               <div
 
@@ -3620,7 +3582,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                   position: 'relative',
 
-                  border: isMultiSelectMode && isItemSelected(item) ? '3px solid #007bff' : '1px solid #ddd',
+                  border: isMultiSelectMode && isItemSelected(item) ? '2px solid #8f5825' : '1px solid #e5d8c9',
 
                   transition: 'all 0.2s ease'
 
@@ -3640,37 +3602,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                 {isMultiSelectMode && (
 
-                  <div style={{
-
-                    position: 'absolute',
-
-                    top: '10px',
-
-                    left: '10px',
-
-                    zIndex: 10,
-
-                    width: '28px',
-
-                    height: '28px',
-
-                    borderRadius: '50%',
-
-                    backgroundColor: isItemSelected(item) ? '#007bff' : 'white',
-
-                    border: isItemSelected(item) ? '2px solid #007bff' : '2px solid #ccc',
-
-                    display: 'flex',
-
-                    alignItems: 'center',
-
-                    justifyContent: 'center',
-
-                    cursor: 'pointer',
-
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-
-                  }}>
+                  <div className={`rc-multi-select-indicator ${isItemSelected(item) ? 'selected' : ''}`}>
 
                     {isItemSelected(item) && (
 
@@ -3690,13 +3622,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                   onError={(e) => { e.target.src = suitSample; }}
 
-                  style={{
-
-                    opacity: isMultiSelectMode ? 0.9 : 1,
-
-                    cursor: isMultiSelectMode ? 'pointer' : 'default'
-
-                  }} 
+                  className={isMultiSelectMode ? 'rc-card-image-select-mode' : ''}
 
                 />
 
@@ -3766,7 +3692,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                   {!isMultiSelectMode && (
 
-                    <button onClick={() => openModal(item)} className="btn-view">View</button>
+                    <button onClick={() => openModal(item)} className="btn-view">View Details</button>
 
                   )}
 
@@ -3804,61 +3730,13 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
         {!showAll && filteredItems.length > 3 && (
 
-          <div style={{
-
-            display: 'flex',
-
-            justifyContent: 'center',
-
-            marginTop: '20px',
-
-            marginBottom: '10px'
-
-          }}>
+          <div className="rc-see-more-wrap">
 
             <span
 
               onClick={handleSeeMore}
 
-              style={{
-
-                color: '#888',
-
-                cursor: 'pointer',
-
-                fontSize: '14px',
-
-                fontWeight: '500',
-
-                display: 'flex',
-
-                alignItems: 'center',
-
-                transition: 'color 0.2s ease',
-
-                padding: '10px 20px',
-
-                borderRadius: '20px',
-
-                backgroundColor: '#f5f5f5'
-
-              }}
-
-              onMouseEnter={(e) => {
-
-                e.target.style.color = '#666';
-
-                e.target.style.backgroundColor = '#e8e8e8';
-
-              }}
-
-              onMouseLeave={(e) => {
-
-                e.target.style.color = '#888';
-
-                e.target.style.backgroundColor = '#f5f5f5';
-
-              }}
+              className="rc-see-more-btn"
 
             >
 
@@ -4205,7 +4083,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
                                         <span className="rc-size-price">₱ {sizePrice.toLocaleString('en-PH', { minimumFractionDigits: 2 })} / {baseDuration} day{baseDuration > 1 ? 's' : ''}</span>
                                       )}
                                       {sizeDeposit > 0 && (
-                                        <span className="rc-size-price" style={{ color: '#b94a48' }}>Deposit: ₱ {sizeDeposit.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+                                        <span className="rc-size-price" style={{ color: '#b94a48' }}>Security Fee: ₱ {sizeDeposit.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
                                       )}
                                     </div>
                                   </div>
@@ -4445,7 +4323,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                               <div key={`${itemId}-${sizeKey}-dep`} className="cost-item deposit">
 
-                                <span>{item.item_name || item.name} ({opt.label || SIZE_LABELS[sizeKey] || sizeKey} x{qty}) Deposit:</span>
+                                <span>{item.item_name || item.name} ({opt.label || SIZE_LABELS[sizeKey] || sizeKey} x{qty}) Security Fee:</span>
 
                                 <span>₱{lineDeposit.toFixed(2)}</span>
 
@@ -4863,7 +4741,7 @@ const RentalClothes = ({ openAuthModal, showAll = false, isGuest = false }) => {
 
                                   <span className="rc-size-price" style={{ color: '#b94a48' }}>
 
-                                    Deposit: ₱ {parseFloat(opt.deposit).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                    Security Fee: ₱ {parseFloat(opt.deposit).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
 
                                   </span>
 

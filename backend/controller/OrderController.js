@@ -2984,11 +2984,12 @@ exports.deleteOrderItem = (req, res) => {
       orderItem.approval_status !== 'completed' &&
       orderItem.approval_status !== 'returned' &&
       orderItem.approval_status !== 'cancelled' &&
+      orderItem.approval_status !== 'price_declined' &&
       !hasPaidCompensation
     ) {
       return res.status(400).json({
         success: false,
-        message: "Only completed/returned/cancelled or compensated orders can be deleted"
+        message: "Only completed/returned/cancelled/price declined or compensated orders can be deleted"
       });
     }
 
@@ -3256,9 +3257,21 @@ exports.updateOrderItemPrice = (req, res) => {
       });
     }
 
-    const updateSql = `UPDATE order_items SET final_price = ?, approval_status = 'price_confirmation' WHERE item_id = ?`;
+    const normalizedReason = typeof reason === 'string' ? reason.trim() : '';
+    const updateSql = `
+      UPDATE order_items
+      SET
+        final_price = ?,
+        approval_status = 'price_confirmation',
+        pricing_factors = JSON_SET(
+          COALESCE(pricing_factors, '{}'),
+          '$.adminPriceUpdated', true,
+          '$.adminNotes', ?
+        )
+      WHERE item_id = ?
+    `;
 
-    db.query(updateSql, [price, itemId], (updateErr, updateResult) => {
+    db.query(updateSql, [price, normalizedReason, itemId], (updateErr, updateResult) => {
       if (updateErr) {
         return res.status(500).json({
           success: false,

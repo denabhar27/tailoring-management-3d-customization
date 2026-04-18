@@ -130,6 +130,7 @@ export function completeGoogleLogin(token, roleFromQuery) {
       email: payload.email || '',
       phone_number: payload.phone_number || null,
       profile_picture: payload.profile_picture || null,
+      birthdate: payload.birthdate || null,
       role
     };
 

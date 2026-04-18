@@ -5,7 +5,7 @@ import '../styles/Profile.css';
 import logo from "../assets/logo.png";
 import dp from "../assets/dp.png";
 import { getUser, updateProfile, uploadProfilePicture } from '../api/AuthApi';
-import { getUserOrderTracking, getStatusBadgeClass, getStatusLabel, cancelOrderItem, requestEnhancement, confirmRentalDepositReceipt } from '../api/OrderTrackingApi';
+import { getUserOrderTracking, getStatusBadgeClass, getStatusLabel, cancelOrderItem, requestEnhancement, confirmRentalSecurityFeeReceipt, haggleOrderItemPrice, confirmOrderItemPickup } from '../api/OrderTrackingApi';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import TransactionLogModal from './components/TransactionLogModal';
 import { useAlert } from '../context/AlertContext';
@@ -52,8 +52,14 @@ const Profile = () => {
   const [enhanceNotes, setEnhanceNotes] = useState('');
   const [enhancePreferredDate, setEnhancePreferredDate] = useState('');
   const [enhanceAddAccessories, setEnhanceAddAccessories] = useState(false);
+  const [enhancePhotoFiles, setEnhancePhotoFiles] = useState([]);
   const [submittingEnhancement, setSubmittingEnhancement] = useState(false);
-  const [confirmingDepositByItem, setConfirmingDepositByItem] = useState({});
+  const [submittingHaggleByItem, setSubmittingHaggleByItem] = useState({});
+  const [haggleModalOpen, setHaggleModalOpen] = useState(false);
+  const [itemToHaggle, setItemToHaggle] = useState(null);
+  const [hagglePriceInput, setHagglePriceInput] = useState('');
+  const [confirmingSecurityFeeByItem, setConfirmingSecurityFeeByItem] = useState({});
+  const [confirmingPickupByItem, setConfirmingPickupByItem] = useState({});
   const [declineReasonModalOpen, setDeclineReasonModalOpen] = useState(false);
   const [declineReasonText, setDeclineReasonText] = useState('');
   const [itemToDecline, setItemToDecline] = useState(null);
@@ -121,6 +127,12 @@ const Profile = () => {
     setPreviewImageUrl(imageUrl);
     setPreviewImageAlt(altText || 'Order Image');
     setImagePreviewOpen(true);
+  };
+
+  const getIncidentImageUrl = (incident) => {
+    const rawUrl = String(incident?.incident_image_url || '').trim();
+    if (!rawUrl || rawUrl === 'no-image') return null;
+    return rawUrl.startsWith('http') ? rawUrl : `${API_BASE_URL}${rawUrl}`;
   };
 
   const [user, setUser] = useState(() => {
@@ -346,6 +358,117 @@ const Profile = () => {
 
       return [{ label: 'Size', value: typeof size === 'string' ? size : 'N/A' }];
     }
+  };
+
+  const isFilledMeasurementValue = (value) => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'object' && value !== null) {
+      if (value.inch !== undefined && value.inch !== null && String(value.inch).trim() !== '' && String(value.inch).trim() !== '0') return true;
+      if (value.cm !== undefined && value.cm !== null && String(value.cm).trim() !== '' && String(value.cm).trim() !== '0') return true;
+      if (value.value !== undefined) return isFilledMeasurementValue(value.value);
+      return false;
+    }
+    const text = String(value).trim();
+    return text !== '' && text !== '0';
+  };
+
+  const formatMeasurementLabel = (key) => {
+    const labelMap = {
+      chest: 'Chest',
+      shoulders: 'Shoulders',
+      sleeveLength: 'Sleeve Length',
+      sleeve_length: 'Sleeve Length',
+      neck: 'Neck',
+      neckCircumference: 'Neck Circumference',
+      neck_circumference: 'Neck Circumference',
+      waist: 'Waist',
+      hips: 'Hips',
+      frontLength: 'Front Length',
+      front_length: 'Front Length',
+      backLength: 'Back Length',
+      back_length: 'Back Length',
+      armhole: 'Armhole',
+      bicep: 'Bicep',
+      inseam: 'Inseam',
+      outseam: 'Outseam',
+      rise: 'Rise',
+      thigh: 'Thigh',
+      length: 'Length'
+    };
+
+    if (labelMap[key]) return labelMap[key];
+    return key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
+  };
+
+  const formatMeasurementValue = (value) => {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'object' && value !== null) {
+      if (value.inch !== undefined && value.inch !== null && String(value.inch).trim() !== '') {
+        const inch = parseFloat(String(value.inch));
+        if (!Number.isNaN(inch)) {
+          const cmValue = (inch * 2.54).toFixed(1);
+          return `${value.inch}" / ${cmValue} cm`;
+        }
+      }
+      if (value.cm !== undefined && value.cm !== null && String(value.cm).trim() !== '') {
+        return `${value.cm} cm`;
+      }
+      if (value.value !== undefined) {
+        return formatMeasurementValue(value.value);
+      }
+      return '—';
+    }
+    const text = String(value).trim();
+    if (text === '' || text === '0') return '—';
+    const inch = parseFloat(text);
+    if (Number.isNaN(inch)) return text;
+    const cmValue = (inch * 2.54).toFixed(1);
+    return `${text}" / ${cmValue} cm`;
+  };
+
+  /** Matches 3D customization form (upper / lower garment) — always one row per field; extras appended for legacy keys. */
+  const getOrderedMeasurementRows = (sectionType, sectionMeasurements) => {
+    const sm = sectionMeasurements && typeof sectionMeasurements === 'object' ? sectionMeasurements : {};
+
+    const orderedFields = sectionType === 'top'
+      ? [
+          { label: 'Chest', keys: ['chest'] },
+          { label: 'Waist', keys: ['waist'] },
+          { label: 'Hips', keys: ['hips'] },
+          { label: 'Shoulders', keys: ['shoulders'] },
+          { label: 'Neck Circumference', keys: ['neck_circumference', 'neckCircumference', 'neck'] },
+          { label: 'Front Length', keys: ['front_length', 'frontLength'] },
+          { label: 'Back Length', keys: ['back_length', 'backLength'] },
+          { label: 'Sleeve Length', keys: ['sleeve_length', 'sleeveLength'] },
+          { label: 'Armhole', keys: ['armhole'] },
+          { label: 'Bicep', keys: ['bicep'] },
+          { label: 'Length', keys: ['length'] }
+        ]
+      : [
+          { label: 'Inseam', keys: ['inseam'] },
+          { label: 'Outseam', keys: ['outseam'] },
+          { label: 'Rise', keys: ['rise'] },
+          { label: 'Thigh', keys: ['thigh'] }
+        ];
+
+    const rows = [];
+    const usedKeys = new Set();
+
+    orderedFields.forEach((field) => {
+      const foundKey = field.keys.find((key) => isFilledMeasurementValue(sm[key]));
+      field.keys.forEach((k) => usedKeys.add(k));
+      rows.push({
+        label: field.label,
+        value: foundKey ? sm[foundKey] : null
+      });
+    });
+
+    Object.entries(sm).forEach(([key, value]) => {
+      if (usedKeys.has(key) || !isFilledMeasurementValue(value)) return;
+      rows.push({ label: formatMeasurementLabel(key), value });
+    });
+
+    return rows;
   };
 
   const getStatusBadgeClass = (status) => {
@@ -647,6 +770,58 @@ const Profile = () => {
       console.error('Error accepting price:', error);
     }
   };
+
+  const handleHagglePrice = async (item) => {
+    const orderItemId = item?.order_item_id;
+    if (!orderItemId) return;
+
+    const pricingFactors = item?.pricing_factors || {};
+    if (pricingFactors.haggleUsed === true) {
+      await alert('You have already used your one-time haggle for this item.', 'Haggle Already Used', 'info');
+      return;
+    }
+
+    const defaultPrice = parseFloat(item.final_price || 0);
+    setItemToHaggle(item);
+    setHagglePriceInput(Number.isFinite(defaultPrice) && defaultPrice > 0 ? defaultPrice.toFixed(2) : '');
+    setHaggleModalOpen(true);
+  };
+
+  const handleSubmitHagglePrice = async () => {
+    const item = itemToHaggle;
+    const orderItemId = item?.order_item_id;
+    if (!orderItemId) return;
+
+    const offeredPrice = parseFloat(String(hagglePriceInput).trim());
+    if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
+      await alert('Please enter a valid haggle price.', 'Error', 'error');
+      return;
+    }
+
+    try {
+      setSubmittingHaggleByItem((prev) => ({ ...prev, [orderItemId]: true }));
+      const result = await haggleOrderItemPrice(orderItemId, offeredPrice);
+
+      if (!result.success) {
+        await alert(result.message || 'Failed to submit haggle price.', 'Error', 'error');
+        return;
+      }
+
+      await alert('Your haggle offer was sent. The button is now disabled for this item.', 'Haggle Submitted', 'success');
+      setHaggleModalOpen(false);
+      setItemToHaggle(null);
+      setHagglePriceInput('');
+      const ordersResult = await getUserOrderTracking();
+      if (ordersResult.success) {
+        setOrders(ordersResult.data || []);
+      }
+    } catch (error) {
+      await alert('Error submitting haggle price. Please try again.', 'Error', 'error');
+      console.error('Error submitting haggle price:', error);
+    } finally {
+      setSubmittingHaggleByItem((prev) => ({ ...prev, [orderItemId]: false }));
+    }
+  };
   const handleDeclinePrice = async (item) => {
     const pricingFactors = item.pricing_factors || {};
     const isAccessoriesDecline = pricingFactors.addAccessories === true && pricingFactors.enhancementRequest === true;
@@ -692,13 +867,13 @@ const Profile = () => {
     }
   };
 
-  const handleConfirmDepositReceipt = async (item) => {
+  const handleConfirmSecurityFeeReceipt = async (item) => {
     const orderItemId = item?.order_item_id;
     if (!orderItemId) return;
 
     const confirmed = await confirm(
-      'Confirm that you already received the deposit refund from the store?',
-      'Confirm Deposit Receipt',
+      'Confirm that you already received the security fee refund from the store?',
+      'Confirm Security Fee Receipt',
       'question',
       { confirmText: 'Yes, Received', cancelText: 'Not Yet' }
     );
@@ -706,15 +881,15 @@ const Profile = () => {
     if (!confirmed) return;
 
     try {
-      setConfirmingDepositByItem((prev) => ({ ...prev, [orderItemId]: true }));
-      const result = await confirmRentalDepositReceipt(orderItemId);
+      setConfirmingSecurityFeeByItem((prev) => ({ ...prev, [orderItemId]: true }));
+      const result = await confirmRentalSecurityFeeReceipt(orderItemId);
 
       if (!result.success) {
-        await alert(result.message || 'Failed to confirm deposit receipt.', 'Error', 'error');
+        await alert(result.message || 'Failed to confirm security fee receipt.', 'Error', 'error');
         return;
       }
 
-      await alert('Deposit receipt confirmed. Thank you!', 'Success', 'success');
+      await alert('Security fee receipt confirmed. Thank you!', 'Success', 'success');
       const ordersResult = await getUserOrderTracking();
       if (ordersResult.success) {
         setOrders(ordersResult.data || []);
@@ -722,7 +897,41 @@ const Profile = () => {
     } catch (error) {
       await alert('Failed to confirm deposit receipt.', 'Error', 'error');
     } finally {
-      setConfirmingDepositByItem((prev) => ({ ...prev, [orderItemId]: false }));
+      setConfirmingSecurityFeeByItem((prev) => ({ ...prev, [orderItemId]: false }));
+    }
+  };
+
+  const handleConfirmPickedUp = async (item) => {
+    const orderItemId = item?.order_item_id;
+    if (!orderItemId) return;
+
+    const confirmed = await confirm(
+      'Confirm that you already picked up this item from the store?',
+      'Confirm Pickup',
+      'question',
+      { confirmText: 'Yes, Picked Up', cancelText: 'Not Yet' }
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setConfirmingPickupByItem((prev) => ({ ...prev, [orderItemId]: true }));
+      const result = await confirmOrderItemPickup(orderItemId);
+
+      if (!result.success) {
+        await alert(result.message || 'Failed to confirm pickup.', 'Error', 'error');
+        return;
+      }
+
+      await alert('Pickup confirmed. Thank you!', 'Success', 'success');
+      const ordersResult = await getUserOrderTracking();
+      if (ordersResult.success) {
+        setOrders(ordersResult.data || []);
+      }
+    } catch (error) {
+      await alert('Failed to confirm pickup.', 'Error', 'error');
+    } finally {
+      setConfirmingPickupByItem((prev) => ({ ...prev, [orderItemId]: false }));
     }
   };
 
@@ -756,12 +965,14 @@ const Profile = () => {
     const serviceType = String(item?.service_type || '').toLowerCase();
     const isEnhanceableService = ['repair', 'customization', 'customize', 'dry_cleaning', 'drycleaning', 'dry-cleaning'].includes(serviceType);
     if (!isEnhanceableService || item?.status !== 'completed') {
-      alert('Enhancement request is only available for completed customization, repair, or dry cleaning orders.', 'Not Available', 'warning');
+      alert('Report / enhancement request is only available for completed customization, repair, or dry cleaning orders.', 'Not Available', 'warning');
       return;
     }
     setItemToEnhance(item);
+    setEnhanceNotes('');
     setEnhancePreferredDate('');
     setEnhanceAddAccessories(false);
+    setEnhancePhotoFiles([]);
     setEnhanceModalOpen(true);
   };
 
@@ -777,15 +988,22 @@ const Profile = () => {
 
     try {
       setSubmittingEnhancement(true);
-      const result = await requestEnhancement(itemToEnhance.order_item_id, notes, enhancePreferredDate || null, addAccessoriesFlag);
+      const result = await requestEnhancement(
+        itemToEnhance.order_item_id,
+        notes,
+        enhancePreferredDate || null,
+        addAccessoriesFlag,
+        enhancePhotoFiles
+      );
       if (result.success) {
-        await alert('Enhancement request submitted. The admin will review and confirm the price.', 'Success', 'success');
+        await alert('Your report / enhancement request was submitted. The admin will review and confirm the price.', 'Success', 'success');
         const ordersResult = await getUserOrderTracking();
         if (ordersResult.success) {
           setOrders(ordersResult.data || []);
         }
         setEnhanceModalOpen(false);
         setItemToEnhance(null);
+        setEnhancePhotoFiles([]);
       } else {
         await alert(result.message || 'Failed to submit enhancement request', 'Error', 'error');
       }
@@ -2233,6 +2451,12 @@ const Profile = () => {
                   <div style={{ marginBottom: '8px' }}>
                     <strong>Contact Number:</strong> {(user && user.phone_number) ? user.phone_number : 'Not provided'}
                   </div>
+                  <div style={{ marginBottom: '8px' }}>
+                    <strong>Date of birth:</strong>{' '}
+                    {user && user.birthdate
+                      ? String(user.birthdate).split('T')[0]
+                      : 'Not on file'}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', marginTop: '15px', flexWrap: 'wrap' }}>
                   <button
@@ -2569,7 +2793,15 @@ const Profile = () => {
                 const totalPaid = amountPaid;
                 const remainingAmount = Math.max(0, finalPrice - totalPaid);
                 const hasPayment = totalPaid > 0 && (isRental || isRepair || isDryCleaning || isCustomization);
-                const adminPriceReason = (pricingFactors?.adminNotes || item.specific_data?.adminNotes || '').toString().trim();
+                const trackingReason = (() => {
+                  const note = String(item.latest_tracking_note || '').trim();
+                  if (!note) return '';
+
+                  const match = note.match(/reason:\s*(.*?)(?:\.?\s*please confirm|$)/i);
+                  return match ? String(match[1] || '').trim() : '';
+                })();
+
+                const adminPriceReason = (pricingFactors?.adminNotes || item.specific_data?.adminNotes || trackingReason || '').toString().trim();
                 const statusLower = String(item.status || '').toLowerCase();
                 const isAdminDeclinedStatus = statusLower === 'cancelled' || statusLower === 'rejected';
                 const rawAdminDeclineReason = String(
@@ -3155,7 +3387,7 @@ const Profile = () => {
                                       <span className="price-value final">₱{finalPrice.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                     </div>
                                     <div className="price-row">
-                                      <span className="price-label">Deposit (Refundable):</span>
+                                      <span className="price-label">Security Fee (Refundable):</span>
                                       <span className="price-value" style={{ color: '#ff9800' }}>₱{downpayment.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                     </div>
                                     <div className="price-row" style={{ borderTop: '2px solid #e0e0e0', paddingTop: '8px', marginTop: '8px' }}>
@@ -3223,13 +3455,13 @@ const Profile = () => {
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                           <span style={{ fontSize: '24px' }}>💰</span>
-                          <strong style={{ color: '#e65100', fontSize: '16px' }}>Deposit Payment Required</strong>
+                          <strong style={{ color: '#e65100', fontSize: '16px' }}>Security Fee Payment Required</strong>
                         </div>
                         <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>
-                          Please pay the deposit amount when picking up your rental item from the store.
+                          Please pay the security fee amount when picking up your rental item from the store.
                         </div>
                         <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ff9800' }}>
-                          Deposit Amount: ₱{(() => {
+                          Security Fee Amount: ₱{(() => {
                             const pf = typeof item.pricing_factors === 'string' ? JSON.parse(item.pricing_factors || '{}') : (item.pricing_factors || {});
                             const isBundleItem = item.specific_data?.is_bundle || pf?.is_bundle;
                             let depositAmt = 0;
@@ -3259,7 +3491,7 @@ const Profile = () => {
                         pricingFactors?.deposit_refund_received === true
                         || String(pricingFactors?.deposit_refund_received).toLowerCase() === 'true';
                       const refundReceivedAt = pricingFactors?.deposit_refund_received_at || null;
-                      const isConfirmingReceipt = !!confirmingDepositByItem[item.order_item_id];
+                      const isConfirmingReceipt = !!confirmingSecurityFeeByItem[item.order_item_id];
 
                       if (item.status === 'returned') {
                         const pf2 = typeof item.pricing_factors === 'string' ? JSON.parse(item.pricing_factors || '{}') : (item.pricing_factors || {});
@@ -3531,6 +3763,30 @@ const Profile = () => {
                         <div>
                           Liability: {compensationIncidentForItem?.liability_status || 'N/A'} / {settlementLabel}: {compensationIncidentForItem?.compensation_status || 'N/A'}
                         </div>
+                        {getIncidentImageUrl(compensationIncidentForItem) && (
+                          <div>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => openImagePreview(getIncidentImageUrl(compensationIncidentForItem), 'Dispute Image')}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  openImagePreview(getIncidentImageUrl(compensationIncidentForItem), 'Dispute Image');
+                                }
+                              }}
+                              style={{
+                                color: '#8B4513',
+                                textDecoration: 'underline',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                fontSize: '13px'
+                              }}
+                            >
+                              See image
+                            </span>
+                          </div>
+                        )}
                         {isLiabilityPendingIncident && (
                           <div>{isRentalDamageChargeFlow ? 'Please review and confirm this damage report.' : 'Please review and confirm this compensation.'}</div>
                         )}
@@ -3670,10 +3926,29 @@ const Profile = () => {
                           <div className="confirmation-message">
                             <strong>Price Update Required</strong>
                             <p>Please review the updated pricing and confirm to proceed.</p>
+                            {(() => {
+                              const haggleDeclined = item.pricing_factors?.haggleDeclined === true || String(item.pricing_factors?.haggleDecision || '').toLowerCase() === 'declined';
+                              const haggleOffer = parseFloat(item.pricing_factors?.haggleOffer || 0);
+                              if (!haggleDeclined) return null;
+
+                              return (
+                                <p style={{ marginTop: '6px', fontSize: '12px', color: '#b71c1c', fontWeight: 600 }}>
+                                  Your haggle offer{Number.isFinite(haggleOffer) && haggleOffer > 0 ? ` (₱${haggleOffer.toFixed(2)})` : ''} was declined by admin.
+                                </p>
+                              );
+                            })()}
+                            <p style={{ marginTop: '6px', fontSize: '12px', color: '#7a4b00' }}>You can haggle this price once.</p>
                           </div>
                           <div className="action-buttons">
                             <button className="btn-accept-price" onClick={() => handleAcceptPrice(item)}>
                               Accept Price - Continue
+                            </button>
+                            <button
+                              className="btn-haggle-price"
+                              onClick={() => handleHagglePrice(item)}
+                              disabled={submittingHaggleByItem[item.order_item_id] || item.pricing_factors?.haggleUsed === true}
+                            >
+                              {item.pricing_factors?.haggleUsed === true ? 'Haggle Used' : 'Haggle Price'}
                             </button>
                             <button className="btn-decline-price" onClick={() => handleDeclinePrice(item)}>
                               Decline Price
@@ -3689,6 +3964,25 @@ const Profile = () => {
                         <span className="date-info">Updated: {formatDate(item.status_updated_at)}</span>
                       </div>
                       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        {(item.status === 'ready_to_pickup' || item.status === 'ready_for_pickup') && item.service_type !== 'rental' && (
+                          <button
+                            onClick={() => handleConfirmPickedUp(item)}
+                            disabled={!!confirmingPickupByItem[item.order_item_id]}
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#2e7d32',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: confirmingPickupByItem[item.order_item_id] ? 'not-allowed' : 'pointer',
+                              fontSize: '0.9rem',
+                              fontWeight: '500',
+                              opacity: confirmingPickupByItem[item.order_item_id] ? 0.75 : 1
+                            }}
+                          >
+                            {confirmingPickupByItem[item.order_item_id] ? 'Confirming...' : 'Confirm Picked Up'}
+                          </button>
+                        )}
                         <button
                           className="btn-view-details"
                           onClick={() => handleViewDetails(item)}
@@ -3756,7 +4050,7 @@ const Profile = () => {
                               fontWeight: '500'
                             }}
                           >
-                            ✨ Request Enhancement
+                            Report / Enhancement request
                           </button>
                         )}
                       </div>
@@ -3926,6 +4220,18 @@ const Profile = () => {
                     <div className="confirmation-message">
                       <strong>Price Update Required</strong>
                       <p>Please review the updated pricing and confirm to proceed.</p>
+                      {(() => {
+                        const haggleDeclined = selectedItem.pricing_factors?.haggleDeclined === true || String(selectedItem.pricing_factors?.haggleDecision || '').toLowerCase() === 'declined';
+                        const haggleOffer = parseFloat(selectedItem.pricing_factors?.haggleOffer || 0);
+                        if (!haggleDeclined) return null;
+
+                        return (
+                          <p style={{ marginTop: '6px', fontSize: '12px', color: '#b71c1c', fontWeight: 600 }}>
+                            Your haggle offer{Number.isFinite(haggleOffer) && haggleOffer > 0 ? ` (₱${haggleOffer.toFixed(2)})` : ''} was declined by admin.
+                          </p>
+                        );
+                      })()}
+                      <p style={{ marginTop: '6px', fontSize: '12px', color: '#7a4b00' }}>You can haggle this price once.</p>
                     </div>
                     <div className="action-buttons" style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                       <button className="btn-accept-price" onClick={() => {
@@ -3933,6 +4239,16 @@ const Profile = () => {
                         closeDetailsModal();
                       }}>
                         Accept Price - Continue
+                      </button>
+                      <button
+                        className="btn-haggle-price"
+                        onClick={() => {
+                          handleHagglePrice(selectedItem);
+                          closeDetailsModal();
+                        }}
+                        disabled={submittingHaggleByItem[selectedItem.order_item_id] || selectedItem.pricing_factors?.haggleUsed === true}
+                      >
+                        {selectedItem.pricing_factors?.haggleUsed === true ? 'Haggle Used' : 'Haggle Price'}
                       </button>
                       <button className="btn-decline-price" onClick={() => {
                         handleDeclinePrice(selectedItem);
@@ -3983,7 +4299,7 @@ const Profile = () => {
                         fontWeight: '500'
                       }}
                     >
-                      ✨ Request Enhancement
+                      Report / Enhancement request
                     </button>
                   )}
                 <button className="btn-secondary" onClick={closeDetailsModal}>
@@ -4169,88 +4485,52 @@ const Profile = () => {
                 <div style={{ textAlign: 'center', padding: '40px' }}>Loading measurements...</div>
               ) : measurements ? (
                 <div>
-                  {measurements.top && Object.keys(measurements.top).length > 0 && (
-                    <div style={{ marginBottom: '30px' }}>
-                      <h4 style={{ marginBottom: '15px', color: '#333', fontSize: '1.1rem', fontWeight: '600', borderBottom: '2px solid #8B4513', paddingBottom: '8px' }}>Top Measurements</h4>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: '#f5e6d3' }}>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Measurement</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Value (Inches / CM)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Object.entries(measurements.top).map(([key, value], idx) => {
-                            if (!value || value === '' || value === '0') return null;
-
-                            const labelMap = {
-                              'chest': 'Chest',
-                              'shoulders': 'Shoulders',
-                              'sleeveLength': 'Sleeve Length',
-                              'sleeve_length': 'Sleeve Length',
-                              'neck': 'Neck',
-                              'waist': 'Waist',
-                              'length': 'Length'
-                            };
-                            const label = labelMap[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
-                            const cmValue = (parseFloat(value) * 2.54).toFixed(1);
-                            return (
-                              <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                                <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', fontWeight: '500', color: '#000' }}>{label}</td>
-                                <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}>{value}" / {cmValue} cm</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  {measurements.bottom && Object.keys(measurements.bottom).length > 0 && (
-                    <div style={{ marginBottom: '30px' }}>
-                      <h4 style={{ marginBottom: '15px', color: '#333', fontSize: '1.1rem', fontWeight: '600', borderBottom: '2px solid #8B4513', paddingBottom: '8px' }}>Bottom Measurements</h4>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: '#f5e6d3' }}>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Measurement</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Value (Inches / CM)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Object.entries(measurements.bottom).map(([key, value], idx) => {
-                            if (!value || value === '' || value === '0') return null;
-
-                            const labelMap = {
-                              'waist': 'Waist',
-                              'hips': 'Hips',
-                              'inseam': 'Inseam',
-                              'length': 'Length',
-                              'thigh': 'Thigh',
-                              'outseam': 'Outseam'
-                            };
-                            const label = labelMap[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
-                            const cmValue = (parseFloat(value) * 2.54).toFixed(1);
-                            return (
-                              <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                                <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', fontWeight: '500', color: '#000' }}>{label}</td>
-                                <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: '#000' }}>{value}" / {cmValue} cm</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                  <div style={{ marginBottom: '30px' }}>
+                    <h4 style={{ marginBottom: '15px', color: '#333', fontSize: '1.1rem', fontWeight: '600', borderBottom: '2px solid #8B4513', paddingBottom: '8px' }}>Top Measurements</h4>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f5e6d3' }}>
+                          <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Measurement</th>
+                          <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Value (Inches / CM)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getOrderedMeasurementRows('top', measurements.top).map(({ label, value }, idx) => {
+                          return (
+                            <tr key={`top-${label}-${idx}`} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                              <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', fontWeight: '500', color: '#000' }}>{label}</td>
+                              <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: value == null || !isFilledMeasurementValue(value) ? '#9ca3af' : '#000' }}>{formatMeasurementValue(value)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ marginBottom: '30px' }}>
+                    <h4 style={{ marginBottom: '15px', color: '#333', fontSize: '1.1rem', fontWeight: '600', borderBottom: '2px solid #8B4513', paddingBottom: '8px' }}>Bottom Measurements</h4>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f5e6d3' }}>
+                          <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Measurement</th>
+                          <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e0e0e0', fontWeight: '600', color: '#fff' }}>Value (Inches / CM)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getOrderedMeasurementRows('bottom', measurements.bottom).map(({ label, value }, idx) => {
+                          return (
+                            <tr key={`bottom-${label}-${idx}`} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                              <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', fontWeight: '500', color: '#000' }}>{label}</td>
+                              <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0', color: value == null || !isFilledMeasurementValue(value) ? '#9ca3af' : '#000' }}>{formatMeasurementValue(value)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                   {measurements.notes && (
                     <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#FFF8F0', borderRadius: '12px', border: '1px solid #E8C9A0', width: '100%', textAlign: 'left' }}>
                       <strong style={{ display: 'block', marginBottom: '10px', color: '#333', fontSize: '16px' }}>Notes</strong>
                       <div style={{ backgroundColor: '#fff', border: '1px solid #E8C9A0', borderRadius: '8px', padding: '12px 14px', color: '#333', fontSize: '14px', lineHeight: '1.5', minHeight: '80px' }}>{measurements.notes}</div>
-                    </div>
-                  )}
-
-                  {(!measurements.top || Object.keys(measurements.top).length === 0) &&
-                   (!measurements.bottom || Object.keys(measurements.bottom).length === 0) && (
-                    <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-                      No measurements have been recorded yet. Please contact the admin to add your measurements.
                     </div>
                   )}
                 </div>
@@ -4673,31 +4953,35 @@ const Profile = () => {
               setItemToEnhance(null);
               setEnhanceNotes('');
               setEnhancePreferredDate('');
+              setEnhancePhotoFiles([]);
+              setEnhanceAddAccessories(false);
             }
           }}
         >
           <div className="details-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
             <div className="details-modal-header">
-              <h3>Request Enhancement</h3>
+              <h3>Report / Enhancement request</h3>
               <button className="details-modal-close" onClick={() => {
                 setEnhanceModalOpen(false);
                 setItemToEnhance(null);
                 setEnhanceNotes('');
                 setEnhancePreferredDate('');
+                setEnhancePhotoFiles([]);
+                setEnhanceAddAccessories(false);
               }}>×</button>
             </div>
             <div className="details-modal-content">
               <p style={{ marginBottom: '16px', color: '#666' }}>
-                Tell us what issue you found and how you want the order improved.
+                Report an issue or describe an enhancement you want. You can attach photos (up to 5).
               </p>
               <div style={{ marginBottom: '14px' }}>
                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
-                  Enhancement Notes <span style={{ color: '#f44336' }}>*</span>
+                  Notes <span style={{ color: '#f44336' }}>*</span>
                 </label>
                 <textarea
                   value={enhanceNotes}
                   onChange={(e) => setEnhanceNotes(e.target.value)}
-                  placeholder="Describe the issue/enhancement request..."
+                  placeholder="Describe the issue or enhancement..."
                   rows={4}
                   style={{
                     width: '100%',
@@ -4709,6 +4993,34 @@ const Profile = () => {
                     resize: 'vertical'
                   }}
                 />
+              </div>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
+                  Attach photos (optional, max 5)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => {
+                    const list = Array.from(e.target.files || []).slice(0, 5);
+                    setEnhancePhotoFiles(list);
+                  }}
+                  style={{ fontSize: '14px', width: '100%' }}
+                />
+                {enhancePhotoFiles.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
+                    {enhancePhotoFiles.map((file, idx) => (
+                      <div key={`${file.name}-${idx}`} style={{ position: 'relative' }}>
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt=""
+                          style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 6, border: '1px solid #e5e7eb' }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
@@ -4755,6 +5067,7 @@ const Profile = () => {
                   setEnhanceNotes('');
                   setEnhancePreferredDate('');
                   setEnhanceAddAccessories(false);
+                  setEnhancePhotoFiles([]);
                 }}
                 disabled={submittingEnhancement}
               >
@@ -4773,7 +5086,7 @@ const Profile = () => {
                   opacity: submittingEnhancement ? 0.7 : 1
                 }}
               >
-                {submittingEnhancement ? 'Submitting...' : 'Submit Request'}
+                {submittingEnhancement ? 'Submitting...' : 'Submit'}
               </button>
             </div>
           </div>
@@ -4818,6 +5131,52 @@ const Profile = () => {
                 style={{ padding: '10px 18px', backgroundColor: '#f44336', color: 'white', border: 'none', borderRadius: '6px', cursor: submittingDecline ? 'not-allowed' : 'pointer', opacity: submittingDecline ? 0.7 : 1 }}
               >
                 {submittingDecline ? 'Submitting...' : 'Decline Price'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {haggleModalOpen && itemToHaggle && (
+        <div className="details-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setHaggleModalOpen(false); setItemToHaggle(null); setHagglePriceInput(''); } }}>
+          <div className="details-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px' }}>
+            <div className="details-modal-header">
+              <h3>Haggle Price</h3>
+              <button className="details-modal-close" onClick={() => { setHaggleModalOpen(false); setItemToHaggle(null); setHagglePriceInput(''); }}>x</button>
+            </div>
+            <div className="details-modal-content">
+              <p style={{ marginBottom: '14px', color: '#666', fontSize: '14px' }}>
+                Enter your one-time haggle offer for {formatCurrencyPHP(itemToHaggle.final_price)}.
+              </p>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
+                  Your Haggle Price
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={hagglePriceInput}
+                  onChange={(e) => setHagglePriceInput(e.target.value)}
+                  placeholder="Enter your offered price"
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+            <div className="details-modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                className="btn-secondary"
+                onClick={() => { setHaggleModalOpen(false); setItemToHaggle(null); setHagglePriceInput(''); }}
+                disabled={submittingHaggleByItem[itemToHaggle.order_item_id]}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitHagglePrice}
+                disabled={submittingHaggleByItem[itemToHaggle.order_item_id]}
+                style={{ padding: '10px 18px', backgroundColor: '#8B4513', color: 'white', border: 'none', borderRadius: '6px', cursor: submittingHaggleByItem[itemToHaggle.order_item_id] ? 'not-allowed' : 'pointer', opacity: submittingHaggleByItem[itemToHaggle.order_item_id] ? 0.7 : 1 }}
+              >
+                {submittingHaggleByItem[itemToHaggle.order_item_id] ? 'Submitting...' : 'Submit Haggle'}
               </button>
             </div>
           </div>

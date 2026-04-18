@@ -3,6 +3,11 @@ const User = require('../model/UserModel');
 const Admin = require('../model/AdminModel');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
+const {
+  validateRegistrationBirthdate,
+  validateLoginBirthdateEligibility,
+  formatBirthdateForApi
+} = require('../utils/ageValidation');
 
 exports.register = (req, res) => {
   const { first_name, middle_name = null, last_name, username, email, password, phone_number, birthdate } = req.body;
@@ -11,6 +16,11 @@ exports.register = (req, res) => {
     return res.status(400).json({
       message: "First name, last name, username, email, password, contact number, and birthdate are required"
     });
+  }
+
+  const ageCheck = validateRegistrationBirthdate(birthdate, 18);
+  if (!ageCheck.ok) {
+    return res.status(400).json({ message: ageCheck.message });
   }
 
   // Check if username exists
@@ -36,7 +46,18 @@ exports.register = (req, res) => {
 
         const role = 'user';
         const token = jwt.sign(
-          { id: result.insertId, role, first_name, middle_name, last_name, email, phone_number },
+          {
+            id: result.insertId,
+            role,
+            username,
+            first_name,
+            middle_name,
+            last_name,
+            email,
+            phone_number,
+            ageVerified: true,
+            birthdate: formatBirthdateForApi(birthdate)
+          },
           process.env.JWT_SECRET || "secret",
           { expiresIn: '24h' }
         );
@@ -52,7 +73,8 @@ exports.register = (req, res) => {
             last_name,
             username,
             email,
-            phone_number
+            phone_number,
+            birthdate: formatBirthdateForApi(birthdate)
           }
         });
       });
@@ -108,9 +130,25 @@ exports.login = async (req, res) => {
       const isMatch = bcrypt.compareSync(password, user.password);
       if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
+      const ageCheck = validateLoginBirthdateEligibility(user.birthdate, 18);
+      if (!ageCheck.ok) {
+        return res.status(403).json({ message: ageCheck.message });
+      }
+
       const userRole = user.role || 'user';
       const token = jwt.sign(
-        { id: user.user_id, role: userRole, username: user.username, first_name: user.first_name, middle_name: user.middle_name, last_name: user.last_name, email: user.email, phone_number: user.phone_number },
+        {
+          id: user.user_id,
+          role: userRole,
+          username: user.username,
+          first_name: user.first_name,
+          middle_name: user.middle_name,
+          last_name: user.last_name,
+          email: user.email,
+          phone_number: user.phone_number,
+          ageVerified: true,
+          birthdate: formatBirthdateForApi(user.birthdate)
+        },
         process.env.JWT_SECRET || "secret",
         { expiresIn: '24h' }
       );
@@ -128,7 +166,8 @@ exports.login = async (req, res) => {
           phone_number: user.phone_number,
           profile_picture: user.profile_picture,
           role: userRole,
-          status: user.status
+          status: user.status,
+          birthdate: formatBirthdateForApi(user.birthdate)
         }
       });
     });
@@ -250,17 +289,28 @@ exports.googleCallback = async (req, res) => {
           return redirectWithError(res, 'Account is inactive. Please contact an admin.', redirectTarget);
         }
 
+        if (userRole === 'user') {
+          const ageCheck = validateLoginBirthdateEligibility(user.birthdate, 18);
+          if (!ageCheck.ok) {
+            return redirectWithError(res, ageCheck.message, redirectTarget);
+          }
+        }
+
         try {
           const token = jwt.sign(
             {
               id: user.user_id,
               role: userRole,
+              username: user.username,
               first_name: user.first_name,
               middle_name: user.middle_name,
               last_name: user.last_name,
               email: user.email,
               phone_number: user.phone_number || null,
-              profile_picture: user.profile_picture || null
+              profile_picture: user.profile_picture || null,
+              ...(userRole === 'user'
+                ? { ageVerified: true, birthdate: formatBirthdateForApi(user.birthdate) }
+                : {})
             },
             process.env.JWT_SECRET || "secret",
             { expiresIn: '24h' }
@@ -272,75 +322,10 @@ exports.googleCallback = async (req, res) => {
           return redirectWithError(res, 'Failed to create authentication token', redirectTarget);
         }
       } else {
-      
-        const nameParts = googleUser.name ? googleUser.name.split(' ') : ['User', ''];
-        const first_name = nameParts[0] || googleUser.given_name || 'User';
-        const last_name = nameParts.slice(1).join(' ') || googleUser.family_name || '';
-
-        User.createGoogleUser(
-          first_name,
-          last_name,
-          googleUser.email,
-          googleUser.id,
-          (err, result) => {
-            if (err) {
-              console.error('Error creating Google user:', err);
-         
-              if (err.code === 'ER_DUP_ENTRY') {
-              
-                User.findByEmail(googleUser.email, (findErr, findResults) => {
-                  if (findErr || !findResults || findResults.length === 0) {
-                    return redirectWithError(res, 'Failed to create account. Please try again.', redirectTarget);
-                  }
-                  const user = findResults[0];
-                  const userRole = user.role || 'user';
-
-                  if (user.status === 'inactive' || user.status === 'suspended') {
-                    return redirectWithError(res, 'Account is inactive. Please contact an admin.', redirectTarget);
-                  }
-
-                  const token = jwt.sign(
-                    {
-                      id: user.user_id,
-                      role: userRole,
-                      first_name: user.first_name,
-                      middle_name: user.middle_name,
-                      last_name: user.last_name,
-                      email: user.email,
-                      phone_number: user.phone_number || null,
-                      profile_picture: user.profile_picture || null
-                    },
-                    process.env.JWT_SECRET || "secret",
-                    { expiresIn: '24h' }
-                  );
-                  res.redirect(appendQueryParams(redirectTarget, `token=${encodeURIComponent(token)}&role=${encodeURIComponent(userRole)}`));
-                });
-              } else {
-                return redirectWithError(res, 'Failed to create account. Please try again.', redirectTarget);
-              }
-              return;
-            }
-
-            try {
-              const token = jwt.sign(
-                {
-                  id: result.insertId,
-                  role: 'user',
-                  first_name,
-                  last_name,
-                  email: googleUser.email,
-                  phone_number: null
-                },
-                process.env.JWT_SECRET || "secret",
-                { expiresIn: '24h' }
-              );
-
-              res.redirect(appendQueryParams(redirectTarget, `token=${encodeURIComponent(token)}&role=user`));
-            } catch (jwtError) {
-              console.error('JWT signing error:', jwtError);
-              return redirectWithError(res, 'Failed to create authentication token', redirectTarget);
-            }
-          }
+        return redirectWithError(
+          res,
+          'Please register with email and password so we can record your date of birth. You must be 18 or older to use this service.',
+          redirectTarget
         );
       }
     });
@@ -395,7 +380,8 @@ exports.updateProfilePicture = (req, res) => {
         username: updatedUser.username,
         profile_picture: updatedUser.profile_picture || null,
         role: updatedUser.role,
-        status: updatedUser.status
+        status: updatedUser.status,
+        birthdate: formatBirthdateForApi(updatedUser.birthdate)
       };
       
       res.status(200).json({
@@ -447,7 +433,8 @@ exports.updateProfile = (req, res) => {
           username: updatedUser.username,
           profile_picture: updatedUser.profile_picture || null,
           role: updatedUser.role,
-          status: updatedUser.status
+          status: updatedUser.status,
+          birthdate: formatBirthdateForApi(updatedUser.birthdate)
         };
         
         res.status(200).json({

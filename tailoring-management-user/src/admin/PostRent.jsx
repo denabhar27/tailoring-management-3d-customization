@@ -2102,7 +2102,7 @@ const PostRent = () => {
 
                           />
 
-                          <label style={{ fontSize: '12px', color: '#555', whiteSpace: 'nowrap', marginLeft: '10px' }}>Deposit:</label>
+                          <label style={{ fontSize: '12px', color: '#555', whiteSpace: 'nowrap', marginLeft: '10px' }}>Security Fee:</label>
 
                           <input
 

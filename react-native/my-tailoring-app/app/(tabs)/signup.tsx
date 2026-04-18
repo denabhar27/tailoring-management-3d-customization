@@ -22,6 +22,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '@/utils/apiService';
+import { validateRegistrationBirthdate } from '@/utils/ageValidation';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -99,15 +100,6 @@ export default function SignupScreen() {
     return { isValid: true };
   };
 
-  const isValidBirthdate = (value: string) => {
-    if (!value) return false;
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return parsed <= today;
-  };
-
   const handleSignup = async () => {
     const sanitizedPhone = sanitizePhilippinePhone(phoneNumber);
 
@@ -133,8 +125,9 @@ export default function SignupScreen() {
       return;
     }
 
-    if (!isValidBirthdate(birthdate)) {
-      Alert.alert("Error", "Please enter a valid birthdate (YYYY-MM-DD) that is not in the future.");
+    const birthdateCheck = validateRegistrationBirthdate(birthdate, 18);
+    if (!birthdateCheck.ok) {
+      Alert.alert("Error", birthdateCheck.message);
       return;
     }
 

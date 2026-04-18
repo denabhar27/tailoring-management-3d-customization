@@ -152,10 +152,10 @@ exports.createRentalOrder = async (req, res) => {
     const itemIds = rentalItemIds && Array.isArray(rentalItemIds) ? rentalItemIds : 
                     (rentalItemId ? [rentalItemId] : []);
 
-    if (!customerName || !customerPhone || itemIds.length === 0 || !rentalDuration) {
+    if (!customerName || !customerPhone || itemIds.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: customerName, customerPhone, rentalItemId(s), rentalDuration'
+        message: 'Missing required fields: customerName, customerPhone, rentalItemId(s)'
       });
     }
 
@@ -196,11 +196,6 @@ exports.createRentalOrder = async (req, res) => {
         }
 
         const startDate = eventDate ? new Date(eventDate) : new Date();
-        const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + parseInt(rentalDuration) - 1);
-
-        const parsedDuration = Math.max(1, parseInt(rentalDuration, 10) || 1);
-        const durationMultiplier = Math.ceil(parsedDuration / 3);
 
         const normalizeSelectionMap = () => {
           const map = new Map();
@@ -217,8 +212,9 @@ exports.createRentalOrder = async (req, res) => {
                 const label = String(size?.label || sizeKey).trim();
                 const quantity = Math.max(0, parseInt(size?.quantity, 10) || 0);
                 const price = Math.max(0, parseFloat(size?.price || 0));
+                const rentalDurationDays = Math.max(1, Math.min(30, parseInt(size?.rental_duration, 10) || 0));
                 if (!sizeKey || quantity <= 0) return null;
-                return { sizeKey, label, quantity, price };
+                return { sizeKey, label, quantity, price, rental_duration: rentalDurationDays };
               })
               .filter(Boolean);
 
@@ -230,6 +226,22 @@ exports.createRentalOrder = async (req, res) => {
         };
 
         const selectionMap = normalizeSelectionMap();
+
+        const globalDuration = Math.max(1, parseInt(rentalDuration, 10) || 1);
+        const globalDurationMultiplier = Math.max(1, Math.ceil(globalDuration / 3));
+        const selectedSizeDurations = [];
+        selectionMap.forEach((entry) => {
+          (entry.selected_sizes || []).forEach((sel) => {
+            const days = Math.max(1, parseInt(sel.rental_duration, 10) || 0);
+            if (days > 0) selectedSizeDurations.push(days);
+          });
+        });
+        const parsedDuration = selectedSizeDurations.length > 0
+          ? Math.max(...selectedSizeDurations)
+          : globalDuration;
+
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + parsedDuration - 1);
 
         let totalPrice = 0;
         let totalDownpayment = 0;
@@ -269,11 +281,14 @@ exports.createRentalOrder = async (req, res) => {
             sizeEntries.forEach((entry) => {
               const key = String(entry?.sizeKey || '').trim();
               if (!key) return;
+              const entryRentalDuration = Math.max(1, Math.min(30, parseInt(entry?.rental_duration, 10) || 3));
               byKey.set(key, {
                 key,
                 label: entry?.label || key,
                 available: Math.max(0, parseInt(entry?.quantity, 10) || 0),
-                price: Math.max(0, parseFloat(entry?.price || 0))
+                price: Math.max(0, parseFloat(entry?.price || 0)),
+                deposit: Math.max(0, parseFloat(entry?.deposit || entry?.downpayment || entry?.security_fee || entry?.securityFee || 0) || 0),
+                rentalDuration: entryRentalDuration
               });
             });
 
@@ -294,7 +309,10 @@ exports.createRentalOrder = async (req, res) => {
                 sizeKey: key,
                 label: source.label,
                 quantity: qty,
-                price: source.price > 0 ? source.price : basePrice
+                price: source.price > 0 ? source.price : basePrice,
+                deposit: Math.max(0, parseFloat(sel.deposit || source.deposit || 0) || 0),
+                cycle_days: source.rentalDuration,
+                rental_duration: Math.max(1, Math.min(30, parseInt(sel.rental_duration, 10) || source.rentalDuration))
               });
             });
 
@@ -308,9 +326,20 @@ exports.createRentalOrder = async (req, res) => {
           }
 
           const itemPrice = hasSizeProfile
-            ? normalizedSelectedSizes.reduce((sum, sel) => sum + (sel.quantity * (sel.price > 0 ? sel.price : basePrice) * durationMultiplier), 0)
-            : (basePrice * durationMultiplier * itemQuantity);
-          const itemDownpayment = itemDownpaymentBase * itemQuantity;
+            ? normalizedSelectedSizes.reduce((sum, sel) => {
+                const cycleDays = Math.max(1, Math.min(30, parseInt(sel.cycle_days, 10) || 3));
+                const selectedDays = Math.max(1, Math.min(30, parseInt(sel.rental_duration, 10) || cycleDays));
+                const cycleCount = Math.max(1, Math.ceil(selectedDays / cycleDays));
+                return sum + (sel.quantity * (sel.price > 0 ? sel.price : basePrice) * cycleCount);
+              }, 0)
+            : (basePrice * globalDurationMultiplier * itemQuantity);
+          const itemDownpayment = hasSizeProfile
+            ? normalizedSelectedSizes.reduce((sum, sel) => {
+                const depositPerUnit = Math.max(0, parseFloat(sel.deposit || 0) || 0);
+                const fallbackDeposit = Math.max(0, itemDownpaymentBase || 0);
+                return sum + (sel.quantity * (depositPerUnit > 0 ? depositPerUnit : fallbackDeposit));
+              }, 0)
+            : (itemDownpaymentBase * itemQuantity);
           
           totalPrice += itemPrice;
           totalDownpayment += itemDownpayment;
@@ -358,7 +387,8 @@ exports.createRentalOrder = async (req, res) => {
             pricing_factors: JSON.stringify({
               rental_duration: parsedDuration.toString(),
               base_price_per_3_days: basePrice.toString(),
-              duration_multiplier: durationMultiplier.toString(),
+              duration_multiplier: globalDurationMultiplier.toString(),
+              duration_factor: globalDurationMultiplier.toString(),
               deposit_amount: itemDownpayment.toString(),
               downpayment: itemDownpayment.toString(),
               rental_payment_mode: normalizedPaymentMode,

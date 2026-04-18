@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import '../styles/Guesthome.css';
+import '../styles/UserHomePage.css';
 import '../styles/Transitions.css';
-import { FiScissors, FiDroplet, FiChevronRight } from 'react-icons/fi';
+import { FiScissors, FiDroplet, FiChevronRight, FiEye, FiEyeOff } from 'react-icons/fi';
 import { FcGoogle } from 'react-icons/fc';
 import { PiTShirtBold } from 'react-icons/pi';
 import { initScrollAnimations, initHeaderScroll } from '../utils/scrollAnimations';
@@ -17,30 +18,176 @@ import repairBg from "../assets/repair.png";
 import brown from "../assets/brown.png";
 import full from "../assets/full.png";
 import tuxedo from "../assets/tuxedo.png";
-import { loginUser, registerUser, getGoogleAuthUrl } from '../api/AuthApi';
+import { loginUser, registerUser, getGoogleAuthUrl, getToken, logoutUser } from '../api/AuthApi';
+import { validateRegistrationBirthdate } from '../utils/ageValidation';
+import { useAlert } from '../context/AlertContext';
+import { notificationApi } from '../api/NotificationApi';
+import { getCartSummary } from '../api/CartApi';
 import RentalClothes from './components/RentalClothes';
 import ForgotPassword from '../components/auth/ForgotPassword';
+import Cart from './components/Cart';
+import RepairFormModal from './components/RepairFormModal';
+import DryCleaningFormModal from './components/DryCleaningFormModal';
+import CustomizationFormModal from './components/CustomizationFormModal';
+import OrderDetailsModal from './OrderDetailsModal';
 
-const App = ({ setIsLoggedIn }) => {
+const APPOINTMENT_STEPS = [
+  'Choose a service that matches your needs.',
+  'Select your preferred date and time slot.',
+  'Visit our shop for fitting and consultation.'
+];
+
+const GuestHomePage = ({ setIsLoggedIn }) => {
+  const { confirm } = useAlert();
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [activeSection, setActiveSection] = useState('top');
+  const [hoveredService, setHoveredService] = useState(null);
+  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [signupFirstName, setSignupFirstName] = useState('');
   const [signupMiddleName, setSignupMiddleName] = useState('');
   const [signupLastName, setSignupLastName] = useState('');
   const [signupUsername, setSignupUsername] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
   const [signupPhone, setSignupPhone] = useState('');
   const [signupBirthdate, setSignupBirthdate] = useState('');
   const [authError, setAuthError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [repairFormModalOpen, setRepairFormModalOpen] = useState(false);
+  const [dryCleaningFormModalOpen, setDryCleaningFormModalOpen] = useState(false);
+  const [customizationFormModalOpen, setCustomizationFormModalOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [cartItemCount, setCartItemCount] = useState(0);
+  const [orderDetailsModalOpen, setOrderDetailsModalOpen] = useState(false);
+  const [selectedOrderItemId, setSelectedOrderItemId] = useState(null);
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const fetchCartCount = async () => {
+    try {
+      const result = await getCartSummary();
+      if (result.success) {
+        setCartItemCount(result.itemCount || 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch cart count:', err);
+      setCartItemCount(0);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const result = await notificationApi.getNotifications();
+      if (result.success) {
+        setNotifications(result.data || []);
+      } else {
+        setNotifications([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+      setNotifications([]);
+    }
+  };
+
+  const fetchUnreadCount = async () => {
+    try {
+      const count = await notificationApi.getUnreadCount();
+      setUnreadCount(count);
+    } catch (err) {
+      console.error('Failed to fetch unread count:', err);
+    }
+  };
+
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      await notificationApi.markAsRead(notificationId);
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.notification_id === notificationId ? { ...n, is_read: 1 } : n
+        )
+      );
+      setUnreadCount((prev) => Math.max(prev - 1, 0));
+    } catch (err) {
+      console.error('Failed to mark as read:', err);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationApi.markAllAsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: 1 })));
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('Failed to mark all as read:', err);
+    }
+  };
+
+  const handleNotificationClick = (notif) => {
+    if (!notif.is_read) {
+      handleMarkAsRead(notif.notification_id);
+    }
+    if (notif.order_item_id) {
+      setSelectedOrderItemId(notif.order_item_id);
+      setOrderDetailsModalOpen(true);
+    }
+  };
+
+  const handleLogout = async () => {
+    const confirmed = await confirm(
+      'Are you sure you want to logout?',
+      'Confirm Logout',
+      'warning',
+      { confirmText: 'Logout', cancelText: 'Cancel' }
+    );
+    if (confirmed) {
+      logoutUser();
+      if (typeof setIsLoggedIn === 'function') {
+        setIsLoggedIn(false);
+      }
+      navigate('/', { replace: true });
+    }
+  };
+
+  const handleCartUpdate = () => {
+    fetchCartCount();
+  };
+
+  const addServiceToCart = (type) => {
+    if (type === 'Repair') {
+      setServiceModalOpen(false);
+      setRepairFormModalOpen(true);
+      return;
+    }
+    if (type === 'Customize') {
+      setServiceModalOpen(false);
+      setCustomizationFormModalOpen(true);
+      return;
+    }
+    if (type === 'Dry Cleaning') {
+      setServiceModalOpen(false);
+      setDryCleaningFormModalOpen(true);
+      return;
+    }
+    setServiceModalOpen(false);
+    setCartOpen(true);
+  };
 
   useEffect(() => {
     const scrollObserver = initScrollAnimations();
@@ -52,15 +199,103 @@ const App = ({ setIsLoggedIn }) => {
     };
   }, []);
 
+  useEffect(() => {
+    const sectionMap = [
+      { id: 'top', key: 'top' },
+      { id: 'Appointment', key: 'Appointment' },
+      { id: 'Rentals', key: 'Rentals' },
+      { id: 'Customize', key: 'Customize' },
+      { id: 'Repair', key: 'Repair' },
+      { id: 'DryCleaning', key: 'DryCleaning' },
+    ];
+
+    const handleMouseMove = (event) => {
+      setCursorPos({ x: event.clientX, y: event.clientY });
+    };
+
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 18);
+
+      // Keep "Home" highlighted immediately on first screen load.
+      if (window.scrollY <= 40) {
+        setActiveSection('top');
+        return;
+      }
+
+      let currentSection = 'top';
+      const headerOffset = 120;
+
+      sectionMap.forEach(({ id, key }) => {
+        const section = document.getElementById(id);
+        if (!section) return;
+        const top = section.offsetTop - headerOffset;
+        const bottom = top + section.offsetHeight;
+        if (window.scrollY >= top && window.scrollY < bottom) {
+          currentSection = key;
+        }
+      });
+
+      setActiveSection(currentSection);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('scroll', handleScroll);
+    handleScroll();
+    window.requestAnimationFrame(handleScroll);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileDropdownOpen && !event.target.closest('.profile-dropdown')) {
+        setProfileDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [profileDropdownOpen]);
+
+  useEffect(() => {
+    if (!getToken()) return;
+    const shouldReopen = sessionStorage.getItem('reopenCustomizationModal');
+    if (shouldReopen === 'true') {
+      sessionStorage.removeItem('reopenCustomizationModal');
+      setTimeout(() => setCustomizationFormModalOpen(true), 100);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!getToken()) return;
+    fetchNotifications();
+    fetchUnreadCount();
+    fetchCartCount();
+  }, []);
+
+  useEffect(() => {
+    if (cartOpen && getToken()) {
+      fetchCartCount();
+    }
+  }, [cartOpen]);
+
+  useEffect(() => {
+    if (notificationsOpen && getToken()) {
+      fetchNotifications();
+    }
+  }, [notificationsOpen]);
+
   const openAuthModal = () => {
     setIsAuthModalOpen(true);
   };
 
   const closeAuthModal = () => {
     setIsAuthModalOpen(false);
+    setShowLoginPassword(false);
+    setShowSignupPassword(false);
   };
-
-  const navigate = useNavigate();
 
   const validatePassword = (password) => {
     if (!password) {
@@ -188,6 +423,13 @@ const App = ({ setIsLoggedIn }) => {
           return;
         }
 
+        const birthdateCheck = validateRegistrationBirthdate(signupBirthdate, 18);
+        if (!birthdateCheck.ok) {
+          setAuthError(birthdateCheck.message);
+          setIsLoading(false);
+          return;
+        }
+
         try {
           const result = await registerUser({
             first_name: signupFirstName.trim(),
@@ -257,75 +499,256 @@ const App = ({ setIsLoggedIn }) => {
   };
 
   const services = [
-    { name: 'Customize', img: customizeBg },
-    { name: 'Repair', img: repairBg },
-    { name: 'Dry Cleaning', img: dryCleanBg },
+    {
+      name: 'Customize',
+      img: customizeBg,
+      description: 'Personalized details and premium fittings for your signature look.'
+    },
+    {
+      name: 'Repair',
+      img: repairBg,
+      description: 'Precision repair with careful restoration and finishing touches.'
+    },
+    {
+      name: 'Dry Cleaning',
+      img: dryCleanBg,
+      description: 'Professional care to keep garments crisp, clean, and event ready.'
+    },
   ];
+
+  if (location.pathname === '/user-home' && !getToken()) {
+    return <Navigate to="/" replace />;
+  }
+
+  const isGuest = !getToken();
 
   return (
     <>
-      <header className="header">
+      <style>
+        {`
+          @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+          @keyframes heroFadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+
+          @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+          }
+
+          @keyframes shimmer {
+            0% { background-position: -200% center; }
+            100% { background-position: 200% center; }
+          }
+
+          @keyframes marquee {
+            from { transform: translateX(100%); }
+            to { transform: translateX(-100%); }
+          }
+        `}
+      </style>
+
+      <div className="dj-custom-cursor" style={{ left: cursorPos.x, top: cursorPos.y }} aria-hidden="true" />
+
+      <header className={`header dj-header ${isScrolled ? 'dj-header-scrolled' : ''}`}>
         <div className="logo">
-          <img
-            src={logo}
-            alt="Logo - Click to Login"
-            className="logo-img clickable"
-            onClick={openAuthModal}
-            style={{ cursor: 'pointer' }}
-            title="Click to Login/Sign Up"
-          />
-          <span className="logo-text">D'jackman Tailor Deluxe</span>
+          <img src={logo} alt="D'Jackman Tailor Deluxe logo" className="dj-logo-image" />
+          <div className="dj-logo-content">
+            <span className="logo-text">D&apos;JACKMAN</span>
+            <span className="dj-logo-subtitle">Tailor Deluxe</span>
+          </div>
         </div>
 
-        <nav className="nav">
-          <a href="#top">Home</a>
-          <a href="#Appointment">Appointment</a>
-          <a href="#Rentals">Rental</a>
-          <a href="#Customize">Customize</a>
-          <a href="#Repair">Repair</a>
-          <a href="#DryCleaning">Dry Cleaning</a>
+        <nav className="nav dj-nav">
+          <a className={`dj-nav-link ${activeSection === 'top' ? 'active' : ''}`} href="#top">Home</a>
+          <a className={`dj-nav-link ${activeSection === 'Appointment' ? 'active' : ''}`} href="#Appointment">Appointment</a>
+          <a className={`dj-nav-link ${activeSection === 'Rentals' ? 'active' : ''}`} href="#Rentals">Rental</a>
+          <a className={`dj-nav-link ${activeSection === 'Customize' ? 'active' : ''}`} href="#Customize">Customize</a>
+          <a className={`dj-nav-link ${activeSection === 'Repair' ? 'active' : ''}`} href="#Repair">Repair</a>
+          <a className={`dj-nav-link ${activeSection === 'DryCleaning' ? 'active' : ''}`} href="#DryCleaning">Dry Cleaning</a>
         </nav>
-          <button className="login-btn" onClick={openAuthModal}>
-          Login
-        </button>
+
+        {isGuest ? (
+          <button type="button" className="login-btn dj-login-btn" onClick={openAuthModal}>
+            Login
+          </button>
+        ) : (
+          <div className="dj-header-user-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            <button className="notif-button icon-button" type="button" onClick={() => setNotificationsOpen(!notificationsOpen)} aria-label="Notifications">
+              <svg width="24" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 3a6 6 0 0 1 6 6v4l2 2H4l2-2V9a6 6 0 0 1 6-6z" stroke="#8B4513" strokeWidth="2" fill="none"/><circle cx="12" cy="20" r="2" fill="#8B4513"/></svg>
+              {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+            </button>
+            {notificationsOpen && (
+              <div className="notification-dropdown-overlay" onClick={() => setNotificationsOpen(false)}>
+                <div className="notification-dropdown" onClick={(e) => e.stopPropagation()}>
+                  <div className="notification-header">
+                    <h3>Notifications</h3>
+                    {unreadCount > 0 && (
+                      <button type="button" className="mark-all-read-btn" onClick={handleMarkAllAsRead}>
+                        Mark all as read
+                      </button>
+                    )}
+                    <button type="button" className="notification-close-btn" onClick={() => setNotificationsOpen(false)}>×</button>
+                  </div>
+                  <div className="notification-list">
+                    {notifications.length === 0 ? (
+                      <div className="notification-empty">
+                        <p>No notifications yet</p>
+                      </div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <div
+                          key={notif.notification_id}
+                          className={`notification-item ${!notif.is_read ? 'unread' : ''}`}
+                          onClick={() => handleNotificationClick(notif)}
+                        >
+                          <div className="notification-content">
+                            <p className="notification-message">
+                              {notif.message
+                                .replace(/price_confirmation/gi, 'Price Confirmation')
+                                .replace(/in_progress/gi, 'In Progress')
+                                .replace(/ready_to_pickup/gi, 'Ready to Pickup')
+                                .replace(/_/g, ' ')}
+                            </p>
+                            <span className="notification-time">
+                              {new Date(notif.created_at).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                          {!notif.is_read && <span className="notification-dot"></span>}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            <button className="cart-button icon-button" type="button" onClick={() => setCartOpen(true)} aria-label="Cart">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 6h14l-2 9H8L6 6z" stroke="#8B4513" strokeWidth="2" fill="none"/><circle cx="9" cy="20" r="2" fill="#8B4513"/><circle cx="17" cy="20" r="2" fill="#8B4513"/></svg>
+              {cartItemCount > 0 && <span className="cart-badge">{cartItemCount}</span>}
+            </button>
+            <button className="profile-button icon-button" type="button" onClick={() => setProfileDropdownOpen(!profileDropdownOpen)} aria-label="Profile">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="#8B4513" strokeWidth="2" fill="none"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="#8B4513" strokeWidth="2" fill="none"/></svg>
+            </button>
+            <div className="profile-dropdown">
+              {profileDropdownOpen && (
+                <div className="dropdown-menu">
+                  <button type="button" className="dropdown-item" onClick={() => {
+                    setProfileDropdownOpen(false);
+                    navigate('/profile');
+                  }}>
+                    My Profile
+                  </button>
+                  <button type="button" className="dropdown-item" onClick={() => {
+                    setProfileDropdownOpen(false);
+                    setServiceModalOpen(true);
+                  }}>
+                    Book Services
+                  </button>
+                  <button type="button" className="dropdown-item logout-item" onClick={() => {
+                    setProfileDropdownOpen(false);
+                    handleLogout();
+                  }}>
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
       </header>
-      <section className="hero" id="top" style={{ backgroundImage: `url(${heroBg})` }}>
-        <div className="hero-overlay"></div>
-        <div className="hero-content">
-          <h1>Welcome to Jackman <br />Tailor Deluxe!</h1>
-          <p>Your Perfect Fit Awaits.</p>
+      <section className="hero dj-hero" id="top" style={{ backgroundImage: `url(${heroBg})` }}>
+        <div className="hero-overlay dj-hero-overlay"></div>
+        <div className="dj-hero-grain"></div>
+        <span className="dj-hero-line left"></span>
+        <span className="dj-hero-line right"></span>
+        <div className="hero-content dj-hero-content">
+          <p className="dj-hero-label">✦ ESTABLISHED IN EXCELLENCE ✦</p>
+          <h1 className="dj-hero-title">Welcome to</h1>
+          <h2 className="dj-hero-shimmer">D&apos;jackman Tailor Deluxe</h2>
+          <p className="dj-hero-subtitle">Your Perfect Fit Awaits.</p>
+          <div className="dj-hero-actions">
+            <button className="dj-primary-btn" onClick={() => setServiceModalOpen(true)}>Book Appointment</button>
+            <a className="dj-outline-btn" href="#jackman-s-services">Our Services</a>
+          </div>
+        </div>
+        <div className="dj-scroll-indicator" aria-hidden="true">
+          <span></span>
         </div>
       </section>
 
-       <section className="services fade-in-up">
-        <h2 className="fade-in-up">Jackman's Services</h2>
+      <div className="dj-marquee">
+        <div className="dj-marquee-track">
+          <span>✦ BESPOKE TAILORING · PREMIUM RENTAL · DRY CLEANING · EXPERT REPAIR</span>
+          <span>✦ BESPOKE TAILORING · PREMIUM RENTAL · DRY CLEANING · EXPERT REPAIR</span>
+        </div>
+      </div>
+
+      <section className="services fade-in-up dj-services" id="jackman-s-services">
+        <p className="dj-section-label">Our Expertise</p>
+        <h2 className="fade-in-up">Jackman&apos;s Services</h2>
+        <span className="dj-divider"></span>
         <div className="services-grid stagger-children">
-          {services.map(({ name, img }) => (
-            <div key={name} className="service-card glow-on-hover">
+          {services.map(({ name, img, description }, index) => (
+            <div
+              key={name}
+              className="service-card glow-on-hover dj-service-card"
+              onMouseEnter={() => setHoveredService(index)}
+              onMouseLeave={() => setHoveredService(null)}
+            >
               <div
                 className="service-img"
                 style={{ backgroundImage: `url(${img})` }}
               ></div>
+              <div className="dj-service-gradient"></div>
               <div className="service-footer">
                 <h3>{name}</h3>
+                <span className={`dj-service-line ${hoveredService === index ? 'expand' : ''}`}></span>
+                <p className={`dj-service-desc ${hoveredService === index ? 'show' : ''}`}>{description}</p>
               </div>
             </div>
           ))}
         </div>
       </section>
-      <section className="appointment fade-in-up" id="Appointment">
-        <h2 className="fade-in-up">Appointment</h2>
-        <div className="appointment-content scale-in">
-          <img src={appointmentBg} alt="Tailor" className="appointment-img" />
-          <div className="appointment-overlay">
-            <h3 className="fade-in-up">Ready to experience our services?</h3>
-            <p className="fade-in-up">Book your appointment now!</p>
-            <button className="btn-book glow-on-hover" onClick={() => setServiceModalOpen(true)}>Book Appointment</button>
+      <section className="appointment fade-in-up dj-appointment" id="Appointment">
+        <div className="dj-appointment-ring dj-appointment-ring-one"></div>
+        <div className="dj-appointment-ring dj-appointment-ring-two"></div>
+
+        <div className="dj-appointment-layout">
+          <div className="dj-appointment-left">
+            <p className="dj-section-label">Book a Session</p>
+            <h2>Ready to experience our services?</h2>
+            <span className="dj-divider"></span>
+            <p>
+              Book your appointment today and step into a world of precision craftsmanship and bespoke luxury.
+            </p>
+            <button className="dj-primary-btn" onClick={() => setServiceModalOpen(true)}>Book Appointment</button>
+          </div>
+
+          <div className="dj-appointment-right">
+            <p className="dj-appointment-quote">&quot;Crafting perfection, one stitch at a time.&quot;</p>
+            <ul>
+              {APPOINTMENT_STEPS.map((step, index) => (
+                <li key={step}>
+                  <span>{index + 1}</span>
+                  <p>{step}</p>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
-      <RentalClothes openAuthModal={openAuthModal} isGuest={true} />
+      <RentalClothes
+        openAuthModal={isGuest ? openAuthModal : () => setServiceModalOpen(true)}
+        isGuest={isGuest}
+      />
 
       <section className="customization fade-in-up"
           id="Customize"
@@ -406,7 +829,7 @@ const App = ({ setIsLoggedIn }) => {
               maxWidth: "500px",
               marginBottom: "30px"
             }}>Turn style ideas into reality</p>
-            <button className="custom-book glow-on-hover" onClick={openAuthModal} style={{ 
+            <button className="custom-book glow-on-hover" onClick={() => (isGuest ? openAuthModal() : setCustomizationFormModalOpen(true))} style={{ 
               padding: "18px 50px", 
               background: "white", 
               color: "#8B4513", 
@@ -429,7 +852,7 @@ const App = ({ setIsLoggedIn }) => {
           <div className="repair-content">
             <h3 className="fade-in-up">Need reliable repair services?</h3>
             <p className="fade-in-up">Get in touch with us today!</p>
-            <button className="repair-book glow-on-hover" onClick={openAuthModal}>Book Repair!</button>
+            <button className="repair-book glow-on-hover" onClick={() => (isGuest ? openAuthModal() : setRepairFormModalOpen(true))}>Book Repair!</button>
           </div>
         </div>
       </section>
@@ -482,7 +905,7 @@ const App = ({ setIsLoggedIn }) => {
               maxWidth: "500px",
               marginBottom: "30px"
             }}>Premium care for suits, gowns, and more</p>
-            <button className="clean-book glow-on-hover" onClick={openAuthModal} style={{ 
+            <button className="clean-book glow-on-hover" onClick={() => (isGuest ? openAuthModal() : setDryCleaningFormModalOpen(true))} style={{ 
               padding: "18px 50px", 
               background: "white", 
               color: "#8B4513", 
@@ -535,7 +958,7 @@ const App = ({ setIsLoggedIn }) => {
                 <div className="service-decorative-line" />
               </div>
               <div className="service-cards-list">
-                <button className="service-card-btn service-card-customize" onClick={() => { setServiceModalOpen(false); openAuthModal(); }}>
+                <button className="service-card-btn service-card-customize" onClick={() => { setServiceModalOpen(false); isGuest ? openAuthModal() : addServiceToCart('Customize'); }}>
                   <div className="service-card-icon"><PiTShirtBold size={28} /></div>
                   <div className="service-card-text">
                     <span className="service-card-title">Customize Service</span>
@@ -543,7 +966,7 @@ const App = ({ setIsLoggedIn }) => {
                   </div>
                   <div className="service-card-chevron"><FiChevronRight size={22} /></div>
                 </button>
-                <button className="service-card-btn service-card-repair" onClick={() => { setServiceModalOpen(false); openAuthModal(); }}>
+                <button className="service-card-btn service-card-repair" onClick={() => { setServiceModalOpen(false); isGuest ? openAuthModal() : addServiceToCart('Repair'); }}>
                   <div className="service-card-icon"><FiScissors size={28} /></div>
                   <div className="service-card-text">
                     <span className="service-card-title">Repair Service</span>
@@ -551,7 +974,7 @@ const App = ({ setIsLoggedIn }) => {
                   </div>
                   <div className="service-card-chevron"><FiChevronRight size={22} /></div>
                 </button>
-                <button className="service-card-btn service-card-drycleaning" onClick={() => { setServiceModalOpen(false); openAuthModal(); }}>
+                <button className="service-card-btn service-card-drycleaning" onClick={() => { setServiceModalOpen(false); isGuest ? openAuthModal() : addServiceToCart('Dry Cleaning'); }}>
                   <div className="service-card-icon"><FiDroplet size={28} /></div>
                   <div className="service-card-text">
                     <span className="service-card-title">Dry Cleaning</span>
@@ -564,11 +987,41 @@ const App = ({ setIsLoggedIn }) => {
           </div>
         </div>
       )}
-{isAuthModalOpen && (
+
+      <Cart
+        isOpen={cartOpen}
+        onClose={() => {
+          setCartOpen(false);
+          fetchCartCount();
+        }}
+        onCartUpdate={handleCartUpdate}
+      />
+      <RepairFormModal
+        isOpen={repairFormModalOpen}
+        onClose={() => setRepairFormModalOpen(false)}
+        onCartUpdate={handleCartUpdate}
+      />
+      <DryCleaningFormModal
+        isOpen={dryCleaningFormModalOpen}
+        onClose={() => setDryCleaningFormModalOpen(false)}
+        onCartUpdate={handleCartUpdate}
+      />
+      <CustomizationFormModal
+        isOpen={customizationFormModalOpen}
+        onClose={() => setCustomizationFormModalOpen(false)}
+        onCartUpdate={handleCartUpdate}
+      />
+      <OrderDetailsModal
+        isOpen={orderDetailsModalOpen}
+        onClose={() => setOrderDetailsModalOpen(false)}
+        orderItemId={selectedOrderItemId}
+      />
+
+{isGuest && isAuthModalOpen && (
   <div className="auth-modal-overlay" onClick={closeAuthModal}>
     <div className="auth-modal" onClick={(e) => e.stopPropagation()}>
       <button className="auth-close" onClick={closeAuthModal}>
-        ×
+        x
       </button>
 
       <div className="auth-container">
@@ -662,15 +1115,37 @@ const App = ({ setIsLoggedIn }) => {
 
           <div className="input-group">
             {!isLogin && <label htmlFor="signup-password" className="input-label">Password</label>}
-            <input
-              id={isLogin ? undefined : 'signup-password'}
-              type="password"
-              placeholder="Password"
-              required
-              autoComplete={isLogin ? "current-password" : "new-password"}
-              value={isLogin ? loginPassword : signupPassword}
-              onChange={(e) => isLogin ? setLoginPassword(e.target.value) : setSignupPassword(e.target.value)}
-            />
+            <div className="password-input-wrapper">
+              <input
+                id={isLogin ? undefined : 'signup-password'}
+                type={isLogin ? (showLoginPassword ? 'text' : 'password') : (showSignupPassword ? 'text' : 'password')}
+                className="has-password-toggle"
+                placeholder="Password"
+                required
+                autoComplete={isLogin ? "current-password" : "new-password"}
+                value={isLogin ? loginPassword : signupPassword}
+                onChange={(e) => isLogin ? setLoginPassword(e.target.value) : setSignupPassword(e.target.value)}
+              />
+              {isLogin ? (
+                <button
+                  type="button"
+                  className="password-toggle-btn"
+                  onClick={() => setShowLoginPassword((prev) => !prev)}
+                  aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showLoginPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="password-toggle-btn"
+                  onClick={() => setShowSignupPassword((prev) => !prev)}
+                  aria-label={showSignupPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showSignupPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                </button>
+              )}
+            </div>
             {!isLogin && signupPassword && (
               <div style={{
                 fontSize: '11px',
@@ -689,7 +1164,7 @@ const App = ({ setIsLoggedIn }) => {
                     gap: '6px'
                   }}>
                     <span style={{ fontSize: '14px' }}>
-                      {signupPassword.length >= 8 ? '✓' : signupPassword.length >= 6 ? '◐' : '✗'}
+                      {signupPassword.length >= 8 ? 'OK' : signupPassword.length >= 6 ? '...' : 'x'}
                     </span>
                     Minimum 8 characters ({signupPassword.length}/8)
                   </li>
@@ -700,7 +1175,7 @@ const App = ({ setIsLoggedIn }) => {
                     gap: '6px'
                   }}>
                     <span style={{ fontSize: '14px' }}>
-                      {/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(signupPassword) ? '✓' : '✗'}
+                      {/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(signupPassword) ? 'OK' : 'x'}
                     </span>
                     At least one special character (!@#$%^&* etc.)
                   </li>
@@ -732,7 +1207,7 @@ const App = ({ setIsLoggedIn }) => {
                     gap: '6px'
                   }}>
                     <span style={{ fontSize: '14px' }}>
-                      {signupPassword === signupConfirmPassword ? '✓' : '✗'}
+                      {signupPassword === signupConfirmPassword ? 'OK' : 'x'}
                     </span>
                     {signupPassword === signupConfirmPassword ? 'Passwords match' : 'Passwords do not match'}
                   </div>
@@ -764,7 +1239,7 @@ const App = ({ setIsLoggedIn }) => {
                     alignItems: 'center',
                     gap: '6px'
                   }}>
-                    <span style={{ fontSize: '14px' }}>✗</span>
+                    <span style={{ fontSize: '14px' }}>x</span>
                     Use a valid PH mobile number (e.g. +63 9XXXXXXXXX).
                   </div>
                 )}
@@ -844,7 +1319,7 @@ const App = ({ setIsLoggedIn }) => {
   </div>
 )}
 
-{isForgotPasswordOpen && (
+{isGuest && isForgotPasswordOpen && (
   <ForgotPassword
     onClose={() => setIsForgotPasswordOpen(false)}
     onSuccess={() => {
@@ -855,104 +1330,46 @@ const App = ({ setIsLoggedIn }) => {
   />
 )}
 
-      <footer style={{
-        backgroundColor: "#a76648ff",
-        color: "#f0e9e2",
-        padding: "15px 20px 10px",
-      }}>
-        <div style={{
-          maxWidth: "1200px",
-          margin: "0 auto",
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-          gap: "40px",
-          textAlign: "center",
-          marginTop: "20px"
-        }}>
+      <footer className="dj-footer">
+        <div className="dj-footer-grain"></div>
+        <div className="dj-footer-inner">
           <div>
-            <h3 style={{
-              fontSize: "1.1rem",
-              fontWeight: 700,
-              marginBottom: "12px",
-              color: "#f0e9e2"
-            }}>Our store:</h3>
-            <p style={{
-              fontSize: "0.9rem",
-              lineHeight: 1.5,
-              marginBottom: "8px",
-              color: "#d4c5b9"
-            }}>Location: Jackman Tailor, 50 Rizal Street</p>
-            <p style={{
-              fontSize: "0.9rem",
-              lineHeight: 1.5,
-              color: "#d4c5b9"
-            }}>Monday to Saturday: 8:30 AM - 4:30 PM</p>
-          </div>
-          
-          <div>
-            <h3 style={{
-              fontSize: "1.1rem",
-              fontWeight: 700,
-              marginBottom: "15px",
-              color: "#f0e9e2"
-            }}>Customer Service</h3>
-            <p style={{
-              fontSize: "1rem",
-              lineHeight: 1.6,
-              marginBottom: "8px",
-              color: "#d4c5b9"
-            }}>Tel: 0917 7107959</p>
-            <p style={{
-              fontSize: "1rem",
-              lineHeight: 1.6,
-              color: "#d4c5b9"
-            }}>Email: ronald_mares1981</p>
+            <div className="dj-footer-brand">
+              <img src={logo} alt="D'Jackman Tailor Deluxe logo" className="dj-logo-image dj-logo-image-footer" />
+              <div className="dj-logo-content">
+                <span className="logo-text">D&apos;JACKMAN</span>
+                <span className="dj-logo-subtitle">Tailor Deluxe</span>
+              </div>
+            </div>
+            <p className="dj-footer-tagline">Crafting perfection with every stitch. Your trusted tailor for all occasions.</p>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <h3 style={{
-              fontSize: "1.1rem",
-              fontWeight: 700,
-              marginBottom: "12px",
-              color: "#f0e9e2"
-            }}>Download the App</h3>
-            <div style={{
-              width: '80px',
-              height: '80px',
-              backgroundColor: '#fff',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '5px',
-              marginBottom: '8px'
-            }}>
-              {/* QR Code pointing to Expo build page */}
-              <img 
-                src="https://api.qrserver.com/v1/create-qr-code/?size=70x70&data=https://expo.dev/accounts/tocka27/projects/my-tailoring-app/builds/d8d5b650-6b41-462b-ae77-ff3eee27d2c1" 
-                alt="Download App QR Code"
-                style={{ width: '70px', height: '70px' }}
-              />
-            </div>
-            <p style={{
-              fontSize: "0.8rem",
-              color: "#d4c5b9",
-              margin: 0
-            }}>Scan to download</p>
+          <div>
+            <h4>Our Store</h4>
+            <p>D&apos;jackman Tailor Deluxe, 50 Rizal Street</p>
+            <p>Mon - Sat</p>
+            <p>8:30 AM - 4:30 PM</p>
+          </div>
+
+          <div>
+            <h4>Customer Service</h4>
+            <p>0917 7107959</p>
+            <p>ronald_mares1981@gmail.com</p>
+          </div>
+
+          <div>
+            <h4>Services</h4>
+            <a href="#Customize">Customize</a>
+            <a href="#Repair">Repair</a>
+            <a href="#DryCleaning">Dry Cleaning</a>
+            <a href="#Rentals">Rental</a>
           </div>
         </div>
-        
-        <div style={{
-          textAlign: "center",
-          marginTop: "30px",
-          paddingTop: "20px",
-          borderTop: "1px solid #4a3426"
-        }}>
-          <p style={{
-            fontSize: "0.9rem",
-            color: "#d4c5b9",
-            margin: 0
-          }}>Copyright 2026 by BridgeIT</p>
+
+        <div className="dj-footer-divider"></div>
+        <div className="dj-footer-bottom">
+          <p>© 2026 D&apos;Jackman Tailor Deluxe. All rights reserved.</p>
+          <p>Your Perfect Fit Awaits.</p>
         </div>
       </footer>
 
@@ -960,4 +1377,4 @@ const App = ({ setIsLoggedIn }) => {
   );
 };
 
-export default App;
+export default GuestHomePage;

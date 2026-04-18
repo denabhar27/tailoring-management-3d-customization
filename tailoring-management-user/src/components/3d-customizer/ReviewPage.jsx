@@ -1,6 +1,33 @@
 import Viewer3D from './Viewer3D';
 
-export default function ReviewPage({ garment, colors, fabric, pattern, style, measurements, personalization, designImage, notes, onBack, onSubmit }) {
+const OWN_MEASUREMENT_SECTIONS = [
+    {
+        title: 'Upper Garment',
+        fields: [
+            ['chest', 'Chest'],
+            ['waist', 'Waist'],
+            ['hips', 'Hips'],
+            ['shoulders', 'Shoulders'],
+            ['neckCircumference', 'Neck Circumference'],
+            ['frontLength', 'Front Length'],
+            ['backLength', 'Back Length'],
+            ['sleeveLength', 'Sleeve Length'],
+            ['armhole', 'Armhole'],
+            ['bicep', 'Bicep']
+        ]
+    },
+    {
+        title: 'Lower Garment',
+        fields: [
+            ['inseam', 'Inseam'],
+            ['outseam', 'Outseam'],
+            ['rise', 'Rise'],
+            ['thigh', 'Thigh']
+        ]
+    }
+];
+
+export default function ReviewPage({ garment, colors, fabric, pattern, style, measurements, personalization, userMeasurements, designImage, notes, onBack, onSubmit }) {
 
     const getPrice = () => {
         switch (fabric) {
@@ -36,6 +63,24 @@ export default function ReviewPage({ garment, colors, fabric, pattern, style, me
                     <p><strong>Garment:</strong> {garment}</p>
                     <p><strong>Fabric:</strong> {fabric}</p>
                     <p><strong>Pattern:</strong> {pattern}</p>
+
+                    {userMeasurements && Object.keys(userMeasurements).length > 0 && (
+                        <div style={{ marginTop: 20 }}>
+                            <strong>My Body Measurements</strong>
+                            {OWN_MEASUREMENT_SECTIONS.map((section) => (
+                                <div key={section.title} style={{ marginTop: 12, padding: 12, border: '1px solid #e5e7eb', borderRadius: 8, background: '#fafafa' }}>
+                                    <div style={{ fontWeight: 700, marginBottom: 8 }}>{section.title}</div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+                                        {section.fields.map(([fieldKey, label]) => (
+                                            <div key={fieldKey} style={{ fontSize: 13 }}>
+                                                <strong>{label}:</strong> {userMeasurements[fieldKey] !== undefined && userMeasurements[fieldKey] !== '' ? `${userMeasurements[fieldKey]} in` : '--'}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
                     {designImage && (
                         <div style={{ marginTop: 20 }}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import '../adminStyle/ordersInventory.css';
 import AdminHeader from './AdminHeader';
 import Sidebar from './Sidebar';
@@ -33,11 +33,19 @@ const parseRentalSizeEntries = (rawSize) => {
         const key = entry?.sizeKey || entry?.size_key || `custom_${idx}`;
         const qty = parseInt(entry?.quantity, 10);
         const quantity = Number.isNaN(qty) ? 0 : Math.max(0, qty);
+        const sizeDeposit = parseFloat(
+          entry?.deposit ?? entry?.security_fee ?? entry?.securityFee ?? 0
+        );
         const label =
           key === 'custom'
             ? (entry?.customLabel || entry?.label || `Custom ${idx + 1}`)
             : (entry?.label || SIZE_LABELS[key] || key);
-        return { key, label, quantity };
+        return {
+          key,
+          label,
+          quantity,
+          securityFee: Number.isFinite(sizeDeposit) ? Math.max(0, sizeDeposit) : 0
+        };
       });
     }
 
@@ -46,7 +54,15 @@ const parseRentalSizeEntries = (rawSize) => {
       return Object.entries(source).map(([key, option]) => {
         const qty = parseInt(option?.quantity, 10);
         const quantity = Number.isNaN(qty) ? 0 : Math.max(0, qty);
-        return { key, label: option?.label || SIZE_LABELS[key] || key, quantity };
+        const optionDeposit = parseFloat(
+          option?.deposit ?? option?.security_fee ?? option?.securityFee ?? 0
+        );
+        return {
+          key,
+          label: option?.label || SIZE_LABELS[key] || key,
+          quantity,
+          securityFee: Number.isFinite(optionDeposit) ? Math.max(0, optionDeposit) : 0
+        };
       });
     }
   } catch {
@@ -90,6 +106,48 @@ const getSizeAvailabilityRows = (item) => {
   });
 };
 
+const parseMaybeObject = (value) => {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+};
+
+const getRentalSecurityFeeValue = (item) => {
+  const pricingFactors = parseMaybeObject(item?.pricing_factors);
+  const specificData = parseMaybeObject(item?.specific_data);
+
+  const candidates = [
+    item?.security_fee,
+    item?.securityFee,
+    item?.deposit,
+    item?.deposit_amount,
+    item?.downpayment,
+    pricingFactors?.security_fee,
+    pricingFactors?.securityFee,
+    pricingFactors?.deposit,
+    pricingFactors?.deposit_amount,
+    pricingFactors?.downpayment,
+    specificData?.security_fee,
+    specificData?.securityFee,
+    specificData?.deposit,
+    specificData?.deposit_amount,
+    specificData?.downpayment
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = parseFloat(candidate || 0);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return 0;
+};
+
 const normalizeSizeKey = (key = '') => {
   const raw = String(key || '').trim().toLowerCase();
   if (!raw) return '';
@@ -118,6 +176,88 @@ const formatServiceTypeLabel = (serviceType = '') => {
   if (normalized === 'rental') return 'Rental';
   if (!normalized) return 'N/A';
   return String(serviceType);
+};
+
+const MultiSelectDropdown = ({
+  allLabel,
+  options,
+  selectedValues,
+  onChange,
+  className = 'filter-select'
+}) => {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  const allSelected = selectedValues.length === 0;
+  const selectedLabels = options
+    .filter((option) => selectedValues.includes(option.value))
+    .map((option) => option.label);
+
+  let triggerLabel = allLabel;
+  if (selectedLabels.length === 1) {
+    triggerLabel = selectedLabels[0];
+  } else if (selectedLabels.length > 1) {
+    triggerLabel = `${selectedLabels.length} selected`;
+  }
+
+  const toggleValue = (value) => {
+    if (selectedValues.includes(value)) {
+      onChange(selectedValues.filter((item) => item !== value));
+      return;
+    }
+    onChange([...selectedValues, value]);
+  };
+
+  return (
+    <div className="multi-filter" ref={dropdownRef}>
+      <button
+        type="button"
+        className={`${className} multi-filter-trigger`}
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+      >
+        <span>{triggerLabel}</span>
+        <i className="fas fa-chevron-down" aria-hidden="true"></i>
+      </button>
+
+      {open && (
+        <div className="multi-filter-menu" role="listbox" aria-multiselectable="true">
+          <label className="multi-filter-option">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={() => onChange([])}
+            />
+            <span>{allLabel}</span>
+          </label>
+
+          {options.map((option) => (
+            <label key={option.value} className="multi-filter-option">
+              <input
+                type="checkbox"
+                checked={selectedValues.includes(option.value)}
+                onChange={() => toggleValue(option.value)}
+              />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 };
 
 // ImageCarousel component for rental items
@@ -241,6 +381,43 @@ const ImageCarousel = ({ images, itemName, getRentalImageUrl }) => {
 };
 
 const OrdersInventory = () => {
+    const REPORT_STATUS_OPTIONS = [
+      { value: 'Completed', label: 'Completed' },
+      { value: 'Paid', label: 'Paid' },
+      { value: 'Fully Paid', label: 'Fully Paid' },
+      { value: 'Partial Payment', label: 'Partial Payment' },
+      { value: 'Unpaid', label: 'Unpaid' },
+      { value: 'Down-payment', label: 'Down-payment' },
+      { value: 'Cancelled', label: 'Cancelled' }
+    ];
+
+    const SERVICE_FILTER_OPTIONS = [
+      { value: 'dry_cleaning', label: 'Dry Cleaning' },
+      { value: 'repair', label: 'Repair' },
+      { value: 'customization', label: 'Customization' },
+      { value: 'rental', label: 'Rental' }
+    ];
+
+    const INCIDENT_STATUS_OPTIONS = [
+      { value: 'pending_liability', label: 'Pending Liability' },
+      { value: 'approved_liability', label: 'Approved Liability' },
+      { value: 'rejected_liability', label: 'Rejected Liability' },
+      { value: 'paid_compensation', label: 'Paid Compensation' },
+      { value: 'unpaid_compensation', label: 'Unpaid Compensation' }
+    ];
+
+    const ENHANCEMENT_STATUS_OPTIONS = [
+      { value: 'requested', label: 'Requested' },
+      { value: 'accepted', label: 'Accepted' },
+      { value: 'cancelled', label: 'Cancelled' }
+    ];
+
+    const RENTAL_SUMMARY_STATUS_OPTIONS = [
+      { value: 'available', label: 'Available' },
+      { value: 'rented', label: 'Rented' },
+      { value: 'maintenance', label: 'Maintenance' }
+    ];
+
   const navigate = useNavigate();
   const location = useLocation();
   const { alert, confirm, prompt } = useAlert();
@@ -282,10 +459,10 @@ const OrdersInventory = () => {
   // UI states
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [incidentStatusFilter, setIncidentStatusFilter] = useState('all');
-  const [enhancementStatusFilter, setEnhancementStatusFilter] = useState('all');
-  const [serviceTypeFilter, setServiceTypeFilter] = useState('');
+  const [statusFilters, setStatusFilters] = useState([]);
+  const [incidentStatusFilters, setIncidentStatusFilters] = useState([]);
+  const [enhancementStatusFilters, setEnhancementStatusFilters] = useState([]);
+  const [serviceTypeFilters, setServiceTypeFilters] = useState([]);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [reportTab, setReportTab] = useState('reports');
@@ -301,6 +478,8 @@ const OrdersInventory = () => {
   const [isRentalModalOpen, setIsRentalModalOpen] = useState(false);
   const [editingRentalId, setEditingRentalId] = useState(null);
   const [rentalFilter, setRentalFilter] = useState('');
+  const [rentalSummaryStatusFilters, setRentalSummaryStatusFilters] = useState([]);
+  const [rentalSummarySizeFilters, setRentalSummarySizeFilters] = useState([]);
   const [rentalFormData, setRentalFormData] = useState({
     item_name: '',
     description: '',
@@ -349,7 +528,7 @@ const OrdersInventory = () => {
   // Combine billing and inventory data when they change
   useEffect(() => {
     combineData();
-  }, [billingRecords, inventoryItems, statusFilter, serviceTypeFilter, searchTerm, dateFrom, dateTo]);
+  }, [billingRecords, inventoryItems, statusFilters, serviceTypeFilters, searchTerm, dateFrom, dateTo]);
 
   const fetchAllData = async () => {
     try {
@@ -444,23 +623,18 @@ const OrdersInventory = () => {
       
       // Status filter — exact match against the real billing status
       let matchesStatus = true;
-      if (statusFilter && statusFilter !== 'all') {
+      if (statusFilters.length > 0) {
         const rawStatus = item.displayStatus || '';
-        matchesStatus = rawStatus.toLowerCase() === statusFilter.toLowerCase();
+        matchesStatus = statusFilters.some((selectedStatus) => rawStatus.toLowerCase() === selectedStatus.toLowerCase());
       }
       
       // Service type filter
       let matchesService = true;
-      if (serviceTypeFilter) {
-        const svc = (item.serviceType || '').toLowerCase();
-        const filterSvc = serviceTypeFilter.toLowerCase();
-        if (filterSvc === 'dry_cleaning') {
-          matchesService = svc === 'dry_cleaning' || svc === 'dry-cleaning' || svc === 'drycleaning';
-        } else if (filterSvc === 'customization') {
-          matchesService = svc === 'customization' || svc === 'customize';
-        } else {
-          matchesService = svc === filterSvc;
-        }
+      if (serviceTypeFilters.length > 0) {
+        const svc = normalizeServiceType(item.serviceType || '');
+        matchesService = serviceTypeFilters
+          .map((selectedService) => normalizeServiceType(selectedService))
+          .includes(svc);
       }
 
       // Date range filter
@@ -594,7 +768,7 @@ const OrdersInventory = () => {
 
   const filteredCompensationIncidents = compensationIncidents.filter((incident) => {
     const incidentService = normalizeServiceType(incident?.service_type || '');
-    const serviceFilterNormalized = normalizeServiceType(serviceTypeFilter || '');
+    const serviceFilterNormalized = serviceTypeFilters.map((service) => normalizeServiceType(service));
     const incidentDate = incident?.updated_at || incident?.created_at || incident?.reported_at;
 
     const matchesSearch = searchTerm === ''
@@ -602,20 +776,22 @@ const OrdersInventory = () => {
       || String(getIncidentCustomerName(incident) || '').toLowerCase().includes(searchTerm.toLowerCase())
       || String(incident?.damage_type || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesService = !serviceTypeFilter || incidentService === serviceFilterNormalized;
+    const matchesService = serviceFilterNormalized.length === 0 || serviceFilterNormalized.includes(incidentService);
 
-    const matchesStatus = incidentStatusFilter === 'all'
-      || (incidentStatusFilter === 'pending_liability' && String(incident?.liability_status || '').toLowerCase() === 'pending')
-      || (incidentStatusFilter === 'approved_liability' && String(incident?.liability_status || '').toLowerCase() === 'approved')
-      || (incidentStatusFilter === 'rejected_liability' && String(incident?.liability_status || '').toLowerCase() === 'rejected')
-      || (incidentStatusFilter === 'paid_compensation' && String(incident?.compensation_status || '').toLowerCase() === 'paid')
-      || (incidentStatusFilter === 'unpaid_compensation' && String(incident?.compensation_status || '').toLowerCase() !== 'paid');
+    const matchesStatus = incidentStatusFilters.length === 0 || incidentStatusFilters.some((filter) => {
+      if (filter === 'pending_liability' && String(incident?.liability_status || '').toLowerCase() === 'pending') return true;
+      if (filter === 'approved_liability' && String(incident?.liability_status || '').toLowerCase() === 'approved') return true;
+      if (filter === 'rejected_liability' && String(incident?.liability_status || '').toLowerCase() === 'rejected') return true;
+      if (filter === 'paid_compensation' && String(incident?.compensation_status || '').toLowerCase() === 'paid') return true;
+      if (filter === 'unpaid_compensation' && String(incident?.compensation_status || '').toLowerCase() !== 'paid') return true;
+      return false;
+    });
 
     return matchesSearch && matchesService && matchesStatus && isWithinDateRange(incidentDate);
   });
 
   const filteredEnhancementRows = enhancementRows.filter((row) => {
-    const serviceFilterNormalized = normalizeServiceType(serviceTypeFilter || '');
+    const serviceFilterNormalized = serviceTypeFilters.map((service) => normalizeServiceType(service));
 
     const matchesSearch = searchTerm === ''
       || String(row.orderId || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -623,8 +799,12 @@ const OrdersInventory = () => {
       || String(row.notes || '').toLowerCase().includes(searchTerm.toLowerCase())
       || String(row.serviceTypeDisplay || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesService = !serviceTypeFilter || row.serviceType === serviceFilterNormalized;
-    const matchesStatus = enhancementStatusFilter === 'all' || row.status === enhancementStatusFilter;
+    const matchesService = serviceFilterNormalized.length === 0 || serviceFilterNormalized.includes(row.serviceType);
+    
+    // Default behavior: show only accepted items (exclude requested and cancelled)
+    const matchesStatus = enhancementStatusFilters.length === 0 
+      ? row.status === 'accepted' 
+      : enhancementStatusFilters.includes(row.status);
 
     return matchesSearch && matchesService && matchesStatus && isWithinDateRange(row.requestDate);
   });
@@ -676,6 +856,12 @@ const OrdersInventory = () => {
     return item.specificData.imageUrls.map(url => 
       url.startsWith('http') ? url : `${API_BASE_URL}${url}`
     );
+  };
+
+  const getIncidentImageUrl = (incident) => {
+    const rawUrl = String(incident?.incident_image_url || '').trim();
+    if (!rawUrl || rawUrl === 'no-image') return null;
+    return rawUrl.startsWith('http') ? rawUrl : `${API_BASE_URL}${rawUrl}`;
   };
 
   const getServiceDescription = (item) => {
@@ -813,23 +999,92 @@ const OrdersInventory = () => {
     };
   };
 
+  const formatPeso = (value) => {
+    const amount = parseFloat(value || 0) || 0;
+    return `₱${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const getAmountPaidValue = (item) => {
+    const candidates = [
+      item?.pricingFactors?.amount_paid,
+      item?.pricingFactors?.amountPaid,
+      item?.amount_paid,
+      item?.amountPaid,
+      item?.paid_amount,
+      item?.payment_amount,
+      item?.partial_payment_amount
+    ];
+
+    for (const candidate of candidates) {
+      const parsed = parseFloat(candidate || 0);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+
+    return 0;
+  };
+
+  const isPartialPaymentStatus = (status) => {
+    const normalized = String(status || '').toLowerCase().trim();
+    return normalized === 'partial payment' || normalized === 'partial-payment';
+  };
+
+  const getReportAmountValue = (item) => {
+    const fullPrice = parseFloat(item?.price || item?.displayAmount || 0) || 0;
+    const paidAmount = getAmountPaidValue(item);
+    const status = item?.displayStatus || item?.status;
+
+    if (isPartialPaymentStatus(status) && paidAmount > 0) {
+      return paidAmount;
+    }
+
+    return fullPrice;
+  };
+
+  const getReportPaymentDetails = (item) => {
+    const fullPrice = parseFloat(item?.price || item?.displayAmount || 0) || 0;
+    const paidAmount = getAmountPaidValue(item);
+    const status = item?.displayStatus || item?.status;
+
+    if (isPartialPaymentStatus(status) && paidAmount > 0) {
+      const balance = Math.max(0, fullPrice - paidAmount);
+      return `Partial paid ${formatPeso(paidAmount)} of ${formatPeso(fullPrice)} (Balance: ${formatPeso(balance)})`;
+    }
+
+    return '';
+  };
+
   const getRentalPriceDisplay = (item) => {
     const fullPrice = parseFloat(item.price || 0);
-    const amountPaid = parseFloat(item.pricingFactors?.amount_paid || 0);
-    const remainingBalance = fullPrice - amountPaid;
+    const amountPaid = getAmountPaidValue(item);
+    const remainingBalance = Math.max(0, fullPrice - amountPaid);
     const serviceType = (item.serviceType || '').toLowerCase();
+    const status = item.displayStatus || item.status;
 
-    if (serviceType === 'rental' && amountPaid > 0) {
+    if (isPartialPaymentStatus(status) && amountPaid > 0) {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          <span style={{ fontSize: '13px' }}>₱{fullPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span style={{ fontSize: '13px', fontWeight: 600 }}>{formatPeso(amountPaid)}</span>
+          <span style={{ fontSize: '11px', color: '#0f5c2e' }}>Partial paid of {formatPeso(fullPrice)}</span>
           {remainingBalance > 0 && (
-            <span style={{ fontSize: '11px', color: '#f44336' }}>Bal: ₱{remainingBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span style={{ fontSize: '11px', color: '#f44336' }}>Bal: {formatPeso(remainingBalance)}</span>
           )}
         </div>
       );
     }
-    return `₱${fullPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    if (serviceType === 'rental' && amountPaid > 0) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <span style={{ fontSize: '13px' }}>{formatPeso(fullPrice)}</span>
+          {remainingBalance > 0 && (
+            <span style={{ fontSize: '11px', color: '#f44336' }}>Bal: {formatPeso(remainingBalance)}</span>
+          )}
+        </div>
+      );
+    }
+    return formatPeso(fullPrice);
   };
 
   // Rental Post Management Functions
@@ -1202,6 +1457,112 @@ const OrdersInventory = () => {
     ? rentalItems.filter(i => (i.status || 'available') === rentalFilter) 
     : rentalItems;
 
+  const rentalInventoryTableRows = filteredRentalItems.flatMap((item) => {
+    const sizeRows = getSizeAvailabilityRows(item);
+    const itemName = item.item_name || item.name || `Item #${item.item_id}`;
+    const itemPrice = parseFloat(item.price || 0) || 0;
+    const securityFee = getRentalSecurityFeeValue(item);
+
+    if (sizeRows.length === 0) {
+      const availableQty = Math.max(0, parseInt(item.total_available, 10) || 0);
+      const totalQty = availableQty;
+      const statusSummary = `${availableQty} of ${totalQty} ${availableQty === 1 ? 'is' : 'are'} available`;
+      const statusTags = [
+        {
+          type: 'available',
+          text: statusSummary
+        }
+      ];
+
+      return [{
+        key: `${item.item_id}-no-size`,
+        itemName,
+        sizeLabel: 'N/A',
+        qty: totalQty,
+        price: itemPrice,
+        securityFee,
+        statusSummary,
+        statusTags,
+        statusTypes: ['available']
+      }];
+    }
+
+    return sizeRows.map((row) => {
+      const rentedQty = Math.max(0, parseInt(row.rentedQty, 10) || 0);
+      const maintenanceQty = Math.max(0, parseInt(row.maintenanceQty, 10) || 0);
+      const availableQty = Math.max(0, parseInt(row.quantity, 10) || 0);
+      const totalQty = Math.max(0, availableQty + rentedQty + maintenanceQty);
+      const rowSecurityFee = Number.isFinite(parseFloat(row.securityFee))
+        ? Math.max(0, parseFloat(row.securityFee))
+        : securityFee;
+      const statusTags = [];
+      const statusTypes = [];
+
+      let statusSummary = `${availableQty} of ${totalQty} ${availableQty === 1 ? 'is' : 'are'} available`;
+
+      if (rentedQty > 0 && maintenanceQty > 0) {
+        statusSummary = `${rentedQty} of ${totalQty} ${rentedQty === 1 ? 'is' : 'are'} rented, ${maintenanceQty} of ${totalQty} ${maintenanceQty === 1 ? 'is' : 'are'} maintenance`;
+        statusTags.push(
+          {
+            type: 'rented',
+            text: `${rentedQty} of ${totalQty} ${rentedQty === 1 ? 'is' : 'are'} rented`
+          },
+          {
+            type: 'maintenance',
+            text: `${maintenanceQty} of ${totalQty} ${maintenanceQty === 1 ? 'is' : 'are'} maintenance`
+          }
+        );
+        statusTypes.push('rented', 'maintenance');
+      } else if (maintenanceQty > 0) {
+        statusSummary = `${maintenanceQty} of ${totalQty} ${maintenanceQty === 1 ? 'is' : 'are'} maintenance`;
+        statusTags.push({
+          type: 'maintenance',
+          text: statusSummary
+        });
+        statusTypes.push('maintenance');
+      } else if (rentedQty > 0) {
+        statusSummary = `${rentedQty} of ${totalQty} ${rentedQty === 1 ? 'is' : 'are'} rented`;
+        statusTags.push({
+          type: 'rented',
+          text: statusSummary
+        });
+        statusTypes.push('rented');
+      } else {
+        statusTags.push({
+          type: 'available',
+          text: statusSummary
+        });
+        statusTypes.push('available');
+      }
+
+      return {
+        key: `${item.item_id}-${row.key}`,
+        itemName,
+        sizeLabel: row.label,
+        qty: totalQty,
+        price: itemPrice,
+        securityFee: rowSecurityFee > 0 ? rowSecurityFee : securityFee,
+        statusSummary,
+        statusTags,
+        statusTypes
+      };
+    });
+  });
+
+  const filteredRentalInventoryTableRows = rentalInventoryTableRows.filter((row) => {
+    const matchesStatus = rentalSummaryStatusFilters.length === 0
+      || row.statusTypes.some((type) => rentalSummaryStatusFilters.includes(type));
+    const matchesSize = rentalSummarySizeFilters.length === 0
+      || rentalSummarySizeFilters.includes(row.sizeLabel);
+    return matchesStatus && matchesSize;
+  });
+
+  const rentalSummarySizeOptions = Array.from(
+    new Set(rentalInventoryTableRows.map((row) => row.sizeLabel).filter(Boolean))
+  )
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+    .map((sizeLabel) => ({ value: sizeLabel, label: sizeLabel }));
+
   const handleExportReportsToExcel = async () => {
     try {
       const currentUser = getUser();
@@ -1209,7 +1570,8 @@ const OrdersInventory = () => {
         'ID': item.dataType === 'order' ? (item.displayId || item.uniqueNo || '') : (item.uniqueNo || ''),
         'Customer/Item': item.displayName || '',
         'Service/Category': item.displayService || '',
-        'Amount/Price': parseFloat(item.displayAmount || 0),
+        'Amount/Price': getReportAmountValue(item),
+        'Payment Details': getReportPaymentDetails(item),
         'Date': item.displayDate || '',
         'Status': item.displayStatus || item.status || ''
       }));
@@ -1231,7 +1593,7 @@ const OrdersInventory = () => {
         data: reportRows,
         filename: 'reports_table',
         sheetName: 'Reports',
-        headers: ['ID', 'Customer/Item', 'Service/Category', 'Amount/Price', 'Date', 'Status'],
+        headers: ['ID', 'Customer/Item', 'Service/Category', 'Amount/Price', 'Payment Details', 'Date', 'Status'],
         receiptInfo: receiptInfo
       });
     } catch (error) {
@@ -1338,9 +1700,10 @@ const OrdersInventory = () => {
 
   const clearReportFilters = () => {
     setSearchTerm('');
-    setStatusFilter('all');
-    setIncidentStatusFilter('all');
-    setEnhancementStatusFilter('all');
+    setStatusFilters([]);
+    setIncidentStatusFilters([]);
+    setEnhancementStatusFilters([]);
+    setServiceTypeFilters([]);
     setDateFrom('');
     setDateTo('');
   };
@@ -1362,14 +1725,14 @@ const OrdersInventory = () => {
           <>
         {/* Combined Statistics Cards */}
         <div className="stats-grid-combined report-print-area">
-          <div className="stat-card" onClick={() => setStatusFilter('all')}>
+          <div className="stat-card" onClick={() => setStatusFilters([])}>
             <div className="stat-header">
               <span>Total Bills</span>
               <div className="stat-icon" style={{ background: '#e3f2fd', color: '#2196f3' }}>📄</div>
             </div>
             <div className="stat-number">{combinedStats.totalOrders}</div>
           </div>
-          <div className="stat-card" onClick={() => setStatusFilter('Paid')}>
+          <div className="stat-card" onClick={() => setStatusFilters(['Paid'])}>
             <div className="stat-header">
               <span>Paid</span>
               <div className="stat-icon" style={{ background: '#e8f5e9', color: '#4caf50' }}>✓</div>
@@ -1377,7 +1740,7 @@ const OrdersInventory = () => {
             <div className="stat-number">{combinedStats.paidBills}</div>
           </div>
 
-          <div className="stat-card" onClick={() => setStatusFilter('Unpaid')}>
+          <div className="stat-card" onClick={() => setStatusFilters(['Unpaid'])}>
             <div className="stat-header">
               <span>Unpaid</span>
               <div className="stat-icon" style={{ background: '#ffebee', color: '#f44336' }}>⚠</div>
@@ -1413,7 +1776,7 @@ const OrdersInventory = () => {
             className="stat-card"
             onClick={() => {
               setReportTab('enhancements');
-              setEnhancementStatusFilter('accepted');
+              setEnhancementStatusFilters(['accepted']);
             }}
           >
             <div className="stat-header">
@@ -1429,7 +1792,7 @@ const OrdersInventory = () => {
             className="stat-card"
             onClick={() => {
               setReportTab('enhancements');
-              setEnhancementStatusFilter('accepted');
+              setEnhancementStatusFilters(['accepted']);
             }}
           >
             <div className="stat-header">
@@ -1483,61 +1846,38 @@ const OrdersInventory = () => {
           />
 
           {reportTab === 'reports' && (
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="filter-select"
-            >
-              <option value="all">All Status</option>
-              <option value="Completed">Completed</option>
-              <option value="Paid">Paid</option>
-              <option value="Fully Paid">Fully Paid</option>
-              <option value="Partial Payment">Partial Payment</option>
-              <option value="Unpaid">Unpaid</option>
-              <option value="Down-payment">Down-payment</option>
-              <option value="Cancelled">Cancelled</option>
-            </select>
+            <MultiSelectDropdown
+              allLabel="All Status"
+              options={REPORT_STATUS_OPTIONS}
+              selectedValues={statusFilters}
+              onChange={setStatusFilters}
+            />
           )}
 
           {reportTab === 'incidents' && (
-            <select
-              value={incidentStatusFilter}
-              onChange={(e) => setIncidentStatusFilter(e.target.value)}
-              className="filter-select"
-            >
-              <option value="all">All Incident Status</option>
-              <option value="pending_liability">Pending Liability</option>
-              <option value="approved_liability">Approved Liability</option>
-              <option value="rejected_liability">Rejected Liability</option>
-              <option value="paid_compensation">Paid Compensation</option>
-              <option value="unpaid_compensation">Unpaid Compensation</option>
-            </select>
+            <MultiSelectDropdown
+              allLabel="All Incident Status"
+              options={INCIDENT_STATUS_OPTIONS}
+              selectedValues={incidentStatusFilters}
+              onChange={setIncidentStatusFilters}
+            />
           )}
 
           {reportTab === 'enhancements' && (
-            <select
-              value={enhancementStatusFilter}
-              onChange={(e) => setEnhancementStatusFilter(e.target.value)}
-              className="filter-select"
-            >
-              <option value="all">All Enhancement Status</option>
-              <option value="requested">Requested</option>
-              <option value="accepted">Accepted</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            <MultiSelectDropdown
+              allLabel="All Enhancement Status"
+              options={ENHANCEMENT_STATUS_OPTIONS}
+              selectedValues={enhancementStatusFilters}
+              onChange={setEnhancementStatusFilters}
+            />
           )}
 
-          <select
-            value={serviceTypeFilter}
-            onChange={(e) => setServiceTypeFilter(e.target.value)}
-            className="filter-select"
-          >
-            <option value="">All Services</option>
-            <option value="dry_cleaning">Dry Cleaning</option>
-            <option value="repair">Repair</option>
-            <option value="customization">Customization</option>
-            <option value="rental">Rental</option>
-          </select>
+          <MultiSelectDropdown
+            allLabel="All Services"
+            options={SERVICE_FILTER_OPTIONS}
+            selectedValues={serviceTypeFilters}
+            onChange={setServiceTypeFilters}
+          />
 
           <input
             type="date"
@@ -1947,6 +2287,72 @@ const OrdersInventory = () => {
               })
             )}
           </div>
+
+          <div className="rental-summary-table-section">
+            <div className="rental-summary-header">
+              <h4 className="rental-summary-title">Rental Item Size Summary</h4>
+              <div className="rental-summary-filters">
+                <MultiSelectDropdown
+                  allLabel="All Summary Status"
+                  options={RENTAL_SUMMARY_STATUS_OPTIONS}
+                  selectedValues={rentalSummaryStatusFilters}
+                  onChange={setRentalSummaryStatusFilters}
+                  className="filter-select"
+                />
+                <MultiSelectDropdown
+                  allLabel="All Sizes"
+                  options={rentalSummarySizeOptions}
+                  selectedValues={rentalSummarySizeFilters}
+                  onChange={setRentalSummarySizeFilters}
+                  className="filter-select"
+                />
+              </div>
+            </div>
+            <div className="rental-summary-table-wrap">
+              <table className="rental-summary-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Size</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th>Security Fee</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRentalInventoryTableRows.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="rental-summary-empty">
+                        {(rentalSummaryStatusFilters.length > 0 || rentalSummarySizeFilters.length > 0)
+                          ? 'No rental records match the selected summary filters.'
+                          : 'No rental records available.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRentalInventoryTableRows.map((row) => (
+                      <tr key={row.key}>
+                        <td>{row.itemName}</td>
+                        <td>{row.sizeLabel}</td>
+                        <td>{row.qty}</td>
+                        <td>{formatPeso(row.price)}</td>
+                        <td>{formatPeso(row.securityFee)}</td>
+                        <td>
+                          <div className="rental-summary-status-list">
+                            {(row.statusTags || [{ type: 'available', text: row.statusSummary }]).map((tag, index) => (
+                              <span key={`${row.key}-${tag.type}-${index}`} className={`rental-summary-status-label ${tag.type}`}>
+                                {tag.text}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
         )}
       </div>
@@ -1986,9 +2392,16 @@ const OrdersInventory = () => {
               </div>
               <div className="detail-row">
                 <strong>Amount:</strong>
-                <span style={{ color: '#2e7d32', fontWeight: 'bold', fontSize: '18px' }}>
-                  ₱{parseFloat(selectedItem.displayAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{ color: '#2e7d32', fontWeight: 'bold', fontSize: '18px' }}>
+                    {formatPeso(getReportAmountValue(selectedItem))}
+                  </span>
+                  {getReportPaymentDetails(selectedItem) && (
+                    <span style={{ color: '#4b5563', fontSize: '12px' }}>
+                      {getReportPaymentDetails(selectedItem)}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="detail-row">
                 <strong>Status:</strong>
@@ -2524,6 +2937,29 @@ const OrdersInventory = () => {
                 <label>Incident:</label>
                 <span>{selectedSettlementIncident.damage_description || 'N/A'}</span>
               </div>
+              {getIncidentImageUrl(selectedSettlementIncident) && (
+                <div className="detail-row">
+                  <label>Dispute Image:</label>
+                  <span>
+                    <img
+                      src={getIncidentImageUrl(selectedSettlementIncident)}
+                      alt="Dispute evidence"
+                      style={{
+                        width: '100px',
+                        height: '100px',
+                        objectFit: 'cover',
+                        borderRadius: '8px',
+                        border: '1px solid #ddd',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => openImagePreview(getIncidentImageUrl(selectedSettlementIncident), 'Dispute Image')}
+                    />
+                    <div style={{ fontSize: '12px', color: '#666', marginTop: '6px' }}>
+                      Click image to view full size
+                    </div>
+                  </span>
+                </div>
+              )}
               <div className="detail-row">
                 <label>Order Item ID:</label>
                 <span>{selectedSettlementIncident.order_item_id || 'N/A'}</span>

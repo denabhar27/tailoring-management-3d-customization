@@ -187,6 +187,8 @@ const Repair = () => {
   const [paymentAmount, setPaymentAmount] = useState('');
 
   const [cashReceived, setCashReceived] = useState('');
+  const [paymentOption, setPaymentOption] = useState('downpayment');
+  const [moveToStatusOnNoDownpayment, setMoveToStatusOnNoDownpayment] = useState('');
 
 
 
@@ -2815,6 +2817,40 @@ const Repair = () => {
 
   const handleRecordPayment = async () => {
 
+    if (!selectedOrder) {
+
+      await alert('No order selected', 'Error', 'error');
+
+      return;
+
+    }
+
+    const canUseNoDownpaymentFlow = selectedOrder.approval_status === 'accepted'
+      && paymentOption === 'no_downpayment';
+
+    if (canUseNoDownpaymentFlow) {
+
+      const nextStatus = moveToStatusOnNoDownpayment
+        || getNextStatus(selectedOrder.approval_status, 'repair', selectedOrder);
+
+      if (!nextStatus) {
+
+        await alert('Please select a status to move to', 'Error', 'error');
+
+        return;
+
+      }
+
+      setShowPaymentModal(false);
+      setPaymentAmount('');
+      setCashReceived('');
+      setPaymentOption('downpayment');
+      setMoveToStatusOnNoDownpayment('');
+      updateStatus(selectedOrder.item_id, nextStatus);
+      return;
+
+    }
+
     if (!selectedOrder || !paymentAmount) {
 
       await alert('Please enter a payment amount', 'Error', 'error');
@@ -2897,6 +2933,8 @@ const Repair = () => {
         setPaymentAmount('');
 
         setCashReceived('');
+        setPaymentOption('downpayment');
+        setMoveToStatusOnNoDownpayment('');
 
         await loadRepairOrders();
 
@@ -3637,8 +3675,13 @@ const Repair = () => {
                                   e.stopPropagation();
                                   setSelectedOrder(item);
                                   const fp = parseFloat(item.final_price || 0);
+                                  const acceptedNextStatus = item.approval_status === 'accepted'
+                                    ? getNextStatus(item.approval_status, 'repair', item)
+                                    : '';
                                   setPaymentAmount((fp * 0.5).toFixed(2));
                                   setCashReceived('');
+                                  setPaymentOption('downpayment');
+                                  setMoveToStatusOnNoDownpayment(acceptedNextStatus || '');
                                   setShowPaymentModal(true);
                                 }}
                                 title="Record Payment"
@@ -3904,8 +3947,13 @@ const Repair = () => {
                                       setSelectedOrder(item);
                                       const finalPrice = parseFloat(item.final_price || 0);
                                       const halfPrice = (finalPrice * 0.5).toFixed(2);
+                                      const acceptedNextStatus = item.approval_status === 'accepted'
+                                        ? getNextStatus(item.approval_status, 'repair', item)
+                                        : '';
                                       setPaymentAmount(halfPrice);
                                       setCashReceived('');
+                                      setPaymentOption('downpayment');
+                                      setMoveToStatusOnNoDownpayment(acceptedNextStatus || '');
                                       setShowPaymentModal(true);
                                     }}
                                     title="Record Payment"
@@ -5720,6 +5768,40 @@ const Repair = () => {
 
 
 
+              {selectedOrder.approval_status === 'accepted' && getNextStatus(selectedOrder.approval_status, 'repair', selectedOrder) && (
+                <div className="payment-form-group">
+                  <label>Payment Option *</label>
+                  <div className="payment-option-group">
+                    <label className="payment-option-item">
+                      <input
+                        type="checkbox"
+                        className="payment-option-input"
+                        checked={paymentOption === 'downpayment'}
+                        onChange={() => setPaymentOption('downpayment')}
+                      />
+                      <span>Downpayment</span>
+                    </label>
+                    <label className="payment-option-item">
+                      <input
+                        type="checkbox"
+                        className="payment-option-input"
+                        checked={paymentOption === 'no_downpayment'}
+                        onChange={() => {
+                          const nextStatus = getNextStatus(selectedOrder.approval_status, 'repair', selectedOrder);
+                          setPaymentOption('no_downpayment');
+                          setMoveToStatusOnNoDownpayment(nextStatus || '');
+                          setPaymentAmount('');
+                          setCashReceived('');
+                        }}
+                      />
+                      <span>No Downpayment</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {!(selectedOrder.approval_status === 'accepted' && paymentOption === 'no_downpayment') && (
+                <>
               <div className="payment-form-group">
 
                 <label>Payment Amount *</label>
@@ -5785,6 +5867,24 @@ const Repair = () => {
                 )}
 
               </div>
+                </>
+              )}
+
+              {selectedOrder.approval_status === 'accepted' && paymentOption === 'no_downpayment' && getNextStatus(selectedOrder.approval_status, 'repair', selectedOrder) && (
+                <div className="payment-form-group">
+                  <label>Move To *</label>
+                  <select
+                    value={moveToStatusOnNoDownpayment}
+                    onChange={(e) => setMoveToStatusOnNoDownpayment(e.target.value)}
+                    className="form-control"
+                  >
+                    <option value="">Select status</option>
+                    <option value={getNextStatus(selectedOrder.approval_status, 'repair', selectedOrder)}>
+                      {getNextStatusLabel(selectedOrder.approval_status, 'repair', selectedOrder)}
+                    </option>
+                  </select>
+                </div>
+              )}
 
             </div>
 
@@ -5797,6 +5897,8 @@ const Repair = () => {
                 setPaymentAmount('');
 
                 setCashReceived('');
+                setPaymentOption('downpayment');
+                setMoveToStatusOnNoDownpayment('');
 
               }}>
 
@@ -5806,7 +5908,7 @@ const Repair = () => {
 
               <button className="btn-save" onClick={handleRecordPayment}>
 
-                Record Payment
+                {selectedOrder.approval_status === 'accepted' && paymentOption === 'no_downpayment' ? 'Move Status' : 'Record Payment'}
 
               </button>
 

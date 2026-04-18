@@ -1396,6 +1396,56 @@ tbody tr.clickable-row:active {
   font-size: 16px;
 }
 
+.payment-option-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  justify-content: center;
+  align-items: stretch;
+  margin-top: 8px;
+}
+
+.payment-option-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid #d7dbe5;
+  border-radius: 12px;
+  background: #fff;
+  color: #2f3b52;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
+}
+
+.payment-option-item:hover {
+  border-color: #8B4513;
+  box-shadow: 0 6px 16px rgba(139, 69, 19, 0.08);
+  transform: translateY(-1px);
+}
+
+.payment-option-item:has(input:checked) {
+  border-color: #8B4513;
+  background: #fdf5ee;
+  box-shadow: 0 8px 18px rgba(139, 69, 19, 0.12);
+}
+
+.payment-option-input {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px;
+  min-height: 18px;
+  margin: 0;
+  accent-color: #8B4513;
+  flex: 0 0 auto;
+}
+
+.payment-option-item span {
+  line-height: 1.2;
+}
+
 /* Consistent UI table styling across all admin pages */
 .rental-page .table-container {
   background: #ffffff;

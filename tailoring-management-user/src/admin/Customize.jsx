@@ -125,6 +125,8 @@ const Customize = () => {
   const [paymentAmount, setPaymentAmount] = useState('');
 
   const [cashReceived, setCashReceived] = useState('');
+  const [paymentOption, setPaymentOption] = useState('downpayment');
+  const [moveToStatusOnNoDownpayment, setMoveToStatusOnNoDownpayment] = useState('');
 
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
@@ -3395,6 +3397,40 @@ const Customize = () => {
 
   const handleRecordPayment = async () => {
 
+    if (!selectedOrder) {
+
+      await alert('No order selected', 'Error', 'error');
+
+      return;
+
+    }
+
+    const canUseNoDownpaymentFlow = selectedOrder.approval_status === 'accepted'
+      && paymentOption === 'no_downpayment';
+
+    if (canUseNoDownpaymentFlow) {
+
+      const nextStatus = moveToStatusOnNoDownpayment
+        || getNextStatus(selectedOrder.approval_status, 'customization', selectedOrder);
+
+      if (!nextStatus) {
+
+        await alert('Please select a status to move to', 'Error', 'error');
+
+        return;
+
+      }
+
+      setShowPaymentModal(false);
+      setPaymentAmount('');
+      setCashReceived('');
+      setPaymentOption('downpayment');
+      setMoveToStatusOnNoDownpayment('');
+      updateStatus(selectedOrder.item_id, nextStatus);
+      return;
+
+    }
+
     if (!selectedOrder || !paymentAmount) {
 
       await alert('Please enter a payment amount', 'Error', 'error');
@@ -3470,6 +3506,8 @@ const Customize = () => {
         setPaymentAmount('');
 
         setCashReceived('');
+        setPaymentOption('downpayment');
+        setMoveToStatusOnNoDownpayment('');
 
         await loadCustomizationOrders();
 
@@ -4529,10 +4567,15 @@ const Customize = () => {
 
                                   const finalPrice = parseFloat(item.final_price || 0);
                                   const halfPrice = (finalPrice * 0.5).toFixed(2);
+                                  const acceptedNextStatus = item.approval_status === 'accepted'
+                                    ? getNextStatus(item.approval_status, 'customization', item)
+                                    : '';
 
                                   setPaymentAmount(halfPrice);
 
                                   setCashReceived('');
+                                  setPaymentOption('downpayment');
+                                  setMoveToStatusOnNoDownpayment(acceptedNextStatus || '');
 
                                   setShowPaymentModal(true);
 
@@ -7896,71 +7939,123 @@ const Customize = () => {
 
               })()}
 
-              <div className="payment-form-group">
+              {selectedOrder.approval_status === 'accepted' && getNextStatus(selectedOrder.approval_status, 'customization', selectedOrder) && (
+                <div className="payment-form-group">
+                  <label>Payment Option *</label>
+                  <div className="payment-option-group">
+                    <label className="payment-option-item">
+                      <input
+                        type="checkbox"
+                        className="payment-option-input"
+                        checked={paymentOption === 'downpayment'}
+                        onChange={() => setPaymentOption('downpayment')}
+                      />
+                      <span>Downpayment</span>
+                    </label>
+                    <label className="payment-option-item">
+                      <input
+                        type="checkbox"
+                        className="payment-option-input"
+                        checked={paymentOption === 'no_downpayment'}
+                        onChange={() => {
+                          const nextStatus = getNextStatus(selectedOrder.approval_status, 'customization', selectedOrder);
+                          setPaymentOption('no_downpayment');
+                          setMoveToStatusOnNoDownpayment(nextStatus || '');
+                          setPaymentAmount('');
+                          setCashReceived('');
+                        }}
+                      />
+                      <span>No Downpayment</span>
+                    </label>
+                  </div>
+                </div>
+              )}
 
-                <label>Payment Amount *</label>
+              {!(selectedOrder.approval_status === 'accepted' && paymentOption === 'no_downpayment') && (
+                <>
+                  <div className="payment-form-group">
 
-                <input
+                    <label>Payment Amount *</label>
 
-                  type="number"
+                    <input
 
-                  value={paymentAmount}
+                      type="number"
 
-                  onChange={(e) => setPaymentAmount(e.target.value)}
+                      value={paymentAmount}
 
-                  className="form-control"
+                      onChange={(e) => setPaymentAmount(e.target.value)}
 
-                  placeholder="Enter payment amount"
+                      className="form-control"
 
-                  min="0"
+                      placeholder="Enter payment amount"
 
-                  step="0.01"
+                      min="0"
 
-                  autoFocus
+                      step="0.01"
 
-                />
+                      autoFocus
 
-                <small style={{ color: '#666', marginTop: '5px', display: 'block' }}>
+                    />
 
-                  Enter the amount the customer is paying now
+                    <small style={{ color: '#666', marginTop: '5px', display: 'block' }}>
 
-                </small>
+                      Enter the amount the customer is paying now
 
-              </div>
+                    </small>
 
-              <div className="payment-form-group">
+                  </div>
 
-                <label>Cash Received *</label>
+                  <div className="payment-form-group">
 
-                <input
+                    <label>Cash Received *</label>
 
-                  type="number"
+                    <input
 
-                  value={cashReceived}
+                      type="number"
 
-                  onChange={(e) => setCashReceived(e.target.value)}
+                      value={cashReceived}
 
-                  className="form-control"
+                      onChange={(e) => setCashReceived(e.target.value)}
 
-                  placeholder="Enter cash received (e.g. 1000)"
+                      className="form-control"
 
-                  min="0"
+                      placeholder="Enter cash received (e.g. 1000)"
 
-                  step="0.01"
+                      min="0"
 
-                />
+                      step="0.01"
 
-                {!Number.isNaN(parseFloat(paymentAmount)) && !Number.isNaN(parseFloat(cashReceived)) && parseFloat(cashReceived) >= parseFloat(paymentAmount) && (
+                    />
 
-                  <small style={{ color: '#2e7d32', marginTop: '5px', display: 'block' }}>
+                    {!Number.isNaN(parseFloat(paymentAmount)) && !Number.isNaN(parseFloat(cashReceived)) && parseFloat(cashReceived) >= parseFloat(paymentAmount) && (
 
-                    Change: ₱{(parseFloat(cashReceived) - parseFloat(paymentAmount)).toFixed(2)}
+                      <small style={{ color: '#2e7d32', marginTop: '5px', display: 'block' }}>
 
-                  </small>
+                        Change: ₱{(parseFloat(cashReceived) - parseFloat(paymentAmount)).toFixed(2)}
 
-                )}
+                      </small>
 
-              </div>
+                    )}
+
+                  </div>
+                </>
+              )}
+
+              {selectedOrder.approval_status === 'accepted' && paymentOption === 'no_downpayment' && getNextStatus(selectedOrder.approval_status, 'customization', selectedOrder) && (
+                <div className="payment-form-group">
+                  <label>Move To *</label>
+                  <select
+                    value={moveToStatusOnNoDownpayment}
+                    onChange={(e) => setMoveToStatusOnNoDownpayment(e.target.value)}
+                    className="form-control"
+                  >
+                    <option value="">Select status</option>
+                    <option value={getNextStatus(selectedOrder.approval_status, 'customization', selectedOrder)}>
+                      {getNextStatusLabel(selectedOrder.approval_status, 'customization', selectedOrder)}
+                    </option>
+                  </select>
+                </div>
+              )}
 
             </div>
 
@@ -7973,6 +8068,8 @@ const Customize = () => {
                 setPaymentAmount('');
 
                 setCashReceived('');
+                setPaymentOption('downpayment');
+                setMoveToStatusOnNoDownpayment('');
 
               }}>
 
@@ -7982,7 +8079,7 @@ const Customize = () => {
 
               <button className="btn-save" onClick={handleRecordPayment}>
 
-                Record Payment
+                {selectedOrder.approval_status === 'accepted' && paymentOption === 'no_downpayment' ? 'Move Status' : 'Record Payment'}
 
               </button>
 

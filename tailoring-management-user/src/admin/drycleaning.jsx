@@ -132,6 +132,8 @@ const DryCleaning = () => {
   const [paymentAmount, setPaymentAmount] = useState('');
 
   const [cashReceived, setCashReceived] = useState('');
+  const [paymentOption, setPaymentOption] = useState('downpayment');
+  const [moveToStatusOnNoDownpayment, setMoveToStatusOnNoDownpayment] = useState('');
 
 
 
@@ -2499,6 +2501,40 @@ const DryCleaning = () => {
 
   const handleRecordPayment = async () => {
 
+    if (!selectedOrder) {
+
+      showToast('No order selected', 'error');
+
+      return;
+
+    }
+
+    const canUseNoDownpaymentFlow = selectedOrder.approval_status === 'accepted'
+      && paymentOption === 'no_downpayment';
+
+    if (canUseNoDownpaymentFlow) {
+
+      const nextStatus = moveToStatusOnNoDownpayment
+        || getNextStatus(selectedOrder.approval_status, 'dry_cleaning', selectedOrder);
+
+      if (!nextStatus) {
+
+        showToast('Please select a status to move to', 'error');
+
+        return;
+
+      }
+
+      setShowPaymentModal(false);
+      setPaymentAmount('');
+      setCashReceived('');
+      setPaymentOption('downpayment');
+      setMoveToStatusOnNoDownpayment('');
+      updateStatus(selectedOrder.item_id, nextStatus);
+      return;
+
+    }
+
     if (!selectedOrder || !paymentAmount) {
 
       showToast('Please enter a payment amount', 'error');
@@ -2582,6 +2618,8 @@ const DryCleaning = () => {
         setPaymentAmount('');
 
         setCashReceived('');
+        setPaymentOption('downpayment');
+        setMoveToStatusOnNoDownpayment('');
 
         await loadDryCleaningOrders();
 
@@ -3484,7 +3522,7 @@ const DryCleaning = () => {
                           {customerWantsToProceed && item.approval_status !== 'completed' && item.approval_status !== 'cancelled' && (
                             <button
                               className="icon-btn"
-                              onClick={(e) => { e.stopPropagation(); setSelectedOrder(item); const fp = parseFloat(item.final_price || 0); setPaymentAmount((fp * 0.5).toFixed(2)); setCashReceived(''); setShowPaymentModal(true); }}
+                              onClick={(e) => { e.stopPropagation(); setSelectedOrder(item); const fp = parseFloat(item.final_price || 0); const acceptedNextStatus = item.approval_status === 'accepted' ? getNextStatus(item.approval_status, 'dry_cleaning', item) : ''; setPaymentAmount((fp * 0.5).toFixed(2)); setCashReceived(''); setPaymentOption('downpayment'); setMoveToStatusOnNoDownpayment(acceptedNextStatus || ''); setShowPaymentModal(true); }}
                               title="Record Payment"
                               style={{ backgroundColor: '#2196F3', color: 'white' }}
                             >
@@ -3639,10 +3677,15 @@ const DryCleaning = () => {
                                   const finalPrice = parseFloat(item.final_price || 0);
 
                                   const halfPrice = (finalPrice * 0.5).toFixed(2);
+                                  const acceptedNextStatus = item.approval_status === 'accepted'
+                                    ? getNextStatus(item.approval_status, 'dry_cleaning', item)
+                                    : '';
 
                                   setPaymentAmount(halfPrice);
 
                                   setCashReceived('');
+                                  setPaymentOption('downpayment');
+                                  setMoveToStatusOnNoDownpayment(acceptedNextStatus || '');
 
                                   setShowPaymentModal(true);
 
@@ -5445,6 +5488,40 @@ const DryCleaning = () => {
 
 
 
+              {selectedOrder.approval_status === 'accepted' && getNextStatus(selectedOrder.approval_status, 'dry_cleaning', selectedOrder) && (
+                <div className="payment-form-group">
+                  <label>Payment Option *</label>
+                  <div className="payment-option-group">
+                    <label className="payment-option-item">
+                      <input
+                        type="checkbox"
+                        className="payment-option-input"
+                        checked={paymentOption === 'downpayment'}
+                        onChange={() => setPaymentOption('downpayment')}
+                      />
+                      <span>Downpayment</span>
+                    </label>
+                    <label className="payment-option-item">
+                      <input
+                        type="checkbox"
+                        className="payment-option-input"
+                        checked={paymentOption === 'no_downpayment'}
+                        onChange={() => {
+                          const nextStatus = getNextStatus(selectedOrder.approval_status, 'dry_cleaning', selectedOrder);
+                          setPaymentOption('no_downpayment');
+                          setMoveToStatusOnNoDownpayment(nextStatus || '');
+                          setPaymentAmount('');
+                          setCashReceived('');
+                        }}
+                      />
+                      <span>No Downpayment</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {!(selectedOrder.approval_status === 'accepted' && paymentOption === 'no_downpayment') && (
+                <>
               <div className="payment-form-group">
 
                 <label>Payment Amount *</label>
@@ -5512,6 +5589,24 @@ const DryCleaning = () => {
                 )}
 
               </div>
+                </>
+              )}
+
+              {selectedOrder.approval_status === 'accepted' && paymentOption === 'no_downpayment' && getNextStatus(selectedOrder.approval_status, 'dry_cleaning', selectedOrder) && (
+                <div className="payment-form-group">
+                  <label>Move To *</label>
+                  <select
+                    value={moveToStatusOnNoDownpayment}
+                    onChange={(e) => setMoveToStatusOnNoDownpayment(e.target.value)}
+                    className="form-control"
+                  >
+                    <option value="">Select status</option>
+                    <option value={getNextStatus(selectedOrder.approval_status, 'dry_cleaning', selectedOrder)}>
+                      {getNextStatusLabel(selectedOrder.approval_status, 'dry_cleaning', selectedOrder)}
+                    </option>
+                  </select>
+                </div>
+              )}
 
             </div>
 
@@ -5524,6 +5619,8 @@ const DryCleaning = () => {
                 setPaymentAmount('');
 
                 setCashReceived('');
+                setPaymentOption('downpayment');
+                setMoveToStatusOnNoDownpayment('');
 
               }}>
 
@@ -5533,7 +5630,7 @@ const DryCleaning = () => {
 
               <button className="btn-save" onClick={handleRecordPayment}>
 
-                Record Payment
+                {selectedOrder.approval_status === 'accepted' && paymentOption === 'no_downpayment' ? 'Move Status' : 'Record Payment'}
 
               </button>
 

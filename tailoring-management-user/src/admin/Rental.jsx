@@ -65,6 +65,8 @@ function Rental() {
   const [paymentAmount, setPaymentAmount] = useState('');
 
   const [cashReceived, setCashReceived] = useState('');
+  const [paymentOption, setPaymentOption] = useState('downpayment');
+  const [moveToStatusOnNoDownpayment, setMoveToStatusOnNoDownpayment] = useState('');
 
   const [paymentModalMode, setPaymentModalMode] = useState('regular');
 
@@ -329,6 +331,8 @@ function Rental() {
     setShowPaymentModal(false);
     setPaymentAmount('');
     setCashReceived('');
+    setPaymentOption('downpayment');
+    setMoveToStatusOnNoDownpayment('');
     setRequiredPaymentAmount(0);
     setPendingRentedStatus(null);
     setPaymentModalMode('regular');
@@ -2008,6 +2012,37 @@ function Rental() {
 
   const handleRecordPayment = async () => {
 
+    if (!selectedRental) {
+
+      await alert('No rental selected', 'Error', 'error');
+
+      return;
+
+    }
+
+    const canUseNoDownpaymentFlow = paymentModalMode === 'regular'
+      && selectedRental.approval_status === 'accepted'
+      && paymentOption === 'no_downpayment';
+
+    if (canUseNoDownpaymentFlow) {
+
+      const nextStatus = moveToStatusOnNoDownpayment
+        || getNextStatus(selectedRental.approval_status, 'rental', selectedRental);
+
+      if (!nextStatus) {
+
+        await alert('Please select a status to move to', 'Error', 'error');
+
+        return;
+
+      }
+
+      closePaymentModal();
+      await handleStatusUpdate(selectedRental.item_id, nextStatus, selectedRental);
+      return;
+
+    }
+
     if (!selectedRental || !paymentAmount) {
 
       await alert('Please enter a payment amount', 'Error', 'error');
@@ -2084,6 +2119,8 @@ function Rental() {
         setPaymentAmount('');
 
         setCashReceived('');
+        setPaymentOption('downpayment');
+        setMoveToStatusOnNoDownpayment('');
 
         setRequiredPaymentAmount(0);
 
@@ -4092,8 +4129,42 @@ function Rental() {
                 </div>
               )}
 
+              {paymentModalMode === 'regular' && selectedRental.approval_status === 'accepted' && getNextStatus(selectedRental.approval_status, 'rental', selectedRental) && (
+                <div className="payment-form-group">
+                  <label>Payment Option *</label>
+                  <div className="payment-option-group">
+                    <label className="payment-option-item">
+                      <input
+                        type="checkbox"
+                        className="payment-option-input"
+                        checked={paymentOption === 'downpayment'}
+                        onChange={() => setPaymentOption('downpayment')}
+                      />
+                      <span>Downpayment</span>
+                    </label>
+                    <label className="payment-option-item">
+                      <input
+                        type="checkbox"
+                        className="payment-option-input"
+                        checked={paymentOption === 'no_downpayment'}
+                        onChange={() => {
+                          const nextStatus = getNextStatus(selectedRental.approval_status, 'rental', selectedRental);
+                          setPaymentOption('no_downpayment');
+                          setMoveToStatusOnNoDownpayment(nextStatus || '');
+                          setPaymentAmount('');
+                          setCashReceived('');
+                        }}
+                      />
+                      <span>No Downpayment</span>
+                    </label>
+                  </div>
+                </div>
+              )}
 
 
+
+              {!(paymentModalMode === 'regular' && selectedRental.approval_status === 'accepted' && paymentOption === 'no_downpayment') && (
+                <>
               <div className="payment-form-group">
 
                 <label>{paymentModalMode === 'overdue' ? 'Overdue Amount *' : 'Payment Amount *'}</label>
@@ -4165,6 +4236,24 @@ function Rental() {
                 )}
 
               </div>
+                </>
+              )}
+
+              {paymentModalMode === 'regular' && selectedRental.approval_status === 'accepted' && paymentOption === 'no_downpayment' && getNextStatus(selectedRental.approval_status, 'rental', selectedRental) && (
+                <div className="payment-form-group">
+                  <label>Move To *</label>
+                  <select
+                    value={moveToStatusOnNoDownpayment}
+                    onChange={(e) => setMoveToStatusOnNoDownpayment(e.target.value)}
+                    className="form-control"
+                  >
+                    <option value="">Select status</option>
+                    <option value={getNextStatus(selectedRental.approval_status, 'rental', selectedRental)}>
+                      {getNextStatusLabel(selectedRental.approval_status, 'rental')}
+                    </option>
+                  </select>
+                </div>
+              )}
 
             </div>
 
@@ -4182,7 +4271,11 @@ function Rental() {
 
               <button className="btn-save" onClick={handleRecordPayment}>
 
-                {paymentModalMode === 'overdue' ? 'Record Overdue Payment' : 'Record Payment'}
+                {paymentModalMode === 'overdue'
+                  ? 'Record Overdue Payment'
+                  : paymentModalMode === 'regular' && selectedRental.approval_status === 'accepted' && paymentOption === 'no_downpayment'
+                    ? 'Move Status'
+                    : 'Record Payment'}
 
               </button>
 

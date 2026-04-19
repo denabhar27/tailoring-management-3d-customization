@@ -242,10 +242,9 @@ const RentalInventory = {
         if (rentedErr) return callback(rentedErr);
 
         const damageSql = `
-          SELECT inventory_item_id, size_key, SUM(quantity) AS qty
+          SELECT inventory_item_id, size_key, quantity, damage_note
           FROM damage_logs
           WHERE status = 'active'
-          GROUP BY inventory_item_id, size_key
         `;
 
         db.query(damageSql, (damageErr, damageRows) => {
@@ -272,7 +271,19 @@ const RentalInventory = {
           (damageRows || []).forEach((row) => {
             const itemId = parseInt(row.inventory_item_id, 10);
             const key = `${itemId}:${row.size_key}`;
-            damagedMap.set(key, parseInt(row.qty, 10) || 0);
+            const qty = Math.max(0, parseInt(row.quantity, 10) || 0);
+            const parsedMeta = parseDamageNoteMeta(row.damage_note || '');
+            const issueType = normalizeIssueType(parsedMeta?.meta?.issue_type || 'damage');
+
+            const existing = damagedMap.get(key) || {
+              total: 0,
+              issue_type_counts: {}
+            };
+
+            existing.total += qty;
+            existing.issue_type_counts[issueType] = (existing.issue_type_counts[issueType] || 0) + qty;
+
+            damagedMap.set(key, existing);
           });
 
           const enriched = items.map((item) => {
@@ -283,9 +294,11 @@ const RentalInventory = {
               const sizeKey = String(entry?.sizeKey || '').trim();
               if (!sizeKey) return;
               const mapKey = `${item.item_id}:${sizeKey}`;
+              const damageMeta = damagedMap.get(mapKey) || { total: 0, issue_type_counts: {} };
               reasonCounts[sizeKey] = {
                 rented: rentedMap.get(mapKey) || 0,
-                maintenance: damagedMap.get(mapKey) || 0
+                maintenance: damageMeta.total || 0,
+                issue_type_counts: damageMeta.issue_type_counts || {}
               };
             });
 

@@ -101,6 +101,9 @@ const getSizeAvailabilityRows = (item) => {
       reason,
       rentedQty,
       maintenanceQty,
+      issueTypeCounts: rowReasons?.issue_type_counts && typeof rowReasons.issue_type_counts === 'object'
+        ? rowReasons.issue_type_counts
+        : {},
       isOut: row.quantity <= 0
     };
   });
@@ -176,6 +179,29 @@ const formatServiceTypeLabel = (serviceType = '') => {
   if (normalized === 'rental') return 'Rental';
   if (!normalized) return 'N/A';
   return String(serviceType);
+};
+
+const normalizeIssueTypeKey = (value = '') => {
+  const normalized = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (!normalized) return '';
+  const aliases = {
+    damages: 'damage',
+    damaged: 'damage',
+    loss: 'lost',
+    replacement: 'replaced'
+  };
+  return aliases[normalized] || normalized;
+};
+
+const formatIssueTypeLabel = (value = '') => {
+  const normalized = normalizeIssueTypeKey(value);
+  if (!normalized) return 'N/A';
+  const labels = {
+    damage: 'Damage',
+    lost: 'Lost',
+    replaced: 'Replaced'
+  };
+  return labels[normalized] || normalized.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
 const MultiSelectDropdown = ({
@@ -422,6 +448,8 @@ const OrdersInventory = () => {
   const location = useLocation();
   const { alert, confirm, prompt } = useAlert();
   const isRentalInventoryPage = location.pathname === '/rental-inventory';
+  const currentRole = getUserRole();
+  const canViewReportsTab = currentRole === 'admin';
   
   // Combined data states
   const [billingRecords, setBillingRecords] = useState([]);
@@ -477,9 +505,11 @@ const OrdersInventory = () => {
   // Rental Post states
   const [isRentalModalOpen, setIsRentalModalOpen] = useState(false);
   const [editingRentalId, setEditingRentalId] = useState(null);
+  const [rentalInventoryTab, setRentalInventoryTab] = useState('items');
   const [rentalFilter, setRentalFilter] = useState('');
   const [rentalSummaryStatusFilters, setRentalSummaryStatusFilters] = useState([]);
   const [rentalSummarySizeFilters, setRentalSummarySizeFilters] = useState([]);
+  const [rentalSummaryIssueTypeFilters, setRentalSummaryIssueTypeFilters] = useState([]);
   const [rentalFormData, setRentalFormData] = useState({
     item_name: '',
     description: '',
@@ -513,8 +543,7 @@ const OrdersInventory = () => {
 
   // Fetch all data on component mount
   useEffect(() => {
-    const role = getUserRole();
-    const canAccessPage = role === 'admin' || (role === 'clerk' && isRentalInventoryPage);
+    const canAccessPage = currentRole === 'admin' || (currentRole === 'clerk' && isRentalInventoryPage);
     if (!canAccessPage) {
       navigate('/customize', { replace: true });
       return undefined;
@@ -523,7 +552,7 @@ const OrdersInventory = () => {
     fetchAllData();
     const refreshInterval = setInterval(fetchAllData, 30000); // Refresh every 30 seconds
     return () => clearInterval(refreshInterval);
-  }, [navigate, isRentalInventoryPage]);
+  }, [navigate, isRentalInventoryPage, currentRole]);
 
   // Combine billing and inventory data when they change
   useEffect(() => {
@@ -1535,6 +1564,24 @@ const OrdersInventory = () => {
         statusTypes.push('available');
       }
 
+      const issueTypeCountsRaw = row?.issueTypeCounts && typeof row.issueTypeCounts === 'object'
+        ? row.issueTypeCounts
+        : {};
+      const issueTypeCounts = Object.entries(issueTypeCountsRaw).reduce((acc, [key, count]) => {
+        const normalizedKey = normalizeIssueTypeKey(key);
+        const numericCount = Math.max(0, parseInt(count, 10) || 0);
+        if (!normalizedKey || numericCount <= 0) return acc;
+        acc[normalizedKey] = (acc[normalizedKey] || 0) + numericCount;
+        return acc;
+      }, {});
+      const issueTypes = Object.keys(issueTypeCounts);
+      const issueTypeLabel = issueTypes.length > 0
+        ? issueTypes
+          .sort((a, b) => formatIssueTypeLabel(a).localeCompare(formatIssueTypeLabel(b), undefined, { sensitivity: 'base' }))
+          .map((type) => `${formatIssueTypeLabel(type)} (${issueTypeCounts[type]})`)
+          .join(', ')
+        : 'N/A';
+
       return {
         key: `${item.item_id}-${row.key}`,
         itemName,
@@ -1542,6 +1589,9 @@ const OrdersInventory = () => {
         qty: totalQty,
         price: itemPrice,
         securityFee: rowSecurityFee > 0 ? rowSecurityFee : securityFee,
+        issueTypes,
+        issueTypeCounts,
+        issueTypeLabel,
         statusSummary,
         statusTags,
         statusTypes
@@ -1554,7 +1604,14 @@ const OrdersInventory = () => {
       || row.statusTypes.some((type) => rentalSummaryStatusFilters.includes(type));
     const matchesSize = rentalSummarySizeFilters.length === 0
       || rentalSummarySizeFilters.includes(row.sizeLabel);
-    return matchesStatus && matchesSize;
+    const rowIssueTypes = Array.isArray(row.issueTypes) ? row.issueTypes : [];
+    const matchesIssueType = rentalSummaryIssueTypeFilters.length === 0
+      || rentalSummaryIssueTypeFilters.some((filterType) => (
+        filterType === 'none'
+          ? rowIssueTypes.length === 0
+          : rowIssueTypes.includes(filterType)
+      ));
+    return matchesStatus && matchesSize && matchesIssueType;
   });
 
   const rentalSummarySizeOptions = Array.from(
@@ -1562,6 +1619,68 @@ const OrdersInventory = () => {
   )
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
     .map((sizeLabel) => ({ value: sizeLabel, label: sizeLabel }));
+
+  const rentalSummaryIssueTypeOptions = (() => {
+    const issueTypes = Array.from(
+      new Set(
+        rentalInventoryTableRows.flatMap((row) => (Array.isArray(row.issueTypes) ? row.issueTypes : []))
+      )
+    )
+      .filter(Boolean)
+      .sort((a, b) => formatIssueTypeLabel(a).localeCompare(formatIssueTypeLabel(b), undefined, { sensitivity: 'base' }));
+
+    const hasNoneRows = rentalInventoryTableRows.some((row) => !Array.isArray(row.issueTypes) || row.issueTypes.length === 0);
+    const options = issueTypes.map((type) => ({ value: type, label: formatIssueTypeLabel(type) }));
+
+    if (hasNoneRows) {
+      options.push({ value: 'none', label: 'N/A' });
+    }
+
+    return options;
+  })();
+
+  const handleExportRentalSummaryToExcel = async () => {
+    try {
+      const currentUser = getUser();
+      const rows = filteredRentalInventoryTableRows.map((row) => ({
+        'Name': row.itemName || '',
+        'Size': row.sizeLabel || '',
+        'Qty': parseInt(row.qty, 10) || 0,
+        'Price': parseFloat(row.price || 0) || 0,
+        'Security Fee': parseFloat(row.securityFee || 0) || 0,
+        'Issue Type': row.issueTypeLabel || 'N/A',
+        'Status': (row.statusTags || []).length > 0
+          ? row.statusTags.map((tag) => tag.text).join(' | ')
+          : (row.statusSummary || '')
+      }));
+
+      if (rows.length === 0) {
+        await alert('No rental summary rows match the current filters.', 'Nothing to Export', 'warning');
+        return;
+      }
+
+      await exportToExcel({
+        data: rows,
+        filename: 'rental_item_size_summary',
+        sheetName: 'Rental Size Summary',
+        headers: ['Name', 'Size', 'Qty', 'Price', 'Security Fee', 'Issue Type', 'Status'],
+        receiptInfo: {
+          clerkName: currentUser ? `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || currentUser.username || 'Unknown Clerk' : 'Unknown Clerk',
+          exportDate: new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          reportType: 'Rental Item Size Summary'
+        }
+      });
+    } catch (error) {
+      console.error('Failed to export rental summary:', error);
+      await alert('Failed to export rental summary to Excel', 'Export Error', 'error');
+    }
+  };
 
   const handleExportReportsToExcel = async () => {
     try {
@@ -2194,104 +2313,133 @@ const OrdersInventory = () => {
             </div>
           </div>
 
-          <div className="rental-filter-container">
-            <select value={rentalFilter} onChange={(e) => setRentalFilter(e.target.value)}>
-              <option value="">All Items</option>
-              <option value="available">In Stock</option>
-              <option value="rented">Unavailable (Rented)</option>
-              <option value="maintenance">Maintenance</option>
-            </select>
+          <div className="reports-tab-switcher" role="tablist" aria-label="Rental inventory views" style={{ marginBottom: '16px' }}>
+            <button
+              type="button"
+              className={`reports-tab-btn ${rentalInventoryTab === 'items' ? 'active' : ''}`}
+              onClick={() => setRentalInventoryTab('items')}
+              role="tab"
+              aria-selected={rentalInventoryTab === 'items'}
+            >
+              Rental Items
+            </button>
+            <button
+              type="button"
+              className={`reports-tab-btn ${rentalInventoryTab === 'summary' ? 'active' : ''}`}
+              onClick={() => setRentalInventoryTab('summary')}
+              role="tab"
+              aria-selected={rentalInventoryTab === 'summary'}
+            >
+              Rental Item Size Summary
+            </button>
           </div>
 
-          <div className="rental-items-grid">
-            {filteredRentalItems.length === 0 ? (
-              <p className="empty-message">
-                {rentalItems.length === 0 
-                  ? 'No rental items found. Add items in Post Rent page.' 
-                  : `No items found with status "${rentalFilter || 'all'}".`}
-              </p>
-            ) : (
-              filteredRentalItems.map(item => {
-                const sizeRows = getSizeAvailabilityRows(item);
-                const outCount = sizeRows.filter((s) => s.isOut).length;
-                const totalCount = sizeRows.length;
-                const isOutOfStock = totalCount > 0 ? outCount >= totalCount : (item.total_available || 0) <= 0;
-                const stockStatus = isOutOfStock ? 'Unavailable' : 'In Stock';
-                return (
-                  <div key={item.item_id} className={`rental-item-card ${isOutOfStock ? 'out-of-stock' : ''}`} onClick={() => openRentalDetailModal(item)}>
-                    <div className="rental-item-image-wrapper">
-                      <img 
-                        src={item.front_image ? getRentalImageUrl(item.front_image) : (item.image_url ? getRentalImageUrl(item.image_url) : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=')} 
-                        alt={item.item_name} 
-                        className="rental-item-image" 
-                      />
-                      {isOutOfStock && (
-                        <div className="out-of-stock-overlay">
-                          <span>UNAVAILABLE</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="rental-item-info">
-                      <h4>{item.item_name}</h4>
-                      <div className="rental-item-price">
-                        ₱{parseFloat(item.price || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                      </div>
-                      <div className="stock-status-row">
-                        <span className={`stock-badge ${isOutOfStock ? 'out' : 'in'}`}>
-                          {stockStatus}
-                        </span>
-                        <span className={`status-badge-rental ${(item.status || 'available').toLowerCase()}`}>
-                          {item.status || 'available'}
-                        </span>
-                      </div>
-                      {sizeRows.length > 0 && (
-                        <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                          {sizeRows.map((row) => (
-                            <button
-                              key={`${item.item_id}-${row.key}-${row.label}`}
-                              type="button"
-                              onClick={(e) => openSizeActivityModal(item, row, e)}
-                              style={{
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                borderRadius: '999px',
-                                padding: '3px 8px',
-                                border: row.isOut ? '1px solid #ef9a9a' : '1px solid #a5d6a7',
-                                background: row.isOut ? '#ffebee' : '#e8f5e9',
-                                color: row.isOut ? '#b71c1c' : '#1b5e20',
-                                cursor: 'pointer'
-                              }}
-                              title={`${row.label}: ${row.quantity} (${row.reason})`}
-                            >
-                              {row.label}: {row.quantity} ({row.reason})
-                            </button>
-                          ))}
-                          <span
-                            style={{
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              color: '#6d4c41',
-                              padding: '3px 0'
-                            }}
-                          >
-                            {outCount}/{totalCount} sizes unavailable
-                          </span>
-                        </div>
-                      )}
-                      <button className="view-details-btn" onClick={(e) => { e.stopPropagation(); openRentalDetailModal(item); }}>
-                        <i className="fas fa-eye"></i> View Details
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+          {rentalInventoryTab === 'items' && (
+            <>
+              <div className="rental-filter-container">
+                <select value={rentalFilter} onChange={(e) => setRentalFilter(e.target.value)}>
+                  <option value="">All Items</option>
+                  <option value="available">In Stock</option>
+                  <option value="rented">Unavailable (Rented)</option>
+                  <option value="maintenance">Maintenance</option>
+                </select>
+              </div>
 
+              <div className="rental-items-grid">
+                {filteredRentalItems.length === 0 ? (
+                  <p className="empty-message">
+                    {rentalItems.length === 0
+                      ? 'No rental items found. Add items in Post Rent page.'
+                      : `No items found with status "${rentalFilter || 'all'}".`}
+                  </p>
+                ) : (
+                  filteredRentalItems.map(item => {
+                    const sizeRows = getSizeAvailabilityRows(item);
+                    const outCount = sizeRows.filter((s) => s.isOut).length;
+                    const totalCount = sizeRows.length;
+                    const isOutOfStock = totalCount > 0 ? outCount >= totalCount : (item.total_available || 0) <= 0;
+                    const stockStatus = isOutOfStock ? 'Unavailable' : 'In Stock';
+                    return (
+                      <div key={item.item_id} className={`rental-item-card ${isOutOfStock ? 'out-of-stock' : ''}`} onClick={() => openRentalDetailModal(item)}>
+                        <div className="rental-item-image-wrapper">
+                          <img
+                            src={item.front_image ? getRentalImageUrl(item.front_image) : (item.image_url ? getRentalImageUrl(item.image_url) : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=')}
+                            alt={item.item_name}
+                            className="rental-item-image"
+                          />
+                          {isOutOfStock && (
+                            <div className="out-of-stock-overlay">
+                              <span>UNAVAILABLE</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="rental-item-info">
+                          <h4>{item.item_name}</h4>
+                          <div className="rental-item-price">
+                            ₱{parseFloat(item.price || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                          <div className="stock-status-row">
+                            <span className={`stock-badge ${isOutOfStock ? 'out' : 'in'}`}>
+                              {stockStatus}
+                            </span>
+                            <span className={`status-badge-rental ${(item.status || 'available').toLowerCase()}`}>
+                              {item.status || 'available'}
+                            </span>
+                          </div>
+                          {sizeRows.length > 0 && (
+                            <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                              {sizeRows.map((row) => (
+                                <button
+                                  key={`${item.item_id}-${row.key}-${row.label}`}
+                                  type="button"
+                                  onClick={(e) => openSizeActivityModal(item, row, e)}
+                                  style={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    borderRadius: '999px',
+                                    padding: '3px 8px',
+                                    border: row.isOut ? '1px solid #ef9a9a' : '1px solid #a5d6a7',
+                                    background: row.isOut ? '#ffebee' : '#e8f5e9',
+                                    color: row.isOut ? '#b71c1c' : '#1b5e20',
+                                    cursor: 'pointer'
+                                  }}
+                                  title={`${row.label}: ${row.quantity} (${row.reason})`}
+                                >
+                                  {row.label}: {row.quantity} ({row.reason})
+                                </button>
+                              ))}
+                              <span
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  color: '#6d4c41',
+                                  padding: '3px 0'
+                                }}
+                              >
+                                {outCount}/{totalCount} sizes unavailable
+                              </span>
+                            </div>
+                          )}
+                          <button className="view-details-btn" onClick={(e) => { e.stopPropagation(); openRentalDetailModal(item); }}>
+                            <i className="fas fa-eye"></i> View Details
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
+
+          {rentalInventoryTab === 'summary' && (
           <div className="rental-summary-table-section">
             <div className="rental-summary-header">
               <h4 className="rental-summary-title">Rental Item Size Summary</h4>
               <div className="rental-summary-filters">
+                <button className="print-report-btn" onClick={handleExportRentalSummaryToExcel}>
+                  <i className="fas fa-file-excel"></i> Export to Excel
+                </button>
                 <MultiSelectDropdown
                   allLabel="All Summary Status"
                   options={RENTAL_SUMMARY_STATUS_OPTIONS}
@@ -2306,6 +2454,13 @@ const OrdersInventory = () => {
                   onChange={setRentalSummarySizeFilters}
                   className="filter-select"
                 />
+                <MultiSelectDropdown
+                  allLabel="All Issue Types"
+                  options={rentalSummaryIssueTypeOptions}
+                  selectedValues={rentalSummaryIssueTypeFilters}
+                  onChange={setRentalSummaryIssueTypeFilters}
+                  className="filter-select"
+                />
               </div>
             </div>
             <div className="rental-summary-table-wrap">
@@ -2317,14 +2472,15 @@ const OrdersInventory = () => {
                     <th>Qty</th>
                     <th>Price</th>
                     <th>Security Fee</th>
+                    <th>Issue Type</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredRentalInventoryTableRows.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="rental-summary-empty">
-                        {(rentalSummaryStatusFilters.length > 0 || rentalSummarySizeFilters.length > 0)
+                      <td colSpan="7" className="rental-summary-empty">
+                        {(rentalSummaryStatusFilters.length > 0 || rentalSummarySizeFilters.length > 0 || rentalSummaryIssueTypeFilters.length > 0)
                           ? 'No rental records match the selected summary filters.'
                           : 'No rental records available.'}
                       </td>
@@ -2337,6 +2493,7 @@ const OrdersInventory = () => {
                         <td>{row.qty}</td>
                         <td>{formatPeso(row.price)}</td>
                         <td>{formatPeso(row.securityFee)}</td>
+                        <td>{row.issueTypeLabel || 'N/A'}</td>
                         <td>
                           <div className="rental-summary-status-list">
                             {(row.statusTags || [{ type: 'available', text: row.statusSummary }]).map((tag, index) => (
@@ -2353,6 +2510,7 @@ const OrdersInventory = () => {
               </table>
             </div>
           </div>
+          )}
         </div>
         )}
       </div>

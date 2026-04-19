@@ -1749,13 +1749,13 @@ const Repair = () => {
 
 
     items.sort((a, b) => {
-      const activityDiff = getItemActivityTimestamp(b) - getItemActivityTimestamp(a);
+      const activityDiff = getItemActivityTimestamp(a) - getItemActivityTimestamp(b);
       if (activityDiff !== 0) return activityDiff;
 
-      const orderDiff = Number(b.order_id || 0) - Number(a.order_id || 0);
+      const orderDiff = Number(a.order_id || 0) - Number(b.order_id || 0);
       if (orderDiff !== 0) return orderDiff;
 
-      return Number(b.item_id || 0) - Number(a.item_id || 0);
+      return Number(a.item_id || 0) - Number(b.item_id || 0);
     });
 
 

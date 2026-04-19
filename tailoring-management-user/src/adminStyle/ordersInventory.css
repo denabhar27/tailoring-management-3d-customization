@@ -903,6 +903,16 @@
   justify-content: flex-end;
 }
 
+.rental-summary-filters .multi-filter-trigger:hover {
+  background: #8B4513;
+  color: #ffffff;
+}
+
+.rental-summary-filters .multi-filter-trigger:hover span,
+.rental-summary-filters .multi-filter-trigger:hover i {
+  color: #ffffff;
+}
+
 .rental-summary-table-wrap {
   overflow-x: auto;
 }

@@ -28,10 +28,8 @@ import {
   addCustomizationToCart,
   convertBase64ToFormData
 } from '../../../utils/customizationService';
-import { appointmentSlotService } from '../../../utils/apiService';
+import { appointmentSlotService, API_BASE_URL, WEB_3D_CUSTOMIZER_URL } from '../../../utils/apiService';
 import { filterUserAllowedSlots } from '../../../utils/appointmentSlotFilters';
-
-const WEB_3D_CUSTOMIZER_URL = process.env.EXPO_PUBLIC_WEB_3D_URL || 'http://192.168.254.102:5174/3d-customizer';
 
 console.log('3D Customizer URL:', WEB_3D_CUSTOMIZER_URL);
 
@@ -237,7 +235,7 @@ export default function Customizer3DScreen() {
   const loadFabricTypes = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.202:5000/api'}/fabric-types`, {
+      const response = await fetch(`${API_BASE_URL}/fabric-types`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json',
@@ -263,7 +261,7 @@ export default function Customizer3DScreen() {
   const loadGarmentTypes = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.202:5000/api'}/garment-types`, {
+      const response = await fetch(`${API_BASE_URL}/garment-types`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json',

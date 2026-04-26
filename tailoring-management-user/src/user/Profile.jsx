@@ -777,8 +777,11 @@ const Profile = () => {
     if (!orderItemId) return;
 
     const pricingFactors = item?.pricing_factors || {};
-    if (pricingFactors.haggleUsed === true) {
-      await alert('You have already used your one-time haggle for this item.', 'Haggle Already Used', 'info');
+    const haggleCount = Number.isFinite(Number(pricingFactors?.haggleCount))
+      ? Number(pricingFactors.haggleCount)
+      : (pricingFactors.haggleUsed === true ? 1 : 0);
+    if (haggleCount >= 2) {
+      await alert('You have already used your 2 haggle attempts for this item.', 'Haggle Limit Reached', 'info');
       return;
     }
 
@@ -808,7 +811,7 @@ const Profile = () => {
         return;
       }
 
-      await alert('Your haggle offer was sent. The button is now disabled for this item.', 'Haggle Submitted', 'success');
+      await alert('Your haggle offer was sent successfully.', 'Haggle Submitted', 'success');
       setHaggleModalOpen(false);
       setItemToHaggle(null);
       setHagglePriceInput('');
@@ -3940,22 +3943,42 @@ const Profile = () => {
                                 </p>
                               );
                             })()}
-                            <p style={{ marginTop: '6px', fontSize: '12px', color: '#7a4b00' }}>You can haggle this price once.</p>
+                            {(() => {
+                              const haggleCount = Number.isFinite(Number(item.pricing_factors?.haggleCount))
+                                ? Number(item.pricing_factors.haggleCount)
+                                : (item.pricing_factors?.haggleUsed === true ? 1 : 0);
+                              const haggleRemaining = Math.max(0, 2 - haggleCount);
+                              return (
+                                <p style={{ marginTop: '6px', fontSize: '12px', color: '#7a4b00' }}>
+                                  You can haggle this price up to 2 times. Remaining: {haggleRemaining}.
+                                </p>
+                              );
+                            })()}
                           </div>
                           <div className="action-buttons">
+                            {(() => {
+                              const haggleCount = Number.isFinite(Number(item.pricing_factors?.haggleCount))
+                                ? Number(item.pricing_factors.haggleCount)
+                                : (item.pricing_factors?.haggleUsed === true ? 1 : 0);
+                              const haggleLimitReached = haggleCount >= 2;
+                              return (
+                                <>
                             <button className="btn-accept-price" onClick={() => handleAcceptPrice(item)}>
                               Accept Price - Continue
                             </button>
                             <button
                               className="btn-haggle-price"
                               onClick={() => handleHagglePrice(item)}
-                              disabled={submittingHaggleByItem[item.order_item_id] || item.pricing_factors?.haggleUsed === true}
+                              disabled={submittingHaggleByItem[item.order_item_id] || haggleLimitReached}
                             >
-                              {item.pricing_factors?.haggleUsed === true ? 'Haggle Used' : 'Haggle Price'}
+                              {haggleLimitReached ? 'Haggle Limit Reached' : 'Haggle Price'}
                             </button>
                             <button className="btn-decline-price" onClick={() => handleDeclinePrice(item)}>
                               Decline Price
                             </button>
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                       ) : null;
@@ -4234,9 +4257,26 @@ const Profile = () => {
                           </p>
                         );
                       })()}
-                      <p style={{ marginTop: '6px', fontSize: '12px', color: '#7a4b00' }}>You can haggle this price once.</p>
+                      {(() => {
+                        const haggleCount = Number.isFinite(Number(selectedItem.pricing_factors?.haggleCount))
+                          ? Number(selectedItem.pricing_factors.haggleCount)
+                          : (selectedItem.pricing_factors?.haggleUsed === true ? 1 : 0);
+                        const haggleRemaining = Math.max(0, 2 - haggleCount);
+                        return (
+                          <p style={{ marginTop: '6px', fontSize: '12px', color: '#7a4b00' }}>
+                            You can haggle this price up to 2 times. Remaining: {haggleRemaining}.
+                          </p>
+                        );
+                      })()}
                     </div>
                     <div className="action-buttons" style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                      {(() => {
+                        const haggleCount = Number.isFinite(Number(selectedItem.pricing_factors?.haggleCount))
+                          ? Number(selectedItem.pricing_factors.haggleCount)
+                          : (selectedItem.pricing_factors?.haggleUsed === true ? 1 : 0);
+                        const haggleLimitReached = haggleCount >= 2;
+                        return (
+                          <>
                       <button className="btn-accept-price" onClick={() => {
                         handleAcceptPrice(selectedItem);
                         closeDetailsModal();
@@ -4249,9 +4289,9 @@ const Profile = () => {
                           handleHagglePrice(selectedItem);
                           closeDetailsModal();
                         }}
-                        disabled={submittingHaggleByItem[selectedItem.order_item_id] || selectedItem.pricing_factors?.haggleUsed === true}
+                        disabled={submittingHaggleByItem[selectedItem.order_item_id] || haggleLimitReached}
                       >
-                        {selectedItem.pricing_factors?.haggleUsed === true ? 'Haggle Used' : 'Haggle Price'}
+                        {haggleLimitReached ? 'Haggle Limit Reached' : 'Haggle Price'}
                       </button>
                       <button className="btn-decline-price" onClick={() => {
                         handleDeclinePrice(selectedItem);
@@ -4259,6 +4299,9 @@ const Profile = () => {
                       }}>
                         Decline Price
                       </button>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
@@ -5149,7 +5192,7 @@ const Profile = () => {
             </div>
             <div className="details-modal-content">
               <p style={{ marginBottom: '14px', color: '#666', fontSize: '14px' }}>
-                Enter your one-time haggle offer for {formatCurrencyPHP(itemToHaggle.final_price)}.
+                Enter your haggle offer for {formatCurrencyPHP(itemToHaggle.final_price)}. You can haggle up to 2 times.
               </p>
               <div style={{ marginBottom: '14px' }}>
                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>

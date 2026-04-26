@@ -822,8 +822,11 @@ export default function ProfileScreen() {
     }
 
     const pricingFactors = getMergedPricingFactors(item);
-    if (pricingFactors?.haggleUsed === true || pricingFactors?.haggleUsed === 'true') {
-      Alert.alert('Haggle Already Used', 'You have already used your one-time haggle for this item.');
+    const haggleCount = Number.isFinite(Number(pricingFactors?.haggleCount))
+      ? Number(pricingFactors?.haggleCount)
+      : (pricingFactors?.haggleUsed === true || pricingFactors?.haggleUsed === 'true' ? 1 : 0);
+    if (haggleCount >= 2) {
+      Alert.alert('Haggle Limit Reached', 'You have already used your 2 haggle attempts for this item.');
       return;
     }
 
@@ -856,7 +859,7 @@ export default function ProfileScreen() {
         return;
       }
 
-      Alert.alert('Haggle Submitted', 'Your haggle offer was sent. The button is now disabled for this item.');
+      Alert.alert('Haggle Submitted', 'Your haggle offer was sent successfully.');
       closeHaggleModal();
       await fetchOrderTracking();
     } catch (error: any) {
@@ -1382,13 +1385,17 @@ export default function ProfileScreen() {
                   const enhancementPendingReview = pricingFactors?.enhancementPendingAdminReview === true || pricingFactors?.enhancementPendingAdminReview === 'true';
                   const enhancementCancelled = pricingFactors?.enhancementCancelledByAdmin === true || pricingFactors?.enhancementCancelledByAdmin === 'true';
                   const addAccessories = pricingFactors?.addAccessories === true || pricingFactors?.addAccessories === 'true';
-                  const haggleUsed = pricingFactors?.haggleUsed === true || pricingFactors?.haggleUsed === 'true';
+                  const haggleCount = Number.isFinite(Number(pricingFactors?.haggleCount))
+                    ? Number(pricingFactors?.haggleCount)
+                    : (pricingFactors?.haggleUsed === true || pricingFactors?.haggleUsed === 'true' ? 1 : 0);
+                  const haggleLimitReached = haggleCount >= 2;
+                  const haggleRemaining = Math.max(0, 2 - haggleCount);
                   const haggleDecision = String(pricingFactors?.haggleDecision || '').toLowerCase();
                   const haggleDeclined = pricingFactors?.haggleDeclined === true || String(pricingFactors?.haggleDecision || '').toLowerCase() === 'declined';
                   const haggleAccepted = haggleDecision === 'accepted';
                   const haggleOffer = parseFloat(pricingFactors?.haggleOffer || 0);
                   const hasHaggleOffer = Number.isFinite(haggleOffer) && haggleOffer > 0;
-                  const showHaggleStatus = haggleUsed || hasHaggleOffer;
+                  const showHaggleStatus = haggleCount > 0 || hasHaggleOffer;
                   const hagglePending = showHaggleStatus && !haggleAccepted && !haggleDeclined;
                   const isEnhancementOrder = enhancementRequested && enhancementAccepted;
                   const isEnhancementPending = enhancementRequested && enhancementPendingReview;
@@ -1764,21 +1771,21 @@ export default function ProfileScreen() {
                                 Your haggle offer{Number.isFinite(haggleOffer) && haggleOffer > 0 ? ` (${formatCurrencyPHP(haggleOffer)})` : ''} was declined by admin.
                               </Text>
                             )}
-                            <Text style={styles.haggleHintText}>You can haggle this price once.</Text>
+                            <Text style={styles.haggleHintText}>You can haggle this price up to 2 times. Remaining: {haggleRemaining}.</Text>
                           </View>
                           <View style={styles.actionButtons}>
                             <TouchableOpacity style={styles.btnAcceptPrice} onPress={() => handleAcceptPrice(item)}>
                               <Text style={styles.btnAcceptPriceText}>Accept Price - Continue</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                              style={[styles.btnHagglePrice, (submittingHaggleByItem[itemOrderItemId] || haggleUsed) && styles.btnHagglePriceDisabled]}
+                              style={[styles.btnHagglePrice, (submittingHaggleByItem[itemOrderItemId] || haggleLimitReached) && styles.btnHagglePriceDisabled]}
                               onPress={() => handleHagglePrice(item)}
-                              disabled={!!submittingHaggleByItem[itemOrderItemId] || haggleUsed}
+                              disabled={!!submittingHaggleByItem[itemOrderItemId] || haggleLimitReached}
                             >
                               <Text style={styles.btnHagglePriceText}>
                                 {submittingHaggleByItem[itemOrderItemId]
                                   ? 'Submitting...'
-                                  : (haggleUsed ? 'Haggle Used' : 'Haggle Price')}
+                                  : (haggleLimitReached ? 'Haggle Limit Reached' : 'Haggle Price')}
                               </Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.btnDeclinePrice} onPress={() => handleDeclinePrice(item)}>
@@ -2242,7 +2249,7 @@ export default function ProfileScreen() {
 
             <View style={styles.haggleModalBody}>
               <Text style={styles.haggleModalHelpText}>
-                Enter your one-time haggle offer for {formatCurrencyPHP(selectedHaggleItem?.final_price || 0)}.
+                Enter your haggle offer for {formatCurrencyPHP(selectedHaggleItem?.final_price || 0)}. You can haggle up to 2 times.
               </Text>
 
               <Text style={styles.haggleInputLabel}>Your Haggle Price</Text>

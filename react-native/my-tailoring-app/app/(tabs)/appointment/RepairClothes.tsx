@@ -180,8 +180,7 @@ export default function RepairClothes() {
       const token = await AsyncStorage.getItem('userToken');
       console.log('[RepairClothes] Token:', token ? 'Retrieved' : 'Missing');
 
-      const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.180:5000/api';
-      const url = `${baseUrl}/repair-garment-types`;
+      const url = `${API_BASE_URL}/repair-garment-types`;
       console.log('[RepairClothes] Fetching:', url);
 
       const response = await fetch(url, {

@@ -18,6 +18,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { addCustomizationToCart, uploadCustomizationImage } from '../../../../utils/customizationService';
+import { API_BASE_URL } from '../../../../utils/apiService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
@@ -73,9 +74,8 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
     setLoadingTypes(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.202:5000/api';
 
-      const garmentResponse = await fetch(`${baseUrl}/garment-types`, {
+      const garmentResponse = await fetch(`${API_BASE_URL}/garment-types`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json',
@@ -95,7 +95,7 @@ export default function CustomizationModal({ visible, onClose }: CustomizationMo
         }
       }
 
-      const fabricResponse = await fetch(`${baseUrl}/fabric-types`, {
+      const fabricResponse = await fetch(`${API_BASE_URL}/fabric-types`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json',

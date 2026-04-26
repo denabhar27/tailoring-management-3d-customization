@@ -31,14 +31,25 @@ const resolveDefaultApiBaseUrl = (): string => {
 
   // Android emulator cannot reach localhost directly; use host loopback alias.
   if (Platform.OS === 'android') {
-    return 'http://192.168.1.66:5000/api';
+    return 'http://10.0.2.2:5000/api';
   }
 
   return 'http://localhost:5000/api';
 };
 
+const resolveDefaultWeb3dUrl = (): string => {
+  const host = resolveExpoHost();
+  if (host && host !== 'localhost' && host !== '127.0.0.1') {
+    return `http://${host}:5174/3d-customizer`;
+  }
+
+  return 'http://localhost:5174/3d-customizer';
+};
+
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || resolveDefaultApiBaseUrl();
+export const WEB_3D_CUSTOMIZER_URL = process.env.EXPO_PUBLIC_WEB_3D_URL || resolveDefaultWeb3dUrl();
 console.log('Using API_BASE_URL:', API_BASE_URL);
+console.log('Using WEB_3D_CUSTOMIZER_URL:', WEB_3D_CUSTOMIZER_URL);
 const REQUEST_TIMEOUT = parseInt(process.env.EXPO_PUBLIC_REQUEST_TIMEOUT || '10000', 10);
 
 const PUBLIC_AUTH_ENDPOINTS = [

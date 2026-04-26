@@ -101,6 +101,7 @@ const acceptPrice = async (req, res) => {
 
 const hagglePrice = async (req, res) => {
   try {
+    const maxHaggleAttempts = 2;
     const { itemId } = req.params;
     const userId = req.user.id;
     const offeredPriceRaw = req.body?.offeredPrice;
@@ -148,12 +149,19 @@ const hagglePrice = async (req, res) => {
           pricingFactors = {};
         }
 
-        if (pricingFactors.haggleUsed === true) {
+        const existingHaggleCountRaw = pricingFactors?.haggleCount;
+        const existingHaggleCount = Number.isFinite(Number(existingHaggleCountRaw))
+          ? Number(existingHaggleCountRaw)
+          : (pricingFactors.haggleUsed === true ? 1 : 0);
+
+        if (existingHaggleCount >= maxHaggleAttempts) {
           return res.status(400).json({
             success: false,
-            message: 'You have already used your one-time haggle.'
+            message: 'You have already used your 2 haggle attempts for this item.'
           });
         }
+
+        const nextHaggleCount = existingHaggleCount + 1;
 
         const serviceType = String(item.service_type || '').toLowerCase().trim();
         const updateData = {
@@ -161,6 +169,7 @@ const hagglePrice = async (req, res) => {
             ...pricingFactors,
             haggleOffer: offeredPrice,
             haggleUsed: true,
+            haggleCount: nextHaggleCount,
             haggleOfferedAt: new Date().toISOString(),
             haggleOfferedBy: userId
           }

@@ -21,7 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePickerModal from '../../../components/DateTimePickerModal';
 import { addCustomizationToCart, uploadCustomizationImage } from '../../../utils/customizationService';
-import { appointmentSlotService } from '../../../utils/apiService';
+import { appointmentSlotService, API_BASE_URL } from '../../../utils/apiService';
 import { filterUserAllowedSlots } from '../../../utils/appointmentSlotFilters';
 
 const { width, height } = Dimensions.get('window');
@@ -99,7 +99,7 @@ export default function CustomizationService() {
     setLoadingGarments(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.202:5000/api'}/garment-types`, {
+      const response = await fetch(`${API_BASE_URL}/garment-types`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json',
@@ -139,7 +139,7 @@ export default function CustomizationService() {
   const loadFabricTypes = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.202:5000/api'}/fabric-types`, {
+      const response = await fetch(`${API_BASE_URL}/fabric-types`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json',
